@@ -5,10 +5,170 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Crunchy - Restaurant Platform</title>
     <meta name="description" content="Multi-tenant restaurant and operations platform featuring Customer Ordering, Staff Operations, Kitchen Display System (KDS), Platform Control Plane, and Device Setup." />
+    
+    <!-- Canonical & Robots Indexing -->
+    <link rel="canonical" href="https://crunchy.com.np/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    
+    <!-- Branding & SEO Metadata -->
+    <meta name="author" content="Crunchy Restaurant" />
+    <meta name="publisher" content="Crunchy Restaurant" />
+    <meta name="keywords" content="Crunchy Kathmandu, fried chicken Kathmandu, smash burgers Kathmandu, food delivery Durbar Marg, eSewa food order, best fried chicken Nepal, restaurant Kathmandu" />
+    <meta name="theme-color" content="#F59E0B" />
+    <meta name="application-name" content="Crunchy" />
+    
+    <!-- Local SEO Geo-tagging for Google Local Search -->
+    <meta name="geo.region" content="NP-BA" />
+    <meta name="geo.placename" content="Kathmandu, Durbar Marg" />
+    <meta name="geo.position" content="27.7125;85.3175" />
+    <meta name="ICBM" content="27.7125, 85.3175" />
+
+    <!-- Open Graph Social Share Cards -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Crunchy - Restaurant Platform" />
     <meta property="og:title" content="Crunchy - Restaurant Platform" />
     <meta property="og:description" content="Multi-tenant restaurant and operations platform featuring Customer Ordering, Staff Operations, Kitchen Display System (KDS), Platform Control Plane, and Device Setup." />
-    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://crunchy.com.np/" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=1200&h=630&q=80" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Crunchy Crispy Fried Chicken and Burgers in Kathmandu" />
+
+    <!-- Twitter / X Cards -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Crunchy - Restaurant Platform" />
+    <meta name="twitter:description" content="Multi-tenant restaurant and operations platform featuring Customer Ordering, Staff Operations, Kitchen Display System (KDS), Platform Control Plane, and Device Setup." />
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=1200&h=630&q=80" />
+    
+    <!-- Favicon & Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Google Structured Data: Restaurant Schema (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FastFoodRestaurant",
+      "@id": "https://crunchy.com.np/#restaurant",
+      "name": "Crunchy Restaurant",
+      "image": [
+        "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "telephone": "+977 1-4229988",
+      "email": "hello@crunchy.com.np",
+      "url": "https://crunchy.com.np/",
+      "priceRange": "NPR 150 - NPR 1500",
+      "servesCuisine": [
+        "Fried Chicken",
+        "Burgers",
+        "Fast Food",
+        "Momos",
+        "Beverages"
+      ],
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Kings Way, Opposite Narayanhiti Palace",
+        "addressLocality": "Durbar Marg, Kathmandu",
+        "addressRegion": "Bagmati Province",
+        "postalCode": "44600",
+        "addressCountry": "NP"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 27.7125,
+        "longitude": 85.3175
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday"
+          ],
+          "opens": "10:00",
+          "closes": "23:30"
+        }
+      ],
+      "hasMenu": "https://crunchy.com.np/#menu",
+      "acceptsReservations": "True",
+      "paymentAccepted": "eSewa, Cash",
+      "currenciesAccepted": "NPR"
+    }
+    </script>
+
+    <!-- Google Structured Data: WebSite & SearchAction Schema (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://crunchy.com.np/#website",
+      "url": "https://crunchy.com.np/",
+      "name": "Crunchy",
+      "description": "Artisanal fried chicken, smash burgers, and food delivery in Kathmandu with instant eSewa payment.",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Crunchy Restaurant",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://crunchy.com.np/favicon.svg"
+        }
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://crunchy.com.np/?search={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Google Structured Data: FAQPage Schema for Rich Search Results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I order food online from Crunchy in Kathmandu?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Select your favorite dishes from our online menu, choose delivery or takeaway, and complete instant payment using your eSewa digital wallet. Your order is sent directly to our kitchen display system for immediate cooking."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What payment methods are supported on Crunchy?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Crunchy supports 100% secure digital payments via eSewa with real-time transaction verification."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Where is Crunchy located in Kathmandu?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Our flagship restaurant is located on Kings Way, opposite Narayanhiti Palace in Durbar Marg, Kathmandu. We offer dine-in, table reservations, counter takeaway, and delivery across Kathmandu Valley."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How long does delivery take?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Average delivery time is 30 to 45 minutes across Kathmandu, Patan, and Lalitpur, with live GPS countdown tracking."
+          }
+        }
+      ]
+    }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">

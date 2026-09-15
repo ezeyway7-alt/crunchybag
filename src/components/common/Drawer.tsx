@@ -12,6 +12,7 @@ export interface DrawerProps {
   position?: "right" | "bottom";
   className?: string;
   bodyClassName?: string;
+  headerClassName?: string;
 }
 
 export const Drawer: React.FC<DrawerProps> = ({
@@ -23,6 +24,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   position = "right",
   className,
   bodyClassName,
+  headerClassName,
 }) => {
   // Close on ESC
   useEffect(() => {
@@ -83,7 +85,12 @@ export const Drawer: React.FC<DrawerProps> = ({
               )}
             >
               {/* Header */}
-              <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
+              <div
+                className={cn(
+                  "px-4 sm:px-6 py-3.5 sm:py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0",
+                  headerClassName
+                )}
+              >
                 <div className="min-w-0 pr-2">
                   {title && (
                     <div className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white truncate">
@@ -98,10 +105,10 @@ export const Drawer: React.FC<DrawerProps> = ({
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-2 -mr-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer shrink-0"
+                  className="p-1.5 -mr-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-none transition-colors cursor-pointer shrink-0"
                   aria-label="Close drawer"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4 sm:h-5 sm:w-5 stroke-[2.2]" />
                 </button>
               </div>
 

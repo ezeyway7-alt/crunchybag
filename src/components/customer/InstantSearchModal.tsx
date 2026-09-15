@@ -120,7 +120,7 @@ export const InstantSearchModal: React.FC<InstantSearchModalProps> = ({
                   className="w-12 h-12 object-cover shrink-0 border border-zinc-200 dark:border-zinc-700"
                 />
                 <div className="min-w-0">
-                  <p className="font-bold text-sm text-zinc-900 dark:text-white group-hover:text-amber-500 transition-colors truncate">
+                  <p className="font-bold text-xs sm:text-[13px] text-zinc-900 dark:text-white group-hover:text-amber-500 transition-colors truncate">
                     {product.name}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-1">

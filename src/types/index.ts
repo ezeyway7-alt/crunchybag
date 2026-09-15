@@ -142,7 +142,7 @@ export interface OrderItemSnapshot {
 }
 
 export type FulfillmentType = "DELIVERY" | "TAKEAWAY" | "DRIVE_THRU" | "DINE_IN";
-export type PaymentMethod = "CASH_ON_DELIVERY" | "CASH_ON_PICKUP" | "FONEPAY_QR" | "WALLET" | "CARD";
+export type PaymentMethod = "ESEWA" | "CASH_ON_DELIVERY" | "CASH_ON_PICKUP" | "FONEPAY_QR" | "WALLET" | "CARD";
 
 export interface Order {
   id: string;

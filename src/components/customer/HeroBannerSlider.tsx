@@ -1,79 +1,85 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Sparkles, SlidersHorizontal, Eye } from "lucide-react";
+import { ComboPackageModal, ComboPackageDefinition } from "./ComboPackageModal";
+import { formatNPR } from "../../lib/utils";
 
-export interface BannerSlide {
-  id: string;
-  badge: string;
-  badgeType?: "hot" | "chef" | "deal" | "shake";
-  title: string;
-  subtitle: string;
-  promoText?: string;
-  buttonLabel: string;
-  targetCategory: string;
-  bgGradient: string;
-  image: string;
-}
+export interface BannerSlide extends ComboPackageDefinition {}
 
-const BANNER_SLIDES: BannerSlide[] = [
+export const BANNER_SLIDES: BannerSlide[] = [
   {
     id: "slide-1",
     badge: "Fresh Kathmandu Batch",
     badgeType: "chef",
     title: "CRUNCH ON DEMAND",
-    subtitle: "24-hr brined whole muscle chicken fried fresh in small batches with garlic aioli.",
-    promoText: "USE CODE CRUNCH15 (15% OFF)",
-    buttonLabel: "Order Chicken",
-    targetCategory: "cat-chicken",
+    subtitle: "24-hr brined whole muscle chicken tenders, crispy beast burger, loaded animal fries & signature shake.",
+    promoText: "SAVE NPR 280 (SPECIAL COMBO)",
+    buttonLabel: "Customize",
+    targetCategory: "cat-combos",
     bgGradient: "from-amber-600 via-amber-500 to-yellow-500",
     image: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=800&auto=format&fit=crop&q=80",
+    basePrice: 1280,
+    originalPrice: 1560,
+    includedProductIds: ["prod-01", "prod-04", "prod-05", "prod-06"],
   },
   {
     id: "slide-2",
     badge: "Chef's Signature Smash",
     badgeType: "hot",
     title: "DOUBLE TRUFFLE SMASH",
-    subtitle: "Angus beef chucks smashed crisp with balsamic shallots & black truffle raclette.",
-    promoText: "TOP RATED BURGER",
-    buttonLabel: "Explore Burgers",
-    targetCategory: "cat-burgers",
+    subtitle: "Angus beef chucks smashed crisp with balsamic shallots & black truffle raclette, fries, tenders & shake.",
+    promoText: "TOP RATED COMBO",
+    buttonLabel: "Customize",
+    targetCategory: "cat-combos",
     bgGradient: "from-zinc-900 via-zinc-800 to-amber-950",
     image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80",
+    basePrice: 1420,
+    originalPrice: 1740,
+    includedProductIds: ["prod-02", "prod-05", "prod-06", "prod-04"],
   },
   {
     id: "slide-3",
     badge: "Limited Value Deal",
     badgeType: "deal",
     title: "FEAST SAVER COMBO",
-    subtitle: "4 crispy tenders, 1 smash burger, seasoned waffle fries, 2 dips & 2 drinks.",
+    subtitle: "4 crispy tenders, 2 smash burgers, seasoned waffle fries, 2 dips & Lotus Biscoff craft shake.",
     promoText: "SAVE NPR 340 TODAY",
-    buttonLabel: "Grab Combo",
+    buttonLabel: "Customize",
     targetCategory: "cat-combos",
     bgGradient: "from-rose-700 via-rose-600 to-amber-600",
     image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80",
+    basePrice: 1850,
+    originalPrice: 2190,
+    includedProductIds: ["prod-01", "prod-02", "prod-04", "prod-05", "prod-06"],
   },
   {
     id: "slide-4",
     badge: "Nashville Spicy Drop",
     badgeType: "hot",
     title: "GHOST CHILI GLAZE",
-    subtitle: "Fiery dry rub dunked in smoked chili oil with thick crinkle-cut pickles on brioche.",
+    subtitle: "Fiery dry rub tenders dunked in smoked chili oil, spicy paneer tikka crunch, animal fries & sweet shake.",
     promoText: "WARNING: VERY SPICY",
-    buttonLabel: "Try Spicy",
-    targetCategory: "cat-chicken",
+    buttonLabel: "Customize",
+    targetCategory: "cat-combos",
     bgGradient: "from-red-900 via-red-800 to-orange-700",
     image: "https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=800&auto=format&fit=crop&q=80",
+    basePrice: 1290,
+    originalPrice: 1580,
+    includedProductIds: ["prod-04", "prod-03", "prod-05", "prod-06"],
   },
   {
     id: "slide-5",
     badge: "Hand-Spun Shakes",
     badgeType: "shake",
     title: "LOTUS SPECULOOS SHAKE",
-    subtitle: "Slow-churned soft serve blended with genuine Biscoff cookie spread & sea salt whip.",
-    promoText: "CHURNED FRESH DAILY",
-    buttonLabel: "View Shakes",
-    targetCategory: "cat-drinks",
+    subtitle: "Slow-churned soft serve blended with genuine Biscoff cookie spread paired with burger & truffle fries.",
+    promoText: "SWEET & SAVORY PACK",
+    buttonLabel: "Customize",
+    targetCategory: "cat-combos",
     bgGradient: "from-amber-900 via-stone-800 to-yellow-900",
     image: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=800&auto=format&fit=crop&q=80",
+    basePrice: 1040,
+    originalPrice: 1280,
+    includedProductIds: ["prod-06", "prod-01", "prod-05"],
   },
 ];
 
@@ -85,6 +91,8 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [selectedCombo, setSelectedCombo] = useState<ComboPackageDefinition | null>(null);
+  const [isComboModalOpen, setIsComboModalOpen] = useState(false);
 
   // Check scroll position to update active dot
   const updateScrollState = useCallback(() => {
@@ -105,9 +113,9 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
     return () => el.removeEventListener("scroll", updateScrollState);
   }, [updateScrollState]);
 
-  // Autoplay slider every 5 seconds when not hovered
+  // Autoplay slider every 6 seconds when not hovered
   useEffect(() => {
-    if (isHovered) return;
+    if (isHovered || isComboModalOpen) return;
     const timer = setInterval(() => {
       const el = scrollContainerRef.current;
       if (!el) return;
@@ -118,10 +126,10 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
       } else {
         el.scrollBy({ left: slideWidth + 16, behavior: "smooth" });
       }
-    }, 5500);
+    }, 6000);
 
     return () => clearInterval(timer);
-  }, [isHovered]);
+  }, [isHovered, isComboModalOpen]);
 
   const scrollToSlide = (index: number) => {
     const el = scrollContainerRef.current;
@@ -136,95 +144,120 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
   };
 
   const handleSlideClick = (slide: BannerSlide) => {
-    if (onSelectCategory) {
-      onSelectCategory(slide.targetCategory);
-    }
-    const targetElement = document.getElementById("categories-rail");
-    if (targetElement) {
-      targetElement.scrollIntoView({ behavior: "smooth" });
-    }
+    // Open the special combo package configurator modal directly
+    setSelectedCombo(slide);
+    setIsComboModalOpen(true);
   };
 
   return (
-    <div
-      className="relative w-full group/slider pt-0"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Slider Viewport Track
-          - Desktop (lg & xl): Exactly 2 full cards and 1 half card visible (flex-[0_0_calc(40%-10px)]):
-            (100% / 40% = 2.5 cards visible at once)
-          - Medium desktop/tablet (md): ~2 cards visible (flex-[0_0_calc(48%-8px)])
-          - Mobile (< md): 1 full card + peeking second card (flex-[0_0_calc(86%-8px)])
-      */}
+    <>
       <div
-        ref={scrollContainerRef}
-        className="flex items-stretch gap-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pt-0 pb-1"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="relative w-full group/slider mt-2 sm:mt-2.5 pt-0"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
-        {BANNER_SLIDES.map((slide, index) => {
-          return (
-            <div
-              key={slide.id}
-              data-slide
-              onClick={() => handleSlideClick(slide)}
-              className="relative shrink-0 snap-start select-none cursor-pointer overflow-hidden border border-zinc-300 dark:border-zinc-800 shadow-sm transition-all duration-200 hover:border-amber-500
-                w-[86%] sm:w-[65%] md:w-[calc(40%-13px)] min-h-[190px] sm:min-h-[205px] md:min-h-[215px]"
-            >
-              {/* Background Image with Dark Vignette Gradient */}
-              <div className="absolute inset-0 z-0">
-                <img
-                  src={slide.image}
-                  alt={slide.title}
-                  className="w-full h-full object-cover group-hover/slider:scale-105 transition-transform duration-700 brightness-[0.7] contrast-[1.1]"
-                  loading="lazy"
-                />
-                <div
-                  className={`absolute inset-0 bg-gradient-to-r ${slide.bgGradient} opacity-75 mix-blend-multiply`}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
-              </div>
-
-              {/* Card Content Overlay */}
-              <div className="relative z-10 p-5 flex flex-col justify-between h-full text-white">
-                {/* Main Big Headline Title Only */}
-                <div className="my-auto py-2">
-                  <h3 className="text-xl sm:text-2xl md:text-2xl lg:text-3xl font-black tracking-tight leading-tight uppercase drop-shadow-md text-white line-clamp-2">
-                    {slide.title}
-                  </h3>
+        {/* Slider Viewport Track */}
+        <div
+          ref={scrollContainerRef}
+          className="flex items-stretch gap-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pt-0 pb-1"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {BANNER_SLIDES.map((slide, index) => {
+            return (
+              <div
+                key={slide.id}
+                data-slide
+                onClick={() => handleSlideClick(slide)}
+                className="relative shrink-0 snap-start select-none cursor-pointer overflow-hidden border border-zinc-300 dark:border-zinc-800 shadow-sm transition-all duration-200 hover:border-amber-500
+                  w-[86%] sm:w-[65%] md:w-[calc(40%-13px)] min-h-[190px] sm:min-h-[205px] md:min-h-[215px]"
+              >
+                {/* Background Image with Lower Gradient for Maximum Food Visibility */}
+                <div className="absolute inset-0 z-0">
+                  <img
+                    src={slide.image}
+                    alt={slide.title}
+                    className="w-full h-full object-cover group-hover/slider:scale-105 transition-transform duration-700 brightness-[0.88] contrast-[1.05]"
+                    loading="lazy"
+                  />
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-r ${slide.bgGradient} opacity-20 mix-blend-multiply`}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
                 </div>
 
-                {/* Bottom Action Button */}
-                <div className="pt-2 flex items-center justify-between">
-                  <div className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider transition-colors shadow-sm">
-                    <span>{slide.buttonLabel}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                {/* Card Content Overlay */}
+                <div className="relative z-10 p-3.5 sm:p-4 flex flex-col justify-between h-full text-white">
+                  {/* Top Right: Detail / Eye Icon to inspect package items & quantities */}
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSlideClick(slide);
+                      }}
+                      className="p-1.5 bg-black/60 hover:bg-amber-500 hover:text-black text-white backdrop-blur-xs transition-colors cursor-pointer border border-white/20 shadow-xs"
+                      title="Inspect items & quantities"
+                      aria-label="Inspect combo items"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <span className="text-[11px] font-mono text-zinc-300 font-bold">
-                    0{index + 1} / 0{BANNER_SLIDES.length}
-                  </span>
+
+                  {/* Main Clean Package Name (No extra clutter) */}
+                  <div className="my-auto py-1">
+                    <h3 className="text-xl sm:text-2xl md:text-2xl font-black tracking-tight leading-tight uppercase drop-shadow-md text-white line-clamp-1">
+                      {slide.title}
+                    </h3>
+                  </div>
+
+                  {/* Bottom Action Button & Price */}
+                  <div className="pt-2 flex items-center justify-between gap-2 border-t border-white/20">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wider transition-colors shadow-sm">
+                      <SlidersHorizontal className="w-3 h-3 text-amber-600" />
+                      <span>{slide.buttonLabel}</span>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] text-zinc-200 line-through mr-1 font-mono">
+                        {formatNPR(slide.originalPrice)}
+                      </span>
+                      <span className="text-xs sm:text-sm font-black text-amber-400 font-mono drop-shadow-xs">
+                        {formatNPR(slide.basePrice)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+
+        {/* Dot Indicators */}
+        <div className="flex items-center justify-center gap-1.5 pt-3">
+          {BANNER_SLIDES.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => scrollToSlide(idx)}
+              className={`h-1.5 transition-all cursor-pointer ${
+                activeIndex === idx
+                  ? "w-6 bg-amber-500"
+                  : "w-2 bg-zinc-300 dark:bg-zinc-700 hover:bg-zinc-400"
+              }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Dot Indicators */}
-      <div className="flex items-center justify-center gap-1.5 pt-3">
-        {BANNER_SLIDES.map((_, idx) => (
-          <button
-            key={idx}
-            onClick={() => scrollToSlide(idx)}
-            className={`h-1.5 transition-all cursor-pointer ${
-              activeIndex === idx
-                ? "w-6 bg-amber-500"
-                : "w-2 bg-zinc-300 dark:bg-zinc-700 hover:bg-zinc-400"
-            }`}
-            aria-label={`Go to slide ${idx + 1}`}
-          />
-        ))}
-      </div>
-    </div>
+      {/* Combo Package Configurator Modal */}
+      <ComboPackageModal
+        combo={selectedCombo}
+        isOpen={isComboModalOpen}
+        onClose={() => {
+          setIsComboModalOpen(false);
+          setSelectedCombo(null);
+        }}
+      />
+    </>
   );
 };

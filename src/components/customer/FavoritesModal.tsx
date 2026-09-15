@@ -50,7 +50,7 @@ export const FavoritesModal: React.FC = () => {
                     className="w-14 h-14 object-cover shrink-0 border border-zinc-200 dark:border-zinc-800"
                   />
                   <div className="min-w-0">
-                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white truncate">
+                    <h4 className="font-bold text-xs sm:text-[13px] text-zinc-900 dark:text-white truncate">
                       {product.name}
                     </h4>
                     <p className="font-mono font-bold text-xs text-amber-600 dark:text-amber-400">

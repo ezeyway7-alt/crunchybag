@@ -307,7 +307,9 @@ export const StaffOrderQueue: React.FC = () => {
                   <p className="text-zinc-500 font-mono">{selectedOrderForDrawer.customerPhone}</p>
                 </div>
                 <Badge variant="brand" size="sm">
-                  {selectedOrderForDrawer.paymentMethod.replace(/_/g, " ")}
+                  {selectedOrderForDrawer.paymentMethod === "ESEWA"
+                    ? "eSewa"
+                    : selectedOrderForDrawer.paymentMethod.replace(/_/g, " ")}
                 </Badge>
               </div>
               {selectedOrderForDrawer.notes && (

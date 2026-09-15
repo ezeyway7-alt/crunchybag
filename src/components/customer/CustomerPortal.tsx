@@ -21,6 +21,7 @@ import { LiveOrderTracker } from "./LiveOrderTracker";
 import { FavoritesModal } from "./FavoritesModal";
 import { HeroBannerSlider } from "./HeroBannerSlider";
 import { Button } from "../common/Button";
+import { CustomerFooter } from "./CustomerFooter";
 
 export const CustomerPortal: React.FC = () => {
   const {
@@ -101,7 +102,12 @@ export const CustomerPortal: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-[#0A0A0B] text-zinc-900 dark:text-zinc-100 transition-colors">
       {customerActiveTab === "menu" ? (
-        <main id="menu" className="max-w-7xl mx-auto px-4 sm:px-6 pt-0 pb-8 space-y-6">
+        <main id="menu" className="max-w-7xl mx-auto px-4 sm:px-6 pt-0 pb-8 space-y-8">
+          {/* Semantic SEO Primary Headline for Search Engines & Screen Readers */}
+          <h1 className="sr-only">
+            Crunchy – Crispy Fried Chicken, Gourmet Smash Burgers & Food Delivery in Kathmandu with eSewa
+          </h1>
+
           {/* Hero Promotional Banner Slider (2.5 cards visible in desktop view) */}
           <HeroBannerSlider onSelectCategory={(catId) => setSelectedCategory(catId)} />
 
@@ -215,6 +221,9 @@ export const CustomerPortal: React.FC = () => {
           onExploreMenu={() => setCustomerActiveTab("menu")}
         />
       )}
+
+      {/* Seamless Customer Footer with Location Map & Easy Navigation */}
+      <CustomerFooter />
 
       {/* Product Detail & Quote Configurator Modal */}
       <ProductConfiguratorModal

@@ -14,6 +14,7 @@ export interface ModalProps {
   showCloseButton?: boolean;
   position?: "center" | "top";
   contentClassName?: string;
+  headerClassName?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -27,6 +28,7 @@ export const Modal: React.FC<ModalProps> = ({
   showCloseButton = true,
   position = "center",
   contentClassName,
+  headerClassName,
 }) => {
   // Close on ESC
   useEffect(() => {
@@ -93,7 +95,12 @@ export const Modal: React.FC<ModalProps> = ({
             )}
           >
             {(title || showCloseButton) && (
-              <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-2">
+              <div
+                className={cn(
+                  "flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-2",
+                  headerClassName
+                )}
+              >
                 <div className="min-w-0 pr-2">
                   {title && (
                     <div className="text-sm sm:text-base font-bold tracking-tight text-zinc-900 dark:text-white truncate">
@@ -109,10 +116,10 @@ export const Modal: React.FC<ModalProps> = ({
                 {showCloseButton && (
                   <button
                     onClick={onClose}
-                    className="p-1.5 sm:p-2 -mr-1 sm:-mr-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-none transition-colors cursor-pointer shrink-0 border border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
+                    className="p-1 sm:p-1.5 -mr-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-none transition-colors cursor-pointer shrink-0 border border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
                     aria-label="Close dialog"
                   >
-                    <X className="h-4 sm:h-5 w-4 sm:w-5" />
+                    <X className="h-4 w-4" />
                   </button>
                 )}
               </div>

@@ -21,11 +21,7 @@ export const DeliveryRider3DAnimation: React.FC<DeliveryRider3DAnimationProps> =
       <div className="flex items-center gap-2 mb-6">
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-black uppercase tracking-wider bg-amber-500 text-black border border-black shadow-xs">
           <Navigation className="h-3 w-3" />
-          <span>Real-Time Fleet Radar</span>
-        </span>
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-          <Compass className="h-3 w-3 text-amber-500" />
-          <span>Kathmandu Valley Hubs</span>
+          <span>Live Order Tracking</span>
         </span>
       </div>
 
@@ -167,6 +163,9 @@ export const DeliveryRider3DAnimation: React.FC<DeliveryRider3DAnimationProps> =
                 >
                   CRUNCHY
                 </text>
+                {/* Eco Leaf Badge on Bag Corner */}
+                <circle cx="48" cy="40" r="3" fill="#10B981" stroke="#000000" strokeWidth="0.75" />
+                <path d="M47 41 Q48 38 50 39" stroke="#FFFFFF" strokeWidth="0.75" strokeLinecap="round" />
                 {/* Straps */}
                 <line x1="24" y1="52" x2="52" y2="52" stroke="#000000" strokeWidth="1.5" />
                 {/* Hot food steam rising */}
@@ -238,11 +237,11 @@ export const DeliveryRider3DAnimation: React.FC<DeliveryRider3DAnimationProps> =
       {/* Narrative & Call-to-action */}
       <div className="max-w-md space-y-2.5 mt-2 z-10">
         <h3 className="text-lg sm:text-xl font-black text-zinc-950 dark:text-white tracking-tight">
-          {hasOrders ? "Select an Order to Track" : "No Active Orders Found"}
+          {hasOrders ? "Select an Order to Track" : "No Active Orders"}
         </h3>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
           {hasOrders
-            ? "Choose an order from the list on the left to monitor live kitchen frying, rider dispatch coordinates, and your immutable receipt."
+            ? "Choose an order from the list on the left to track live kitchen preparation, delivery countdown, and receipt."
             : "Craving hot, crispy fried chicken, burgers, or momos? Place your first delivery or takeaway order now."}
         </p>
 
@@ -252,24 +251,12 @@ export const DeliveryRider3DAnimation: React.FC<DeliveryRider3DAnimationProps> =
             variant="primary"
             size="md"
             onClick={onExploreMenu}
-            className="text-xs font-black rounded-none bg-amber-500 hover:bg-amber-400 text-black border border-black shadow-md"
+            className="text-xs font-black rounded-none bg-amber-500 hover:bg-amber-400 text-black border border-black shadow-md cursor-pointer"
             leftIcon={<Sparkles className="h-3.5 w-3.5" />}
           >
             Explore Crunchy Menu
           </Button>
         </div>
-      </div>
-
-      {/* Fleet compliance footer */}
-      <div className="mt-8 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-4 text-[10px] text-zinc-400 uppercase font-mono">
-        <span className="flex items-center gap-1">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-          Pathao & Yango GPS Ready
-        </span>
-        <span>•</span>
-        <span>Zero Contact Delivery</span>
-        <span>•</span>
-        <span>Hot Bag Guarantee</span>
       </div>
     </div>
   );

@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 100" fill="none">
+  <defs>
+    <!-- Vibrant golden-orange gradient for "bag" -->
+    <linearGradient id="bagGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#FBBF24"/>
+      <stop offset="40%" stopColor="#F59E0B"/>
+      <stop offset="100%" stopColor="#EA580C"/>
+    </linearGradient>
+
+    <!-- 3D Extrusion shadow gradient for "bag" -->
+    <linearGradient id="bagShadowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#D97706"/>
+      <stop offset="100%" stopColor="#9A3412"/>
+    </linearGradient>
+
+    <!-- Eco Green Leaf Gradient -->
+    <linearGradient id="leafGrad" x1="20%" y1="90%" x2="90%" y2="10%">
+      <stop offset="0%" stopColor="#15803D"/>
+      <stop offset="40%" stopColor="#22C55E"/>
+      <stop offset="100%" stopColor="#4ADE80"/>
+    </linearGradient>
+
+    <!-- Subtle White / Pearlescent Gradient for "crunchy" -->
+    <linearGradient id="crunchyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#FFFFFF"/>
+      <stop offset="70%" stopColor="#F4F4F5"/>
+      <stop offset="100%" stopColor="#E4E4E7"/>
+    </linearGradient>
+
+    <!-- Filter for crisp drop shadow so white text is readable on light and dark -->
+    <filter id="textGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.38"/>
+    </filter>
+
+    <filter id="bagGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2" flood-color="#7C2D12" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Group with slight italic / forward motion slant -->
+  <g transform="skewX(-6)">
+    <!-- 1. LEFT SPEED LINES (Flanking 'b') -->
+    <g fill="#F59E0B">
+      <!-- Top streak -->
+      <path d="M 12 68 Q 28 67 43 67 L 41 71 Q 26 71 14 70 Z"/>
+      <!-- Middle streak (longest) -->
+      <path d="M 4 77 Q 24 76 42 76 L 40 81 Q 22 81 6 80 Z"/>
+      <!-- Bottom streak -->
+      <path d="M 16 87 Q 28 86 40 86 L 38 89 Q 28 90 18 89 Z"/>
+    </g>
+
+    <!-- 2. RIGHT SPEED LINES (Flanking 'g') -->
+    <g fill="#F59E0B">
+      <!-- Top streak (longer) -->
+      <path d="M 190 67 Q 208 67 226 66 L 222 70 Q 205 71 188 71 Z"/>
+      <!-- Bottom streak -->
+      <path d="M 189 77 Q 204 77 217 76 L 213 81 Q 201 81 187 81 Z"/>
+    </g>
+
+    <!-- 3. "bag" 3D UNDERLAYER (Extrusion / Bevel Effect) -->
+    <g transform="translate(0, 3)" filter="url(#bagGlow)">
+      <text
+        x="115"
+        y="88"
+        text-anchor="middle"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Arial Black', Impact, sans-serif"
+        font-weight="900"
+        font-size="62"
+        letter-spacing="-1.5"
+        fill="url(#bagShadowGrad)"
+        stroke="#9A3412"
+        stroke-width="1.5"
+      >
+        bag
+      </text>
+    </g>
+
+    <!-- 4. "bag" MAIN VIBRANT GRADIENT -->
+    <text
+      x="115"
+      y="88"
+      text-anchor="middle"
+      font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Arial Black', Impact, sans-serif"
+      font-weight="900"
+      font-size="62"
+      letter-spacing="-1.5"
+      fill="url(#bagGrad)"
+    >
+      bag
+    </text>
+
+    <!-- 5. ARCHED "crunchy" WORDMARK -->
+    <!-- Arched text group with individual tilted glyphs matching the reference arch -->
+    <g filter="url(#textGlow)">
+      <!-- c -->
+      <text
+        x="42"
+        y="49"
+        transform="rotate(-15 42 49)"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Arial Black', sans-serif"
+        font-weight="900"
+        font-size="34"
+        fill="url(#crunchyGrad)"
+        stroke="rgba(0,0,0,0.2)"
+        stroke-width="0.8"
+      >
+        c
+      </text>
+      <!-- r -->
+      <text
+        x="63"
+        y="43"
+        transform="rotate(-10 63 43)"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Arial Black', sans-serif"
+        font-weight="900"
+        font-size="34"
+        fill="url(#crunchyGrad)"
+        stroke="rgba(0,0,0,0.2)"
+        stroke-width="0.8"
+      >
+        r
+      </text>
+      <!-- u -->
+      <text
+        x="86"
+        y="37"
+        transform="rotate(-5 86 37)"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Arial Black', sans-serif"
+        font-weight="900"
+        font-size="34"
+        fill="url(#crunchyGrad)"
+        stroke="rgba(0,0,0,0.2)"
+        stroke-width="0.8"
+      >
+        u
+      </text>
+      <!-- n -->
+      <text
+        x="110"
+        y="35"
+        transform="rotate(0 110 35)"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Arial Black', sans-serif"
+        font-weight="900"
+        font-size="34"
+        fill="url(#crunchyGrad)"
+        stroke="rgba(0,0,0,0.2)"
+        stroke-width="0.8"
+      >
+        n
+      </text>
+      <!-- c -->
+      <text
+        x="137"
+        y="37"
+        transform="rotate(5 137 37)"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Arial Black', sans-serif"
+        font-weight="900"
+        font-size="34"
+        fill="url(#crunchyGrad)"
+        stroke="rgba(0,0,0,0.2)"
+        stroke-width="0.8"
+      >
+        c
+      </text>
+      <!-- h -->
+      <text
+        x="161"
+        y="42"
+        transform="rotate(10 161 42)"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Arial Black', sans-serif"
+        font-weight="900"
+        font-size="34"
+        fill="url(#crunchyGrad)"
+        stroke="rgba(0,0,0,0.2)"
+        stroke-width="0.8"
+      >
+        h
+      </text>
+      <!-- y -->
+      <text
+        x="186"
+        y="50"
+        transform="rotate(15 186 50)"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Arial Black', sans-serif"
+        font-weight="900"
+        font-size="34"
+        fill="url(#crunchyGrad)"
+        stroke="rgba(0,0,0,0.2)"
+        stroke-width="0.8"
+      >
+        y
+      </text>
+    </g>
+
+    <!-- 6. GREEN ECO LEAF (Tilted ~45° above the 'y') -->
+    <g transform="translate(204, 18) rotate(32)" filter="drop-shadow(0 2px 2px rgba(0,0,0,0.3))">
+      <!-- Leaf body -->
+      <path
+        d="M 0 16 C -6 8 -2 0 12 -4 C 18 10 10 20 0 16 Z"
+        fill="url(#leafGrad)"
+        stroke="#14532D"
+        stroke-width="0.6"
+      />
+      <!-- Leaf center vein -->
+      <path
+        d="M 1 15 Q 6 8 11 -3"
+        stroke="#DCFCE7"
+        stroke-width="0.9"
+        stroke-linecap="round"
+        fill="none"
+      />
+    </g>
+  </g>
+</svg>

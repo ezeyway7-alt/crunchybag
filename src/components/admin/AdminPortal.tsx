@@ -292,7 +292,8 @@ export const AdminPortal: React.FC = () => {
                           </span>
                         </div>
                         <span className="text-[11px] text-zinc-400">
-                          {order.items.length} item(s) • {order.paymentMethod}
+                          {order.items.length} item(s) •{" "}
+                          {order.paymentMethod === "ESEWA" ? "eSewa" : order.paymentMethod}
                         </span>
                       </div>
                       <div className="text-right">
@@ -350,7 +351,9 @@ export const AdminPortal: React.FC = () => {
                         {o.items.map((i) => `${i.quantity}x ${i.productName}`).join(", ")}
                       </td>
                       <td className="p-3 font-mono font-bold">{formatNPR(o.totalAmount)}</td>
-                      <td className="p-3 font-mono text-zinc-500">{o.paymentMethod}</td>
+                      <td className="p-3 font-mono text-zinc-500">
+                        {o.paymentMethod === "ESEWA" ? "eSewa" : o.paymentMethod}
+                      </td>
                       <td className="p-3">
                         <Badge
                           variant={

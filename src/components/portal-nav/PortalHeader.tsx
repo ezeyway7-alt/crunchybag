@@ -16,6 +16,7 @@ import {
   Package,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { CrunchyLogo } from "../common/CrunchyLogo";
 
 export const PortalHeader: React.FC = () => {
   const {
@@ -80,13 +81,15 @@ export const PortalHeader: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 gap-3">
           {/* Left: Brand + Role Badge */}
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-amber-500 flex items-center justify-center font-black text-black text-xs">
-                CR
-              </div>
-              <span className="font-extrabold tracking-tight text-base sm:text-lg text-white">
-                CRUNCHY
-              </span>
+            <div
+              className="flex items-center cursor-pointer group"
+              onClick={() => {
+                setActivePortal("customer");
+                setCustomerActiveTab("menu");
+              }}
+              title="Home"
+            >
+              <CrunchyLogo size="md" className="h-10 sm:h-11 max-h-11 w-auto group-hover:scale-105 transition-transform" />
             </div>
 
             <div className="hidden sm:block h-5 w-px bg-zinc-800" />
@@ -163,21 +166,10 @@ export const PortalHeader: React.FC = () => {
                 setActivePortal("customer");
                 setCustomerActiveTab("menu");
               }}
-              className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group"
+              className="flex items-center cursor-pointer group py-0.5"
+              title="Crunchy Bag - Home"
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-amber-500 flex items-center justify-center font-black text-black text-xs sm:text-sm tracking-tighter shadow-sm group-hover:bg-amber-400 transition-colors">
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-black" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1">
-                  <span className="font-black tracking-tight text-lg sm:text-xl text-zinc-950 dark:text-white leading-none">
-                    CRUNCHY
-                  </span>
-                </div>
-                <p className="hidden sm:block text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">
-                  Fried Chicken & Burgers
-                </p>
-              </div>
+              <CrunchyLogo size="md" className="h-11 sm:h-12 md:h-13.5 max-h-14 w-auto group-hover:scale-105 transition-transform" />
             </div>
           </div>
 

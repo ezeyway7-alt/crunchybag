@@ -11,10 +11,12 @@ import {
   AlertCircle,
   Crosshair,
   Sparkles,
+  Eye,
 } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
+import { OrderItemsPreviewModal } from "./OrderItemsPreviewModal";
 
 // Pre-indexed landmark hubs familiar from ride-sharing apps (Pathao, Yango, InDrive)
 export interface LandmarkItem {
@@ -75,6 +77,7 @@ export const DeliveryLocationModal: React.FC<DeliveryLocationModalProps> = ({
   const [landmarkNote, setLandmarkNote] = useState("Near Standard Chartered Bank");
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [geoNotice, setGeoNotice] = useState<string | null>(null);
+  const [isPreviewItemsOpen, setIsPreviewItemsOpen] = useState(false);
 
   // Sync streetAddress when opening modal with prop
   useEffect(() => {
@@ -253,8 +256,9 @@ export const DeliveryLocationModal: React.FC<DeliveryLocationModalProps> = ({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
+    <>
+      <Modal
+        isOpen={isOpen}
       onClose={onClose}
       title="Choose Delivery Location"
       description="Pin your exact location on the map or search landmarks (Pathao & Yango ready)"
@@ -262,7 +266,7 @@ export const DeliveryLocationModal: React.FC<DeliveryLocationModalProps> = ({
       bodyClassName="p-0 overflow-hidden"
     >
       <div className="flex flex-col h-[82vh] max-h-[640px]">
-        {/* Top Control Bar: Search & Quick GPS */}
+        {/* Top Control Bar: Search & Quick GPS & View Items Eye Button */}
         <div className="p-3 bg-zinc-50 dark:bg-[#141416] border-b border-zinc-200 dark:border-zinc-800 space-y-2 shrink-0">
           <div className="flex items-center gap-2">
             {/* Search Input */}
@@ -296,6 +300,17 @@ export const DeliveryLocationModal: React.FC<DeliveryLocationModalProps> = ({
               <Crosshair className={`h-3.5 w-3.5 ${isDetectingLocation ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Current Location</span>
               <span className="sm:hidden">GPS</span>
+            </button>
+
+            {/* Eye button to view order items */}
+            <button
+              type="button"
+              onClick={() => setIsPreviewItemsOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-2 bg-white dark:bg-[#1E1E22] hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 text-xs font-bold cursor-pointer transition-colors shrink-0 shadow-xs"
+              title="View products in this delivery order"
+            >
+              <Eye className="h-3.5 w-3.5 text-amber-500" />
+              <span className="hidden sm:inline">View Items</span>
             </button>
           </div>
 
@@ -443,5 +458,14 @@ export const DeliveryLocationModal: React.FC<DeliveryLocationModalProps> = ({
         </div>
       </div>
     </Modal>
+
+    {/* View order items preview modal */}
+    <OrderItemsPreviewModal
+      isOpen={isPreviewItemsOpen}
+      onClose={() => setIsPreviewItemsOpen(false)}
+      title="Delivery Order Items"
+      description="Food items to be delivered to your pinned address"
+    />
+    </>
   );
 };

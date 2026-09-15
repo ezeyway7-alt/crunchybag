@@ -176,7 +176,24 @@ interface AppContextType {
     selectedModifiers: SelectedModifier[],
     quantity: number
   ) => void;
+  addCustomComboToCart: (combo: {
+    title: string;
+    image: string;
+    unitPrice: number;
+    quantity: number;
+    items: {
+      productName: string;
+      variantName: string;
+      modifiers: string[];
+    }[];
+  }) => void;
   updateCartItemQty: (cartItemId: string, delta: number) => void;
+  updateCartItemConfig: (
+    cartItemId: string,
+    variant: ProductVariant,
+    selectedModifiers: SelectedModifier[],
+    quantity: number
+  ) => void;
   removeCartItem: (cartItemId: string) => void;
   clearCart: () => void;
 
@@ -446,6 +463,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const addCustomComboToCart = (combo: {
+    title: string;
+    image: string;
+    unitPrice: number;
+    quantity: number;
+    items: {
+      productName: string;
+      variantName: string;
+      modifiers: string[];
+    }[];
+  }) => {
+    const selectedModifiers: SelectedModifier[] = combo.items.map((it, idx) => ({
+      groupId: `combo-item-${idx}`,
+      groupName: it.productName,
+      optionId: `opt-${idx}`,
+      optionName: `${it.variantName}${it.modifiers.length > 0 ? ` [${it.modifiers.join(", ")}]` : ""}`,
+      priceDelta: 0,
+    }));
+
+    const newItem: CartLineItem = {
+      cartItemId: `ci-combo-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      productId: `combo-pack-${Date.now()}`,
+      productName: combo.title,
+      image: combo.image,
+      variant: {
+        id: "combo-custom-pack",
+        name: `Combo Package (${combo.items.length} Items Included)`,
+        price: combo.unitPrice,
+      },
+      selectedModifiers,
+      quantity: combo.quantity,
+      unitPrice: combo.unitPrice,
+      lineTotal: combo.unitPrice * combo.quantity,
+      addedAt: Date.now(),
+      quoteExpiresAt: Date.now() + 15 * 60 * 1000,
+    };
+
+    setCartItems((prev) => [...prev, newItem]);
+    addToast({
+      title: "Combo Package Added",
+      description: `${combo.quantity}x ${combo.title} (${combo.items.length} customized items)`,
+      type: "success",
+    });
+  };
+
   const updateCartItemQty = (cartItemId: string, delta: number) => {
     setCartItems((prev) =>
       prev
@@ -463,6 +525,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })
         .filter(Boolean) as CartLineItem[]
     );
+  };
+
+  const updateCartItemConfig = (
+    cartItemId: string,
+    variant: ProductVariant,
+    selectedModifiers: SelectedModifier[],
+    quantity: number
+  ) => {
+    const modifiersDelta = selectedModifiers.reduce((acc, m) => acc + m.priceDelta, 0);
+    const unitPrice = variant.price + modifiersDelta;
+    const lineTotal = unitPrice * quantity;
+
+    setCartItems((prev) =>
+      prev.map((item) => {
+        if (item.cartItemId === cartItemId) {
+          return {
+            ...item,
+            variant,
+            selectedModifiers,
+            quantity,
+            unitPrice,
+            lineTotal,
+          };
+        }
+        return item;
+      })
+    );
+    addToast({
+      title: "Cart Updated",
+      description: `Updated ${variant.name}`,
+      type: "success",
+    });
   };
 
   const removeCartItem = (cartItemId: string) => {
@@ -930,7 +1024,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isCartDrawerOpen,
         setIsCartDrawerOpen,
         addToCart,
+        addCustomComboToCart,
         updateCartItemQty,
+        updateCartItemConfig,
         removeCartItem,
         clearCart,
         orders,
