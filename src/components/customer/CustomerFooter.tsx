@@ -54,6 +54,9 @@ export const CustomerFooter: React.FC = () => {
     setIsFavoritesModalOpen,
     setIsProfileModalOpen,
     setIsLoginModalOpen,
+    loginAsRole,
+    setActivePortal,
+    setIsTableOrderMode,
   } = useApp();
 
   const [isReserveModalOpen, setIsReserveModalOpen] = useState(false);
@@ -371,6 +374,18 @@ export const CustomerFooter: React.FC = () => {
                     Reserve Table &rarr;
                   </button>
                 </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePortal("table-qr");
+                      setIsTableOrderMode(true);
+                    }}
+                    className="hover:text-amber-500 transition-colors cursor-pointer text-left text-zinc-500 dark:text-zinc-400"
+                  >
+                    Table QR Order
+                  </button>
+                </li>
               </ul>
             </div>
 
@@ -435,13 +450,20 @@ export const CustomerFooter: React.FC = () => {
                 <li className="text-[11px] text-zinc-500">
                   Durbar Marg, Kathmandu
                 </li>
-                <li className="pt-1">
+                <li className="pt-1 flex flex-col gap-1.5">
                   <button
                     type="button"
                     onClick={() => setIsLoginModalOpen(true)}
-                    className="text-[10px] text-zinc-400 hover:text-amber-500 underline uppercase tracking-wider cursor-pointer"
+                    className="text-[10px] text-zinc-400 hover:text-amber-500 underline uppercase tracking-wider cursor-pointer text-left"
                   >
-                    Staff / KDS Portal &rarr;
+                    Staff / KDS / Manager &rarr;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => loginAsRole("KIOSK")}
+                    className="text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-wider cursor-pointer text-left flex items-center gap-1"
+                  >
+                    <span>⚡ Launch Self-Order Kiosk Tablet</span>
                   </button>
                 </li>
               </ul>
@@ -483,6 +505,26 @@ export const CustomerFooter: React.FC = () => {
                 className="text-rose-600 dark:text-rose-400 hover:underline transition-colors cursor-pointer font-bold"
               >
                 User Account Deletion
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePortal("table-qr");
+                  setIsTableOrderMode(true);
+                }}
+                className="hover:text-amber-500 transition-colors cursor-pointer"
+              >
+                Table QR
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                id="footer-tv-board-btn"
+                onClick={() => setActivePortal("tv")}
+                className="hover:text-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold transition-colors cursor-pointer"
+              >
+                Live TV Screen
               </button>
               <span>•</span>
               <span>Durbar Marg, Kathmandu</span>

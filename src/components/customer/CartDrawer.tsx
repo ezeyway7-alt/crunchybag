@@ -249,7 +249,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
                         ) : (
                           <span>{item.variant.name}</span>
                         )}
-                        {!isCombo && item.selectedModifiers.length > 0 && (
+                        {!isCombo && item.selectedModifiers && item.selectedModifiers.length > 0 && (
                           <span className="text-zinc-400 ml-1">
                             • {item.selectedModifiers.map((m) => m.optionName).join(", ")}
                           </span>

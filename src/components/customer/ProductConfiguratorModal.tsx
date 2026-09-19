@@ -37,11 +37,9 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
   initialQuantity,
   onUpdateCartItem,
 }) => {
-  if (!product) return null;
-
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(
-    initialVariant || product.variants[0] || { id: "default", name: "Standard", price: product.basePrice }
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
+    initialVariant || product?.variants?.[0] || null
   );
   const [selectedModifiers, setSelectedModifiers] = useState<SelectedModifier[]>(initialModifiers || []);
   const [quantity, setQuantity] = useState(initialQuantity || 1);
@@ -56,7 +54,7 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
         setQuantity(initialQuantity || 1);
       } else {
         const defaultVariant = product.variants.find((v) => v.isDefault) || product.variants[0];
-        setSelectedVariant(defaultVariant);
+        setSelectedVariant(defaultVariant || null);
         setQuantity(1);
 
         const initialMods: SelectedModifier[] = [];
@@ -78,6 +76,8 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
       setValidationError(null);
     }
   }, [product, isOpen, editingCartItemId, initialVariant, initialModifiers, initialQuantity]);
+
+  if (!product || !selectedVariant) return null;
 
   // Handle modifier selection toggle
   const handleToggleModifier = (group: Product["modifierGroups"][0], option: typeof group.options[0]) => {

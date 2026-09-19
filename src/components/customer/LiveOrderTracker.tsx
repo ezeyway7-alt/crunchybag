@@ -21,6 +21,9 @@ import {
   Search,
   SlidersHorizontal,
   ChevronRight,
+  Printer,
+  Star,
+  QrCode,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Order, OrderStatus } from "../../types";
@@ -28,6 +31,8 @@ import { formatNPR, formatTimer, getOrderReverseTimer } from "../../lib/utils";
 import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { DeliveryRider3DAnimation } from "./DeliveryRider3DAnimation";
+import { PrintableTokenReceiptModal } from "./PrintableTokenReceiptModal";
+import { QrOrderTrackAndReviewModal } from "./QrOrderTrackAndReviewModal";
 
 interface LiveOrderTrackerProps {
   initialOrderId?: string;
@@ -47,6 +52,10 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
 
   // Search/filter in left sidebar
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
+
+  // Sub-modals for Print Token Slip & Rate/Review Experience
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   const selectedOrder = orders.find((o) => o.id === selectedOrderId) || null;
   const selectedOrderTimer = selectedOrder ? getOrderReverseTimer(selectedOrder) : null;
@@ -241,7 +250,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
 
                     {/* Row 3: Items summary snippet */}
                     <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate mb-1">
-                      {order.items.map((i) => `${i.quantity}x ${i.productName}`).join(", ")}
+                      {order.items?.map((i) => `${i.quantity}x ${i.productName}`)?.join(", ") || "No items"}
                     </p>
 
                     {/* Row 4: Total Price */}
@@ -559,7 +568,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                         <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold">
                           {item.variantName}
                         </p>
-                        {item.modifiersSummary.length > 0 && (
+                        {item.modifiersSummary && item.modifiersSummary.length > 0 && (
                           <p className="text-[11px] text-zinc-400 mt-0.5">
                             {item.modifiersSummary.join(", ")}
                           </p>
@@ -593,8 +602,8 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                 </div>
               </div>
 
-              {/* Action Buttons: Cancel or 1-Tap Reorder */}
-              <div className="flex items-center justify-between gap-3 pt-1">
+              {/* Action Buttons: Cancel, Print Slip, Review, 1-Tap Reorder */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
                 {selectedOrder.status === "AWAITING_PAYMENT" ? (
                   <Button
                     variant="danger"
@@ -605,7 +614,25 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                     Cancel Order
                   </Button>
                 ) : (
-                  <div />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsReceiptOpen(true)}
+                      className="h-9 px-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Print Token Slip</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsReviewOpen(true)}
+                      className="h-9 px-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-amber-500 text-xs font-bold border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Star className="w-3.5 h-3.5" />
+                      <span>Rate Experience</span>
+                    </button>
+                  </div>
                 )}
 
                 <div className="flex items-center gap-2">
@@ -624,6 +651,32 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
           )}
         </section>
       </div>
+
+      {/* Printable Receipt & Token Slip Modal */}
+      {isReceiptOpen && selectedOrder && (
+        <PrintableTokenReceiptModal
+          order={selectedOrder}
+          isOpen={isReceiptOpen}
+          onClose={() => setIsReceiptOpen(false)}
+          onOpenTrackerAndReview={() => {
+            setIsReceiptOpen(false);
+            setIsReviewOpen(true);
+          }}
+        />
+      )}
+
+      {/* Scanned QR Slip Order Tracker & Rate/Review Modal */}
+      {isReviewOpen && selectedOrder && (
+        <QrOrderTrackAndReviewModal
+          isOpen={isReviewOpen}
+          onClose={() => setIsReviewOpen(false)}
+          initialOrder={selectedOrder}
+          onOpenReceipt={() => {
+            setIsReviewOpen(false);
+            setIsReceiptOpen(true);
+          }}
+        />
+      )}
     </div>
   );
 };

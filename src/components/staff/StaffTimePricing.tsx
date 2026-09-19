@@ -115,7 +115,7 @@ export const StaffTimePricing: React.FC = () => {
               {/* Targeted Products */}
               <div className="pt-2 text-zinc-500">
                 <span className="font-semibold text-zinc-700 dark:text-zinc-300">Target Items: </span>
-                <span>{schedule.productNames.join(", ")}</span>
+                <span>{schedule.productNames?.join(", ") || "All Menu Products"}</span>
               </div>
             </div>
 

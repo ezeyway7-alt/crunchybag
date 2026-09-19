@@ -43,16 +43,30 @@ interface ComboItemConfig {
   isRemoved?: boolean;
 }
 
-interface ComboPackageModalProps {
+export interface ComboPackageModalProps {
   combo: ComboPackageDefinition | null;
   isOpen: boolean;
   onClose: () => void;
+  onAddToCartCustom?: (comboData: {
+    title: string;
+    image: string;
+    unitPrice: number;
+    quantity: number;
+    items: {
+      productName: string;
+      variantName: string;
+      modifiers: string[];
+    }[];
+  }) => void;
+  addLabel?: string;
 }
 
 export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
   combo,
   isOpen,
   onClose,
+  onAddToCartCustom,
+  addLabel,
 }) => {
   const { products, addCustomComboToCart } = useApp();
 
@@ -306,7 +320,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
   const handleAddToCart = () => {
     if (activeItems.length === 0) return;
 
-    addCustomComboToCart({
+    const comboPayload = {
       title: combo.title,
       image: combo.image,
       unitPrice: comboTotalPrice,
@@ -318,7 +332,13 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
           m.priceDelta > 0 ? `${m.optionName} (+${formatNPR(m.priceDelta)})` : m.optionName
         ),
       })),
-    });
+    };
+
+    if (onAddToCartCustom) {
+      onAddToCartCustom(comboPayload);
+    } else {
+      addCustomComboToCart(comboPayload);
+    }
 
     onClose();
   };
@@ -402,7 +422,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
                 className="h-8 sm:h-8.5 px-3 sm:px-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wide cursor-pointer transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 border border-amber-600"
               >
                 <ShoppingBag className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Add to Cart</span>
+                <span>{addLabel || "Add to Cart"}</span>
               </button>
 
               {/* Dismiss X */}

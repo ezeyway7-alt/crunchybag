@@ -4,7 +4,7 @@ import { Button } from "../common/Button";
 import { Input } from "../common/Input";
 import { useApp } from "../../context/AppContext";
 import { UserRole } from "../../types";
-import { ChefHat, CreditCard, ShieldCheck, ArrowRight, Lock, Mail, AlertCircle } from "lucide-react";
+import { ChefHat, CreditCard, ShieldCheck, ArrowRight, Lock, Mail, AlertCircle, Tablet } from "lucide-react";
 
 export const StaffLoginModal: React.FC = () => {
   const {
@@ -56,7 +56,7 @@ export const StaffLoginModal: React.FC = () => {
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2.5">
             1-Click Demo Login (Select Role)
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Kitchen Cook */}
             <button
               type="button"
@@ -131,6 +131,32 @@ export const StaffLoginModal: React.FC = () => {
               </p>
               <div className="mt-3 flex items-center text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 gap-1">
                 <span>Enter Admin</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </button>
+
+            {/* Self-Order Touch Kiosk (Tablet) */}
+            <button
+              type="button"
+              onClick={() => handleQuickLogin("KIOSK")}
+              className="p-3.5 border border-zinc-200 dark:border-zinc-800 hover:border-amber-500 dark:hover:border-amber-500 bg-zinc-50/70 dark:bg-zinc-900/50 hover:bg-amber-500/5 dark:hover:bg-amber-500/5 text-left transition-all duration-150 rounded-none group cursor-pointer relative overflow-hidden"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-2 bg-amber-500/20 text-amber-500">
+                  <Tablet className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-amber-500 text-black">
+                  Tablet
+                </span>
+              </div>
+              <h4 className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-amber-500">
+                Touch Kiosk
+              </h4>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 leading-snug">
+                Cafe tablet touch screen, pay & print token
+              </p>
+              <div className="mt-3 flex items-center text-[11px] font-semibold text-amber-600 dark:text-amber-400 gap-1">
+                <span>Launch Kiosk</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </button>

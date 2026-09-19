@@ -193,10 +193,10 @@ export const StaffOrderQueue: React.FC = () => {
                       {/* Items */}
                       <td className="px-4 py-3.5 max-w-xs">
                         <p className="font-medium text-zinc-800 dark:text-zinc-200 truncate">
-                          {order.items.map((i) => `${i.quantity}x ${i.productName}`).join(", ")}
+                          {order.items?.map((i) => `${i.quantity}x ${i.productName}`)?.join(", ") || "No items"}
                         </p>
                         <p className="text-[11px] text-zinc-400">
-                          {order.items.reduce((acc, i) => acc + i.quantity, 0)} items total
+                          {order.items?.reduce((acc, i) => acc + i.quantity, 0) ?? 0} items total
                         </p>
                       </td>
 

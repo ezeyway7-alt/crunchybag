@@ -2,12 +2,23 @@
 
 @layer base {
   :root {
+    color-scheme: dark;
     --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
   }
 
+  html {
+    color-scheme: dark;
+    background-color: #09090b !important;
+    color: #f4f4f5 !important;
+  }
+
   body {
     font-family: var(--font-sans);
+    color-scheme: dark;
+    background-color: #09090b !important;
+    color: #f4f4f5 !important;
+    min-height: 100vh;
   }
 
   .font-mono {
@@ -26,12 +37,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.4);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.7);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .dark ::-webkit-scrollbar-thumb {
@@ -51,14 +62,24 @@
   scrollbar-width: none;
 }
 
-/* Skeleton pulse animation */
-@keyframes shimmer {
-  0% { opacity: 0.5; }
-  50% { opacity: 1; }
-  100% { opacity: 0.5; }
+/* Skeleton pulse & sweep shimmer animation */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton-shimmer {
-  animation: shimmer 1.8s infinite ease-in-out;
+  background: linear-gradient(
+    90deg,
+    rgba(39, 39, 42, 0.45) 0%,
+    rgba(63, 63, 70, 0.75) 50%,
+    rgba(39, 39, 42, 0.45) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.8s infinite ease-in-out;
 }
 

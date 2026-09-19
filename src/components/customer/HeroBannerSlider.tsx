@@ -8,10 +8,10 @@ export interface BannerSlide extends ComboPackageDefinition {}
 export const BANNER_SLIDES: BannerSlide[] = [
   {
     id: "slide-1",
-    badge: "Fresh Kathmandu Batch",
+    badge: "",
     badgeType: "chef",
     title: "CRUNCH ON DEMAND",
-    subtitle: "24-hr brined whole muscle chicken tenders, crispy beast burger, loaded animal fries & signature shake.",
+    subtitle: "",
     promoText: "SAVE NPR 280 (SPECIAL COMBO)",
     buttonLabel: "Customize",
     targetCategory: "cat-combos",

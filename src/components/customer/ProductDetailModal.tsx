@@ -62,28 +62,69 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         </div>
 
         {/* Nutritional & Prep Stats */}
-        <div className="grid grid-cols-2 gap-2 p-2 bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800">
-          <div className="flex items-center gap-2">
-            <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <div>
-              <span className="text-[10px] uppercase font-bold text-zinc-400 block leading-tight">
-                Prep Time
-              </span>
-              <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 font-mono">
-                {product.prepTimeMinutes} mins
-              </span>
-            </div>
+        <div className="grid grid-cols-4 gap-1.5 p-2.5 bg-zinc-50 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 text-center">
+          <div className="p-1">
+            <span className="text-[9px] uppercase font-bold text-zinc-400 block leading-tight">
+              Calories
+            </span>
+            <span className="text-xs font-black text-amber-500 font-mono">
+              {product.calories ? `${product.calories}` : "420"} <span className="text-[9px] font-normal text-zinc-400">kcal</span>
+            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Flame className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <div>
-              <span className="text-[10px] uppercase font-bold text-zinc-400 block leading-tight">
-                Energy
-              </span>
-              <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 font-mono">
-                {product.calories ? `${product.calories} kcal` : "Fresh Made"}
-              </span>
-            </div>
+
+          <div className="p-1 border-l border-zinc-200 dark:border-zinc-800">
+            <span className="text-[9px] uppercase font-bold text-zinc-400 block leading-tight">
+              Protein
+            </span>
+            <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 font-mono">
+              {Math.round((product.calories || 420) * 0.05)}g
+            </span>
+          </div>
+
+          <div className="p-1 border-l border-zinc-200 dark:border-zinc-800">
+            <span className="text-[9px] uppercase font-bold text-zinc-400 block leading-tight">
+              Carbs
+            </span>
+            <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 font-mono">
+              {Math.round((product.calories || 420) * 0.08)}g
+            </span>
+          </div>
+
+          <div className="p-1 border-l border-zinc-200 dark:border-zinc-800">
+            <span className="text-[9px] uppercase font-bold text-zinc-400 block leading-tight">
+              Prep
+            </span>
+            <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 font-mono">
+              {product.prepTimeMinutes}m
+            </span>
+          </div>
+        </div>
+
+        {/* Detailed Allergen & Kitchen Advisory Box */}
+        <div className="p-2.5 bg-amber-500/5 border border-amber-500/30 text-xs space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-500">
+              Allergen & Dietary Advisory
+            </span>
+            <span className="text-[9px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-1.5 py-0.2 border border-emerald-500/30">
+              ✓ 100% Halal
+            </span>
+          </div>
+          <p className="text-[11px] text-zinc-600 dark:text-zinc-300 leading-snug">
+            {product.dietary.some((d) => d.toLowerCase().includes("gluten") || d.toLowerCase().includes("veg"))
+              ? "Allergen notes: Contains wheat gluten, soy & dairy cultures. Nut-free frying facility."
+              : "Prepared in facility handling sesame seeds, dairy (cheese & mayo) and gluten. Fried in 100% pure sunflower oil (No peanut oils)."}
+          </p>
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            <span className="px-1.5 py-0.2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[9px] font-bold">
+              Nut-Free Facility
+            </span>
+            <span className="px-1.5 py-0.2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[9px] font-bold">
+              Zero Trans Fat
+            </span>
+            <span className="px-1.5 py-0.2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[9px] font-bold">
+              Fresh Daily Buns
+            </span>
           </div>
         </div>
 

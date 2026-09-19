@@ -383,7 +383,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 label="Kitchen / Delivery Note (Optional)"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Extra napkins, sauce on side"
+                placeholder="Special notes"
                 className="rounded-none text-xs h-7.5"
               />
             </div>

@@ -104,3 +104,14 @@ export function getOrderReverseTimer(order: {
   };
 }
 
+/**
+ * Format elapsed seconds into human readable string e.g. "12m ago" or "45s ago"
+ */
+export function getElapsedString(seconds: number): string {
+  if (seconds < 60) return `${Math.max(0, Math.floor(seconds))}s ago`;
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ago`;
+}
+

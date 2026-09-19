@@ -33,6 +33,7 @@ export const DevicePortal: React.FC = () => {
     unpairDeviceKiosk,
     outlets,
     addToast,
+    setActivePortal,
   } = useApp();
 
   const [isPairModalOpen, setIsPairModalOpen] = useState(false);
@@ -99,18 +100,29 @@ export const DevicePortal: React.FC = () => {
             </p>
           </div>
 
-          <Button
-            size="sm"
-            variant="primary"
-            className="font-bold text-xs"
-            leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() => {
-              regenerateCode();
-              setIsPairModalOpen(true);
-            }}
-          >
-            Pair New Terminal / Screen
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="font-bold text-xs"
+              leftIcon={<Tv className="h-4 w-4 text-emerald-500" />}
+              onClick={() => setActivePortal("tv")}
+            >
+              Open TV Display
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              className="font-bold text-xs"
+              leftIcon={<Plus className="h-4 w-4" />}
+              onClick={() => {
+                regenerateCode();
+                setIsPairModalOpen(true);
+              }}
+            >
+              Pair New Terminal / Screen
+            </Button>
+          </div>
         </div>
       </div>
 

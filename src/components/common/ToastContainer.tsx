@@ -7,7 +7,7 @@ export const ToastContainer: React.FC = () => {
   const { toasts, removeToast } = useApp();
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
+    <div className="fixed top-4 right-4 sm:top-5 sm:right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none">
       <AnimatePresence>
         {toasts.map((toast) => {
           const icons = {
@@ -20,10 +20,10 @@ export const ToastContainer: React.FC = () => {
           return (
             <motion.div
               key={toast.id}
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              initial={{ opacity: 0, y: -16, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-              className="pointer-events-auto flex items-start gap-3 p-4 bg-zinc-900/95 text-white dark:bg-[#1A1A1E]/95 border border-zinc-700/60 shadow-2xl rounded-2xl backdrop-blur-md"
+              exit={{ opacity: 0, y: -10, scale: 0.9, transition: { duration: 0.15 } }}
+              className="pointer-events-auto flex items-start gap-3 p-3.5 sm:p-4 bg-zinc-900/95 text-white dark:bg-[#1A1A1E]/95 border border-zinc-700/60 shadow-2xl rounded-xl backdrop-blur-md"
             >
               {icons[toast.type || "info"]}
               <div className="flex-1 min-w-0 pr-1">
