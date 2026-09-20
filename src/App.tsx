@@ -117,14 +117,17 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // Temporarily hide Staff / KDS / Manager portals as requested
+  const SHOW_STAFF_PORTALS = false;
+
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 antialiased selection:bg-amber-500 selection:text-black">
-      {/* Dynamic Header (Public Restaurant Header for Customer, Operational Top Bar for Staff) */}
+      {/* Dynamic Header (Public Restaurant Header for Customer) */}
       <PortalHeader />
 
-      {/* Role-isolated Portal Rendering: Each user accesses only their own dashboard */}
-      {userRole === "CUSTOMER" && <CustomerPortal />}
-      {userRole === "KITCHEN" && (
+      {/* Customer Portal (Staff, KDS, and Manager portals temporarily hidden) */}
+      {(!SHOW_STAFF_PORTALS || userRole === "CUSTOMER") && <CustomerPortal />}
+      {SHOW_STAFF_PORTALS && userRole === "KITCHEN" && (
         <>
           <StaffFloatingOrderNotice
             onOpenOngoingOrder={() => {
@@ -139,8 +142,8 @@ const AppContent: React.FC = () => {
           <KDSPortal />
         </>
       )}
-      {userRole === "STAFF" && <StaffPortal />}
-      {userRole === "ADMIN" && (
+      {SHOW_STAFF_PORTALS && userRole === "STAFF" && <StaffPortal />}
+      {SHOW_STAFF_PORTALS && userRole === "ADMIN" && (
         <>
           <StaffFloatingOrderNotice
             onOpenOngoingOrder={() => {
@@ -156,8 +159,8 @@ const AppContent: React.FC = () => {
         </>
       )}
 
-      {/* Staff & Management Login Modal */}
-      <StaffLoginModal />
+      {/* Staff & Management Login Modal (temporarily hidden) */}
+      {SHOW_STAFF_PORTALS && <StaffLoginModal />}
 
       {/* Global Notification Toasts */}
       <ToastContainer toasts={toasts} onClose={removeToast} />

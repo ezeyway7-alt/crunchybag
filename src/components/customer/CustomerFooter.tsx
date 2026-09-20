@@ -438,7 +438,7 @@ export const CustomerFooter: React.FC = () => {
             {/* Col 5: Operations & Contact */}
             <div className="space-y-2.5">
               <h5 className="font-bold text-zinc-950 dark:text-white uppercase tracking-wider text-[11px]">
-                Contact & Kitchen
+                Contact & Location
               </h5>
               <ul className="space-y-1.5 text-zinc-600 dark:text-zinc-400">
                 <li className="font-mono text-zinc-900 dark:text-zinc-200 font-bold">
@@ -449,34 +449,6 @@ export const CustomerFooter: React.FC = () => {
                 </li>
                 <li className="text-[11px] text-zinc-500">
                   Durbar Marg, Kathmandu
-                </li>
-                <li className="pt-1 flex flex-col gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        window.history.pushState(null, "", "/admin-login");
-                        window.dispatchEvent(new PopStateEvent("popstate"));
-                      }
-                    }}
-                    className="text-[10px] text-zinc-400 hover:text-amber-500 underline uppercase tracking-wider cursor-pointer text-left"
-                  >
-                    Admin Portal (/admin-login) &rarr;
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsLoginModalOpen(true)}
-                    className="text-[10px] text-zinc-400 hover:text-amber-500 underline uppercase tracking-wider cursor-pointer text-left"
-                  >
-                    Staff / KDS / Manager &rarr;
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loginAsRole("KIOSK")}
-                    className="text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-wider cursor-pointer text-left flex items-center gap-1"
-                  >
-                    <span>⚡ Launch Self-Order Kiosk Tablet</span>
-                  </button>
                 </li>
               </ul>
             </div>

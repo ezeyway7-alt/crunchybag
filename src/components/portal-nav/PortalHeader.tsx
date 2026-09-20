@@ -81,7 +81,9 @@ export const PortalHeader: React.FC = () => {
   }, [setIsSearchModalOpen]);
 
   // If logged in as staff (KITCHEN, STAFF, ADMIN), show clean, minimalist operational header
-  if (userRole !== "CUSTOMER" && currentUser) {
+  // (Staff / KDS / Manager temporarily hidden: default to public restaurant customer header)
+  const SHOW_STAFF_HEADER = false;
+  if (SHOW_STAFF_HEADER && userRole !== "CUSTOMER" && currentUser) {
     return (
       <header className="sticky top-0 z-40 w-full border-b bg-zinc-950 text-white border-zinc-800/80 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-12 gap-3">
