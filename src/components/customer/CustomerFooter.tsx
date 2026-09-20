@@ -450,6 +450,22 @@ export const CustomerFooter: React.FC = () => {
                 <li className="text-[11px] text-zinc-500">
                   Durbar Marg, Kathmandu
                 </li>
+                <li className="pt-2">
+                  <button
+                    type="button"
+                    id="footer-admin-login-btn"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.history.pushState(null, "", "/admin-login");
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-amber-500 transition-colors cursor-pointer"
+                  >
+                    <span>Admin Login</span>
+                    <span className="text-zinc-600">&rarr;</span>
+                  </button>
+                </li>
               </ul>
             </div>
           </div>
@@ -509,6 +525,20 @@ export const CustomerFooter: React.FC = () => {
                 className="hover:text-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold transition-colors cursor-pointer"
               >
                 Live TV Screen
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                id="footer-bottom-admin-login-btn"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.history.pushState(null, "", "/admin-login");
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                  }
+                }}
+                className="hover:text-amber-500 transition-colors cursor-pointer font-medium"
+              >
+                Admin Login
               </button>
               <span>•</span>
               <span>Durbar Marg, Kathmandu</span>
