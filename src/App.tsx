@@ -18,7 +18,11 @@ const AppContent: React.FC = () => {
   // Enforce permanent dark theme across all mobile and desktop browsers
   React.useEffect(() => {
     document.documentElement.classList.add("dark");
+    document.documentElement.setAttribute("data-theme", "dark");
+    document.documentElement.style.colorScheme = "dark";
     document.documentElement.style.backgroundColor = "#09090b";
+    document.body.classList.add("dark");
+    document.body.style.colorScheme = "dark";
     document.body.style.backgroundColor = "#09090b";
   }, []);
 

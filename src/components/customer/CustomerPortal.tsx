@@ -196,7 +196,7 @@ export const CustomerPortal: React.FC = () => {
   const latestOrder = orders[0] || null;
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#0A0A0B] text-zinc-900 dark:text-zinc-100 transition-colors">
+    <div className="min-h-screen bg-[#0A0A0B] text-zinc-100 transition-colors">
       {customerActiveTab === "menu" ? (
         <main id="menu" className="max-w-7xl mx-auto px-4 sm:px-6 pt-0 pb-8 space-y-6">
           {/* Semantic SEO Primary Headline for Search Engines & Screen Readers */}
@@ -210,7 +210,7 @@ export const CustomerPortal: React.FC = () => {
           {/* Sticky Category Rail & Allergen/Dietary Filters */}
           <div
             id="categories-rail"
-            className="sticky top-[98px] md:top-16 z-30 bg-zinc-50/95 dark:bg-[#0A0A0B]/95 backdrop-blur-md py-2.5 -mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-zinc-200 dark:border-zinc-800 space-y-2"
+            className="sticky top-[98px] md:top-16 z-30 bg-[#0A0A0B]/95 backdrop-blur-md py-2.5 -mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-zinc-800 space-y-2"
           >
             {/* Row 1: Categories */}
             <div className="flex items-center justify-between gap-3">
@@ -312,7 +312,7 @@ export const CustomerPortal: React.FC = () => {
                     setSelectedModalOrder(latestOrder);
                     setIsReceiptModalOpen(true);
                   }}
-                  className="h-6.5 px-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-bold flex items-center gap-1 border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
+                  className="h-6.5 px-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-bold flex items-center gap-1 border border-zinc-700 transition-colors cursor-pointer"
                   title="View digital token receipt slip"
                 >
                   <Receipt className="w-3 h-3 text-amber-500" />
@@ -325,7 +325,7 @@ export const CustomerPortal: React.FC = () => {
                     setSelectedModalOrder(latestOrder);
                     setIsQrReviewModalOpen(true);
                   }}
-                  className="h-6.5 px-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 text-[11px] font-black flex items-center gap-1 border border-amber-500/30 transition-colors cursor-pointer"
+                  className="h-6.5 px-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 text-[11px] font-black flex items-center gap-1 border border-amber-500/30 transition-colors cursor-pointer"
                   title="Scan printed QR slip to track & rate experience"
                 >
                   <QrCode className="w-3 h-3" />
@@ -356,7 +356,7 @@ export const CustomerPortal: React.FC = () => {
           {!isLoadingSkeleton && !isCategoryLoading && displayedProducts.length === 0 && (
             <div className="py-16 text-center space-y-3 bg-[#121214] border border-zinc-800 p-8">
               <Sparkles className="h-10 w-10 text-amber-500 mx-auto" />
-              <h4 className="font-bold text-lg text-zinc-900 dark:text-white">
+              <h4 className="font-bold text-lg text-white">
                 No items found matching filter in {getActiveCategoryTitle()}
               </h4>
               <p className="text-xs text-zinc-500">

@@ -90,7 +90,7 @@ export const Modal: React.FC<ModalProps> = ({
             exit={{ opacity: 0, scale: 0.96, y: position === "top" ? -10 : 15 }}
             transition={{ type: "spring", damping: 26, stiffness: 320 }}
             className={cn(
-              "relative w-full bg-white dark:bg-[#121214] border border-black/15 dark:border-white/15 rounded-none shadow-2xl overflow-hidden z-10 text-zinc-900 dark:text-zinc-100",
+              "relative w-full bg-[#121214] border border-white/15 rounded-none shadow-2xl overflow-hidden z-10 text-zinc-100",
               position !== "top" && "my-auto",
               maxWidthClasses[maxWidth],
               className
@@ -105,7 +105,7 @@ export const Modal: React.FC<ModalProps> = ({
               >
                 <div className="min-w-0 pr-2">
                   {title && (
-                    <div className="text-sm sm:text-base font-bold tracking-tight text-zinc-900 dark:text-white truncate">
+                    <div className="text-sm sm:text-base font-bold tracking-tight text-white truncate">
                       {title}
                     </div>
                   )}

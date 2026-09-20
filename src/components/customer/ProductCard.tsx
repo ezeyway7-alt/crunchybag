@@ -48,12 +48,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <>
       <div
         onClick={() => onSelect(product)}
-      className="group relative bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 hover:border-amber-500 dark:hover:border-amber-500 rounded-none overflow-hidden shadow-sm transition-all duration-150 flex flex-col cursor-pointer"
+      className="group relative bg-[#121214] border border-zinc-800 hover:border-amber-500 rounded-none overflow-hidden shadow-sm transition-all duration-150 flex flex-col cursor-pointer"
     >
       {/* Product Media with Zero CLS container */}
-      <div className="relative w-full aspect-4/3 sm:aspect-16/11 bg-zinc-100 dark:bg-zinc-900 overflow-hidden">
+      <div className="relative w-full aspect-4/3 sm:aspect-16/11 bg-zinc-900 overflow-hidden">
         {!imageLoaded && (
-          <div className="absolute inset-0 bg-zinc-200 dark:bg-zinc-800" />
+          <div className="absolute inset-0 bg-zinc-800" />
         )}
         <img
           src={product.images[0]}
@@ -133,19 +133,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
         <div>
           <div className="flex items-start justify-between gap-2">
-            <h4 className="font-bold text-xs sm:text-[13px] text-zinc-900 dark:text-white group-hover:text-amber-500 transition-colors line-clamp-1 leading-snug">
+            <h4 className="font-bold text-xs sm:text-[13px] text-white group-hover:text-amber-500 transition-colors line-clamp-1 leading-snug">
               {product.name}
             </h4>
           </div>
         </div>
 
         {/* Pricing & CTA */}
-        <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-zinc-800">
           <div>
             <span className="text-[10px] text-zinc-400 uppercase font-semibold tracking-wider block">
               {product.variants.length > 1 ? "Starts From" : "Price"}
             </span>
-            <span className="font-mono font-bold text-sm sm:text-base text-zinc-950 dark:text-amber-400 tracking-tight">
+            <span className="font-mono font-bold text-sm sm:text-base text-amber-400 tracking-tight">
               {formatNPR(product.basePrice)}
             </span>
           </div>
@@ -155,7 +155,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <button
                 disabled={!product.isAvailable}
                 onClick={() => onSelect(product)}
-                className="flex items-center gap-1.5 h-8.5 px-3 text-xs font-bold bg-zinc-100 hover:bg-amber-500 hover:text-black dark:bg-zinc-800 dark:hover:bg-amber-500 dark:hover:text-black text-zinc-800 dark:text-zinc-200 rounded-none transition-all disabled:opacity-40 cursor-pointer border border-zinc-200 dark:border-zinc-700 hover:border-amber-500"
+                className="flex items-center gap-1.5 h-8.5 px-3 text-xs font-bold bg-zinc-800 hover:bg-amber-500 hover:text-black text-zinc-200 rounded-none transition-all disabled:opacity-40 cursor-pointer border border-zinc-700 hover:border-amber-500"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
                 <span>Customize</span>

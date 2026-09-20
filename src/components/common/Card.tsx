@@ -13,13 +13,13 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   const variantStyles = {
     default:
-      "bg-white dark:bg-[#121214] border border-black/10 dark:border-white/10 shadow-sm rounded-none",
+      "bg-[#121214] border border-white/10 shadow-sm rounded-none text-zinc-100",
     elevated:
-      "bg-white dark:bg-[#121214] border border-black/10 dark:border-white/10 shadow-md dark:shadow-black/50 rounded-none",
+      "bg-[#121214] border border-white/10 shadow-md shadow-black/50 rounded-none text-zinc-100",
     flat:
-      "bg-zinc-50 dark:bg-[#18181B] border border-zinc-200/80 dark:border-zinc-800 rounded-none",
+      "bg-[#18181B] border border-zinc-800 rounded-none text-zinc-100",
     interactive:
-      "bg-white dark:bg-[#121214] border border-black/10 dark:border-white/10 shadow-sm hover:border-amber-500 dark:hover:border-amber-500 transition-all duration-150 cursor-pointer rounded-none",
+      "bg-[#121214] border border-white/10 shadow-sm hover:border-amber-500 transition-all duration-150 cursor-pointer rounded-none text-zinc-100",
   };
 
   return (

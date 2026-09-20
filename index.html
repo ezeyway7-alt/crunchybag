@@ -1,8 +1,16 @@
 <!doctype html>
-<html lang="en" class="dark" style="color-scheme: dark; background-color: #09090b;">
+<html lang="en" class="dark" data-theme="dark" style="color-scheme: dark; background-color: #09090b;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.style.colorScheme = 'dark';
+        document.documentElement.style.backgroundColor = '#09090b';
+      })();
+    </script>
     <title>Crunchy - Restaurant Platform</title>
     <meta name="description" content="Multi-tenant restaurant and operations platform featuring Customer Ordering, Staff Operations, Kitchen Display System (KDS), Platform Control Plane, and Device Setup." />
     
@@ -172,7 +180,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-[#09090b] text-zinc-100 antialiased selection:bg-amber-500 selection:text-black min-h-screen">
+  <body class="dark bg-[#09090b] text-zinc-100 antialiased selection:bg-amber-500 selection:text-black min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

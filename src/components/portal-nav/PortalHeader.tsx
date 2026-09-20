@@ -133,7 +133,7 @@ export const PortalHeader: React.FC = () => {
 
   // PUBLIC RESTAURANT WEBSITE HEADER (Customer View)
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-white dark:bg-[#0A0A0B] border-zinc-200 dark:border-zinc-800 transition-colors">
+    <header className="sticky top-0 z-40 w-full border-b bg-[#0A0A0B] border-zinc-800 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         {/* Main Row: Logo, Desktop Search, and Action Icons */}
         <div className="flex items-center justify-between h-14 md:h-16 gap-2 sm:gap-4">
@@ -156,15 +156,15 @@ export const PortalHeader: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsSearchModalOpen(true)}
-              className="w-full flex items-center justify-between h-11 bg-zinc-100 hover:bg-zinc-200/70 dark:bg-[#141416] dark:hover:bg-[#1C1C1F] border border-zinc-300 dark:border-zinc-700 px-3.5 transition-all cursor-pointer text-left group"
+              className="w-full flex items-center justify-between h-11 bg-[#141416] hover:bg-[#1C1C1F] border border-zinc-700 px-3.5 transition-all cursor-pointer text-left group"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <Search className="w-4 h-4 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
-                <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 font-medium truncate">
+                <span className="text-xs sm:text-sm text-zinc-400 font-medium truncate">
                   Search burgers, fried chicken, sides, shakes...
                 </span>
               </div>
-              <kbd className="inline-flex items-center gap-0.5 shrink-0 text-[10px] font-mono text-zinc-400 dark:text-zinc-500 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-1.5 py-0.5 font-bold">
+              <kbd className="inline-flex items-center gap-0.5 shrink-0 text-[10px] font-mono text-zinc-400 bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 font-bold">
                 ⌘K
               </kbd>
             </button>
@@ -176,7 +176,7 @@ export const PortalHeader: React.FC = () => {
             <button
               id="header-love-btn"
               onClick={() => setIsFavoritesModalOpen(true)}
-              className="relative flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:text-rose-500 dark:hover:text-rose-400 border border-zinc-300 dark:border-zinc-700 transition-colors cursor-pointer"
+              className="relative flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-rose-400 border border-zinc-700 transition-colors cursor-pointer"
               aria-label="Favorites"
               title="Saved Favorites"
             >
@@ -192,13 +192,13 @@ export const PortalHeader: React.FC = () => {
             <button
               id="header-cart-btn"
               onClick={() => setIsCartDrawerOpen(true)}
-              className="relative flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 transition-colors cursor-pointer"
+              className="relative flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 transition-colors cursor-pointer"
               aria-label="Shopping Cart"
               title="View Cart"
             >
               <ShoppingBag className="h-4 w-4 font-bold" />
               {cart.items.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-amber-500 text-black text-[10px] font-black h-4 min-w-4 sm:h-4.5 sm:min-w-4.5 px-1 flex items-center justify-center border border-black dark:border-zinc-900">
+                <span className="absolute -top-1 -right-1 bg-amber-500 text-black text-[10px] font-black h-4 min-w-4 sm:h-4.5 sm:min-w-4.5 px-1 flex items-center justify-center border border-zinc-900">
                   {cart.items.reduce((sum, item) => sum + item.quantity, 0)}
                 </span>
               )}
@@ -215,7 +215,7 @@ export const PortalHeader: React.FC = () => {
               >
                 <User className="h-4 w-4 stroke-[2.5]" />
                 {activeOrder && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-600 border border-black dark:border-zinc-900 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-600 border border-zinc-900 animate-pulse" />
                 )}
               </button>
 
@@ -223,19 +223,19 @@ export const PortalHeader: React.FC = () => {
               {isProfileMenuOpen && (
                 <div
                   id="profile-dropdown-menu"
-                  className="absolute right-0 top-full mt-2 w-52 sm:w-56 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 shadow-2xl py-1 z-50 text-zinc-900 dark:text-zinc-100 animate-in fade-in zoom-in-95 duration-100"
+                  className="absolute right-0 top-full mt-2 w-52 sm:w-56 max-w-[calc(100vw-1.5rem)] bg-[#121214] border border-zinc-800 shadow-2xl py-1 z-50 text-zinc-100 animate-in fade-in zoom-in-95 duration-100"
                 >
                   {/* Customer Info Header */}
-                  <div className="px-3.5 py-2.5 border-b border-zinc-100 dark:border-zinc-800/80 bg-zinc-50 dark:bg-[#161619]">
+                  <div className="px-3.5 py-2.5 border-b border-zinc-800/80 bg-[#161619]">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 bg-amber-500 text-black font-black text-xs flex items-center justify-center shrink-0 border border-amber-600">
                         {customerProfile.name.charAt(0) || "A"}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-bold truncate text-zinc-950 dark:text-white">
+                        <p className="text-xs font-bold truncate text-white">
                           {customerProfile.name}
                         </p>
-                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                        <p className="text-[10px] text-zinc-400 truncate">
                           {customerProfile.email}
                         </p>
                       </div>
@@ -251,7 +251,7 @@ export const PortalHeader: React.FC = () => {
                         setIsProfileMenuOpen(false);
                         setIsProfileModalOpen(true);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 transition-colors text-left cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-amber-500/10 hover:text-amber-400 transition-colors text-left cursor-pointer"
                     >
                       <User className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                       <span>My Profile</span>
@@ -264,7 +264,7 @@ export const PortalHeader: React.FC = () => {
                         setIsProfileMenuOpen(false);
                         setCustomerActiveTab("orders");
                       }}
-                      className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 transition-colors text-left cursor-pointer"
+                      className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-amber-500/10 hover:text-amber-400 transition-colors text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5">
                         <Package className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -286,7 +286,7 @@ export const PortalHeader: React.FC = () => {
                         setIsProfileMenuOpen(false);
                         setIsScanQrOpen(true);
                       }}
-                      className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
+                      className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5">
                         <QrCode className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -361,13 +361,13 @@ export const PortalHeader: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsSearchModalOpen(true)}
-            className="w-full flex items-center justify-between h-9.5 bg-zinc-100 hover:bg-zinc-200/70 dark:bg-[#141416] dark:hover:bg-[#1C1C1F] border border-zinc-300 dark:border-zinc-700 px-3 text-left transition-all cursor-pointer"
+            className="w-full flex items-center justify-between h-9.5 bg-[#141416] hover:bg-[#1C1C1F] border border-zinc-700 px-3 text-left transition-all cursor-pointer"
           >
-            <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+            <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium">
               <Search className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span className="truncate">Search burgers, fried chicken, shakes...</span>
             </div>
-            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase">
+            <span className="text-[10px] text-amber-400 font-bold uppercase">
               Search
             </span>
           </button>

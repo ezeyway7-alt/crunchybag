@@ -77,7 +77,7 @@ export const Drawer: React.FC<DrawerProps> = ({
               exit={isBottom ? { y: "100%" } : { x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 350 }}
               className={cn(
-                "pointer-events-auto w-screen bg-white dark:bg-[#121214] text-zinc-900 dark:text-zinc-100 shadow-2xl flex flex-col border-zinc-200 dark:border-zinc-800",
+                "pointer-events-auto w-screen bg-[#121214] text-zinc-100 shadow-2xl flex flex-col border-zinc-800",
                 isBottom
                   ? "max-h-[85vh] border-t"
                   : "w-full sm:max-w-md md:max-w-lg border-l h-full",
@@ -87,25 +87,25 @@ export const Drawer: React.FC<DrawerProps> = ({
               {/* Header */}
               <div
                 className={cn(
-                  "px-4 sm:px-6 py-3.5 sm:py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0",
+                  "px-4 sm:px-6 py-3.5 sm:py-4 border-b border-zinc-800 flex items-center justify-between shrink-0",
                   headerClassName
                 )}
               >
                 <div className="min-w-0 pr-2">
                   {title && (
-                    <div className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white truncate">
+                    <div className="text-base sm:text-lg font-bold text-white truncate">
                       {title}
                     </div>
                   )}
                   {description && (
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
+                    <div className="text-xs text-zinc-400 mt-0.5 truncate">
                       {description}
                     </div>
                   )}
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-1.5 -mr-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-none transition-colors cursor-pointer shrink-0"
+                  className="p-1.5 -mr-1 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-none transition-colors cursor-pointer shrink-0"
                   aria-label="Close drawer"
                 >
                   <X className="h-4 w-4 sm:h-5 sm:w-5 stroke-[2.2]" />
