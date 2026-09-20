@@ -219,6 +219,22 @@ export const StaffLoginModal: React.FC = () => {
               Sign In to Dashboard
             </Button>
           </div>
+
+          <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsLoginModalOpen(false);
+                if (typeof window !== "undefined") {
+                  window.history.pushState(null, "", "/admin-login");
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                }
+              }}
+              className="text-[11px] text-zinc-400 hover:text-amber-500 underline transition-colors cursor-pointer"
+            >
+              Open dedicated admin login page (/admin-login) &rarr;
+            </button>
+          </div>
         </form>
       </div>
     </Modal>

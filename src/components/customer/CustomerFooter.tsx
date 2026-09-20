@@ -453,6 +453,18 @@ export const CustomerFooter: React.FC = () => {
                 <li className="pt-1 flex flex-col gap-1.5">
                   <button
                     type="button"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.history.pushState(null, "", "/admin-login");
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                      }
+                    }}
+                    className="text-[10px] text-zinc-400 hover:text-amber-500 underline uppercase tracking-wider cursor-pointer text-left"
+                  >
+                    Admin Portal (/admin-login) &rarr;
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setIsLoginModalOpen(true)}
                     className="text-[10px] text-zinc-400 hover:text-amber-500 underline uppercase tracking-wider cursor-pointer text-left"
                   >
