@@ -15,6 +15,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { useAuth } from "../../context/AuthContext";
 import { CrunchyLogo } from "../common/CrunchyLogo";
 import { ReserveTableModal } from "./ReserveTableModal";
 import { AboutUsModal } from "./AboutUsModal";
@@ -48,6 +49,7 @@ const SINGLE_OUTLET: OutletLocation = {
 };
 
 export const CustomerFooter: React.FC = () => {
+  const { openLoginModal } = useAuth();
   const {
     setCustomerActiveTab,
     setIsSearchModalOpen,
@@ -455,10 +457,8 @@ export const CustomerFooter: React.FC = () => {
                     type="button"
                     id="footer-admin-login-btn"
                     onClick={() => {
-                      if (typeof window !== "undefined") {
-                        window.history.pushState(null, "", "/admin-login");
-                        window.dispatchEvent(new PopStateEvent("popstate"));
-                      }
+                      openLoginModal();
+                      setIsLoginModalOpen(true);
                     }}
                     className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-amber-500 transition-colors cursor-pointer"
                   >
@@ -531,10 +531,8 @@ export const CustomerFooter: React.FC = () => {
                 type="button"
                 id="footer-bottom-admin-login-btn"
                 onClick={() => {
-                  if (typeof window !== "undefined") {
-                    window.history.pushState(null, "", "/admin-login");
-                    window.dispatchEvent(new PopStateEvent("popstate"));
-                  }
+                  openLoginModal();
+                  setIsLoginModalOpen(true);
                 }}
                 className="hover:text-amber-500 transition-colors cursor-pointer font-medium"
               >

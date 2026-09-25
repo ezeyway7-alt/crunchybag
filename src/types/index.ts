@@ -28,7 +28,7 @@ export interface ActivityLogItem {
   badgeType: "order" | "kitchen" | "menu" | "staff" | "payment";
 }
 
-export type PortalType = "customer" | "staff" | "kitchen" | "platform" | "device" | "kiosk" | "table-qr" | "tv";
+export type PortalType = "customer" | "staff" | "kitchen" | "admin" | "platform" | "device" | "kiosk" | "table-qr" | "tv";
 
 export interface Outlet {
   id: string;
@@ -380,19 +380,33 @@ export type AdminSubPage =
   | "outlets"
   | "logs";
 
+export interface EmployeeAssignedOutlet {
+  id: string | number;
+  name: string;
+  code?: string;
+  branch_code?: string;
+}
+
 export interface Employee {
   id: string;
   name: string;
   email: string;
   phone: string;
-  role: "SUPER_ADMIN" | "STORE_MANAGER" | "CASHIER" | "KITCHEN_SUPERVISOR" | "INVENTORY_MANAGER" | "FLOOR_STAFF";
+  role: "SUPER_ADMIN" | "STORE_MANAGER" | "CASHIER" | "KITCHEN_SUPERVISOR" | "INVENTORY_MANAGER" | "FLOOR_STAFF" | string;
   title: string;
-  assignedOutletId: string;
+  assignedOutletId?: string;
+  assigned_outlet?: EmployeeAssignedOutlet;
   assignedPages: AdminSubPage[];
+  assigned_pages?: AdminSubPage[];
   isActive: boolean;
+  is_active?: boolean;
   salaryMonthly?: number;
+  salary_monthly?: string | number;
   joinedDate: string;
-  avatar?: string;
+  joined_date?: string;
+  avatar?: string | null;
+  pin_code?: string;
+  temporary_password?: string;
 }
 
 export type InventoryCategory =

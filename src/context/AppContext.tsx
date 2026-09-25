@@ -67,6 +67,7 @@ import {
   INITIAL_PARTIES,
   INITIAL_DAYBOOK_ENTRIES,
 } from "../mock/adminData";
+import { authStorage } from "../lib/authStorage";
 
 export interface ToastItem {
   id: string;
@@ -466,8 +467,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Outlets
   const [outlets, setOutlets] = useState<Outlet[]>(MOCK_OUTLETS);
-  const [currentOutlet, setCurrentOutlet] = useState<Outlet>(MOCK_OUTLETS[0]);
+  const [currentOutlet, setCurrentOutlet] = useState<Outlet>(() => {
+    const saved = authStorage.getOutlet();
+    if (saved && saved.name) {
+      return {
+        ...MOCK_OUTLETS[0],
+        id: String(saved.id || MOCK_OUTLETS[0].id),
+        name: saved.name || MOCK_OUTLETS[0].name,
+        code: saved.branch_code || saved.code || MOCK_OUTLETS[0].code,
+        address: saved.address || MOCK_OUTLETS[0].address,
+        phone: saved.phone || MOCK_OUTLETS[0].phone,
+      };
+    }
+    return MOCK_OUTLETS[0];
+  });
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("DELIVERY");
+
+  // Sync with authStorage outlet changes
+  useEffect(() => {
+    const handleOutletSync = () => {
+      const saved = authStorage.getOutlet();
+      if (saved && saved.name) {
+        setCurrentOutlet((prev) => ({
+          ...prev,
+          id: String(saved.id || prev.id),
+          name: saved.name || prev.name,
+          code: saved.branch_code || saved.code || prev.code,
+          address: saved.address || prev.address,
+          phone: saved.phone || prev.phone,
+        }));
+      }
+    };
+
+    window.addEventListener("crunchy:outlet_change", handleOutletSync);
+    window.addEventListener("crunchy:auth_change", handleOutletSync);
+    return () => {
+      window.removeEventListener("crunchy:outlet_change", handleOutletSync);
+      window.removeEventListener("crunchy:auth_change", handleOutletSync);
+    };
+  }, []);
 
   // Organization Suite States
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
@@ -1544,7 +1582,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (role === "KITCHEN") setActivePortal("kitchen");
     else if (role === "STAFF") setActivePortal("staff");
-    else if (role === "ADMIN") setActivePortal("platform");
+    else if (role === "ADMIN") setActivePortal("admin");
     else if (role === "KIOSK") setActivePortal("kiosk");
 
     addActivityLog({
@@ -1572,7 +1610,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsLoginModalOpen(false);
       if (match.role === "KITCHEN") setActivePortal("kitchen");
       else if (match.role === "STAFF") setActivePortal("staff");
-      else if (match.role === "ADMIN") setActivePortal("platform");
+      else if (match.role === "ADMIN") setActivePortal("admin");
       else if (match.role === "KIOSK") setActivePortal("kiosk");
 
       addActivityLog({

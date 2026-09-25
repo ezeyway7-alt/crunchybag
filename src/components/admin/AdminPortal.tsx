@@ -29,8 +29,13 @@ import {
   X,
   CreditCard,
   ChefHat,
+  ArrowLeft,
+  LogOut,
+  Globe,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { useAuth } from "../../context/AuthContext";
+import { ROLE_LABELS } from "../../types/auth";
 import { formatNPR } from "../../lib/utils";
 import { Order, OrderStatus } from "../../types";
 import { Badge } from "../common/Badge";
@@ -44,6 +49,7 @@ import { StaffBillingTab } from "../staff/StaffBillingTab";
 import { StaffInventoryTab } from "../staff/StaffInventoryTab";
 import { StaffDaybookTab } from "../staff/StaffDaybookTab";
 import { KDSPortal } from "../kds/KDSPortal";
+import { PlatformPortal } from "../platform/PlatformPortal";
 import { AdminEmployeesTab } from "./AdminEmployeesTab";
 import { AdminLoyaltyTab } from "./AdminLoyaltyTab";
 import { AdminMenuManagerTab } from "./AdminMenuManagerTab";
@@ -72,7 +78,24 @@ export const AdminPortal: React.FC = () => {
     loyaltyRecords,
     employees,
     isLoadingSkeleton,
+    setActivePortal,
+    logout: appLogout,
   } = useApp();
+
+  const { authUser, authOutlet, logout: authLogout } = useAuth();
+
+  const displayName =
+    authUser?.name ||
+    authUser?.first_name ||
+    authUser?.username ||
+    currentUser?.name ||
+    "Store General Manager";
+
+  const displayRole = authUser?.role
+    ? ROLE_LABELS[authUser.role] || authUser.role
+    : currentUser?.title || "Store Manager";
+
+  const displayOutlet = authOutlet?.name || currentOutlet?.name || "Kathmandu Branch";
 
   type TabType =
     | "overview"
@@ -85,6 +108,7 @@ export const AdminPortal: React.FC = () => {
     | "loyalty"
     | "employees"
     | "organization"
+    | "platform"
     | "logs";
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
@@ -98,6 +122,24 @@ export const AdminPortal: React.FC = () => {
     setIsAdminTabLoading(true);
     setActiveTab(tab);
     setTimeout(() => setIsAdminTabLoading(false), 220);
+  };
+
+  const handleReturnToCustomer = () => {
+    setActivePortal("customer");
+    if (typeof window !== "undefined") {
+      window.history.pushState(null, "", "/menu");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  };
+
+  const handleSignOut = () => {
+    authLogout();
+    appLogout();
+    setActivePortal("customer");
+    if (typeof window !== "undefined") {
+      window.history.pushState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
   };
 
   // Key metrics
@@ -175,6 +217,11 @@ export const AdminPortal: React.FC = () => {
       icon: Building2,
     },
     {
+      id: "platform",
+      label: "Multi-Tenant Governance",
+      icon: ShieldCheck,
+    },
+    {
       id: "logs",
       label: "Activity & Audit Logs",
       icon: FileText,
@@ -196,11 +243,35 @@ export const AdminPortal: React.FC = () => {
           >
             {isMobileSidebarOpen ? <X className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
           </button>
-          <span className="text-xs font-bold text-zinc-200">
-            Store Manager
-          </span>
+          <div>
+            <span className="text-xs font-bold text-zinc-100 block">
+              {displayName}
+            </span>
+            <span className="text-[10px] text-amber-400 font-mono">
+              {displayRole}
+            </span>
+          </div>
         </div>
-        <span className="text-[11px] text-zinc-400 font-mono">{currentOutlet.name}</span>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleReturnToCustomer}
+            title="Customer Storefront"
+            className="px-2 py-1 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded flex items-center gap-1 cursor-pointer"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            <span>Storefront</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            title="Logout"
+            className="p-1.5 text-zinc-400 hover:text-rose-400 cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* -------------------------------------------------------------
@@ -233,10 +304,10 @@ export const AdminPortal: React.FC = () => {
                 }`}
               >
                 <div className="text-xs font-bold text-zinc-100 truncate">
-                  Store Manager
+                  {displayName}
                 </div>
-                <div className="text-[10px] text-zinc-400 truncate font-mono">
-                  {currentOutlet.name}
+                <div className="text-[10px] text-amber-400 truncate font-mono">
+                  {displayRole} • {displayOutlet}
                 </div>
               </div>
             </div>
@@ -289,13 +360,13 @@ export const AdminPortal: React.FC = () => {
             })}
           </nav>
 
-          {/* Footer - Quick Add Log */}
-          <div className="p-2 border-t border-zinc-800 bg-[#0D0D0F] shrink-0">
+          {/* Footer - Quick Add Log & Navigation */}
+          <div className="p-2 border-t border-zinc-800 bg-[#0D0D0F] shrink-0 space-y-1">
             <button
               type="button"
               title="Add Staff Note / Log"
               onClick={() => handleTabChange("logs")}
-              className="w-full h-10 px-3 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 rounded-md flex items-center cursor-pointer relative"
+              className="w-full h-9 px-3 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 rounded-md flex items-center cursor-pointer relative"
             >
               <div className="w-6 flex items-center justify-center shrink-0">
                 <Plus className="w-4 h-4 text-amber-500" />
@@ -309,6 +380,44 @@ export const AdminPortal: React.FC = () => {
                 <span className="font-mono text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">
                   NEW
                 </span>
+              </div>
+            </button>
+
+            {/* Return to Customer Storefront */}
+            <button
+              type="button"
+              title="Return to Customer Storefront"
+              onClick={handleReturnToCustomer}
+              className="w-full h-9 px-3 text-xs text-zinc-400 hover:text-amber-400 hover:bg-zinc-800/50 rounded-md flex items-center cursor-pointer"
+            >
+              <div className="w-6 flex items-center justify-center shrink-0">
+                <ArrowLeft className="w-4 h-4 text-zinc-400" />
+              </div>
+              <div
+                className={`flex-1 ml-2.5 overflow-hidden transition-opacity duration-200 ${
+                  isSidebarHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+                }`}
+              >
+                <span className="truncate whitespace-nowrap font-medium">Customer Menu</span>
+              </div>
+            </button>
+
+            {/* Sign Out */}
+            <button
+              type="button"
+              title="Sign Out"
+              onClick={handleSignOut}
+              className="w-full h-9 px-3 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 rounded-md flex items-center cursor-pointer"
+            >
+              <div className="w-6 flex items-center justify-center shrink-0">
+                <LogOut className="w-4 h-4 text-rose-500" />
+              </div>
+              <div
+                className={`flex-1 ml-2.5 overflow-hidden transition-opacity duration-200 ${
+                  isSidebarHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+                }`}
+              >
+                <span className="truncate whitespace-nowrap font-medium">Sign Out</span>
               </div>
             </button>
           </div>
@@ -332,8 +441,8 @@ export const AdminPortal: React.FC = () => {
                     <Store className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-zinc-100">Store Manager</div>
-                    <div className="text-[10px] text-zinc-400 font-mono">{currentOutlet.name}</div>
+                    <div className="text-xs font-bold text-zinc-100">{displayName}</div>
+                    <div className="text-[10px] text-amber-400 font-mono">{displayRole} • {displayOutlet}</div>
                   </div>
                 </div>
                 <button
@@ -384,17 +493,41 @@ export const AdminPortal: React.FC = () => {
               </nav>
             </div>
 
-            <div className="pt-2 border-t border-zinc-800">
+            <div className="pt-2 border-t border-zinc-800 space-y-1.5">
               <button
                 type="button"
                 onClick={() => {
                   setIsMobileSidebarOpen(false);
                   handleTabChange("logs");
                 }}
-                className="w-full h-10 px-3 text-xs bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-md flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full h-9 px-3 text-xs bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Staff Log</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileSidebarOpen(false);
+                  handleReturnToCustomer();
+                }}
+                className="w-full h-9 px-3 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium rounded-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Customer Menu</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileSidebarOpen(false);
+                  handleSignOut();
+                }}
+                className="w-full h-9 px-3 text-xs bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/60 text-rose-300 font-medium rounded-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out</span>
               </button>
             </div>
           </aside>
@@ -618,7 +751,10 @@ export const AdminPortal: React.FC = () => {
         {/* TAB 10: OUTLETS & ORGANIZATION */}
         {activeTab === "organization" && <AdminOrganizationTab />}
 
-        {/* TAB 11: ACTIVITY & AUDIT LOGS */}
+        {/* TAB 11: PLATFORM MULTI-TENANT GOVERNANCE */}
+        {activeTab === "platform" && <PlatformPortal />}
+
+        {/* TAB 12: ACTIVITY & AUDIT LOGS */}
         {activeTab === "logs" && <AdminActivityTab />}
           </>
         )}
