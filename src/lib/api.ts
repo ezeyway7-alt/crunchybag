@@ -20,6 +20,103 @@ export const PROXY_API_BASE_URL = "/api/v1";
 const isHostedOnCrunchyBag = typeof window !== "undefined" && window.location.origin === LIVE_API_ORIGIN;
 export const DEFAULT_API_BASE = isHostedOnCrunchyBag ? API_BASE_URL : PROXY_API_BASE_URL;
 
+/**
+ * Safely extracts the Django CSRF token from browser cookies, DOM meta tags, hidden inputs, or storage.
+ */
+export function getCsrfToken(): string | null {
+  if (typeof document === "undefined") return null;
+
+  // 1. Try reading the standard Django `csrftoken` cookie
+  const match = document.cookie.match(/(?:^|;\s*)(?:csrftoken|csrf_token|XSRF-TOKEN)=([^;]+)/i);
+  if (match) {
+    const val = decodeURIComponent(match[1]).trim();
+    if (val) return val;
+  }
+
+  // 2. Try reading from a meta tag <meta name="csrf-token" content="..."> or similar
+  const meta = document.querySelector(
+    'meta[name="csrf-token"], meta[name="csrf-param"], meta[name="csrf_token"], meta[name="csrfmiddlewaretoken"]'
+  ) as HTMLMetaElement | null;
+  if (meta && meta.content) {
+    const val = meta.content.trim();
+    if (val) return val;
+  }
+
+  // 3. Try reading from hidden input <input name="csrfmiddlewaretoken">
+  const input = document.querySelector('input[name="csrfmiddlewaretoken"]') as HTMLInputElement | null;
+  if (input && input.value) {
+    const val = input.value.trim();
+    if (val) return val;
+  }
+
+  // 4. Try sessionStorage or localStorage
+  try {
+    const stored =
+      sessionStorage.getItem("crunchy_csrftoken") ||
+      localStorage.getItem("crunchy_csrftoken");
+    if (stored && stored.trim()) return stored.trim();
+  } catch {}
+
+  return null;
+}
+
+let csrfPromise: Promise<string | null> | null = null;
+
+/**
+ * Proactively fetches and ensures a valid Django CSRF cookie/token is present in the browser.
+ * Hits Django endpoints with GET/HEAD to trigger Django's `ensure_csrf_cookie` middleware.
+ */
+export async function ensureCsrfToken(): Promise<string | null> {
+  const existing = getCsrfToken();
+  if (existing) return existing;
+
+  if (typeof window === "undefined") return null;
+
+  if (csrfPromise) {
+    return csrfPromise;
+  }
+
+  csrfPromise = (async () => {
+    try {
+      // Candidate endpoints on Django backend that issue csrftoken cookies
+      const candidates = [
+        "/admin/login/",
+        "/csrf/",
+        `${LIVE_API_ORIGIN}/admin/login/`,
+      ];
+
+      for (const endpoint of candidates) {
+        try {
+          await fetch(endpoint, {
+            method: "GET",
+            credentials: "include",
+            headers: {
+              Accept: "text/html,application/json,*/*",
+            },
+          });
+          const token = getCsrfToken();
+          if (token) {
+            try {
+              sessionStorage.setItem("crunchy_csrftoken", token);
+            } catch {}
+            return token;
+          }
+        } catch {
+          // ignore candidate failure and try next
+        }
+      }
+
+      return getCsrfToken();
+    } catch {
+      return null;
+    } finally {
+      csrfPromise = null;
+    }
+  })();
+
+  return csrfPromise;
+}
+
 export interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
   skipRefreshRetry?: boolean;
@@ -94,6 +191,18 @@ export function extractErrorMessage(error: unknown): string {
       }
     }
 
+    // Check if error is related to CSRF
+    const detailLower = String(
+      (error.data && typeof error.data === "object" ? error.data.detail || error.data.error || "" : "") ||
+      (typeof error.data === "string" ? error.data : "") ||
+      error.message ||
+      ""
+    ).toLowerCase();
+
+    if (detailLower.includes("csrf failed") || detailLower.includes("csrf token")) {
+      return "Security session verification failed (CSRF token missing). Please reload the page to refresh session.";
+    }
+
     // Status code fallbacks
     if (error.status === 400) {
       return "Invalid credentials or malformed request. Please check your username/email and password.";
@@ -160,10 +269,42 @@ export async function baseRequest<T = any>(
     }
   }
 
+  // Determine method and check if mutating (POST, PUT, PATCH, DELETE)
+  const method = (restOptions.method || "GET").toUpperCase();
+  const isMutating = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+
+  // Attach Django CSRF Token if present, or proactively prime it for mutating requests
+  let csrfToken = getCsrfToken();
+  if (isMutating && !csrfToken && typeof window !== "undefined") {
+    csrfToken = await ensureCsrfToken();
+  }
+
+  if (csrfToken) {
+    if (!requestHeaders.has("X-CSRFToken")) {
+      requestHeaders.set("X-CSRFToken", csrfToken);
+    }
+    if (!requestHeaders.has("X-CSRF-Token")) {
+      requestHeaders.set("X-CSRF-Token", csrfToken);
+    }
+  }
+
+  // Determine safe credentials mode (include cookies when on same origin)
+  let credentialsMode: RequestCredentials = restOptions.credentials || "same-origin";
+  if (typeof window !== "undefined") {
+    const isSameOrigin =
+      targetUrl.startsWith("/") ||
+      targetUrl.startsWith(window.location.origin) ||
+      (window.location.hostname.includes("crunchybag.com") && targetUrl.includes("crunchybag.com"));
+    if (isSameOrigin) {
+      credentialsMode = "include";
+    }
+  }
+
   let response: Response;
   try {
     response = await fetch(targetUrl, {
       ...restOptions,
+      credentials: credentialsMode,
       headers: requestHeaders,
     });
   } catch (networkErr: any) {
@@ -173,6 +314,7 @@ export async function baseRequest<T = any>(
         const proxyUrl = targetUrl.replace(LIVE_API_ORIGIN, "");
         response = await fetch(proxyUrl, {
           ...restOptions,
+          credentials: credentialsMode,
           headers: requestHeaders,
         });
       } catch {
@@ -188,6 +330,36 @@ export async function baseRequest<T = any>(
         0,
         networkErr
       );
+    }
+  }
+
+  // Handle 403 CSRF failure: automatically refresh token and retry once
+  if (response.status === 403 && !skipRefreshRetry) {
+    let isCsrfError = false;
+    try {
+      const cloned = response.clone();
+      const text = await cloned.text();
+      if (text.toLowerCase().includes("csrf")) {
+        isCsrfError = true;
+      }
+    } catch {}
+
+    if (isCsrfError && typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("crunchy_csrftoken");
+        localStorage.removeItem("crunchy_csrftoken");
+      } catch {}
+
+      const freshToken = await ensureCsrfToken();
+      if (freshToken) {
+        requestHeaders.set("X-CSRFToken", freshToken);
+        requestHeaders.set("X-CSRF-Token", freshToken);
+        return baseRequest<T>(endpoint, {
+          ...options,
+          skipRefreshRetry: true,
+          headers: requestHeaders,
+        });
+      }
     }
   }
 
@@ -279,13 +451,21 @@ async function performTokenRefresh(refreshToken: string): Promise<string> {
   const refreshUrl = `${DEFAULT_API_BASE}/auth/token/refresh/`;
   let resp: Response;
 
+  const csrf = getCsrfToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  if (csrf) {
+    headers["X-CSRFToken"] = csrf;
+    headers["X-CSRF-Token"] = csrf;
+  }
+
   try {
     resp = await fetch(refreshUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      credentials: "include",
+      headers,
       body: JSON.stringify({ refresh: refreshToken }),
     });
   } catch (err) {
@@ -293,10 +473,8 @@ async function performTokenRefresh(refreshToken: string): Promise<string> {
     const fallbackUrl = `${LIVE_API_ORIGIN}/api/v1/auth/token/refresh/`;
     resp = await fetch(fallbackUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      credentials: "include",
+      headers,
       body: JSON.stringify({ refresh: refreshToken }),
     });
   }
@@ -324,11 +502,16 @@ export const authApi = {
    * Response: { access: string, refresh: string, user: BackendUser, outlet: BackendOutlet }
    */
   async login(payload: LoginPayload): Promise<LoginResponse> {
+    // Proactively prime CSRF cookie if in browser
+    if (typeof window !== "undefined") {
+      await ensureCsrfToken().catch(() => null);
+    }
+
     const result = await baseRequest<LoginResponse>("/auth/login/", {
       method: "POST",
       body: JSON.stringify(payload),
       skipAuth: true,
-      skipRefreshRetry: true,
+      skipRefreshRetry: false,
     });
 
     if (result && result.access && result.user) {

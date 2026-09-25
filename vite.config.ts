@@ -25,6 +25,11 @@ export default defineConfig(() => {
             });
           },
         },
+        '/admin/login': {
+          target: 'https://crunchybag.com',
+          changeOrigin: true,
+          secure: true,
+        },
       },
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
