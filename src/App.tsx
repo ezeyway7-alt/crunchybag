@@ -28,6 +28,7 @@ const AppContent: React.FC = () => {
   const {
     authUser,
     isAuthenticated,
+    isLoading: isAuthLoading,
     isLoginModalOpen,
     closeLoginModal,
   } = useAuth();
@@ -78,6 +79,8 @@ const AppContent: React.FC = () => {
   const isAdminRoute =
     currentPath === "/admin" ||
     (currentPath.startsWith("/admin") && currentPath !== "/admin-login" && !currentPath.startsWith("/admin-login")) ||
+    currentPath === "/admin-portal" ||
+    currentPath.startsWith("/admin-portal") ||
     currentPath === "/superadmin" ||
     currentPath.startsWith("/superadmin") ||
     currentPath === "/brand/dashboard" ||
@@ -85,6 +88,7 @@ const AppContent: React.FC = () => {
     currentPath === "/outlet/dashboard" ||
     currentPath.startsWith("/outlet") ||
     currentPath === "/dashboard" ||
+    currentPath.startsWith("/dashboard") ||
     activePortal === "admin" ||
     activePortal === "platform";
 
@@ -119,7 +123,19 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // 2. Protected routes guard: If user accesses staff/admin portal while logged out, show Login screen
+  // 2. Protected routes guard: Wait for session verification on page refresh without flickering login modal
+  if (isProtectedRoleRoute && isAuthLoading && !authUser) {
+    return (
+      <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-zinc-100">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs uppercase tracking-widest text-zinc-400 font-mono">Restoring Crunchy Session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user accesses staff/admin portal while logged out, show Login screen
   if (isProtectedRoleRoute && !isAuthenticated) {
     return (
       <div className="min-h-screen bg-[#09090b] text-zinc-100 antialiased selection:bg-amber-500 selection:text-black">

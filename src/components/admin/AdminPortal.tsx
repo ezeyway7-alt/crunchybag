@@ -111,18 +111,74 @@ export const AdminPortal: React.FC = () => {
     | "platform"
     | "logs";
 
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const VALID_TABS: TabType[] = [
+    "overview",
+    "pos_orders",
+    "billing",
+    "kitchen",
+    "inventory",
+    "daybook",
+    "menu",
+    "loyalty",
+    "employees",
+    "organization",
+    "platform",
+    "logs",
+  ];
+
+  const getInitialTab = (): TabType => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlTab = searchParams.get("tab") as TabType;
+      if (urlTab && VALID_TABS.includes(urlTab)) return urlTab;
+
+      const hashTab = window.location.hash.replace("#", "") as TabType;
+      if (hashTab && VALID_TABS.includes(hashTab)) return hashTab;
+
+      const savedTab = localStorage.getItem("crunchy_admin_active_tab") as TabType;
+      if (savedTab && VALID_TABS.includes(savedTab)) return savedTab;
+    }
+    return "overview";
+  };
+
+  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
   const [isAdminTabLoading, setIsAdminTabLoading] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedBillingOrder, setSelectedBillingOrder] = useState<Order | null>(null);
 
+  // Sync tab changes with URL and localStorage
   const handleTabChange = (tab: TabType) => {
     if (tab === activeTab) return;
     setIsAdminTabLoading(true);
     setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("crunchy_admin_active_tab", tab);
+        const url = new URL(window.location.href);
+        url.searchParams.set("tab", tab);
+        window.history.replaceState(null, "", url.toString());
+      } catch (e) {
+        console.warn("Failed to persist admin tab in URL/storage:", e);
+      }
+    }
     setTimeout(() => setIsAdminTabLoading(false), 220);
   };
+
+  // Listen for back/forward navigation or manual URL changes
+  React.useEffect(() => {
+    const handleUrlTabChange = () => {
+      if (typeof window !== "undefined") {
+        const searchParams = new URLSearchParams(window.location.search);
+        const urlTab = searchParams.get("tab") as TabType;
+        if (urlTab && VALID_TABS.includes(urlTab) && urlTab !== activeTab) {
+          setActiveTab(urlTab);
+        }
+      }
+    };
+    window.addEventListener("popstate", handleUrlTabChange);
+    return () => window.removeEventListener("popstate", handleUrlTabChange);
+  }, [activeTab]);
 
   const handleReturnToCustomer = () => {
     setActivePortal("customer");
