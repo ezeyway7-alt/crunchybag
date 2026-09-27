@@ -15,6 +15,7 @@ import { useApp } from "../../../context/AppContext";
 import { formatNPR } from "../../../lib/utils";
 import { inventoryApi, BackendInventoryItem } from "../../../lib/inventoryApi";
 import { useInventoryWebSocket } from "../../../lib/useInventoryWebSocket";
+import { SupplierSelect2 } from "./PurchaseInwardWorkbench";
 
 interface StockCatalogWorkbenchProps {
   refreshTrigger?: number;
@@ -898,13 +899,12 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
 
               <div>
                 <label className="block text-[10px] text-zinc-400 font-semibold mb-0.5 uppercase tracking-wider">
-                  Supplier
+                  Supplier (Select2)
                 </label>
-                <input
-                  type="text"
+                <SupplierSelect2
                   value={supplierName}
-                  onChange={(e) => setSupplierName(e.target.value)}
-                  className="w-full h-7 px-2 bg-zinc-800/80 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 text-xs focus:outline-none"
+                  phone=""
+                  onChange={(sup) => setSupplierName(sup)}
                 />
               </div>
 

@@ -73,6 +73,8 @@ export const DeliveryLocationModal: React.FC<DeliveryLocationModalProps> = ({
   });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [highlightedLandmarkIndex, setHighlightedLandmarkIndex] = useState(-1);
+  const landmarkListRef = useRef<HTMLDivElement>(null);
   const [streetAddress, setStreetAddress] = useState(currentAddress || "House #14, Lazimpat, Kathmandu");
   const [landmarkNote, setLandmarkNote] = useState("Near Standard Chartered Bank");
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -92,6 +94,26 @@ export const DeliveryLocationModal: React.FC<DeliveryLocationModalProps> = ({
       l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       l.area.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setHighlightedLandmarkIndex(filteredLandmarks.length > 0 ? 0 : -1);
+    } else {
+      setHighlightedLandmarkIndex(-1);
+    }
+  }, [searchQuery, filteredLandmarks.length]);
+
+  // Auto-scroll highlighted landmark into view
+  useEffect(() => {
+    if (searchQuery.trim() !== "" && landmarkListRef.current && highlightedLandmarkIndex >= 0) {
+      const activeEl = landmarkListRef.current.querySelector<HTMLElement>(
+        `[data-landmark-index="${highlightedLandmarkIndex}"]`
+      );
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [highlightedLandmarkIndex, searchQuery]);
 
   // Create custom vector HTML divIcon for pin
   const createPinIcon = () => {
@@ -274,14 +296,60 @@ export const DeliveryLocationModal: React.FC<DeliveryLocationModalProps> = ({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
               <input
                 type="text"
+                role="combobox"
+                aria-expanded={searchQuery.trim() !== ""}
+                aria-autocomplete="list"
+                aria-haspopup="listbox"
+                aria-activedescendant={
+                  highlightedLandmarkIndex >= 0 ? `landmark-opt-${highlightedLandmarkIndex}` : undefined
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (filteredLandmarks.length === 0) return;
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setHighlightedLandmarkIndex((prev) => (prev + 1) % filteredLandmarks.length);
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setHighlightedLandmarkIndex((prev) =>
+                      prev <= 0 ? filteredLandmarks.length - 1 : prev - 1
+                    );
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (
+                      highlightedLandmarkIndex >= 0 &&
+                      highlightedLandmarkIndex < filteredLandmarks.length
+                    ) {
+                      handleSelectLandmark(filteredLandmarks[highlightedLandmarkIndex]);
+                    } else if (filteredLandmarks.length > 0) {
+                      handleSelectLandmark(filteredLandmarks[0]);
+                    }
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setSearchQuery("");
+                    setHighlightedLandmarkIndex(-1);
+                  }
+                }}
                 placeholder="Search landmark, area or junction (e.g. Durbar Marg, Baneshwor, Thamel)..."
                 className="w-full pl-9 pr-3 py-2 text-xs bg-white dark:bg-[#1E1E22] border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
               />
               {searchQuery && (
                 <button
-                  onClick={() => setSearchQuery("")}
+                  type="button"
+                  tabIndex={0}
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setHighlightedLandmarkIndex(-1);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSearchQuery("");
+                      setHighlightedLandmarkIndex(-1);
+                    }
+                  }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
                 >
                   Clear
@@ -316,33 +384,50 @@ export const DeliveryLocationModal: React.FC<DeliveryLocationModalProps> = ({
 
           {/* Autocomplete Dropdown if typing in search */}
           {searchQuery.trim() !== "" && (
-            <div className="max-h-40 overflow-y-auto bg-white dark:bg-[#1E1E22] border border-zinc-200 dark:border-zinc-700 divide-y divide-zinc-100 dark:divide-zinc-800 shadow-lg">
+            <div
+              ref={landmarkListRef}
+              role="listbox"
+              id="landmark-listbox"
+              className="max-h-40 overflow-y-auto bg-white dark:bg-[#1E1E22] border border-zinc-200 dark:border-zinc-700 divide-y divide-zinc-100 dark:divide-zinc-800 shadow-lg"
+            >
               {filteredLandmarks.length === 0 ? (
                 <div className="p-3 text-xs text-zinc-500 dark:text-zinc-400 text-center">
                   No landmark matches found. Drag or click on the map to place pin manually.
                 </div>
               ) : (
-                filteredLandmarks.map((lm) => (
-                  <button
-                    key={lm.id}
-                    type="button"
-                    onClick={() => handleSelectLandmark(lm)}
-                    className="w-full flex items-center justify-between p-2.5 text-left hover:bg-amber-500/10 text-xs text-zinc-900 dark:text-zinc-200 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                      <div>
-                        <span className="font-bold">{lm.name}</span>
-                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 ml-1.5">
-                          ({lm.area})
-                        </span>
+                filteredLandmarks.map((lm, idx) => {
+                  const isHighlighted = highlightedLandmarkIndex === idx;
+                  return (
+                    <button
+                      key={lm.id}
+                      id={`landmark-opt-${idx}`}
+                      data-landmark-index={idx}
+                      role="option"
+                      aria-selected={isHighlighted}
+                      type="button"
+                      onMouseEnter={() => setHighlightedLandmarkIndex(idx)}
+                      onClick={() => handleSelectLandmark(lm)}
+                      className={`w-full flex items-center justify-between p-2.5 text-left text-xs transition-colors cursor-pointer ${
+                        isHighlighted
+                          ? "bg-amber-500/20 text-zinc-900 dark:text-white ring-1 ring-amber-500/60 font-semibold"
+                          : "hover:bg-amber-500/10 text-zinc-900 dark:text-zinc-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <div>
+                          <span className="font-bold">{lm.name}</span>
+                          <span className="text-[10px] text-zinc-500 dark:text-zinc-400 ml-1.5">
+                            ({lm.area})
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 uppercase font-bold">
-                      Select
-                    </span>
-                  </button>
-                ))
+                      <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 uppercase font-bold">
+                        Select
+                      </span>
+                    </button>
+                  );
+                })
               )}
             </div>
           )}
