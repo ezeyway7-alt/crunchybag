@@ -49,7 +49,6 @@ interface UseInventoryWebSocketOptions {
   onStockDeducted?: (data: StockDeductedEvent) => void;
   onLowStockAlert?: (data: LowStockAlertEvent) => void;
   onAuditAdjusted?: (data: StockAuditAdjustedEvent) => void;
-  onAnyUpdate?: () => void;
   enabled?: boolean;
 }
 
@@ -59,7 +58,6 @@ export function useInventoryWebSocket({
   onStockDeducted,
   onLowStockAlert,
   onAuditAdjusted,
-  onAnyUpdate,
   enabled = true,
 }: UseInventoryWebSocketOptions = {}) {
   const [isConnected, setIsConnected] = useState(false);
@@ -77,13 +75,15 @@ export function useInventoryWebSocket({
   onLowStockAlertRef.current = onLowStockAlert;
   const onAuditAdjustedRef = useRef(onAuditAdjusted);
   onAuditAdjustedRef.current = onAuditAdjusted;
-  const onAnyUpdateRef = useRef(onAnyUpdate);
-  onAnyUpdateRef.current = onAnyUpdate;
 
   const connect = useCallback(() => {
     if (!enabled || typeof window === "undefined") return;
 
-    if (socketRef.current && (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING)) {
+    if (
+      socketRef.current &&
+      (socketRef.current.readyState === WebSocket.OPEN ||
+        socketRef.current.readyState === WebSocket.CONNECTING)
+    ) {
       return;
     }
 
@@ -120,24 +120,22 @@ export function useInventoryWebSocket({
               onAuditAdjustedRef.current?.(parsed as StockAuditAdjustedEvent);
               break;
           }
-
-          onAnyUpdateRef.current?.();
         } catch {
-          // Non-JSON ping/pong or message
+          // Non-JSON ping/pong or heartbeat - ignored to avoid polling loops
         }
       };
 
       ws.onerror = () => {
-        // Handled silently to avoid console flooding when dev server or backend WS is unavailable
+        // Silently handled to avoid browser console spam
       };
 
       ws.onclose = () => {
         setIsConnected(false);
         socketRef.current = null;
 
-        // Reconnect with exponential backoff (capped at 15s)
+        // Reconnect with conservative backoff (5s, 10s, 20s, max 30s)
         if (enabled) {
-          const delay = Math.min(1000 * Math.pow(1.5, retryCountRef.current), 15000);
+          const delay = Math.min(5000 * Math.pow(1.5, retryCountRef.current), 30000);
           retryCountRef.current += 1;
           clearTimeout(reconnectTimeoutRef.current);
           reconnectTimeoutRef.current = setTimeout(() => {

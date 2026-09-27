@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Search,
   Plus,
@@ -15,6 +15,7 @@ import {
 import { useApp } from "../../../context/AppContext";
 import { formatNPR } from "../../../lib/utils";
 import { inventoryApi, BackendInventoryItem } from "../../../lib/inventoryApi";
+import { useInventoryWebSocket } from "../../../lib/useInventoryWebSocket";
 
 interface StockCatalogWorkbenchProps {
   refreshTrigger?: number;
@@ -32,8 +33,17 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [isLowStockOnly, setIsLowStockOnly] = useState(false);
+
+  // Debounce search query by 350ms to prevent rapid-fire requests
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Live Backend Data State
   const [catalogResults, setCatalogResults] = useState<BackendInventoryItem[]>([]);
@@ -43,6 +53,105 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
     total_valuation: 0,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const isInitialLoadRef = useRef(true);
+
+  // Real-Time WebSocket Listener (Direct In-Memory Updates - ZERO HTTP Polling)
+  useInventoryWebSocket({
+    outletId: "DM-01",
+    onRestocked: (data) => {
+      if (data.updated_items && data.updated_items.length > 0) {
+        setCatalogResults((prev) =>
+          prev.map((item) => {
+            const match = data.updated_items?.find(
+              (u) =>
+                String(u.item_id) === String(item.id) ||
+                (item.sku && String(u.item_id) === String(item.sku))
+            );
+            if (match) {
+              const newQty = Number(match.new_stock);
+              const cost = match.cost_per_unit !== undefined ? Number(match.cost_per_unit) : Number(item.cost_per_unit);
+              return {
+                ...item,
+                current_stock: newQty,
+                cost_per_unit: cost,
+                total_valuation: newQty * cost,
+                is_low_stock: newQty <= Number(item.min_threshold),
+              };
+            }
+            return item;
+          })
+        );
+
+        // Update overall metrics in memory
+        setMetrics((prev) => {
+          return {
+            ...prev,
+            total_valuation: catalogResults.reduce(
+              (acc, it) => acc + Number(it.current_stock || 0) * Number(it.cost_per_unit || 0),
+              0
+            ),
+          };
+        });
+
+        addToast({
+          title: "Real-Time Inward Stock",
+          description: `Bill #${data.invoice_number || ""} updated stock balances.`,
+          type: "success",
+        });
+      }
+    },
+    onStockDeducted: (data) => {
+      if (data.deductions && data.deductions.length > 0) {
+        setCatalogResults((prev) =>
+          prev.map((item) => {
+            const match = data.deductions?.find(
+              (d) => String(d.item_id) === String(item.id)
+            );
+            if (match) {
+              const remaining = Number(match.remaining_stock);
+              const cost = Number(item.cost_per_unit || 0);
+              return {
+                ...item,
+                current_stock: remaining,
+                total_valuation: remaining * cost,
+                is_low_stock: remaining <= Number(item.min_threshold),
+              };
+            }
+            return item;
+          })
+        );
+      }
+    },
+    onLowStockAlert: (data) => {
+      addToast({
+        title: "Low Stock Alert",
+        description: `${data.item_name} reached threshold (${data.current_stock} remaining).`,
+        type: "warning",
+      });
+    },
+    onAuditAdjusted: (data) => {
+      if (data.adjustments && data.adjustments.length > 0) {
+        setCatalogResults((prev) =>
+          prev.map((item) => {
+            const match = data.adjustments?.find(
+              (a) => String(a.item_id) === String(item.id)
+            );
+            if (match) {
+              const adjusted = Number(match.adjusted_stock);
+              const cost = Number(item.cost_per_unit || 0);
+              return {
+                ...item,
+                current_stock: adjusted,
+                total_valuation: adjusted * cost,
+                is_low_stock: adjusted <= Number(item.min_threshold),
+              };
+            }
+            return item;
+          })
+        );
+      }
+    },
+  });
 
   // Quick Stock Adjust state
   const [adjustingItemId, setAdjustingItemId] = useState<string | number | null>(null);
@@ -74,12 +183,16 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
   const [costPerUnit, setCostPerUnit] = useState("350");
   const [supplierName, setSupplierName] = useState("");
 
-  // Load from backend
+  // Reference to current local inventory for fallback without adding to dependencies
+  const localInventoryRef = useRef(inventory);
+  localInventoryRef.current = inventory;
+
+  // Controlled fetch - ONLY triggers on mount or explicit filter change
   const loadCatalog = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await inventoryApi.fetchItems({
-        search: searchQuery.trim() || undefined,
+        search: debouncedSearch.trim() || undefined,
         category_id: selectedCategory !== "ALL" ? selectedCategory : undefined,
         low_stock: isLowStockOnly ? true : undefined,
       });
@@ -93,10 +206,11 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
         });
       }
     } catch {
-      // Fallback to local context
-      const filtered = inventory.filter((item) => {
+      // Local fallback
+      const local = localInventoryRef.current;
+      const filtered = local.filter((item) => {
         const matchCat = selectedCategory === "ALL" || item.category === selectedCategory;
-        const q = searchQuery.toLowerCase().trim();
+        const q = debouncedSearch.toLowerCase().trim();
         const matchSearch =
           !q ||
           item.name.toLowerCase().includes(q) ||
@@ -106,11 +220,11 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
         return matchCat && matchSearch && matchLow;
       });
 
-      const totalValuation = inventory.reduce((sum, i) => sum + i.currentStock * i.costPerUnit, 0);
-      const lowCount = inventory.filter((i) => i.currentStock <= i.minThreshold).length;
+      const totalValuation = local.reduce((sum, i) => sum + i.currentStock * i.costPerUnit, 0);
+      const lowCount = local.filter((i) => i.currentStock <= i.minThreshold).length;
 
       setMetrics({
-        count: inventory.length,
+        count: local.length,
         low_stock_count: lowCount,
         total_valuation: totalValuation,
       });
@@ -134,8 +248,9 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, selectedCategory, isLowStockOnly, inventory]);
+  }, [debouncedSearch, selectedCategory, isLowStockOnly]);
 
+  // Load once on filter change or manual refreshTrigger (when purchase is saved)
   useEffect(() => {
     loadCatalog();
   }, [loadCatalog, refreshTrigger]);
@@ -463,7 +578,7 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/30">
-            {isLoading && (
+            {isLoading && catalogResults.length === 0 && (
               <tr>
                 <td colSpan={11} className="py-6 text-center text-zinc-500">
                   <div className="flex items-center justify-center gap-2 text-xs">
@@ -482,124 +597,123 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
               </tr>
             )}
 
-            {!isLoading &&
-              catalogResults.map((item) => {
-                const stock = parseFloat(String(item.current_stock)) || 0;
-                const min = parseFloat(String(item.min_threshold)) || 0;
-                const cost = parseFloat(String(item.cost_per_unit)) || 0;
-                const valuation = parseFloat(String(item.total_valuation)) || stock * cost;
-                const isLow = item.is_low_stock ?? stock <= min;
-                const skuCode = item.sku || `SKU-${String(item.id).slice(0, 8).toUpperCase()}`;
+            {catalogResults.map((item) => {
+              const stock = parseFloat(String(item.current_stock)) || 0;
+              const min = parseFloat(String(item.min_threshold)) || 0;
+              const cost = parseFloat(String(item.cost_per_unit)) || 0;
+              const valuation = parseFloat(String(item.total_valuation)) || stock * cost;
+              const isLow = item.is_low_stock ?? stock <= min;
+              const skuCode = item.sku || `SKU-${String(item.id).slice(0, 8).toUpperCase()}`;
 
-                return (
-                  <tr key={String(item.id)} className="hover:bg-zinc-900/40">
-                    {/* SKU */}
-                    <td className="py-1.5 px-2 font-mono text-[10px] text-zinc-400 font-semibold truncate">
-                      {skuCode}
-                    </td>
+              return (
+                <tr key={String(item.id)} className="hover:bg-zinc-900/40">
+                  {/* SKU */}
+                  <td className="py-1.5 px-2 font-mono text-[10px] text-zinc-400 font-semibold truncate">
+                    {skuCode}
+                  </td>
 
-                    {/* Item Name */}
-                    <td className="py-1.5 px-2 font-semibold text-zinc-100">{item.name}</td>
+                  {/* Item Name */}
+                  <td className="py-1.5 px-2 font-semibold text-zinc-100">{item.name}</td>
 
-                    {/* Category */}
-                    <td className="py-1.5 px-2 text-[11px] text-zinc-400">
-                      {item.category_name || (typeof item.category === "string" ? item.category : "Produce")}
-                    </td>
+                  {/* Category */}
+                  <td className="py-1.5 px-2 text-[11px] text-zinc-400">
+                    {item.category_name || (typeof item.category === "string" ? item.category : "Produce")}
+                  </td>
 
-                    {/* Supplier */}
-                    <td className="py-1.5 px-2 text-[11px] text-zinc-400 truncate max-w-[140px]">
-                      {item.supplier_name || "Verified Supplier"}
-                    </td>
+                  {/* Supplier */}
+                  <td className="py-1.5 px-2 text-[11px] text-zinc-400 truncate max-w-[140px]">
+                    {item.supplier_name || "Verified Supplier"}
+                  </td>
 
-                    {/* Current Stock */}
-                    <td className="py-1.5 px-2 text-right font-mono font-bold text-xs">
-                      <span className={isLow ? "text-rose-400 font-black" : "text-zinc-100"}>
-                        {stock.toFixed(2)}
+                  {/* Current Stock */}
+                  <td className="py-1.5 px-2 text-right font-mono font-bold text-xs">
+                    <span className={isLow ? "text-rose-400 font-black" : "text-zinc-100"}>
+                      {stock.toFixed(2)}
+                    </span>
+                  </td>
+
+                  {/* Unit */}
+                  <td className="py-1.5 px-1.5 text-center font-mono text-[10px] text-zinc-400 uppercase">
+                    {item.unit}
+                  </td>
+
+                  {/* Min Threshold */}
+                  <td className="py-1.5 px-2 text-right font-mono text-zinc-400 text-xs">
+                    {min.toFixed(1)}
+                  </td>
+
+                  {/* Cost Rate */}
+                  <td className="py-1.5 px-2 text-right font-mono text-zinc-300 text-xs">
+                    {formatNPR(cost)}
+                  </td>
+
+                  {/* Total Valuation */}
+                  <td className="py-1.5 px-2 text-right font-mono text-emerald-400 font-semibold text-xs">
+                    {formatNPR(valuation)}
+                  </td>
+
+                  {/* Status Pill */}
+                  <td className="py-1.5 px-2 text-center">
+                    {isLow ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border-0 ring-1 ring-rose-500/40">
+                        <TrendingDown className="w-2.5 h-2.5 text-rose-400 shrink-0" />
+                        <span>Low</span>
                       </span>
-                    </td>
+                    ) : (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400">
+                        Adequate
+                      </span>
+                    )}
+                  </td>
 
-                    {/* Unit */}
-                    <td className="py-1.5 px-1.5 text-center font-mono text-[10px] text-zinc-400 uppercase">
-                      {item.unit}
-                    </td>
-
-                    {/* Min Threshold */}
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-400 text-xs">
-                      {min.toFixed(1)}
-                    </td>
-
-                    {/* Cost Rate */}
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-300 text-xs">
-                      {formatNPR(cost)}
-                    </td>
-
-                    {/* Total Valuation */}
-                    <td className="py-1.5 px-2 text-right font-mono text-emerald-400 font-semibold text-xs">
-                      {formatNPR(valuation)}
-                    </td>
-
-                    {/* Status Pill */}
-                    <td className="py-1.5 px-2 text-center">
-                      {isLow ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border-0 ring-1 ring-rose-500/40">
-                          <TrendingDown className="w-2.5 h-2.5 text-rose-400 shrink-0" />
-                          <span>Low</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400">
-                          Adequate
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Quick Adjust */}
-                    <td className="py-1.5 px-2 text-right">
-                      {adjustingItemId === item.id ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={adjustValue}
-                            autoFocus
-                            onChange={(e) => setAdjustValue(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleSaveAdjust(item);
-                              if (e.key === "Escape") setAdjustingItemId(null);
-                            }}
-                            className="w-14 h-5 px-1 text-[11px] bg-zinc-950 font-mono text-right rounded border-0 ring-1 ring-amber-500 focus:outline-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSaveAdjust(item)}
-                            className="p-0.5 text-emerald-400 hover:text-emerald-300 cursor-pointer"
-                          >
-                            <Check className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setAdjustingItemId(null)}
-                            className="p-0.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
+                  {/* Quick Adjust */}
+                  <td className="py-1.5 px-2 text-right">
+                    {adjustingItemId === item.id ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={adjustValue}
+                          autoFocus
+                          onChange={(e) => setAdjustValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveAdjust(item);
+                            if (e.key === "Escape") setAdjustingItemId(null);
+                          }}
+                          className="w-14 h-5 px-1 text-[11px] bg-zinc-950 font-mono text-right rounded border-0 ring-1 ring-amber-500 focus:outline-none"
+                        />
                         <button
                           type="button"
-                          onClick={() => {
-                            setAdjustingItemId(item.id);
-                            setAdjustValue(String(stock));
-                          }}
-                          className="px-1.5 py-0.5 text-[10px] rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors font-medium cursor-pointer"
+                          onClick={() => handleSaveAdjust(item)}
+                          className="p-0.5 text-emerald-400 hover:text-emerald-300 cursor-pointer"
                         >
-                          Adjust
+                          <Check className="w-3 h-3" />
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                        <button
+                          type="button"
+                          onClick={() => setAdjustingItemId(null)}
+                          className="p-0.5 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAdjustingItemId(item.id);
+                          setAdjustValue(String(stock));
+                        }}
+                        className="px-1.5 py-0.5 text-[10px] rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors font-medium cursor-pointer"
+                      >
+                        Adjust
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

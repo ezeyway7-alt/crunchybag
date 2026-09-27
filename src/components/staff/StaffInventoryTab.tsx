@@ -16,7 +16,6 @@ import { StockCatalogWorkbench } from "./inventory/StockCatalogWorkbench";
 import { PurchaseInwardWorkbench } from "./inventory/PurchaseInwardWorkbench";
 import { PurchaseBillsDatatable } from "./inventory/PurchaseBillsDatatable";
 import { StockAuditWorkbench } from "./inventory/StockAuditWorkbench";
-import { useInventoryWebSocket } from "../../lib/useInventoryWebSocket";
 
 export const StaffInventoryTab: React.FC = () => {
   const {
@@ -35,36 +34,6 @@ export const StaffInventoryTab: React.FC = () => {
   const [activeView, setActiveView] = useState<"items" | "bills" | "audit" | "movements">("items");
   const [isPurchaseFormVisible, setIsPurchaseFormVisible] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  // Real-Time WebSocket Synchronization (Operating Branch: Crunchy Flagship - Durbar Marg [DM-01])
-  useInventoryWebSocket({
-    outletId: "DM-01",
-    onRestocked: (data) => {
-      addToast({
-        title: "Real-Time Inward Restock",
-        description: `Bill #${data.invoice_number || ""} synchronized. Stock updated.`,
-        type: "success",
-      });
-      setRefreshKey((k) => k + 1);
-    },
-    onStockDeducted: (data) => {
-      setRefreshKey((k) => k + 1);
-    },
-    onLowStockAlert: (data) => {
-      addToast({
-        title: "Low Stock Alert",
-        description: `${data.item_name} has dropped below threshold (${data.current_stock} remaining).`,
-        type: "warning",
-      });
-      setRefreshKey((k) => k + 1);
-    },
-    onAuditAdjusted: () => {
-      setRefreshKey((k) => k + 1);
-    },
-    onAnyUpdate: () => {
-      setRefreshKey((k) => k + 1);
-    },
-  });
 
   // Movement Log state (Zero Placeholders)
   const [movementSearch, setMovementSearch] = useState("");
