@@ -54,14 +54,14 @@ const DEFAULT_CATEGORIES = [
 // ============================================================================
 // SELECT2 SUPPLIER COMBOBOX (LIVE API FETCH + AUTO-DISCOVERY)
 // ============================================================================
-export interface SupplierSelect2Props {
+interface SupplierSelect2Props {
   value: string;
   phone: string;
   onChange: (supplierName: string, phone?: string) => void;
   onSupplierSelected?: () => void;
 }
 
-export const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
+const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
   value,
   phone,
   onChange,
@@ -71,10 +71,8 @@ export const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
   const [query, setQuery] = useState("");
   const [apiSuppliers, setApiSuppliers] = useState<SupplierItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -150,38 +148,10 @@ export const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
     return apiSuppliers.some((s) => s.name.toLowerCase() === query.trim().toLowerCase());
   }, [apiSuppliers, query]);
 
-  const showAddNew = Boolean(query.trim() && !hasExactMatch);
-  const totalOptions = filtered.length + (showAddNew ? 1 : 0);
-
-  // Synchronize highlighted index when open or options change
-  useEffect(() => {
-    if (isOpen) {
-      const matchIdx = filtered.findIndex(
-        (s) => s.name.toLowerCase() === (value || "").trim().toLowerCase()
-      );
-      setHighlightedIndex(matchIdx >= 0 ? matchIdx : totalOptions > 0 ? 0 : -1);
-    } else {
-      setHighlightedIndex(-1);
-    }
-  }, [isOpen, filtered.length, showAddNew]);
-
-  // Auto-scroll highlighted option into view
-  useEffect(() => {
-    if (isOpen && listRef.current && highlightedIndex >= 0) {
-      const activeEl = listRef.current.querySelector<HTMLElement>(
-        `[data-option-index="${highlightedIndex}"]`
-      );
-      if (activeEl) {
-        activeEl.scrollIntoView({ block: "nearest" });
-      }
-    }
-  }, [highlightedIndex, isOpen]);
-
   const handleSelect = (sup: SupplierItem) => {
     onChange(sup.name.trim(), sup.phone || "");
     setQuery(sup.name.trim());
     setIsOpen(false);
-    setHighlightedIndex(-1);
     if (onSupplierSelected) onSupplierSelected();
   };
 
@@ -191,24 +161,16 @@ export const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
     onChange(trimmed);
     setQuery(trimmed);
     setIsOpen(false);
-    setHighlightedIndex(-1);
     if (onSupplierSelected) onSupplierSelected();
   };
 
   return (
     <div ref={containerRef} className="relative w-full">
-      <div className="relative flex items-center">
+      <div className="relative">
         <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
         <input
           ref={inputRef}
           type="text"
-          role="combobox"
-          aria-expanded={isOpen}
-          aria-autocomplete="list"
-          aria-haspopup="listbox"
-          aria-activedescendant={
-            highlightedIndex >= 0 ? `supplier-opt-${highlightedIndex}` : undefined
-          }
           value={isOpen ? query : value}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -219,113 +181,38 @@ export const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
             setIsOpen(true);
           }}
           onKeyDown={(e) => {
-            if (e.key === "ArrowDown") {
+            if (e.key === "Enter") {
               e.preventDefault();
-              if (!isOpen) {
-                setIsOpen(true);
-              } else if (totalOptions > 0) {
-                setHighlightedIndex((prev) => (prev + 1) % totalOptions);
-              }
-            } else if (e.key === "ArrowUp") {
-              e.preventDefault();
-              if (!isOpen) {
-                setIsOpen(true);
-              } else if (totalOptions > 0) {
-                setHighlightedIndex((prev) => (prev <= 0 ? totalOptions - 1 : prev - 1));
-              }
-            } else if (e.key === "Enter") {
-              e.preventDefault();
-              if (!isOpen) {
-                setIsOpen(true);
-                return;
-              }
-              if (highlightedIndex >= 0 && highlightedIndex < filtered.length) {
-                handleSelect(filtered[highlightedIndex]);
-              } else if (showAddNew && highlightedIndex === filtered.length) {
-                handleCreateNew(query.trim());
-              } else if (filtered.length > 0) {
+              if (filtered.length > 0) {
                 handleSelect(filtered[0]);
               } else if (query.trim()) {
                 handleCreateNew(query.trim());
               }
             } else if (e.key === "Escape") {
-              e.preventDefault();
               setIsOpen(false);
-              setHighlightedIndex(-1);
-            } else if (e.key === "Tab") {
-              if (isOpen) {
-                if (highlightedIndex >= 0 && highlightedIndex < filtered.length) {
-                  handleSelect(filtered[highlightedIndex]);
-                } else if (showAddNew && highlightedIndex === filtered.length) {
-                  handleCreateNew(query.trim());
-                }
-                setIsOpen(false);
-              }
             }
           }}
-          className="w-full h-7 pl-6 pr-14 text-xs bg-zinc-900/80 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 focus:outline-none"
+          className="w-full h-7 pl-6 pr-6 text-xs bg-zinc-900/80 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 focus:outline-none"
         />
-
-        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-          {value && (
-            <button
-              type="button"
-              tabIndex={0}
-              aria-label="Clear selected supplier"
-              title="Clear supplier"
-              onClick={() => {
-                onChange("", "");
-                setQuery("");
-                setIsOpen(false);
-                inputRef.current?.focus();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onChange("", "");
-                  setQuery("");
-                  setIsOpen(false);
-                  inputRef.current?.focus();
-                }
-              }}
-              className="text-zinc-500 hover:text-white p-0.5 rounded cursor-pointer transition-colors"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-
+        {value && (
           <button
             type="button"
-            tabIndex={0}
-            aria-label="Toggle supplier list"
-            title="Toggle dropdown (ArrowDown / Enter)"
+            tabIndex={-1}
             onClick={() => {
-              const next = !isOpen;
-              setIsOpen(next);
-              if (next) inputRef.current?.focus();
+              onChange("", "");
+              setQuery("");
+              setIsOpen(false);
+              inputRef.current?.focus();
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                const next = !isOpen;
-                setIsOpen(next);
-                if (next) inputRef.current?.focus();
-              }
-            }}
-            className="text-zinc-500 hover:text-white focus:text-amber-400 p-0.5 rounded cursor-pointer transition-colors"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
           >
-            <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? "rotate-180 text-amber-400" : ""}`} />
+            <X className="w-3 h-3" />
           </button>
-        </div>
+        )}
       </div>
 
       {isOpen && (
-        <div
-          ref={listRef}
-          role="listbox"
-          id="supplier-listbox"
-          className="absolute left-0 right-0 top-full mt-1 z-[999] bg-zinc-900 border border-zinc-700 shadow-2xl rounded max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40"
-        >
+        <div className="absolute left-0 right-0 top-full mt-1 z-[999] bg-zinc-900 border border-zinc-700 shadow-2xl rounded max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40">
           {isLoading && (
             <div className="p-2 text-center text-zinc-500 flex items-center justify-center gap-1.5 text-[11px]">
               <Loader2 className="w-3 h-3 animate-spin text-amber-500" />
@@ -333,59 +220,35 @@ export const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
             </div>
           )}
 
-          {filtered.map((sup, idx) => {
-            const isHighlighted = highlightedIndex === idx;
-            const isSelected = value === sup.name;
-            return (
-              <div
-                key={sup.id || sup.name}
-                id={`supplier-opt-${idx}`}
-                data-option-index={idx}
-                role="option"
-                aria-selected={isSelected || isHighlighted}
-                onMouseEnter={() => setHighlightedIndex(idx)}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleSelect(sup);
-                }}
-                className={`p-1.5 cursor-pointer flex items-center justify-between transition-colors ${
-                  isHighlighted
-                    ? "bg-amber-500/25 text-white ring-1 ring-amber-500/60"
-                    : "hover:bg-zinc-800/80 text-zinc-200"
-                }`}
-              >
-                <div className="flex flex-col truncate">
-                  <span className={`font-medium ${isHighlighted ? "text-amber-300 font-semibold" : "text-zinc-100"}`}>
-                    {sup.name}
-                  </span>
-                  {sup.phone && <span className="text-[10px] text-zinc-400">{sup.phone}</span>}
-                </div>
-                {isSelected && (
-                  <span className="text-amber-400 font-bold text-[10px] shrink-0 ml-1">Selected</span>
-                )}
-              </div>
-            );
-          })}
-
-          {showAddNew && (
+          {filtered.map((sup) => (
             <div
-              id={`supplier-opt-${filtered.length}`}
-              data-option-index={filtered.length}
-              role="option"
-              aria-selected={highlightedIndex === filtered.length}
-              onMouseEnter={() => setHighlightedIndex(filtered.length)}
+              key={sup.id || sup.name}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(sup);
+              }}
+              className="p-1.5 hover:bg-zinc-800/80 cursor-pointer flex items-center justify-between text-zinc-200"
+            >
+              <div className="flex flex-col truncate">
+                <span className="font-medium text-zinc-100">{sup.name}</span>
+                {sup.phone && <span className="text-[10px] text-zinc-500">{sup.phone}</span>}
+              </div>
+              {value === sup.name && (
+                <span className="text-amber-400 font-bold text-[10px] shrink-0 ml-1">Selected</span>
+              )}
+            </div>
+          ))}
+
+          {query.trim() && !hasExactMatch && (
+            <div
               onMouseDown={(e) => {
                 e.preventDefault();
                 handleCreateNew(query.trim());
               }}
-              className={`p-1.5 cursor-pointer flex items-center gap-1 text-[11px] transition-colors ${
-                highlightedIndex === filtered.length
-                  ? "bg-amber-500/30 text-amber-200 ring-1 ring-amber-500/60 font-bold"
-                  : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold"
-              }`}
+              className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold cursor-pointer flex items-center gap-1 text-[11px]"
             >
               <Plus className="w-3 h-3 text-amber-400 shrink-0" />
-              <span className="truncate">+ Add new "{query.trim()}" (Press Enter)</span>
+              <span className="truncate">+ Add new "{query.trim()}"</span>
             </div>
           )}
         </div>
@@ -397,14 +260,14 @@ export const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
 // ============================================================================
 // SELECT2 CATEGORY COMBOBOX (LIVE API FETCH + AUTO-DISCOVERY + DELETE/DEACTIVATE)
 // ============================================================================
-export interface CategorySelect2Props {
+interface CategorySelect2Props {
   value: string;
   onChange: (category: string) => void;
   onCategoryDeleted?: (category: string) => void;
   onOpenChange?: (isOpen: boolean) => void;
 }
 
-export const CategorySelect2: React.FC<CategorySelect2Props> = ({
+const CategorySelect2: React.FC<CategorySelect2Props> = ({
   value,
   onChange,
   onCategoryDeleted,
@@ -412,7 +275,6 @@ export const CategorySelect2: React.FC<CategorySelect2Props> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
 
   const handleSetOpen = (nextOpen: boolean) => {
     setIsOpen(nextOpen);
@@ -429,7 +291,6 @@ export const CategorySelect2: React.FC<CategorySelect2Props> = ({
   });
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
   const { addToast } = useApp();
 
   useEffect(() => {
@@ -488,40 +349,12 @@ export const CategorySelect2: React.FC<CategorySelect2Props> = ({
     return categories.some((c) => c.toLowerCase() === search.trim().toLowerCase());
   }, [categories, search]);
 
-  const showAddNew = Boolean(search.trim() && !hasExactMatch);
-  const totalOptions = filtered.length + (showAddNew ? 1 : 0);
-
-  // Synchronize highlighted index when open or options change
-  useEffect(() => {
-    if (isOpen) {
-      const matchIdx = filtered.findIndex(
-        (c) => c.toLowerCase() === (value || "").trim().toLowerCase()
-      );
-      setHighlightedIndex(matchIdx >= 0 ? matchIdx : totalOptions > 0 ? 0 : -1);
-    } else {
-      setHighlightedIndex(-1);
-    }
-  }, [isOpen, filtered.length, showAddNew]);
-
-  // Auto-scroll highlighted item into view
-  useEffect(() => {
-    if (isOpen && listRef.current && highlightedIndex >= 0) {
-      const activeEl = listRef.current.querySelector<HTMLElement>(
-        `[data-option-index="${highlightedIndex}"]`
-      );
-      if (activeEl) {
-        activeEl.scrollIntoView({ block: "nearest" });
-      }
-    }
-  }, [highlightedIndex, isOpen]);
-
   const handleSelect = (catName: string) => {
     const trimmed = catName.trim();
     if (!trimmed) return;
     onChange(trimmed);
     setSearch(trimmed);
     handleSetOpen(false);
-    setHighlightedIndex(-1);
   };
 
   const handleDeleteCategory = async (catToDelete: string) => {
@@ -584,13 +417,6 @@ export const CategorySelect2: React.FC<CategorySelect2Props> = ({
         <input
           ref={inputRef}
           type="text"
-          role="combobox"
-          aria-expanded={isOpen}
-          aria-autocomplete="list"
-          aria-haspopup="listbox"
-          aria-activedescendant={
-            highlightedIndex >= 0 ? `cat-opt-${highlightedIndex}` : undefined
-          }
           value={isOpen ? search : value}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -601,156 +427,75 @@ export const CategorySelect2: React.FC<CategorySelect2Props> = ({
             handleSetOpen(true);
           }}
           onKeyDown={(e) => {
-            if (e.key === "ArrowDown") {
+            if (e.key === "Enter") {
               e.preventDefault();
-              if (!isOpen) {
-                handleSetOpen(true);
-              } else if (totalOptions > 0) {
-                setHighlightedIndex((prev) => (prev + 1) % totalOptions);
-              }
-            } else if (e.key === "ArrowUp") {
-              e.preventDefault();
-              if (!isOpen) {
-                handleSetOpen(true);
-              } else if (totalOptions > 0) {
-                setHighlightedIndex((prev) => (prev <= 0 ? totalOptions - 1 : prev - 1));
-              }
-            } else if (e.key === "Enter") {
-              e.preventDefault();
-              if (!isOpen) {
-                handleSetOpen(true);
-                return;
-              }
-              if (highlightedIndex >= 0 && highlightedIndex < filtered.length) {
-                handleSelect(filtered[highlightedIndex]);
-              } else if (showAddNew && highlightedIndex === filtered.length) {
-                handleSelect(search.trim());
-              } else if (filtered.length > 0) {
+              if (filtered.length > 0) {
                 handleSelect(filtered[0]);
               } else if (search.trim()) {
                 handleSelect(search.trim());
               }
             } else if (e.key === "Escape") {
-              e.preventDefault();
               handleSetOpen(false);
-              setHighlightedIndex(-1);
-            } else if (e.key === "Tab") {
-              if (isOpen) {
-                if (highlightedIndex >= 0 && highlightedIndex < filtered.length) {
-                  handleSelect(filtered[highlightedIndex]);
-                } else if (showAddNew && highlightedIndex === filtered.length) {
-                  handleSelect(search.trim());
-                }
-                handleSetOpen(false);
-              }
             }
           }}
-          className="w-full h-7 pl-1.5 pr-5 text-[11px] bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 focus:outline-none"
+          className="w-full h-7 pl-1.5 pr-4 text-[11px] bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 focus:outline-none"
         />
         <button
           type="button"
-          tabIndex={0}
-          aria-label="Toggle category list"
-          title="Toggle dropdown (ArrowDown / Enter)"
+          tabIndex={-1}
           onClick={() => {
             const next = !isOpen;
             handleSetOpen(next);
             if (next) inputRef.current?.focus();
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              const next = !isOpen;
-              handleSetOpen(next);
-              if (next) inputRef.current?.focus();
-            }
-          }}
-          className="absolute right-0.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white focus:text-amber-400 p-0.5 cursor-pointer rounded transition-colors"
+          className="absolute right-0.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-0.5"
         >
-          <ChevronDown className={`w-2.5 h-2.5 transition-transform ${isOpen ? "rotate-180 text-amber-400" : ""}`} />
+          <ChevronDown className="w-2.5 h-2.5" />
         </button>
       </div>
 
       {isOpen && (
-        <div
-          ref={listRef}
-          role="listbox"
-          id="category-listbox"
-          className="absolute left-0 top-full mt-0.5 w-52 z-[999] bg-zinc-900 border border-zinc-700 shadow-2xl rounded max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40"
-        >
-          {filtered.map((cat, idx) => {
-            const isHighlighted = highlightedIndex === idx;
-            const isSelected = value === cat;
-            return (
-              <div
-                key={cat}
-                id={`cat-opt-${idx}`}
-                data-option-index={idx}
-                role="option"
-                aria-selected={isSelected || isHighlighted}
-                onMouseEnter={() => setHighlightedIndex(idx)}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleSelect(cat);
-                }}
-                className={`p-1 cursor-pointer flex items-center justify-between text-[11px] group transition-colors ${
-                  isHighlighted
-                    ? "bg-amber-500/25 text-white ring-1 ring-amber-500/60"
-                    : "hover:bg-zinc-800/80 text-zinc-200"
-                }`}
-              >
-                <span className={`truncate pr-1 ${isHighlighted ? "text-amber-300 font-semibold" : "font-medium"}`}>
-                  {cat}
-                </span>
-                <div className="flex items-center gap-1 shrink-0 ml-1">
-                  {isSelected && (
-                    <span className="text-amber-400 font-bold text-[9px]">Active</span>
-                  )}
-                  <button
-                    type="button"
-                    tabIndex={0}
-                    aria-label={`Delete category ${cat}`}
-                    title={`Delete or deactivate category "${cat}"`}
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      handleDeleteCategory(cat);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        handleDeleteCategory(cat);
-                      }
-                    }}
-                    className="opacity-40 group-hover:opacity-100 hover:text-rose-400 focus:opacity-100 p-0.5 rounded transition-opacity cursor-pointer text-zinc-400 hover:bg-rose-500/10 focus:outline-none"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {showAddNew && (
+        <div className="absolute left-0 top-full mt-0.5 w-52 z-[999] bg-zinc-900 border border-zinc-700 shadow-2xl rounded max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40">
+          {filtered.map((cat) => (
             <div
-              id={`cat-opt-${filtered.length}`}
-              data-option-index={filtered.length}
-              role="option"
-              aria-selected={highlightedIndex === filtered.length}
-              onMouseEnter={() => setHighlightedIndex(filtered.length)}
+              key={cat}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(cat);
+              }}
+              className="p-1 hover:bg-zinc-800/80 cursor-pointer flex items-center justify-between text-zinc-200 text-[11px] group"
+            >
+              <span className="font-medium truncate pr-1">{cat}</span>
+              <div className="flex items-center gap-1 shrink-0 ml-1">
+                {value === cat && (
+                  <span className="text-amber-400 font-bold text-[9px]">Active</span>
+                )}
+                <button
+                  type="button"
+                  title={`Delete or deactivate category "${cat}"`}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleDeleteCategory(cat);
+                  }}
+                  className="opacity-40 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity cursor-pointer text-zinc-400 hover:bg-rose-500/10"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {search.trim() && !hasExactMatch && (
+            <div
               onMouseDown={(e) => {
                 e.preventDefault();
                 handleSelect(search.trim());
               }}
-              className={`p-1 cursor-pointer flex items-center gap-1 text-[10px] transition-colors ${
-                highlightedIndex === filtered.length
-                  ? "bg-amber-500/30 text-amber-200 ring-1 ring-amber-500/60 font-bold"
-                  : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold"
-              }`}
+              className="p-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold cursor-pointer flex items-center gap-1 text-[10px]"
             >
               <Plus className="w-2.5 h-2.5 text-amber-400 shrink-0" />
-              <span className="truncate">+ New category "{search.trim()}" (Press Enter)</span>
+              <span className="truncate">+ New category "{search.trim()}"</span>
             </div>
           )}
         </div>
@@ -804,7 +549,6 @@ export const PurchaseInwardWorkbench: React.FC<{
   ]);
 
   const [activeSearchRowId, setActiveSearchRowId] = useState<string | null>(null);
-  const [productHighlightedIndex, setProductHighlightedIndex] = useState(-1);
   const [openCategoryRowId, setOpenCategoryRowId] = useState<string | null>(null);
   const firstProductInputRef = useRef<HTMLInputElement>(null);
   const rowInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
@@ -1221,111 +965,41 @@ export const PurchaseInwardWorkbench: React.FC<{
                         rowInputRefs.current[row.id] = el;
                       }}
                       type="text"
-                      role="combobox"
-                      aria-expanded={activeSearchRowId === row.id}
-                      aria-autocomplete="list"
                       value={row.productName}
                       onChange={(e) => {
                         handleUpdateRow(row.id, { productName: e.target.value });
                         setActiveSearchRowId(row.id);
-                        setProductHighlightedIndex(0);
                       }}
-                      onFocus={() => {
-                        setActiveSearchRowId(row.id);
-                        setProductHighlightedIndex(0);
-                      }}
-                      onKeyDown={(e) => {
-                        const visibleMatches = matchingItems.slice(0, 6);
-                        const showCreate = Boolean(
-                          row.productName.trim() &&
-                            !allAvailableItems.some(
-                              (i: any) => i.name.toLowerCase() === row.productName.trim().toLowerCase()
-                            )
-                        );
-                        const totalProductOpts = visibleMatches.length + (showCreate ? 1 : 0);
-
-                        if (e.key === "ArrowDown") {
-                          e.preventDefault();
-                          if (activeSearchRowId !== row.id) {
-                            setActiveSearchRowId(row.id);
-                            setProductHighlightedIndex(0);
-                          } else if (totalProductOpts > 0) {
-                            setProductHighlightedIndex((prev) => (prev + 1) % totalProductOpts);
-                          }
-                        } else if (e.key === "ArrowUp") {
-                          e.preventDefault();
-                          if (activeSearchRowId !== row.id) {
-                            setActiveSearchRowId(row.id);
-                            setProductHighlightedIndex(totalProductOpts - 1);
-                          } else if (totalProductOpts > 0) {
-                            setProductHighlightedIndex((prev) => (prev <= 0 ? totalProductOpts - 1 : prev - 1));
-                          }
-                        } else if (e.key === "Enter") {
-                          if (activeSearchRowId === row.id) {
-                            e.preventDefault();
-                            if (productHighlightedIndex >= 0 && productHighlightedIndex < visibleMatches.length) {
-                              handleSelectProduct(row.id, visibleMatches[productHighlightedIndex]);
-                            } else if (showCreate && productHighlightedIndex === visibleMatches.length) {
-                              handleCreateNewProduct(row.id, row.productName);
-                            } else if (visibleMatches.length > 0) {
-                              handleSelectProduct(row.id, visibleMatches[0]);
-                            } else if (row.productName.trim()) {
-                              handleCreateNewProduct(row.id, row.productName);
-                            }
-                            setActiveSearchRowId(null);
-                          }
-                        } else if (e.key === "Escape") {
-                          e.preventDefault();
-                          setActiveSearchRowId(null);
-                          setProductHighlightedIndex(-1);
-                        }
-                      }}
+                      onFocus={() => setActiveSearchRowId(row.id)}
                       className="w-full h-6 px-1.5 text-xs bg-zinc-900/80 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 focus:outline-none"
                     />
 
                     {activeSearchRowId === row.id && (
                       <div className="absolute left-1.5 right-1.5 top-full mt-0.5 z-[999] bg-zinc-900 border border-zinc-700 shadow-2xl rounded max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40">
-                        {matchingItems.slice(0, 6).map((item: any, pIdx: number) => {
-                          const isProductHighlighted = productHighlightedIndex === pIdx;
-                          return (
-                            <div
-                              key={item.id}
-                              role="option"
-                              aria-selected={isProductHighlighted}
-                              onMouseEnter={() => setProductHighlightedIndex(pIdx)}
-                              onMouseDown={() => handleSelectProduct(row.id, item)}
-                              className={`p-1 cursor-pointer flex items-center justify-between transition-colors ${
-                                isProductHighlighted
-                                  ? "bg-amber-500/25 text-white ring-1 ring-amber-500/60"
-                                  : "hover:bg-zinc-800/80 text-zinc-200"
-                              }`}
-                            >
-                              <span className={`text-[11px] truncate ${isProductHighlighted ? "text-amber-300 font-semibold" : "font-semibold text-zinc-100"}`}>
-                                {item.name}
-                              </span>
-                              <span className="font-mono text-[10px] text-zinc-400 shrink-0 ml-1">
-                                Stock: {item.current_stock ?? item.currentStock} {item.unit}
-                              </span>
-                            </div>
-                          );
-                        })}
+                        {matchingItems.slice(0, 6).map((item: any) => (
+                          <div
+                            key={item.id}
+                            onMouseDown={() => handleSelectProduct(row.id, item)}
+                            className="p-1 hover:bg-zinc-800/80 cursor-pointer flex items-center justify-between text-zinc-200"
+                          >
+                            <span className="font-semibold text-zinc-100 text-[11px] truncate">
+                              {item.name}
+                            </span>
+                            <span className="font-mono text-[10px] text-zinc-400 shrink-0 ml-1">
+                              Stock: {item.current_stock ?? item.currentStock} {item.unit}
+                            </span>
+                          </div>
+                        ))}
 
                         {row.productName.trim() &&
                           !allAvailableItems.some(
                             (i: any) => i.name.toLowerCase() === row.productName.trim().toLowerCase()
                           ) && (
                             <div
-                              role="option"
-                              aria-selected={productHighlightedIndex === matchingItems.slice(0, 6).length}
-                              onMouseEnter={() => setProductHighlightedIndex(matchingItems.slice(0, 6).length)}
                               onMouseDown={() => handleCreateNewProduct(row.id, row.productName)}
-                              className={`p-1 cursor-pointer text-[10px] transition-colors ${
-                                productHighlightedIndex === matchingItems.slice(0, 6).length
-                                  ? "bg-amber-500/30 text-amber-200 ring-1 ring-amber-500/60 font-bold"
-                                  : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold"
-                              }`}
+                              className="p-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold cursor-pointer text-[10px]"
                             >
-                              + Create "{row.productName.trim()}" as new SKU (Press Enter)
+                              + Create "{row.productName.trim()}" as new SKU
                             </div>
                           )}
                       </div>

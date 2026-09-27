@@ -19,7 +19,6 @@ import { Badge } from "../common/Badge";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
 import { Modal } from "../common/Modal";
-import { SupplierSelect2 } from "../staff/inventory/PurchaseInwardWorkbench";
 
 export const AdminPurchasesTab: React.FC = () => {
   const { purchases, addPurchaseRecord, inventory, currentOutlet } = useApp();
@@ -313,12 +312,14 @@ export const AdminPurchasesTab: React.FC = () => {
 
             <div>
               <label className="text-xs font-bold text-zinc-600 dark:text-zinc-300 block mb-1">
-                Supplier Company Name (Select2) *
+                Supplier Company Name *
               </label>
-              <SupplierSelect2
+              <Input
                 value={supplierName}
-                phone=""
-                onChange={(sup) => setSupplierName(sup)}
+                onChange={(e) => setSupplierName(e.target.value)}
+                placeholder="e.g. Valley Poultry Nepal"
+                required
+                className="text-xs"
               />
             </div>
           </div>
