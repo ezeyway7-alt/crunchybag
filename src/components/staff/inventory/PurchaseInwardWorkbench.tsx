@@ -212,7 +212,7 @@ const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded max-h-48 overflow-y-auto text-xs divide-y divide-zinc-800/40">
+        <div className="absolute left-0 right-0 top-full mt-1 z-[999] bg-zinc-900 border border-zinc-700 shadow-2xl rounded max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40">
           {isLoading && (
             <div className="p-2 text-center text-zinc-500 flex items-center justify-center gap-1.5 text-[11px]">
               <Loader2 className="w-3 h-3 animate-spin text-amber-500" />
@@ -264,15 +264,22 @@ interface CategorySelect2Props {
   value: string;
   onChange: (category: string) => void;
   onCategoryDeleted?: (category: string) => void;
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 const CategorySelect2: React.FC<CategorySelect2Props> = ({
   value,
   onChange,
   onCategoryDeleted,
+  onOpenChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
+
+  const handleSetOpen = (nextOpen: boolean) => {
+    setIsOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  };
   const [categories, setCategories] = useState<string[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -324,7 +331,7 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({
           if (search.trim() && search.trim() !== value) {
             onChange(search.trim());
           }
-          setIsOpen(false);
+          handleSetOpen(false);
         }
       }
     };
@@ -347,7 +354,7 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({
     if (!trimmed) return;
     onChange(trimmed);
     setSearch(trimmed);
-    setIsOpen(false);
+    handleSetOpen(false);
   };
 
   const handleDeleteCategory = async (catToDelete: string) => {
@@ -405,7 +412,7 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full">
+    <div ref={containerRef} className={`relative w-full ${isOpen ? "z-50" : ""}`}>
       <div className="relative flex items-center">
         <input
           ref={inputRef}
@@ -413,11 +420,11 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({
           value={isOpen ? search : value}
           onChange={(e) => {
             setSearch(e.target.value);
-            if (!isOpen) setIsOpen(true);
+            if (!isOpen) handleSetOpen(true);
           }}
           onFocus={() => {
             setSearch(value);
-            setIsOpen(true);
+            handleSetOpen(true);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -428,7 +435,7 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({
                 handleSelect(search.trim());
               }
             } else if (e.key === "Escape") {
-              setIsOpen(false);
+              handleSetOpen(false);
             }
           }}
           className="w-full h-7 pl-1.5 pr-4 text-[11px] bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 focus:outline-none"
@@ -437,8 +444,9 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({
           type="button"
           tabIndex={-1}
           onClick={() => {
-            setIsOpen((prev) => !prev);
-            if (!isOpen) inputRef.current?.focus();
+            const next = !isOpen;
+            handleSetOpen(next);
+            if (next) inputRef.current?.focus();
           }}
           className="absolute right-0.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-0.5"
         >
@@ -447,7 +455,7 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-0.5 w-48 z-50 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded max-h-48 overflow-y-auto text-xs divide-y divide-zinc-800/40">
+        <div className="absolute left-0 top-full mt-0.5 w-52 z-[999] bg-zinc-900 border border-zinc-700 shadow-2xl rounded max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40">
           {filtered.map((cat) => (
             <div
               key={cat}
@@ -531,7 +539,7 @@ export const PurchaseInwardWorkbench: React.FC<{
       id: "row-1",
       productName: "",
       category: "Raw Meat & Poultry",
-      quantity: 10,
+      quantity: 1,
       unit: "KG",
       costPrice: 0,
       discount: 0,
@@ -541,6 +549,7 @@ export const PurchaseInwardWorkbench: React.FC<{
   ]);
 
   const [activeSearchRowId, setActiveSearchRowId] = useState<string | null>(null);
+  const [openCategoryRowId, setOpenCategoryRowId] = useState<string | null>(null);
   const firstProductInputRef = useRef<HTMLInputElement>(null);
   const rowInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
@@ -605,7 +614,7 @@ export const PurchaseInwardWorkbench: React.FC<{
         id: newId,
         productName: "",
         category: "Raw Meat & Poultry",
-        quantity: 5,
+        quantity: 1,
         unit: "KG",
         costPrice: 0,
         discount: 0,
@@ -803,7 +812,7 @@ export const PurchaseInwardWorkbench: React.FC<{
           id: `row-${Date.now()}`,
           productName: "",
           category: "Raw Meat & Poultry",
-          quantity: 10,
+          quantity: 1,
           unit: "KG",
           costPrice: 0,
           discount: 0,
@@ -831,7 +840,7 @@ export const PurchaseInwardWorkbench: React.FC<{
   return (
     <div className="bg-zinc-900/60 p-3 rounded-lg space-y-2.5">
       {/* Top Header Grid (Supplier, Date, Bill #, Notes) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-end relative z-40">
         {/* Col 1-4: Supplier Combobox */}
         <div className="lg:col-span-4">
           <label className="block text-[10px] text-zinc-400 font-semibold mb-0.5 uppercase tracking-wider">
@@ -903,7 +912,7 @@ export const PurchaseInwardWorkbench: React.FC<{
       </div>
 
       {/* 12-Column Compact Table (Tiny UI, No Placeholders) */}
-      <div className="overflow-x-auto rounded border-0 ring-1 ring-zinc-800/40">
+      <div className="overflow-x-auto rounded border-0 ring-1 ring-zinc-800/40 min-h-[280px] pb-20">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-zinc-900/90 text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
@@ -933,14 +942,23 @@ export const PurchaseInwardWorkbench: React.FC<{
               );
 
               return (
-                <tr key={row.id} className="hover:bg-zinc-900/40">
+                <tr
+                  key={row.id}
+                  className="relative hover:bg-zinc-900/40"
+                  style={{
+                    zIndex:
+                      activeSearchRowId === row.id || openCategoryRowId === row.id
+                        ? 100
+                        : rows.length - idx + 10,
+                  }}
+                >
                   {/* Col 1: # */}
                   <td className="py-1 px-1.5 text-center font-mono text-[10px] text-zinc-500">
                     {idx + 1}
                   </td>
 
                   {/* Col 2: Item / Product Select2 */}
-                  <td className="py-1 px-1.5 relative">
+                  <td className={`py-1 px-1.5 relative ${activeSearchRowId === row.id ? "z-50" : ""}`}>
                     <input
                       ref={(el) => {
                         if (idx === 0) firstProductInputRef.current = el;
@@ -957,7 +975,7 @@ export const PurchaseInwardWorkbench: React.FC<{
                     />
 
                     {activeSearchRowId === row.id && (
-                      <div className="absolute left-1.5 right-1.5 top-full mt-0.5 z-40 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded max-h-44 overflow-y-auto text-xs divide-y divide-zinc-800/40">
+                      <div className="absolute left-1.5 right-1.5 top-full mt-0.5 z-[999] bg-zinc-900 border border-zinc-700 shadow-2xl rounded max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40">
                         {matchingItems.slice(0, 6).map((item: any) => (
                           <div
                             key={item.id}
@@ -989,10 +1007,11 @@ export const PurchaseInwardWorkbench: React.FC<{
                   </td>
 
                   {/* Col 3: Category Select2 */}
-                  <td className="py-1 px-1.5">
+                  <td className={`py-1 px-1.5 relative ${openCategoryRowId === row.id ? "z-50" : ""}`}>
                     <CategorySelect2
                       value={row.category}
                       onChange={(cat) => handleUpdateRow(row.id, { category: cat })}
+                      onOpenChange={(open) => setOpenCategoryRowId(open ? row.id : null)}
                     />
                   </td>
 

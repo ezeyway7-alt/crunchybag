@@ -45,7 +45,7 @@ export const StockAuditWorkbench: React.FC = () => {
     "ALL" | "DISCREPANCY" | "LOW_STOCK" | "EXPIRED"
   >("ALL");
 
-  const [physicalCounts, setPhysicalCounts] = useState<{ [itemId: string]: number }>({});
+  const [userEditedPhysicalCounts, setUserEditedPhysicalCounts] = useState<{ [itemId: string]: number }>({});
   const [countReasons, setCountReasons] = useState<{ [itemId: string]: string }>({});
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -80,18 +80,6 @@ export const StockAuditWorkbench: React.FC = () => {
     };
   }, [syncBackendInventory]);
 
-  useEffect(() => {
-    setPhysicalCounts((prev) => {
-      const next = { ...prev };
-      inventory.forEach((item) => {
-        if (next[item.id] === undefined) {
-          next[item.id] = item.currentStock;
-        }
-      });
-      return next;
-    });
-  }, [inventory]);
-
   const categories = useMemo(() => {
     let excluded: string[] = [];
     if (typeof window !== "undefined") {
@@ -113,7 +101,9 @@ export const StockAuditWorkbench: React.FC = () => {
   const auditedItems = useMemo(() => {
     return inventory.map((item) => {
       const physical =
-        physicalCounts[item.id] !== undefined ? physicalCounts[item.id] : item.currentStock;
+        userEditedPhysicalCounts[item.id] !== undefined
+          ? userEditedPhysicalCounts[item.id]
+          : item.currentStock;
       const variance = Number((physical - item.currentStock).toFixed(2));
       const varianceValue = Number((variance * item.costPerUnit).toFixed(2));
 
@@ -141,7 +131,7 @@ export const StockAuditWorkbench: React.FC = () => {
         hasDiscrepancy,
       };
     });
-  }, [inventory, physicalCounts, todayStr, next7DaysStr]);
+  }, [inventory, userEditedPhysicalCounts, todayStr, next7DaysStr]);
 
   const filteredItems = useMemo(() => {
     return auditedItems.filter(({ item, isLow, hasDiscrepancy, expiryStatus }) => {
@@ -217,6 +207,12 @@ export const StockAuditWorkbench: React.FC = () => {
       `Audited. Variance: ${variance > 0 ? "+" : ""}${variance} ${item.unit}`
     );
 
+    setUserEditedPhysicalCounts((prev) => {
+      const next = { ...prev };
+      delete next[item.id];
+      return next;
+    });
+
     addToast({
       title: "Stock Reconciled",
       description: `${item.name} set to ${physicalCount} ${item.unit}`,
@@ -251,6 +247,8 @@ export const StockAuditWorkbench: React.FC = () => {
         `Batch Audit. Variance: ${variance > 0 ? "+" : ""}${variance} ${item.unit}`
       );
     });
+
+    setUserEditedPhysicalCounts({});
 
     addToast({
       title: "Batch Audit Completed",
@@ -297,10 +295,11 @@ export const StockAuditWorkbench: React.FC = () => {
       adjustNote.trim() || undefined
     );
 
-    setPhysicalCounts((prev) => ({
-      ...prev,
-      [item.id]: newStock,
-    }));
+    setUserEditedPhysicalCounts((prev) => {
+      const next = { ...prev };
+      delete next[item.id];
+      return next;
+    });
 
     setActiveAdjustModal(null);
     setAdjustQty(1);
@@ -535,7 +534,7 @@ export const StockAuditWorkbench: React.FC = () => {
                             onFocus={(e) => e.target.select()}
                             onChange={(e) => {
                               const val = Math.max(0, parseFloat(e.target.value) || 0);
-                              setPhysicalCounts((prev) => ({
+                              setUserEditedPhysicalCounts((prev) => ({
                                 ...prev,
                                 [item.id]: val,
                               }));

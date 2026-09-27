@@ -360,7 +360,7 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
     setCategory("Raw Meat & Poultry");
     setIsCustomCategory(false);
     setCustomCategoryInput("");
-    setCurrentStock("20");
+    setCurrentStock("0");
     setUnit("KG");
     setMinThreshold("10");
     setCostPerUnit("300");
