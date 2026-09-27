@@ -100,7 +100,7 @@ export const AdminOrganizationTab: React.FC = () => {
         setServiceChargePercent(remote.serviceChargePercent.toString());
         setAcceptedPaymentMethods(remote.acceptedPaymentMethods);
         setApiStatusMessage({
-          text: "Synchronized with live backend at /api/v1/organization/",
+          text: "Synchronized with live backend at crunchybag.com",
           type: "success",
         });
         if (isManual) {
@@ -273,16 +273,17 @@ export const AdminOrganizationTab: React.FC = () => {
         type: "success",
       });
     } catch (err) {
-      // If backend endpoint is not implemented yet or returned an error,
-      // the local storage and AppContext already have the data saved.
       const errMsg = extractErrorMessage(err);
       if (errMsg.includes("404") || errMsg.includes("not found")) {
         setApiStatusMessage({
-          text: "Saved locally. Backend /api/v1/organization/ endpoint will sync once provisioned.",
+          text: "Organization saved locally in application storage.",
           type: "info",
         });
       } else {
-        console.warn("Backend org sync warning:", errMsg);
+        setApiStatusMessage({
+          text: `Save status: ${errMsg}`,
+          type: "warning",
+        });
       }
     } finally {
       // Record audit log entry

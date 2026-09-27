@@ -568,12 +568,42 @@ export const authApi = {
 
 /**
  * Organization Profile & Logo Endpoints
+ * Automatically interfaces with live DRF /api/v1/restaurants/ and /api/v1/organization/
  */
+let cachedRestaurantId: string | number = 1;
+
 export const organizationApi = {
   async getSettings(): Promise<OrganizationSettings> {
-    const raw = await baseRequest<any>("/organization/");
-    const data = raw?.data || raw?.organization || raw?.result || raw || {};
-    
+    let data: any = null;
+
+    // 1. Try real live endpoint /restaurants/
+    try {
+      const raw = await baseRequest<any>("/restaurants/");
+      if (Array.isArray(raw) && raw.length > 0) {
+        data = raw[0];
+        if (data.id) cachedRestaurantId = data.id;
+      } else if (raw?.results && Array.isArray(raw.results) && raw.results.length > 0) {
+        data = raw.results[0];
+        if (data.id) cachedRestaurantId = data.id;
+      } else if (raw && typeof raw === "object") {
+        data = raw;
+        if (data.id) cachedRestaurantId = data.id;
+      }
+    } catch (restErr) {
+      // 2. Fallback to /organization/
+      try {
+        const rawOrg = await baseRequest<any>("/organization/");
+        data = rawOrg?.data || rawOrg?.organization || rawOrg?.result || rawOrg || {};
+      } catch (orgErr) {
+        // rethrow to let caller handle
+        throw restErr;
+      }
+    }
+
+    if (!data) {
+      throw new Error("No organization or restaurant details found on server");
+    }
+
     let parsedMethods: PaymentMethod[] = ["ESEWA", "FONEPAY_QR", "CASH_ON_PICKUP", "CARD", "WALLET"];
     const rawMethods = data.accepted_payment_methods ?? data.acceptedPaymentMethods;
     if (Array.isArray(rawMethods)) {
@@ -586,15 +616,15 @@ export const organizationApi = {
     }
 
     return {
-      brandName: data.brand_name || data.brandName || "Crunchy",
-      tagline: data.tagline ?? data.tagLine ?? "",
-      legalEntity: data.legal_entity || data.legalEntity || "",
+      brandName: data.name || data.brand_name || data.brandName || "Crunchy Bag",
+      tagline: data.description || data.tagline || data.tagLine || "",
+      legalEntity: data.legal_entity || data.legalEntity || data.name || "Crunchy Bag",
       panNumber: data.pan_number || data.panNumber || "",
       logoUrl: data.logo_url || data.logo || data.logoUrl || "",
-      websiteUrl: data.website_url || data.websiteUrl || "",
-      contactEmail: data.contact_email || data.contactEmail || "",
-      contactPhone: data.contact_phone || data.contactPhone || "",
-      headquartersAddress: data.headquarters_address || data.headquartersAddress || "",
+      websiteUrl: data.website || data.website_url || data.websiteUrl || "https://crunchybag.com/",
+      contactEmail: data.email || data.contact_email || data.contactEmail || "",
+      contactPhone: data.phone || data.contact_phone || data.contactPhone || "",
+      headquartersAddress: data.address || data.headquarters_address || data.headquartersAddress || "Kathmandu, Nepal",
       vatRatePercent: parseFloat(data.vat_rate_percent ?? data.vatRatePercent ?? 13) || 13,
       serviceChargePercent: parseFloat(data.service_charge_percent ?? data.serviceChargePercent ?? 0) || 0,
       defaultCurrency: data.default_currency || data.defaultCurrency || "NPR",
@@ -603,53 +633,88 @@ export const organizationApi = {
   },
 
   async updateSettings(settings: Partial<OrganizationSettings>, logoFile?: File | null): Promise<OrganizationSettings> {
-    let data: any;
+    let data: any = null;
+    const restId = cachedRestaurantId || 1;
+
+    // Helper to attempt PATCH on /restaurants/{id}/ first, then fallback to /organization/
+    const sendUpdate = async (endpoint: string, isMultipart: boolean, body: any) => {
+      return baseRequest<any>(endpoint, {
+        method: "PATCH",
+        body: isMultipart ? body : JSON.stringify(body),
+      });
+    };
+
     if (logoFile) {
-      const formData = new FormData();
-      if (settings.brandName) formData.append("brand_name", settings.brandName);
-      if (settings.tagline !== undefined) formData.append("tagline", settings.tagline);
-      if (settings.legalEntity) formData.append("legal_entity", settings.legalEntity);
-      if (settings.panNumber) formData.append("pan_number", settings.panNumber);
-      if (settings.websiteUrl !== undefined) formData.append("website_url", settings.websiteUrl);
-      if (settings.contactEmail !== undefined) formData.append("contact_email", settings.contactEmail);
-      if (settings.contactPhone !== undefined) formData.append("contact_phone", settings.contactPhone);
-      if (settings.headquartersAddress !== undefined) formData.append("headquarters_address", settings.headquartersAddress);
-      if (settings.vatRatePercent !== undefined) formData.append("vat_rate_percent", String(settings.vatRatePercent));
-      if (settings.serviceChargePercent !== undefined) formData.append("service_charge_percent", String(settings.serviceChargePercent));
-      if (settings.acceptedPaymentMethods) {
-        formData.append("accepted_payment_methods", JSON.stringify(settings.acceptedPaymentMethods));
+      const restFormData = new FormData();
+      if (settings.brandName) restFormData.append("name", settings.brandName);
+      if (settings.tagline !== undefined) restFormData.append("description", settings.tagline);
+      if (settings.panNumber) restFormData.append("pan_number", settings.panNumber);
+      if (settings.websiteUrl !== undefined) restFormData.append("website", settings.websiteUrl);
+      if (settings.contactEmail !== undefined) restFormData.append("email", settings.contactEmail);
+      if (settings.contactPhone !== undefined) restFormData.append("phone", settings.contactPhone);
+      // Also add standard organization field aliases in case server supports them
+      if (settings.brandName) restFormData.append("brand_name", settings.brandName);
+      if (settings.legalEntity) restFormData.append("legal_entity", settings.legalEntity);
+      restFormData.append("logo", logoFile);
+
+      try {
+        const raw = await sendUpdate(`/restaurants/${restId}/`, true, restFormData);
+        data = raw?.data || raw || {};
+      } catch (err1) {
+        // Fallback to /organization/
+        try {
+          const orgFormData = new FormData();
+          if (settings.brandName) orgFormData.append("brand_name", settings.brandName);
+          if (settings.tagline !== undefined) orgFormData.append("tagline", settings.tagline);
+          if (settings.legalEntity) orgFormData.append("legal_entity", settings.legalEntity);
+          if (settings.panNumber) orgFormData.append("pan_number", settings.panNumber);
+          if (settings.websiteUrl !== undefined) orgFormData.append("website_url", settings.websiteUrl);
+          if (settings.contactEmail !== undefined) orgFormData.append("contact_email", settings.contactEmail);
+          if (settings.contactPhone !== undefined) orgFormData.append("contact_phone", settings.contactPhone);
+          if (settings.headquartersAddress !== undefined) orgFormData.append("headquarters_address", settings.headquartersAddress);
+          orgFormData.append("logo", logoFile);
+          const raw2 = await sendUpdate("/organization/", true, orgFormData);
+          data = raw2?.data || raw2 || {};
+        } catch (err2) {
+          throw err1; // Throw original error
+        }
       }
-      formData.append("logo", logoFile);
-
-      const raw = await baseRequest<any>("/organization/", {
-        method: "PATCH",
-        body: formData,
-      });
-      data = raw?.data || raw?.organization || raw?.result || raw || {};
     } else {
-      const payload: any = {};
-      if (settings.brandName) payload.brand_name = settings.brandName;
-      if (settings.tagline !== undefined) payload.tagline = settings.tagline;
-      if (settings.legalEntity) payload.legal_entity = settings.legalEntity;
-      if (settings.panNumber) payload.pan_number = settings.panNumber;
-      if (settings.logoUrl !== undefined) payload.logo_url = settings.logoUrl;
-      if (settings.websiteUrl !== undefined) payload.website_url = settings.websiteUrl;
-      if (settings.contactEmail !== undefined) payload.contact_email = settings.contactEmail;
-      if (settings.contactPhone !== undefined) payload.contact_phone = settings.contactPhone;
-      if (settings.headquartersAddress !== undefined) payload.headquarters_address = settings.headquartersAddress;
-      if (settings.vatRatePercent !== undefined) payload.vat_rate_percent = settings.vatRatePercent;
-      if (settings.serviceChargePercent !== undefined) payload.service_charge_percent = settings.serviceChargePercent;
-      if (settings.acceptedPaymentMethods) payload.accepted_payment_methods = settings.acceptedPaymentMethods;
+      const restPayload: any = {};
+      if (settings.brandName) restPayload.name = settings.brandName;
+      if (settings.tagline !== undefined) restPayload.description = settings.tagline;
+      if (settings.panNumber) restPayload.pan_number = settings.panNumber;
+      if (settings.websiteUrl !== undefined) restPayload.website = settings.websiteUrl;
+      if (settings.contactEmail !== undefined) restPayload.email = settings.contactEmail;
+      if (settings.contactPhone !== undefined) restPayload.phone = settings.contactPhone;
+      if (settings.logoUrl !== undefined) restPayload.logo_url = settings.logoUrl;
 
-      const raw = await baseRequest<any>("/organization/", {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-      data = raw?.data || raw?.organization || raw?.result || raw || {};
+      try {
+        const raw = await sendUpdate(`/restaurants/${restId}/`, false, restPayload);
+        data = raw?.data || raw || {};
+      } catch (err1) {
+        // Fallback to /organization/
+        try {
+          const orgPayload: any = {};
+          if (settings.brandName) orgPayload.brand_name = settings.brandName;
+          if (settings.tagline !== undefined) orgPayload.tagline = settings.tagline;
+          if (settings.legalEntity) orgPayload.legal_entity = settings.legalEntity;
+          if (settings.panNumber) orgPayload.pan_number = settings.panNumber;
+          if (settings.logoUrl !== undefined) orgPayload.logo_url = settings.logoUrl;
+          if (settings.websiteUrl !== undefined) orgPayload.website_url = settings.websiteUrl;
+          if (settings.contactEmail !== undefined) orgPayload.contact_email = settings.contactEmail;
+          if (settings.contactPhone !== undefined) orgPayload.contact_phone = settings.contactPhone;
+          if (settings.headquartersAddress !== undefined) orgPayload.headquarters_address = settings.headquartersAddress;
+          const raw2 = await sendUpdate("/organization/", false, orgPayload);
+          data = raw2?.data || raw2 || {};
+        } catch (err2) {
+          throw err1;
+        }
+      }
     }
 
     let parsedMethods: PaymentMethod[] = settings.acceptedPaymentMethods || ["ESEWA", "FONEPAY_QR", "CASH_ON_PICKUP", "CARD", "WALLET"];
-    const rawMethods = data.accepted_payment_methods ?? data.acceptedPaymentMethods;
+    const rawMethods = data?.accepted_payment_methods ?? data?.acceptedPaymentMethods;
     if (Array.isArray(rawMethods)) {
       parsedMethods = rawMethods;
     } else if (typeof rawMethods === "string") {
@@ -660,18 +725,18 @@ export const organizationApi = {
     }
 
     return {
-      brandName: data.brand_name || data.brandName || settings.brandName || "Crunchy",
-      tagline: data.tagline ?? data.tagLine ?? settings.tagline ?? "",
-      legalEntity: data.legal_entity || data.legalEntity || settings.legalEntity || "",
-      panNumber: data.pan_number || data.panNumber || settings.panNumber || "",
-      logoUrl: data.logo_url || data.logo || data.logoUrl || settings.logoUrl || "",
-      websiteUrl: data.website_url ?? data.websiteUrl ?? settings.websiteUrl ?? "",
-      contactEmail: data.contact_email ?? data.contactEmail ?? settings.contactEmail ?? "",
-      contactPhone: data.contact_phone ?? data.contactPhone ?? settings.contactPhone ?? "",
-      headquartersAddress: data.headquarters_address ?? data.headquartersAddress ?? settings.headquartersAddress ?? "",
-      vatRatePercent: parseFloat(data.vat_rate_percent ?? data.vatRatePercent ?? settings.vatRatePercent ?? 13) || 13,
-      serviceChargePercent: parseFloat(data.service_charge_percent ?? data.serviceChargePercent ?? settings.serviceChargePercent ?? 0) || 0,
-      defaultCurrency: data.default_currency || data.defaultCurrency || settings.defaultCurrency || "NPR",
+      brandName: data?.name || data?.brand_name || data?.brandName || settings.brandName || "Crunchy Bag",
+      tagline: data?.description ?? data?.tagline ?? data?.tagLine ?? settings.tagline ?? "",
+      legalEntity: data?.legal_entity || data?.legalEntity || data?.name || settings.legalEntity || "Crunchy Bag",
+      panNumber: data?.pan_number || data?.panNumber || settings.panNumber || "",
+      logoUrl: data?.logo_url || data?.logo || data?.logoUrl || settings.logoUrl || "",
+      websiteUrl: data?.website ?? data?.website_url ?? data?.websiteUrl ?? settings.websiteUrl ?? "https://crunchybag.com/",
+      contactEmail: data?.email ?? data?.contact_email ?? data?.contactEmail ?? settings.contactEmail ?? "",
+      contactPhone: data?.phone ?? data?.contact_phone ?? data?.contactPhone ?? settings.contactPhone ?? "",
+      headquartersAddress: data?.address ?? data?.headquarters_address ?? data?.headquartersAddress ?? settings.headquartersAddress ?? "",
+      vatRatePercent: parseFloat(data?.vat_rate_percent ?? data?.vatRatePercent ?? settings.vatRatePercent ?? 13) || 13,
+      serviceChargePercent: parseFloat(data?.service_charge_percent ?? data?.serviceChargePercent ?? settings.serviceChargePercent ?? 0) || 0,
+      defaultCurrency: data?.default_currency || data?.defaultCurrency || settings.defaultCurrency || "NPR",
       acceptedPaymentMethods: parsedMethods,
     };
   },
@@ -679,10 +744,17 @@ export const organizationApi = {
   async uploadLogo(file: File): Promise<{ logo_url: string }> {
     const formData = new FormData();
     formData.append("logo", file);
-    return baseRequest<{ logo_url: string }>("/organization/logo/", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      return await baseRequest<{ logo_url: string }>(`/restaurants/${cachedRestaurantId || 1}/`, {
+        method: "PATCH",
+        body: formData,
+      });
+    } catch {
+      return baseRequest<{ logo_url: string }>("/organization/logo/", {
+        method: "POST",
+        body: formData,
+      });
+    }
   },
 };
 
