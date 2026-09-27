@@ -61,8 +61,7 @@ const ALL_PAGES: PageDefinition[] = [
   { id: "analytics", label: "Reports & KPIs", category: "financial", description: "Sales analytics & settlement logs" },
   // Management
   { id: "employees", label: "Staff & Access", category: "management", description: "Team accounts, roles & credentials" },
-  { id: "outlets", label: "Branch Outlets", category: "management", description: "Multi-branch store configuration" },
-  { id: "organization", label: "Fiscal & PAN", category: "management", description: "VAT rates, entity & payment gateways" },
+  { id: "organization", label: "Organization & Fiscal", category: "management", description: "Company profile, PAN, VAT & payment channels" },
   { id: "logs", label: "Activity Logs", category: "management", description: "Chronological operational audit trail" },
 ];
 

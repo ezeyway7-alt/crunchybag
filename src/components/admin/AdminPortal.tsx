@@ -269,7 +269,7 @@ export const AdminPortal: React.FC = () => {
     },
     {
       id: "organization",
-      label: "Outlets & Org",
+      label: "Organization",
       icon: Building2,
     },
     {
@@ -636,7 +636,11 @@ export const AdminPortal: React.FC = () => {
             )}
             {activeTab === "organization" && (
               <div className="space-y-4">
-                <SkeletonTable rows={5} columns={4} />
+                <SkeletonMetricsRow count={4} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <SkeletonChartCard />
+                  <SkeletonChartCard />
+                </div>
               </div>
             )}
             {activeTab === "logs" && <SkeletonTable rows={10} columns={4} />}

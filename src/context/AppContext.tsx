@@ -524,7 +524,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loyaltyRecords, setLoyaltyRecords] = useState<CustomerLoyaltyRecord[]>(INITIAL_LOYALTY_RECORDS);
   const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(INITIAL_LOYALTY_SETTINGS);
   const [appliedLoyaltyDiscounts, setAppliedLoyaltyDiscounts] = useState<AppliedLoyaltyDiscount[]>(INITIAL_APPLIED_LOYALTY_DISCOUNTS);
-  const [orgSettings, setOrgSettings] = useState<OrganizationSettings>(INITIAL_ORG_SETTINGS);
+  const [orgSettings, setOrgSettings] = useState<OrganizationSettings>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("crunchy_org_settings");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        // ignore fallback to initial
+      }
+    }
+    return INITIAL_ORG_SETTINGS;
+  });
   const [stockAudits, setStockAudits] = useState<StockAuditRecord[]>(INITIAL_STOCK_AUDITS);
   const [stockMovements, setStockMovements] = useState<StockMovementRecord[]>(INITIAL_STOCK_MOVEMENTS);
 
@@ -2172,7 +2182,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Organization Settings
   const updateOrgSettings = (settings: Partial<OrganizationSettings>) => {
-    setOrgSettings((prev) => ({ ...prev, ...settings }));
+    setOrgSettings((prev) => {
+      const updated = { ...prev, ...settings };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("crunchy_org_settings", JSON.stringify(updated));
+        } catch (e) {
+          // ignore
+        }
+      }
+      return updated;
+    });
     addToast({
       title: "Organization Profile Updated",
       description: "Brand logo, PAN, legal identity, and outlet policies updated",
