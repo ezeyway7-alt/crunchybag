@@ -9,17 +9,19 @@ import {
   X,
   FileText,
   Upload,
+  ChevronDown,
+  Layers,
 } from "lucide-react";
 import { useApp } from "../../../context/AppContext";
 import { InventoryItem, InventoryCategory, PurchaseLineItem } from "../../../types";
 import { formatNPR } from "../../../lib/utils";
 
-interface ExcelRowItem {
+export interface ExcelRowItem {
   id: string;
   itemId?: string;
   isNewProduct: boolean;
   productName: string;
-  category: InventoryCategory;
+  category: string;
   quantity: number;
   unit: InventoryItem["unit"];
   costPrice: number;
@@ -28,7 +30,7 @@ interface ExcelRowItem {
   expiryDate?: string;
 }
 
-const DEFAULT_CATEGORIES: InventoryCategory[] = [
+const DEFAULT_CATEGORIES: string[] = [
   "Raw Meat & Poultry",
   "Dairy & Cheese",
   "Bakery & Buns",
@@ -50,6 +52,299 @@ const DEFAULT_UNITS: Array<InventoryItem["unit"]> = [
   "bottles",
 ];
 
+// ============================================================================
+// SELECT2 SEARCHABLE CATEGORY COMBOBOX COMPONENT
+// ============================================================================
+interface CategorySelect2Props {
+  value: string;
+  onChange: (category: string) => void;
+  categories: string[];
+  onRegisterNewCategory: (newCat: string) => void;
+}
+
+const CategorySelect2: React.FC<CategorySelect2Props> = ({
+  value,
+  onChange,
+  categories,
+  onRegisterNewCategory,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync internal search with external value when dropdown closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearch(value);
+    }
+  }, [value, isOpen]);
+
+  // Click outside to close and auto-commit typed category if any
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        if (isOpen) {
+          if (search.trim() && search.trim() !== value) {
+            onRegisterNewCategory(search.trim());
+            onChange(search.trim());
+          }
+          setIsOpen(false);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isOpen, search, value, onChange, onRegisterNewCategory]);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return categories;
+    const q = search.toLowerCase();
+    return categories.filter((c) => c.toLowerCase().includes(q));
+  }, [categories, search]);
+
+  const hasExactMatch = useMemo(() => {
+    return categories.some((c) => c.toLowerCase() === search.trim().toLowerCase());
+  }, [categories, search]);
+
+  const handleSelect = (catName: string) => {
+    const trimmed = catName.trim();
+    if (!trimmed) return;
+    onRegisterNewCategory(trimmed);
+    onChange(trimmed);
+    setSearch(trimmed);
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative flex items-center">
+        <input
+          ref={inputRef}
+          type="text"
+          value={isOpen ? search : value}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            if (!isOpen) setIsOpen(true);
+          }}
+          onFocus={() => {
+            setSearch(value);
+            setIsOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (filtered.length > 0) {
+                handleSelect(filtered[0]);
+              } else if (search.trim()) {
+                handleSelect(search.trim());
+              }
+            } else if (e.key === "Escape") {
+              setIsOpen(false);
+            }
+          }}
+          placeholder="Category..."
+          className="w-full h-7 pl-2 pr-5 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => {
+            setIsOpen((prev) => !prev);
+            if (!isOpen) inputRef.current?.focus();
+          }}
+          className="absolute right-1 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-0.5"
+        >
+          <ChevronDown className="w-3 h-3" />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="absolute left-0 top-full mt-1 w-52 z-40 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded-lg max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40">
+          {filtered.map((cat) => (
+            <div
+              key={cat}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(cat);
+              }}
+              className="p-1.5 hover:bg-zinc-800/70 cursor-pointer flex items-center justify-between text-zinc-200"
+            >
+              <span className="font-medium truncate">{cat}</span>
+              {value === cat && (
+                <span className="text-amber-400 font-bold text-[10px] ml-1">Active</span>
+              )}
+            </div>
+          ))}
+
+          {/* If typed search query does not match any existing category, auto-take as new */}
+          {search.trim() && !hasExactMatch && (
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(search.trim());
+              }}
+              className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold cursor-pointer flex items-center gap-1 text-[11px]"
+            >
+              <Plus className="w-3 h-3 text-amber-400 shrink-0" />
+              <span className="truncate">+ New category "{search.trim()}"</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// SELECT2 SEARCHABLE SUPPLIER COMBOBOX COMPONENT
+// ============================================================================
+interface SupplierSelect2Props {
+  value: string;
+  onChange: (supplier: string) => void;
+  suppliers: string[];
+  onSupplierSelected?: () => void;
+}
+
+const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
+  value,
+  onChange,
+  suppliers,
+  onSupplierSelected,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setQuery(value);
+    }
+  }, [value, isOpen]);
+
+  // Click outside commits typed supplier if non-empty
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        if (isOpen) {
+          if (query.trim() && query.trim() !== value) {
+            onChange(query.trim());
+          }
+          setIsOpen(false);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isOpen, query, value, onChange]);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return suppliers;
+    const q = query.toLowerCase();
+    return suppliers.filter((s) => s.toLowerCase().includes(q));
+  }, [suppliers, query]);
+
+  const hasExactMatch = useMemo(() => {
+    return suppliers.some((s) => s.toLowerCase() === query.trim().toLowerCase());
+  }, [suppliers, query]);
+
+  const handleSelect = (supName: string) => {
+    const trimmed = supName.trim();
+    if (!trimmed) return;
+    onChange(trimmed);
+    setQuery(trimmed);
+    setIsOpen(false);
+    if (onSupplierSelected) onSupplierSelected();
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative">
+        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={isOpen ? query : value}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (!isOpen) setIsOpen(true);
+          }}
+          onFocus={() => {
+            setQuery(value);
+            setIsOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (filtered.length > 0) {
+                handleSelect(filtered[0]);
+              } else if (query.trim()) {
+                handleSelect(query.trim());
+              }
+            } else if (e.key === "Escape") {
+              setIsOpen(false);
+            }
+          }}
+          placeholder="Search or enter supplier..."
+          className="w-full h-8 pl-8 pr-7 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setQuery("");
+              setIsOpen(false);
+              inputRef.current?.focus();
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded-lg max-h-56 overflow-y-auto text-xs divide-y divide-zinc-800/40">
+          {filtered.map((sup) => (
+            <div
+              key={sup}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(sup);
+              }}
+              className="p-2 hover:bg-zinc-800/60 cursor-pointer flex items-center justify-between text-zinc-200"
+            >
+              <span className="font-medium">{sup}</span>
+              {value === sup && (
+                <span className="text-amber-400 font-semibold text-[10px]">Selected</span>
+              )}
+            </div>
+          ))}
+
+          {/* Auto-take typed new supplier if not matching */}
+          {query.trim() && !hasExactMatch && (
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(query.trim());
+              }}
+              className="p-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold cursor-pointer flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5 text-amber-400" />
+              <span>+ Add new "{query.trim()}"</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// MAIN PURCHASE INWARD WORKBENCH
+// ============================================================================
 export const PurchaseInwardWorkbench: React.FC<{
   onPurchaseSaved?: () => void;
 }> = ({ onPurchaseSaved }) => {
@@ -63,12 +358,8 @@ export const PurchaseInwardWorkbench: React.FC<{
     addToast,
   } = useApp();
 
-  // 1. SUPPLIER STATE
-  const [supplierQuery, setSupplierQuery] = useState("");
+  // 1. SUPPLIER STATE (Select2 Search)
   const [selectedSupplier, setSelectedSupplier] = useState("");
-  const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
-  const supplierInputRef = useRef<HTMLInputElement>(null);
-
   const existingSuppliers = useMemo(() => {
     const set = new Set<string>();
     inventory.forEach((i) => {
@@ -87,13 +378,28 @@ export const PurchaseInwardWorkbench: React.FC<{
     return Array.from(set);
   }, [inventory, purchases]);
 
-  const filteredSuppliers = useMemo(() => {
-    if (!supplierQuery.trim()) return existingSuppliers;
-    const q = supplierQuery.toLowerCase();
-    return existingSuppliers.filter((s) => s.toLowerCase().includes(q));
-  }, [existingSuppliers, supplierQuery]);
+  // 2. CATEGORIES STATE (Select2 Search + Dynamic Addition)
+  const [sessionCategories, setSessionCategories] = useState<string[]>([]);
+  const allAvailableCategories = useMemo(() => {
+    const set = new Set<string>(DEFAULT_CATEGORIES);
+    inventory.forEach((i) => {
+      if (i.category && i.category.trim()) set.add(i.category.trim());
+    });
+    sessionCategories.forEach((c) => {
+      if (c && c.trim()) set.add(c.trim());
+    });
+    return Array.from(set);
+  }, [inventory, sessionCategories]);
 
-  // 2. METADATA STATE
+  const handleRegisterNewCategory = (newCat: string) => {
+    const trimmed = newCat.trim();
+    if (!trimmed) return;
+    if (!allAvailableCategories.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+      setSessionCategories((prev) => [...prev, trimmed]);
+    }
+  };
+
+  // 3. METADATA STATE
   const [purchaseDate, setPurchaseDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
@@ -107,7 +413,7 @@ export const PurchaseInwardWorkbench: React.FC<{
   } | null>(null);
   const [notes, setNotes] = useState("");
 
-  // 3. ROWS STATE
+  // 4. ROWS STATE
   const [rows, setRows] = useState<ExcelRowItem[]>([
     {
       id: "row-1",
@@ -127,7 +433,7 @@ export const PurchaseInwardWorkbench: React.FC<{
   const firstProductInputRef = useRef<HTMLInputElement>(null);
   const rowInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
-  // 4. FINANCIAL STATE
+  // 5. FINANCIAL STATE
   const [overallDiscount, setOverallDiscount] = useState<number>(0);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<
@@ -161,17 +467,6 @@ export const PurchaseInwardWorkbench: React.FC<{
     }
   }, [netPayable, paymentMethod, isPaidManuallySet]);
 
-  const handleSelectSupplier = (supplierName: string) => {
-    const trimmed = supplierName.trim();
-    if (!trimmed) return;
-    setSelectedSupplier(trimmed);
-    setSupplierQuery(trimmed);
-    setIsSupplierDropdownOpen(false);
-    setTimeout(() => {
-      firstProductInputRef.current?.focus();
-    }, 100);
-  };
-
   const handleAddRow = () => {
     const newRowId = `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     setRows((prev) => [
@@ -180,7 +475,7 @@ export const PurchaseInwardWorkbench: React.FC<{
         id: newRowId,
         isNewProduct: false,
         productName: "",
-        category: "Raw Meat & Poultry",
+        category: allAvailableCategories[0] || "Raw Meat & Poultry",
         quantity: 5,
         unit: "kg",
         costPrice: 0,
@@ -201,7 +496,7 @@ export const PurchaseInwardWorkbench: React.FC<{
           id: `row-${Date.now()}`,
           isNewProduct: false,
           productName: "",
-          category: "Raw Meat & Poultry",
+          category: allAvailableCategories[0] || "Raw Meat & Poultry",
           quantity: 1,
           unit: "kg",
           costPrice: 0,
@@ -228,6 +523,7 @@ export const PurchaseInwardWorkbench: React.FC<{
       unit: item.unit,
       costPrice: item.costPerUnit || 0,
     });
+    handleRegisterNewCategory(item.category);
     setActiveSearchRowId(null);
   };
 
@@ -243,9 +539,10 @@ export const PurchaseInwardWorkbench: React.FC<{
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const sizeStr = file.size > 1024 * 1024
-        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-        : `${Math.round(file.size / 1024)} KB`;
+      const sizeStr =
+        file.size > 1024 * 1024
+          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+          : `${Math.round(file.size / 1024)} KB`;
       setUploadedDocument({
         name: file.name,
         size: sizeStr,
@@ -262,10 +559,9 @@ export const PurchaseInwardWorkbench: React.FC<{
     if (!selectedSupplier.trim()) {
       addToast({
         title: "Supplier Required",
-        description: "Please enter or select a supplier.",
+        description: "Please enter or select a supplier via Select2 search.",
         type: "warning",
       });
-      supplierInputRef.current?.focus();
       return;
     }
 
@@ -283,16 +579,21 @@ export const PurchaseInwardWorkbench: React.FC<{
 
     validRows.forEach((row) => {
       let finalItemId = row.itemId;
+      const finalCategory = row.category.trim() || "Raw Meat & Poultry";
+
+      // Register category in session
+      handleRegisterNewCategory(finalCategory);
+
       if (row.isNewProduct || !finalItemId) {
         finalItemId = `sku-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         addInventoryItem({
           name: row.productName.trim(),
-          category: row.category,
+          category: finalCategory,
           currentStock: row.quantity,
           unit: row.unit,
           minThreshold: 5,
           costPerUnit: row.costPrice || 0,
-          supplierName: selectedSupplier,
+          supplierName: selectedSupplier.trim(),
           batchNo: row.batchNo || undefined,
           expiryDate: row.expiryDate || undefined,
           outletId: currentOutlet.id,
@@ -305,7 +606,7 @@ export const PurchaseInwardWorkbench: React.FC<{
       purchaseItems.push({
         itemId: finalItemId,
         itemName: row.productName.trim(),
-        category: row.category,
+        category: finalCategory,
         quantity: row.quantity,
         unit: row.unit,
         unitCost: row.costPrice || 0,
@@ -318,7 +619,7 @@ export const PurchaseInwardWorkbench: React.FC<{
       recordStockMovement({
         itemId: finalItemId || `inv-temp`,
         itemName: row.productName.trim(),
-        category: row.category,
+        category: finalCategory,
         type: "INCREASE",
         quantity: row.quantity,
         unit: row.unit,
@@ -353,8 +654,8 @@ export const PurchaseInwardWorkbench: React.FC<{
     });
 
     addToast({
-      title: "Bill Saved",
-      description: `Inward #${invoiceNumber} for ${selectedSupplier} recorded.`,
+      title: "Bill Saved & Restocked",
+      description: `Inward #${invoiceNumber} for ${selectedSupplier.trim()} recorded.`,
       type: "success",
     });
 
@@ -363,7 +664,7 @@ export const PurchaseInwardWorkbench: React.FC<{
         id: `row-${Date.now()}`,
         isNewProduct: false,
         productName: "",
-        category: "Raw Meat & Poultry",
+        category: allAvailableCategories[0] || "Raw Meat & Poultry",
         quantity: 10,
         unit: "kg",
         costPrice: 0,
@@ -384,81 +685,34 @@ export const PurchaseInwardWorkbench: React.FC<{
 
   return (
     <div className="bg-zinc-900/40 p-4 rounded-xl space-y-4">
+      {/* Module Title / Header */}
+      <div className="flex items-center justify-between pb-1 border-b border-zinc-800/40">
+        <div className="flex items-center gap-2">
+          <Truck className="w-4 h-4 text-amber-500" />
+          <h3 className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
+            Inward Purchase Bill Entry
+          </h3>
+        </div>
+        <div className="text-[11px] text-zinc-500 font-mono">
+          Auto-restocks inventory items below upon saving
+        </div>
+      </div>
+
       {/* Top Header Fields (Borderless, Clean 5-col layout) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
-        {/* Supplier */}
-        <div className="lg:col-span-4 relative">
+        {/* Supplier (Select2 Searchable with Auto-Create) */}
+        <div className="lg:col-span-4">
           <label className="block text-[11px] text-zinc-400 font-medium mb-1">
             Supplier
           </label>
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <input
-              ref={supplierInputRef}
-              type="text"
-              value={supplierQuery}
-              onChange={(e) => {
-                setSupplierQuery(e.target.value);
-                setIsSupplierDropdownOpen(true);
-              }}
-              onFocus={() => setIsSupplierDropdownOpen(true)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  if (filteredSuppliers.length > 0) {
-                    handleSelectSupplier(filteredSuppliers[0]);
-                  } else if (supplierQuery.trim()) {
-                    handleSelectSupplier(supplierQuery);
-                  }
-                }
-              }}
-              className="w-full h-8 pl-8 pr-7 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 focus:outline-none"
-            />
-            {supplierQuery && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSupplierQuery("");
-                  setSelectedSupplier("");
-                  setIsSupplierDropdownOpen(false);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-
-          {/* Supplier Dropdown */}
-          {isSupplierDropdownOpen && (
-            <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded-lg max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40">
-              {filteredSuppliers.map((sup) => (
-                <div
-                  key={sup}
-                  onMouseDown={() => handleSelectSupplier(sup)}
-                  className="p-2 hover:bg-zinc-800/60 cursor-pointer flex items-center justify-between text-zinc-200"
-                >
-                  <span className="font-medium">{sup}</span>
-                  {selectedSupplier === sup && (
-                    <span className="text-amber-400 font-semibold text-[10px]">Selected</span>
-                  )}
-                </div>
-              ))}
-
-              {supplierQuery.trim() &&
-                !existingSuppliers.some(
-                  (s) => s.toLowerCase() === supplierQuery.trim().toLowerCase()
-                ) && (
-                  <div
-                    onMouseDown={() => handleSelectSupplier(supplierQuery)}
-                    className="p-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-amber-400" />
-                    <span>+ Add new "{supplierQuery.trim()}"</span>
-                  </div>
-                )}
-            </div>
-          )}
+          <SupplierSelect2
+            value={selectedSupplier}
+            onChange={(sup) => setSelectedSupplier(sup)}
+            suppliers={existingSuppliers}
+            onSupplierSelected={() => {
+              firstProductInputRef.current?.focus();
+            }}
+          />
         </div>
 
         {/* Date */}
@@ -483,18 +737,18 @@ export const PurchaseInwardWorkbench: React.FC<{
             type="text"
             value={invoiceNumber}
             onChange={(e) => setInvoiceNumber(e.target.value)}
-            className="w-full h-8 px-2.5 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 font-mono uppercase focus:outline-none"
+            className="w-full h-8 px-2.5 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 font-mono uppercase font-semibold focus:outline-none"
           />
         </div>
 
-        {/* Document */}
+        {/* Attach File */}
         <div className="lg:col-span-3">
           <label className="block text-[11px] text-zinc-400 font-medium mb-1">
-            Document
+            Bill Attachment
           </label>
           {uploadedDocument ? (
-            <div className="h-8 px-2.5 bg-zinc-900/70 rounded-lg flex items-center justify-between text-xs text-emerald-400">
-              <span className="truncate font-mono text-[11px]">
+            <div className="h-8 px-2.5 bg-zinc-900/70 rounded-lg flex items-center justify-between text-xs text-zinc-200">
+              <span className="truncate max-w-[170px] text-amber-400 font-mono">
                 {uploadedDocument.name}
               </span>
               <button
@@ -519,7 +773,7 @@ export const PurchaseInwardWorkbench: React.FC<{
           )}
         </div>
 
-        {/* Add Row */}
+        {/* Add Row Button */}
         <div className="lg:col-span-1">
           <button
             type="button"
@@ -538,8 +792,8 @@ export const PurchaseInwardWorkbench: React.FC<{
           <thead>
             <tr className="bg-zinc-900/60 text-zinc-400 text-[11px] font-semibold">
               <th className="py-2.5 px-2.5 w-7 text-center">#</th>
-              <th className="py-2.5 px-2.5 w-60">Item</th>
-              <th className="py-2.5 px-2.5 w-36">Category</th>
+              <th className="py-2.5 px-2.5 w-56">Item</th>
+              <th className="py-2.5 px-2.5 w-40">Category</th>
               <th className="py-2.5 px-2.5 w-20 text-center">Qty</th>
               <th className="py-2.5 px-2.5 w-20">Unit</th>
               <th className="py-2.5 px-2.5 w-24 text-right">Cost</th>
@@ -568,7 +822,7 @@ export const PurchaseInwardWorkbench: React.FC<{
                     {idx + 1}
                   </td>
 
-                  {/* Product Field */}
+                  {/* Product Field (Select Search with Auto Create) */}
                   <td className="py-1.5 px-2 relative">
                     <input
                       ref={(el) => {
@@ -588,11 +842,12 @@ export const PurchaseInwardWorkbench: React.FC<{
                         setActiveSearchRowId(row.id);
                       }}
                       onFocus={() => setActiveSearchRowId(row.id)}
-                      className="w-full h-7 px-2 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 focus:outline-none"
+                      placeholder="Item name..."
+                      className="w-full h-7 px-2 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
                     />
 
                     {activeSearchRowId === row.id && (
-                      <div className="absolute left-2 right-2 top-full mt-1 z-20 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded-lg max-h-48 overflow-y-auto text-xs divide-y divide-zinc-800/40">
+                      <div className="absolute left-2 right-2 top-full mt-1 z-30 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded-lg max-h-48 overflow-y-auto text-xs divide-y divide-zinc-800/40">
                         {matchingInventoryItems.slice(0, 6).map((inv) => (
                           <div
                             key={inv.id}
@@ -624,23 +879,14 @@ export const PurchaseInwardWorkbench: React.FC<{
                     )}
                   </td>
 
-                  {/* Category */}
+                  {/* Category Field (Select2 Searchable with Auto-Create) */}
                   <td className="py-1.5 px-2">
-                    <select
+                    <CategorySelect2
                       value={row.category}
-                      onChange={(e) =>
-                        handleUpdateRow(row.id, {
-                          category: e.target.value as InventoryCategory,
-                        })
-                      }
-                      className="w-full h-7 px-1 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-200 focus:outline-none cursor-pointer"
-                    >
-                      {DEFAULT_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(cat) => handleUpdateRow(row.id, { category: cat })}
+                      categories={allAvailableCategories}
+                      onRegisterNewCategory={handleRegisterNewCategory}
+                    />
                   </td>
 
                   {/* Quantity */}
@@ -727,10 +973,11 @@ export const PurchaseInwardWorkbench: React.FC<{
                     <input
                       type="text"
                       value={row.batchNo || ""}
+                      placeholder="Batch #"
                       onChange={(e) =>
                         handleUpdateRow(row.id, { batchNo: e.target.value })
                       }
-                      className="w-full h-7 px-1.5 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-300 font-mono uppercase focus:outline-none"
+                      className="w-full h-7 px-1.5 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-300 placeholder:text-zinc-600 font-mono uppercase focus:outline-none"
                     />
                   </td>
 
@@ -773,8 +1020,9 @@ export const PurchaseInwardWorkbench: React.FC<{
           <input
             type="text"
             value={notes}
+            placeholder="Receiving remarks..."
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full h-8 px-2.5 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-200 focus:outline-none"
+            className="w-full h-8 px-2.5 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
           />
         </div>
 

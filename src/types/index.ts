@@ -418,7 +418,8 @@ export type InventoryCategory =
   | "Beverage Syrups & Dairy"
   | "Beverages & Drinks"
   | "Retail Counter Goods"
-  | "Packaging & Disposables";
+  | "Packaging & Disposables"
+  | (string & {});
 
 export interface InventoryItem {
   id: string;

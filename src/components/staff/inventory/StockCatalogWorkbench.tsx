@@ -12,18 +12,6 @@ import { useApp } from "../../../context/AppContext";
 import { InventoryItem, InventoryCategory } from "../../../types";
 import { formatNPR } from "../../../lib/utils";
 
-const CATEGORIES: Array<"ALL" | InventoryCategory> = [
-  "ALL",
-  "Raw Meat & Poultry",
-  "Bakery & Buns",
-  "Dairy & Cheese",
-  "Vegetables & Produce",
-  "Sauces & Condiments",
-  "Beverages & Drinks",
-  "Packaging & Disposables",
-  "Retail Counter Goods",
-];
-
 export const StockCatalogWorkbench: React.FC = () => {
   const {
     inventory,
@@ -34,7 +22,25 @@ export const StockCatalogWorkbench: React.FC = () => {
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<"ALL" | InventoryCategory>("ALL");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+
+  const categoriesList = useMemo(() => {
+    const set = new Set<string>([
+      "ALL",
+      "Raw Meat & Poultry",
+      "Bakery & Buns",
+      "Dairy & Cheese",
+      "Vegetables & Produce",
+      "Sauces & Condiments",
+      "Beverages & Drinks",
+      "Packaging & Disposables",
+      "Retail Counter Goods",
+    ]);
+    inventory.forEach((i) => {
+      if (i.category && i.category.trim()) set.add(i.category.trim());
+    });
+    return Array.from(set);
+  }, [inventory]);
 
   // Adjust Stock state
   const [adjustingItemId, setAdjustingItemId] = useState<string | null>(null);
@@ -43,7 +49,9 @@ export const StockCatalogWorkbench: React.FC = () => {
   // Add Item modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<InventoryCategory>("Raw Meat & Poultry");
+  const [category, setCategory] = useState<string>("Raw Meat & Poultry");
+  const [customCategoryInput, setCustomCategoryInput] = useState("");
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [currentStock, setCurrentStock] = useState("");
   const [unit, setUnit] = useState<InventoryItem["unit"]>("kg");
   const [minThreshold, setMinThreshold] = useState("10");
@@ -67,6 +75,8 @@ export const StockCatalogWorkbench: React.FC = () => {
   const handleOpenAdd = () => {
     setName("");
     setCategory("Raw Meat & Poultry");
+    setIsCustomCategory(false);
+    setCustomCategoryInput("");
     setCurrentStock("20");
     setUnit("kg");
     setMinThreshold("10");
@@ -79,9 +89,13 @@ export const StockCatalogWorkbench: React.FC = () => {
     e.preventDefault();
     if (!name.trim()) return;
 
+    const finalCategory = isCustomCategory && customCategoryInput.trim()
+      ? customCategoryInput.trim()
+      : category;
+
     addInventoryItem({
       name: name.trim(),
-      category,
+      category: finalCategory,
       currentStock: parseFloat(currentStock) || 0,
       unit,
       minThreshold: parseFloat(minThreshold) || 0,
@@ -149,7 +163,7 @@ export const StockCatalogWorkbench: React.FC = () => {
 
       {/* Category Pills (Borderless, Sleek) */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-        {CATEGORIES.map((cat) => (
+        {categoriesList.map((cat) => (
           <button
             key={cat}
             type="button"
@@ -322,20 +336,39 @@ export const StockCatalogWorkbench: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-zinc-400 font-medium mb-1">
-                    Category
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as InventoryCategory)}
-                    className="w-full h-8 px-2 bg-zinc-800/60 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 text-xs focus:outline-none"
-                  >
-                    {CATEGORIES.filter((c) => c !== "ALL").map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] text-zinc-400 font-medium">
+                      Category
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomCategory(!isCustomCategory)}
+                      className="text-[10px] text-amber-400 hover:underline cursor-pointer"
+                    >
+                      {isCustomCategory ? "Pick existing" : "+ New category"}
+                    </button>
+                  </div>
+                  {isCustomCategory ? (
+                    <input
+                      type="text"
+                      value={customCategoryInput}
+                      onChange={(e) => setCustomCategoryInput(e.target.value)}
+                      placeholder="Enter new category name..."
+                      className="w-full h-8 px-2.5 bg-zinc-800/60 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 text-xs focus:outline-none"
+                    />
+                  ) : (
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full h-8 px-2 bg-zinc-800/60 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 text-xs focus:outline-none cursor-pointer"
+                    >
+                      {categoriesList.filter((c) => c !== "ALL").map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div>

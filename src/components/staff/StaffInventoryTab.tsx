@@ -26,12 +26,12 @@ export const StaffInventoryTab: React.FC = () => {
   } = useApp();
 
   // Active view:
-  // "items" = Stock Items Catalog & SKUs
-  // "purchase" = Inward Bill Entry Form
+  // "items" = Stock Items Catalog & Purchase Inward Form (positioned directly above)
   // "bills" = Purchase Invoices Datatable
   // "audit" = Stock Audit & Variances
   // "movements" = Stock Movement Log
-  const [activeView, setActiveView] = useState<"items" | "purchase" | "bills" | "audit" | "movements">("items");
+  const [activeView, setActiveView] = useState<"items" | "bills" | "audit" | "movements">("items");
+  const [isPurchaseFormVisible, setIsPurchaseFormVisible] = useState(true);
 
   // Movement Log state
   const [movementSearch, setMovementSearch] = useState("");
@@ -123,99 +123,103 @@ export const StaffInventoryTab: React.FC = () => {
       {/* -------------------------------------------------------------
           CLEAN VIEW NAVIGATION TABS (BORDERLESS PILL SWITCHER)
       ------------------------------------------------------------- */}
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-        <button
-          type="button"
-          onClick={() => setActiveView("items")}
-          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
-            activeView === "items"
-              ? "bg-zinc-800 text-white font-bold shadow-xs"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
-          }`}
-        >
-          <Boxes className="w-3.5 h-3.5" />
-          <span>Stock Items</span>
-        </button>
+      <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-0.5">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveView("items")}
+            className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
+              activeView === "items"
+                ? "bg-zinc-800 text-white font-bold shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
+            }`}
+          >
+            <Boxes className="w-3.5 h-3.5" />
+            <span>Stock & Inward Purchase</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveView("purchase")}
-          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
-            activeView === "purchase"
-              ? "bg-zinc-800 text-white font-bold shadow-xs"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
-          }`}
-        >
-          <Truck className="w-3.5 h-3.5" />
-          <span>Inward Purchase</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveView("bills")}
+            className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
+              activeView === "bills"
+                ? "bg-zinc-800 text-white font-bold shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Bills History ({purchases.length})</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveView("bills")}
-          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
-            activeView === "bills"
-              ? "bg-zinc-800 text-white font-bold shadow-xs"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
-          }`}
-        >
-          <FileText className="w-3.5 h-3.5" />
-          <span>Bills History ({purchases.length})</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveView("audit")}
+            className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
+              activeView === "audit"
+                ? "bg-zinc-800 text-white font-bold shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5" />
+            <span>Stock Audit</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveView("audit")}
-          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
-            activeView === "audit"
-              ? "bg-zinc-800 text-white font-bold shadow-xs"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
-          }`}
-        >
-          <Scale className="w-3.5 h-3.5" />
-          <span>Stock Audit</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveView("movements")}
+            className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
+              activeView === "movements"
+                ? "bg-zinc-800 text-white font-bold shadow-xs"
+                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
+            }`}
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>Movements ({stockMovements.length})</span>
+          </button>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => setActiveView("movements")}
-          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
-            activeView === "movements"
-              ? "bg-zinc-800 text-white font-bold shadow-xs"
-              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
-          }`}
-        >
-          <History className="w-3.5 h-3.5" />
-          <span>Movements ({stockMovements.length})</span>
-        </button>
+        {activeView === "items" && (
+          <button
+            type="button"
+            onClick={() => setIsPurchaseFormVisible(!isPurchaseFormVisible)}
+            className="text-[11px] text-zinc-400 hover:text-amber-400 px-2.5 py-1 rounded-lg hover:bg-zinc-900/60 transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1 font-medium"
+          >
+            <Truck className="w-3.5 h-3.5 text-amber-500" />
+            <span>{isPurchaseFormVisible ? "Hide Purchase Form" : "+ Open Purchase Form"}</span>
+          </button>
+        )}
       </div>
 
       {/* -------------------------------------------------------------
           VIEWS RENDERING
       ------------------------------------------------------------- */}
-      {/* VIEW 1: STOCK ITEMS MASTER */}
-      {activeView === "items" && <StockCatalogWorkbench />}
+      {/* VIEW 1: PURCHASE FORM POSITIONED DIRECTLY ABOVE STOCK ITEMS TABLE */}
+      {activeView === "items" && (
+        <div className="space-y-4">
+          {isPurchaseFormVisible && (
+            <PurchaseInwardWorkbench
+              onPurchaseSaved={() => {
+                addToast({
+                  title: "Purchase Recorded",
+                  description: "Inventory stock updated immediately in the table below.",
+                  type: "success",
+                });
+              }}
+            />
+          )}
 
-      {/* VIEW 2: INWARD PURCHASE BILL ENTRY */}
-      {activeView === "purchase" && (
-        <PurchaseInwardWorkbench
-          onPurchaseSaved={() => {
-            addToast({
-              title: "Bill Saved",
-              description: "Purchase recorded and stock restocked.",
-              type: "success",
-            });
-          }}
-        />
+          {/* STOCK ITEMS TABLE */}
+          <StockCatalogWorkbench />
+        </div>
       )}
 
-      {/* VIEW 3: BILLS HISTORY */}
+      {/* VIEW 2: BILLS HISTORY */}
       {activeView === "bills" && <PurchaseBillsDatatable />}
 
-      {/* VIEW 4: STOCK AUDIT */}
+      {/* VIEW 3: STOCK AUDIT */}
       {activeView === "audit" && <StockAuditWorkbench />}
 
-      {/* VIEW 5: STOCK MOVEMENTS LOG */}
+      {/* VIEW 4: STOCK MOVEMENTS LOG */}
       {activeView === "movements" && (
         <div className="bg-zinc-900/40 p-4 rounded-xl space-y-3.5">
           {/* Controls Bar (Borderless) */}
