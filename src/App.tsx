@@ -6,7 +6,6 @@ import { CustomerPortal } from "./components/customer/CustomerPortal";
 import { StaffPortal } from "./components/staff/StaffPortal";
 import { KDSPortal } from "./components/kds/KDSPortal";
 import { AdminPortal } from "./components/admin/AdminPortal";
-import { PlatformPortal } from "./components/platform/PlatformPortal";
 import { WaiterPortal } from "./components/staff/WaiterPortal";
 import { RiderPortal } from "./components/staff/RiderPortal";
 import { KioskPortal } from "./components/kiosk/KioskPortal";
@@ -89,8 +88,7 @@ const AppContent: React.FC = () => {
     currentPath.startsWith("/outlet") ||
     currentPath === "/dashboard" ||
     currentPath.startsWith("/dashboard") ||
-    activePortal === "admin" ||
-    activePortal === "platform";
+    activePortal === "admin";
 
   const isPosRoute = currentPath === "/pos" || currentPath.startsWith("/pos") || activePortal === "staff";
   const isKdsRoute = currentPath === "/kds" || currentPath.startsWith("/kds") || activePortal === "kitchen";

@@ -1,16 +1,18 @@
 import React, { useState, useMemo } from "react";
 import {
+  Boxes,
   Truck,
+  FileText,
   Scale,
   History,
   Search,
   ArrowUpRight,
   ArrowDownRight,
   X,
-  FileText,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { formatNPR } from "../../lib/utils";
+import { StockCatalogWorkbench } from "./inventory/StockCatalogWorkbench";
 import { PurchaseInwardWorkbench } from "./inventory/PurchaseInwardWorkbench";
 import { PurchaseBillsDatatable } from "./inventory/PurchaseBillsDatatable";
 import { StockAuditWorkbench } from "./inventory/StockAuditWorkbench";
@@ -24,30 +26,30 @@ export const StaffInventoryTab: React.FC = () => {
   } = useApp();
 
   // Active view:
-  // "purchase" = Inward Purchase (Bill Entry) + Invoices Datatable below
-  // "audit" = Stock Audit & Discrepancies
+  // "items" = Stock Items Catalog & SKUs
+  // "purchase" = Inward Bill Entry Form
+  // "bills" = Purchase Invoices Datatable
+  // "audit" = Stock Audit & Variances
   // "movements" = Stock Movement Log
-  const [activeView, setActiveView] = useState<"purchase" | "audit" | "movements">("purchase");
+  const [activeView, setActiveView] = useState<"items" | "purchase" | "bills" | "audit" | "movements">("items");
 
-  // Filter state for Stock Movement view
+  // Movement Log state
   const [movementSearch, setMovementSearch] = useState("");
   const [movementPage, setMovementPage] = useState(1);
   const [movementPageSize] = useState(15);
   const [movementTypeFilter, setMovementTypeFilter] = useState<"ALL" | "INCREASE" | "DECREASE">("ALL");
-  const [movementReasonFilter, setMovementReasonFilter] = useState<string>("ALL");
 
-  // Overall Inventory Stats (clean inline labels & values)
+  // Overall Inventory Stats
   const totalItemsCount = inventory.length;
   const lowStockCount = inventory.filter((i) => i.currentStock <= i.minThreshold).length;
   const totalValuation = inventory.reduce((sum, i) => sum + i.currentStock * i.costPerUnit, 0);
   const totalPurchasesCount = purchases.length;
   const totalMovementsCount = stockMovements.length;
 
-  // Filtered Movements for Movement Log Tab
+  // Filtered Movements
   const filteredMovements = useMemo(() => {
     return stockMovements.filter((m) => {
       if (movementTypeFilter !== "ALL" && m.type !== movementTypeFilter) return false;
-      if (movementReasonFilter !== "ALL" && !m.reason.includes(movementReasonFilter)) return false;
 
       if (movementSearch.trim()) {
         const q = movementSearch.toLowerCase();
@@ -59,7 +61,7 @@ export const StaffInventoryTab: React.FC = () => {
       }
       return true;
     });
-  }, [stockMovements, movementTypeFilter, movementReasonFilter, movementSearch]);
+  }, [stockMovements, movementTypeFilter, movementSearch]);
 
   const totalMovementPages = Math.max(1, Math.ceil(filteredMovements.length / movementPageSize));
   const paginatedMovements = useMemo(() => {
@@ -68,23 +70,29 @@ export const StaffInventoryTab: React.FC = () => {
   }, [filteredMovements, movementPage, movementPageSize]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3.5">
       {/* -------------------------------------------------------------
-          TOP INLINE TEXT VALUE SUMMARY (NO BULKY BOX CARDS)
+          TOP METRICS STRIP (CLEAN, BORDERLESS INLINE TEXT)
       ------------------------------------------------------------- */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-zinc-400 py-1 font-medium overflow-x-auto no-scrollbar border-b border-zinc-800 pb-2">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-zinc-400 py-1 font-medium overflow-x-auto no-scrollbar">
         <span className="flex items-center gap-1.5 whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
           <span className="text-zinc-500">Tracked SKUs:</span>
           <strong className="font-mono text-zinc-100 font-bold">{totalItemsCount}</strong>
         </span>
 
         <span className="flex items-center gap-1.5 whitespace-nowrap">
-          <span className={lowStockCount > 0 ? "text-amber-500 font-bold" : "text-zinc-500"}>
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              lowStockCount > 0 ? "bg-rose-500" : "bg-zinc-600"
+            }`}
+          />
+          <span className={lowStockCount > 0 ? "text-rose-400 font-semibold" : "text-zinc-500"}>
             Low Stock:
           </span>
           <strong
             className={`font-mono font-bold ${
-              lowStockCount > 0 ? "text-amber-400" : "text-zinc-300"
+              lowStockCount > 0 ? "text-rose-400" : "text-zinc-300"
             }`}
           >
             {lowStockCount}
@@ -92,122 +100,130 @@ export const StaffInventoryTab: React.FC = () => {
         </span>
 
         <span className="flex items-center gap-1.5 whitespace-nowrap">
-          <span className="text-zinc-500">Total Stock Value:</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span className="text-zinc-500">Valuation:</span>
           <strong className="font-mono text-emerald-400 font-bold">
             {formatNPR(totalValuation)}
           </strong>
         </span>
 
         <span className="flex items-center gap-1.5 whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
           <span className="text-zinc-500">Inward Bills:</span>
           <strong className="font-mono text-zinc-200 font-bold">{totalPurchasesCount}</strong>
         </span>
 
         <span className="flex items-center gap-1.5 whitespace-nowrap">
-          <span className="text-zinc-500">Movement Logs:</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+          <span className="text-zinc-500">Movements:</span>
           <strong className="font-mono text-zinc-300 font-bold">{totalMovementsCount}</strong>
         </span>
       </div>
 
       {/* -------------------------------------------------------------
-          CLEAN VIEW NAVIGATION TABS
-          1. Inward Purchase & Bills
-          2. Stock Audit & Discrepancies
-          3. Stock Movement
+          CLEAN VIEW NAVIGATION TABS (BORDERLESS PILL SWITCHER)
       ------------------------------------------------------------- */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-2">
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          {/* 1. Inward Purchase & Bills */}
-          <button
-            type="button"
-            onClick={() => setActiveView("purchase")}
-            className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer border transition-colors whitespace-nowrap ${
-              activeView === "purchase"
-                ? "bg-amber-500 text-black border-amber-500 font-black"
-                : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-white"
-            }`}
-          >
-            <Truck className="w-3.5 h-3.5" />
-            <span>Inward Purchase & Bills ({purchases.length})</span>
-          </button>
+      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+        <button
+          type="button"
+          onClick={() => setActiveView("items")}
+          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
+            activeView === "items"
+              ? "bg-zinc-800 text-white font-bold shadow-xs"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
+          }`}
+        >
+          <Boxes className="w-3.5 h-3.5" />
+          <span>Stock Items</span>
+        </button>
 
-          {/* 2. Stock Audit */}
-          <button
-            type="button"
-            onClick={() => setActiveView("audit")}
-            className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer border transition-colors whitespace-nowrap ${
-              activeView === "audit"
-                ? "bg-amber-500 text-black border-amber-500 font-black"
-                : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-white"
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5" />
-            <span>Stock Audit & Discrepancies</span>
-          </button>
+        <button
+          type="button"
+          onClick={() => setActiveView("purchase")}
+          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
+            activeView === "purchase"
+              ? "bg-zinc-800 text-white font-bold shadow-xs"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
+          }`}
+        >
+          <Truck className="w-3.5 h-3.5" />
+          <span>Inward Purchase</span>
+        </button>
 
-          {/* 3. Stock Movement */}
-          <button
-            type="button"
-            onClick={() => setActiveView("movements")}
-            className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer border transition-colors whitespace-nowrap ${
-              activeView === "movements"
-                ? "bg-amber-500 text-black border-amber-500 font-black"
-                : "bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-white"
-            }`}
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>Stock Movement ({stockMovements.length})</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveView("bills")}
+          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
+            activeView === "bills"
+              ? "bg-zinc-800 text-white font-bold shadow-xs"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Bills History ({purchases.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveView("audit")}
+          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
+            activeView === "audit"
+              ? "bg-zinc-800 text-white font-bold shadow-xs"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
+          }`}
+        >
+          <Scale className="w-3.5 h-3.5" />
+          <span>Stock Audit</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveView("movements")}
+          className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap font-medium ${
+            activeView === "movements"
+              ? "bg-zinc-800 text-white font-bold shadow-xs"
+              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50"
+          }`}
+        >
+          <History className="w-3.5 h-3.5" />
+          <span>Movements ({stockMovements.length})</span>
+        </button>
       </div>
 
       {/* -------------------------------------------------------------
-          VIEW 1: INWARD PURCHASE BILL ENTRY & INVOICES DATATABLE JUST BELOW
+          VIEWS RENDERING
       ------------------------------------------------------------- */}
-      {activeView === "purchase" && (
-        <div className="space-y-4">
-          {/* Purchase Inward Form (Workbench) */}
-          <div>
-            <PurchaseInwardWorkbench
-              onPurchaseSaved={() => {
-                addToast({
-                  title: "Purchase Bill Recorded",
-                  description: "Inventory restocked and purchase invoice logged below.",
-                  type: "success",
-                });
-              }}
-            />
-          </div>
+      {/* VIEW 1: STOCK ITEMS MASTER */}
+      {activeView === "items" && <StockCatalogWorkbench />}
 
-          {/* Just below the form of the purchase bill: Purchase Invoices & Bills Datatable */}
-          <div className="pt-1">
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <FileText className="w-4 h-4 text-amber-500" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-200">
-                Purchase Invoices & Bills History ({purchases.length})
-              </h3>
-            </div>
-            <PurchaseBillsDatatable />
-          </div>
-        </div>
+      {/* VIEW 2: INWARD PURCHASE BILL ENTRY */}
+      {activeView === "purchase" && (
+        <PurchaseInwardWorkbench
+          onPurchaseSaved={() => {
+            addToast({
+              title: "Bill Saved",
+              description: "Purchase recorded and stock restocked.",
+              type: "success",
+            });
+          }}
+        />
       )}
 
-      {/* -------------------------------------------------------------
-          VIEW 2: STOCK AUDIT WORKBENCH
-      ------------------------------------------------------------- */}
+      {/* VIEW 3: BILLS HISTORY */}
+      {activeView === "bills" && <PurchaseBillsDatatable />}
+
+      {/* VIEW 4: STOCK AUDIT */}
       {activeView === "audit" && <StockAuditWorkbench />}
 
-      {/* -------------------------------------------------------------
-          VIEW 3: STOCK MOVEMENT LOG & AUDIT TRAIL
-      ------------------------------------------------------------- */}
+      {/* VIEW 5: STOCK MOVEMENTS LOG */}
       {activeView === "movements" && (
-        <div className="bg-[#141417] border border-zinc-800 p-3 shadow-sm space-y-3">
-          {/* Filter Header */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-800">
+        <div className="bg-zinc-900/40 p-4 rounded-xl space-y-3.5">
+          {/* Controls Bar (Borderless) */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex items-center gap-2">
               <History className="w-4 h-4 text-amber-500" />
-              <span className="text-xs font-bold uppercase text-zinc-200">
-                Stock Movements Audit Trail ({stockMovements.length})
+              <span className="text-xs font-semibold text-zinc-200">
+                Stock Movements ({stockMovements.length})
               </span>
             </div>
 
@@ -218,15 +234,15 @@ export const StaffInventoryTab: React.FC = () => {
                   setMovementTypeFilter(e.target.value as any);
                   setMovementPage(1);
                 }}
-                className="h-8 px-2 bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs focus:outline-none cursor-pointer"
+                className="h-8 px-2 bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-200 text-xs focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Directions</option>
-                <option value="INCREASE">Stock Inward (+)</option>
-                <option value="DECREASE">Stock Outward (-)</option>
+                <option value="INCREASE">Inward (+)</option>
+                <option value="DECREASE">Outward (-)</option>
               </select>
 
               <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <input
                   type="text"
                   value={movementSearch}
@@ -234,8 +250,8 @@ export const StaffInventoryTab: React.FC = () => {
                     setMovementSearch(e.target.value);
                     setMovementPage(1);
                   }}
-                  placeholder="Search item, reason, note..."
-                  className="w-48 sm:w-56 h-8 pl-8 pr-6 text-xs bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 font-mono"
+                  placeholder="Search movements..."
+                  className="w-48 sm:w-56 h-8 pl-8 pr-7 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
                 />
                 {movementSearch && (
                   <button
@@ -244,7 +260,7 @@ export const StaffInventoryTab: React.FC = () => {
                       setMovementSearch("");
                       setMovementPage(1);
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -253,26 +269,26 @@ export const StaffInventoryTab: React.FC = () => {
             </div>
           </div>
 
-          {/* Movement Records Table */}
-          <div className="overflow-x-auto border border-zinc-800">
+          {/* Borderless Table */}
+          <div className="overflow-x-auto rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-zinc-900 text-zinc-400 uppercase text-[10px] font-bold tracking-wider border-b border-zinc-800">
-                <tr>
-                  <th className="py-2.5 px-3">Time & Date</th>
-                  <th className="py-2.5 px-3">Item Name</th>
+              <thead>
+                <tr className="bg-zinc-900/60 text-zinc-400 text-[11px] font-semibold">
+                  <th className="py-2.5 px-3">Date & Time</th>
+                  <th className="py-2.5 px-3">Item</th>
                   <th className="py-2.5 px-2.5">Type</th>
-                  <th className="py-2.5 px-3 text-right">Qty Changed</th>
-                  <th className="py-2.5 px-3 text-right">Prev ➔ New</th>
-                  <th className="py-2.5 px-3">Accountable Reason</th>
-                  <th className="py-2.5 px-3">Explanatory Note</th>
-                  <th className="py-2.5 px-3">Recorded By</th>
+                  <th className="py-2.5 px-3 text-right">Quantity</th>
+                  <th className="py-2.5 px-3 text-right">Stock Level</th>
+                  <th className="py-2.5 px-3">Reason</th>
+                  <th className="py-2.5 px-3">Note</th>
+                  <th className="py-2.5 px-3">User</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800 bg-[#141417]">
+              <tbody className="divide-y divide-zinc-800/30">
                 {paginatedMovements.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-8 text-center text-zinc-500 text-xs">
-                      No stock movement records match your filter criteria.
+                      No stock movement records found.
                     </td>
                   </tr>
                 ) : (
@@ -280,13 +296,13 @@ export const StaffInventoryTab: React.FC = () => {
                     const isIncrease = mov.type === "INCREASE";
 
                     return (
-                      <tr key={mov.id} className="hover:bg-zinc-900/50 transition-colors">
+                      <tr key={mov.id} className="hover:bg-zinc-900/30 transition-colors">
                         <td className="py-2 px-3 whitespace-nowrap font-mono text-[11px] text-zinc-400">
                           {mov.timestamp}
                         </td>
 
                         <td className="py-2 px-3">
-                          <p className="font-bold text-zinc-100">{mov.itemName}</p>
+                          <p className="font-semibold text-zinc-100">{mov.itemName}</p>
                           {mov.category && (
                             <p className="text-[10px] text-zinc-500">{mov.category}</p>
                           )}
@@ -294,17 +310,17 @@ export const StaffInventoryTab: React.FC = () => {
 
                         <td className="py-2 px-2.5 whitespace-nowrap">
                           {isIncrease ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                              <ArrowUpRight className="w-3 h-3" /> In (+)
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold bg-emerald-500/10 text-emerald-400 rounded">
+                              <ArrowUpRight className="w-3 h-3" /> In
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black bg-rose-500/10 text-rose-400 border border-rose-500/30">
-                              <ArrowDownRight className="w-3 h-3" /> Out (-)
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold bg-rose-500/10 text-rose-400 rounded">
+                              <ArrowDownRight className="w-3 h-3" /> Out
                             </span>
                           )}
                         </td>
 
-                        <td className="py-2 px-3 whitespace-nowrap text-right font-mono font-black text-xs">
+                        <td className="py-2 px-3 whitespace-nowrap text-right font-mono font-bold text-xs">
                           <span className={isIncrease ? "text-emerald-400" : "text-rose-400"}>
                             {isIncrease ? "+" : "-"}
                             {mov.quantity} {mov.unit}
@@ -319,25 +335,13 @@ export const StaffInventoryTab: React.FC = () => {
                           </strong>
                         </td>
 
-                        <td className="py-2 px-3">
-                          <span
-                            className={`inline-block px-2 py-0.5 text-[11px] font-bold border ${
-                              isIncrease
-                                ? "bg-zinc-800 text-zinc-200 border-zinc-700"
-                                : mov.reason.includes("Wastage") ||
-                                  mov.reason.includes("Expired") ||
-                                  mov.reason.includes("Theft")
-                                ? "bg-rose-500/10 text-rose-400 border-rose-500/30 font-black"
-                                : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                            }`}
-                          >
-                            {mov.reason}
-                          </span>
+                        <td className="py-2 px-3 text-zinc-300">
+                          <span className="text-[11px] font-medium">{mov.reason}</span>
                         </td>
 
-                        <td className="py-2 px-3 max-w-[200px]">
+                        <td className="py-2 px-3 max-w-[200px] text-zinc-400">
                           {mov.note ? (
-                            <p className="text-xs text-zinc-300 italic truncate" title={mov.note}>
+                            <p className="text-xs truncate italic" title={mov.note}>
                               "{mov.note}"
                             </p>
                           ) : (
@@ -345,8 +349,8 @@ export const StaffInventoryTab: React.FC = () => {
                           )}
                         </td>
 
-                        <td className="py-2 px-3 whitespace-nowrap text-xs text-zinc-400 font-medium">
-                          {mov.recordedBy || "Staff Member"}
+                        <td className="py-2 px-3 whitespace-nowrap text-xs text-zinc-400">
+                          {mov.recordedBy || "Staff"}
                         </td>
                       </tr>
                     );
@@ -356,18 +360,18 @@ export const StaffInventoryTab: React.FC = () => {
             </table>
           </div>
 
-          {/* Movements Pagination */}
+          {/* Pagination */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs text-zinc-500">
             <div>
               Showing{" "}
-              <strong className="text-zinc-200">
+              <strong className="text-zinc-300">
                 {filteredMovements.length === 0 ? 0 : (movementPage - 1) * movementPageSize + 1}
               </strong>{" "}
               to{" "}
-              <strong className="text-zinc-200">
+              <strong className="text-zinc-300">
                 {Math.min(movementPage * movementPageSize, filteredMovements.length)}
               </strong>{" "}
-              of <strong className="text-zinc-200">{filteredMovements.length}</strong> events
+              of <strong className="text-zinc-300">{filteredMovements.length}</strong> events
             </div>
 
             <div className="flex items-center gap-1">
@@ -375,7 +379,7 @@ export const StaffInventoryTab: React.FC = () => {
                 type="button"
                 disabled={movementPage <= 1}
                 onClick={() => setMovementPage((p) => Math.max(1, p - 1))}
-                className="px-2.5 py-1 bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed hover:bg-zinc-800 text-xs"
+                className="px-2.5 py-1 bg-zinc-900/80 text-zinc-400 hover:text-white rounded disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed text-xs"
               >
                 Prev
               </button>
@@ -386,7 +390,7 @@ export const StaffInventoryTab: React.FC = () => {
                 type="button"
                 disabled={movementPage >= totalMovementPages}
                 onClick={() => setMovementPage((p) => Math.min(totalMovementPages, p + 1))}
-                className="px-2.5 py-1 bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed hover:bg-zinc-800 text-xs"
+                className="px-2.5 py-1 bg-zinc-900/80 text-zinc-400 hover:text-white rounded disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed text-xs"
               >
                 Next
               </button>

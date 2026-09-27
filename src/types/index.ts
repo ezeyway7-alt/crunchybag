@@ -28,7 +28,7 @@ export interface ActivityLogItem {
   badgeType: "order" | "kitchen" | "menu" | "staff" | "payment";
 }
 
-export type PortalType = "customer" | "staff" | "kitchen" | "admin" | "platform" | "device" | "kiosk" | "table-qr" | "tv";
+export type PortalType = "customer" | "staff" | "kitchen" | "admin" | "device" | "kiosk" | "table-qr" | "tv";
 
 export interface Outlet {
   id: string;

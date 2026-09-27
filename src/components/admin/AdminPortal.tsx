@@ -12,7 +12,6 @@ import {
   AlertCircle,
   Plus,
   Edit2,
-  ShieldCheck,
   UserCheck,
   Boxes,
   Truck,
@@ -49,7 +48,6 @@ import { StaffBillingTab } from "../staff/StaffBillingTab";
 import { StaffInventoryTab } from "../staff/StaffInventoryTab";
 import { StaffDaybookTab } from "../staff/StaffDaybookTab";
 import { KDSPortal } from "../kds/KDSPortal";
-import { PlatformPortal } from "../platform/PlatformPortal";
 import { AdminEmployeesTab } from "./AdminEmployeesTab";
 import { AdminLoyaltyTab } from "./AdminLoyaltyTab";
 import { AdminMenuManagerTab } from "./AdminMenuManagerTab";
@@ -108,7 +106,6 @@ export const AdminPortal: React.FC = () => {
     | "loyalty"
     | "employees"
     | "organization"
-    | "platform"
     | "logs";
 
   const VALID_TABS: TabType[] = [
@@ -122,7 +119,6 @@ export const AdminPortal: React.FC = () => {
     "loyalty",
     "employees",
     "organization",
-    "platform",
     "logs",
   ];
 
@@ -240,7 +236,7 @@ export const AdminPortal: React.FC = () => {
     },
     {
       id: "inventory",
-      label: "Inventory & Purchases",
+      label: "Inventory",
       icon: Boxes,
       badge: lowStockCount > 0 ? `${lowStockCount} low` : undefined,
     },
@@ -271,11 +267,6 @@ export const AdminPortal: React.FC = () => {
       id: "organization",
       label: "Organization",
       icon: Building2,
-    },
-    {
-      id: "platform",
-      label: "Multi-Tenant Governance",
-      icon: ShieldCheck,
     },
     {
       id: "logs",
@@ -808,13 +799,10 @@ export const AdminPortal: React.FC = () => {
         {/* TAB 9: STAFF & ACCESS */}
         {activeTab === "employees" && <AdminEmployeesTab />}
 
-        {/* TAB 10: OUTLETS & ORGANIZATION */}
+        {/* TAB 10: ORGANIZATION */}
         {activeTab === "organization" && <AdminOrganizationTab />}
 
-        {/* TAB 11: PLATFORM MULTI-TENANT GOVERNANCE */}
-        {activeTab === "platform" && <PlatformPortal />}
-
-        {/* TAB 12: ACTIVITY & AUDIT LOGS */}
+        {/* TAB 11: ACTIVITY & AUDIT LOGS */}
         {activeTab === "logs" && <AdminActivityTab />}
           </>
         )}

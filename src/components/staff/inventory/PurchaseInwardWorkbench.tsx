@@ -4,15 +4,9 @@ import {
   Plus,
   Trash2,
   Calendar,
-  Hash,
-  Paperclip,
   CheckCircle2,
-  DollarSign,
   Search,
   X,
-  Sparkles,
-  ArrowRight,
-  AlertCircle,
   FileText,
   Upload,
 } from "lucide-react";
@@ -21,15 +15,15 @@ import { InventoryItem, InventoryCategory, PurchaseLineItem } from "../../../typ
 import { formatNPR } from "../../../lib/utils";
 
 interface ExcelRowItem {
-  id: string; // unique row id
-  itemId?: string; // matched inventory item id or empty if new
+  id: string;
+  itemId?: string;
   isNewProduct: boolean;
   productName: string;
   category: InventoryCategory;
   quantity: number;
   unit: InventoryItem["unit"];
-  costPrice: number; // CP / unit
-  discount: number; // item discount in NPR
+  costPrice: number;
+  discount: number;
   batchNo?: string;
   expiryDate?: string;
 }
@@ -69,13 +63,12 @@ export const PurchaseInwardWorkbench: React.FC<{
     addToast,
   } = useApp();
 
-  // 1. TOP SUPPLIER (SELECT2 STYLE) STATE
+  // 1. SUPPLIER STATE
   const [supplierQuery, setSupplierQuery] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
   const supplierInputRef = useRef<HTMLInputElement>(null);
 
-  // Extract all unique existing suppliers from inventory & past purchases
   const existingSuppliers = useMemo(() => {
     const set = new Set<string>();
     inventory.forEach((i) => {
@@ -84,7 +77,6 @@ export const PurchaseInwardWorkbench: React.FC<{
     purchases.forEach((p) => {
       if (p.supplierName && p.supplierName.trim()) set.add(p.supplierName.trim());
     });
-    // Defaults if empty
     if (set.size === 0) {
       set.add("Valley Poultry & Fresh Farm Nepal");
       set.add("Kathmandu Artisan Bakery Pvt. Ltd.");
@@ -101,7 +93,7 @@ export const PurchaseInwardWorkbench: React.FC<{
     return existingSuppliers.filter((s) => s.toLowerCase().includes(q));
   }, [existingSuppliers, supplierQuery]);
 
-  // 2. PURCHASE METADATA STATE
+  // 2. METADATA STATE
   const [purchaseDate, setPurchaseDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
@@ -113,11 +105,9 @@ export const PurchaseInwardWorkbench: React.FC<{
     name: string;
     size?: string;
   } | null>(null);
-  const [supplierPhone, setSupplierPhone] = useState("");
-  const [supplierPan, setSupplierPan] = useState("");
   const [notes, setNotes] = useState("");
 
-  // 3. EXCEL-STYLE ROWS
+  // 3. ROWS STATE
   const [rows, setRows] = useState<ExcelRowItem[]>([
     {
       id: "row-1",
@@ -133,14 +123,11 @@ export const PurchaseInwardWorkbench: React.FC<{
     },
   ]);
 
-  // Active product search dropdown state per row
   const [activeSearchRowId, setActiveSearchRowId] = useState<string | null>(null);
-
-  // Ref to the first product field for auto-focus after supplier selection
   const firstProductInputRef = useRef<HTMLInputElement>(null);
   const rowInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
-  // 4. FINANCIAL & SETTLEMENT STATE
+  // 4. FINANCIAL STATE
   const [overallDiscount, setOverallDiscount] = useState<number>(0);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<
@@ -148,7 +135,6 @@ export const PurchaseInwardWorkbench: React.FC<{
   >("CASH");
   const [isPaidManuallySet, setIsPaidManuallySet] = useState(false);
 
-  // Financial calculations
   const grossSubtotal = useMemo(() => {
     return rows.reduce((sum, r) => sum + (r.quantity || 0) * (r.costPrice || 0), 0);
   }, [rows]);
@@ -165,7 +151,6 @@ export const PurchaseInwardWorkbench: React.FC<{
     return Math.max(0, netPayable - (paidAmount || 0));
   }, [netPayable, paidAmount]);
 
-  // Sync paidAmount to netPayable unless manually typed
   useEffect(() => {
     if (!isPaidManuallySet) {
       if (paymentMethod === "CREDIT") {
@@ -176,22 +161,17 @@ export const PurchaseInwardWorkbench: React.FC<{
     }
   }, [netPayable, paymentMethod, isPaidManuallySet]);
 
-  // Handler: Select or Auto-save Supplier
   const handleSelectSupplier = (supplierName: string) => {
     const trimmed = supplierName.trim();
     if (!trimmed) return;
-
     setSelectedSupplier(trimmed);
     setSupplierQuery(trimmed);
     setIsSupplierDropdownOpen(false);
-
-    // Auto-focus the first product row
     setTimeout(() => {
       firstProductInputRef.current?.focus();
     }, 100);
   };
 
-  // Handler: Add New Row
   const handleAddRow = () => {
     const newRowId = `row-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     setRows((prev) => [
@@ -214,10 +194,8 @@ export const PurchaseInwardWorkbench: React.FC<{
     }, 50);
   };
 
-  // Handler: Remove Row
   const handleRemoveRow = (rowId: string) => {
     if (rows.length <= 1) {
-      // Reset single row
       setRows([
         {
           id: `row-${Date.now()}`,
@@ -235,14 +213,12 @@ export const PurchaseInwardWorkbench: React.FC<{
     setRows((prev) => prev.filter((r) => r.id !== rowId));
   };
 
-  // Handler: Update Row Field
   const handleUpdateRow = (rowId: string, updates: Partial<ExcelRowItem>) => {
     setRows((prev) =>
       prev.map((r) => (r.id === rowId ? { ...r, ...updates } : r))
     );
   };
 
-  // Handler: Choose Existing Product for a Row
   const handleSelectProduct = (rowId: string, item: InventoryItem) => {
     handleUpdateRow(rowId, {
       itemId: item.id,
@@ -255,7 +231,6 @@ export const PurchaseInwardWorkbench: React.FC<{
     setActiveSearchRowId(null);
   };
 
-  // Handler: Create As New Product for a Row
   const handleCreateNewProduct = (rowId: string, typedName: string) => {
     handleUpdateRow(rowId, {
       itemId: undefined,
@@ -265,7 +240,6 @@ export const PurchaseInwardWorkbench: React.FC<{
     setActiveSearchRowId(null);
   };
 
-  // Handler: Document Upload (Simple & Clean)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -277,19 +251,18 @@ export const PurchaseInwardWorkbench: React.FC<{
         size: sizeStr,
       });
       addToast({
-        title: "Document Attached",
-        description: `${file.name} (${sizeStr}) linked to invoice`,
+        title: "Attached",
+        description: file.name,
         type: "success",
       });
     }
   };
 
-  // Submit & Save Inward Purchase
   const handleSavePurchase = () => {
     if (!selectedSupplier.trim()) {
       addToast({
         title: "Supplier Required",
-        description: "Please search and select or enter a supplier name.",
+        description: "Please enter or select a supplier.",
         type: "warning",
       });
       supplierInputRef.current?.focus();
@@ -299,53 +272,49 @@ export const PurchaseInwardWorkbench: React.FC<{
     const validRows = rows.filter((r) => r.productName.trim() && r.quantity > 0);
     if (validRows.length === 0) {
       addToast({
-        title: "Empty Inward Items",
-        description: "Please enter at least one product with quantity greater than 0.",
+        title: "No Items",
+        description: "Please enter at least one product with quantity.",
         type: "warning",
       });
       return;
     }
 
-    // 1. Process items: create new items if necessary, generate purchase line items
     const purchaseItems: PurchaseLineItem[] = [];
 
     validRows.forEach((row) => {
       let finalItemId = row.itemId;
-
       if (row.isNewProduct || !finalItemId) {
-        // Create brand new inventory item
-        const newItemPayload = {
+        finalItemId = `sku-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        addInventoryItem({
           name: row.productName.trim(),
           category: row.category,
           currentStock: row.quantity,
           unit: row.unit,
-          minThreshold: Math.max(5, Math.round(row.quantity * 0.2)),
-          costPerUnit: row.costPrice,
-          supplierName: selectedSupplier.trim(),
-          outletId: currentOutlet.id,
+          minThreshold: 5,
+          costPerUnit: row.costPrice || 0,
+          supplierName: selectedSupplier,
           batchNo: row.batchNo || undefined,
           expiryDate: row.expiryDate || undefined,
-          lastCostPrice: row.costPrice,
-        };
-        addInventoryItem(newItemPayload);
-        finalItemId = `inv-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          outletId: currentOutlet.id,
+        });
       }
 
-      const rowTotal = Math.max(0, row.quantity * row.costPrice - (row.discount || 0));
+      const gross = (row.quantity || 0) * (row.costPrice || 0);
+      const net = Math.max(0, gross - (row.discount || 0));
+
       purchaseItems.push({
-        itemId: finalItemId || `inv-${Date.now()}`,
+        itemId: finalItemId,
         itemName: row.productName.trim(),
         category: row.category,
         quantity: row.quantity,
         unit: row.unit,
-        unitCost: row.costPrice,
+        unitCost: row.costPrice || 0,
         discount: row.discount || 0,
-        totalCost: rowTotal,
+        totalCost: net,
         batchNo: row.batchNo || undefined,
         expiryDate: row.expiryDate || undefined,
       });
 
-      // Record stock inward movement log
       recordStockMovement({
         itemId: finalItemId || `inv-temp`,
         itemName: row.productName.trim(),
@@ -353,24 +322,21 @@ export const PurchaseInwardWorkbench: React.FC<{
         type: "INCREASE",
         quantity: row.quantity,
         unit: row.unit,
-        previousStock: 0, // context handles stock increment
+        previousStock: 0,
         newStock: row.quantity,
-        reason: `Supplier Inward Delivery (Bill #${invoiceNumber.trim() || "PURCHASE"})`,
-        note: `Supplier: ${selectedSupplier} | Rate: NPR ${row.costPrice}${row.batchNo ? ` | Batch: ${row.batchNo}` : ""}`,
+        reason: `Supplier Inward (${invoiceNumber.trim() || "PURCHASE"})`,
+        note: `Supplier: ${selectedSupplier} | Rate: NPR ${row.costPrice}`,
         outletId: currentOutlet.id,
         recordedBy: "Staff Receiving",
       });
     });
 
-    // 2. Add Purchase Record to AppContext
     const paymentStatus: "PAID" | "PENDING" | "PARTIAL" =
       paidAmount >= netPayable ? "PAID" : paidAmount > 0 ? "PARTIAL" : "PENDING";
 
     addPurchaseRecord({
       invoiceNumber: invoiceNumber.trim() || `INV-${Date.now()}`,
       supplierName: selectedSupplier.trim(),
-      supplierPhone: supplierPhone.trim() || undefined,
-      supplierPan: supplierPan.trim() || undefined,
       purchaseDate,
       items: purchaseItems,
       subtotal: grossSubtotal,
@@ -387,12 +353,11 @@ export const PurchaseInwardWorkbench: React.FC<{
     });
 
     addToast({
-      title: "Purchase Bill Recorded",
-      description: `Inward Invoice #${invoiceNumber} for ${selectedSupplier} saved. Stock updated!`,
+      title: "Bill Saved",
+      description: `Inward #${invoiceNumber} for ${selectedSupplier} recorded.`,
       type: "success",
     });
 
-    // Reset Workbench
     setRows([
       {
         id: `row-${Date.now()}`,
@@ -418,27 +383,16 @@ export const PurchaseInwardWorkbench: React.FC<{
   };
 
   return (
-    <div className="bg-[#141417] border border-zinc-800 p-3.5 shadow-sm space-y-3.5">
-      {/* -------------------------------------------------------------
-          TOP SUPPLIER & INVOICE HEADER (SELECT2 SEARCH + DATE + INV + DOC)
-      ------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 pb-3 border-b border-zinc-800 items-end">
-        {/* SUPPLIER SELECT2 SEARCH (COL-SPAN 4) */}
+    <div className="bg-zinc-900/40 p-4 rounded-xl space-y-4">
+      {/* Top Header Fields (Borderless, Clean 5-col layout) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+        {/* Supplier */}
         <div className="lg:col-span-4 relative">
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
-              <Truck className="w-3 h-3 text-amber-500" />
-              <span>Choose Supplier (Select2 Search)</span>
-            </label>
-            {selectedSupplier && (
-              <span className="text-[10px] font-mono text-emerald-400 font-bold">
-                ✓ Auto-Saved
-              </span>
-            )}
-          </div>
-
+          <label className="block text-[11px] text-zinc-400 font-medium mb-1">
+            Supplier
+          </label>
           <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               ref={supplierInputRef}
               type="text"
@@ -458,8 +412,7 @@ export const PurchaseInwardWorkbench: React.FC<{
                   }
                 }
               }}
-              placeholder="Search or type new supplier name..."
-              className="w-full h-8 pl-8 pr-7 text-xs bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500"
+              className="w-full h-8 pl-8 pr-7 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 focus:outline-none"
             />
             {supplierQuery && (
               <button
@@ -469,28 +422,25 @@ export const PurchaseInwardWorkbench: React.FC<{
                   setSelectedSupplier("");
                   setIsSupplierDropdownOpen(false);
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
               >
                 <X className="w-3 h-3" />
               </button>
             )}
           </div>
 
-          {/* Select2 Dropdown */}
+          {/* Supplier Dropdown */}
           {isSupplierDropdownOpen && (
-            <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-[#18181b] border border-zinc-700 shadow-xl max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800">
+            <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded-lg max-h-52 overflow-y-auto text-xs divide-y divide-zinc-800/40">
               {filteredSuppliers.map((sup) => (
                 <div
                   key={sup}
                   onMouseDown={() => handleSelectSupplier(sup)}
-                  className="p-2 hover:bg-amber-500/15 cursor-pointer flex items-center justify-between text-zinc-200"
+                  className="p-2 hover:bg-zinc-800/60 cursor-pointer flex items-center justify-between text-zinc-200"
                 >
-                  <div className="flex items-center gap-2">
-                    <Truck className="w-3.5 h-3.5 text-zinc-400" />
-                    <span className="font-medium">{sup}</span>
-                  </div>
+                  <span className="font-medium">{sup}</span>
                   {selectedSupplier === sup && (
-                    <span className="text-emerald-400 font-bold text-[10px]">Active</span>
+                    <span className="text-amber-400 font-semibold text-[10px]">Selected</span>
                   )}
                 </div>
               ))}
@@ -501,74 +451,64 @@ export const PurchaseInwardWorkbench: React.FC<{
                 ) && (
                   <div
                     onMouseDown={() => handleSelectSupplier(supplierQuery)}
-                    className="p-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold cursor-pointer flex items-center justify-between"
+                    className="p-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold cursor-pointer flex items-center gap-1.5"
                   >
-                    <div className="flex items-center gap-1.5">
-                      <Plus className="w-3.5 h-3.5 text-amber-400" />
-                      <span>+ Auto-save "{supplierQuery.trim()}" as new supplier</span>
-                    </div>
-                    <span className="text-[10px] text-zinc-400 font-mono">Press Enter</span>
+                    <Plus className="w-3.5 h-3.5 text-amber-400" />
+                    <span>+ Add new "{supplierQuery.trim()}"</span>
                   </div>
                 )}
             </div>
           )}
         </div>
 
-        {/* PURCHASE DATE (COL-SPAN 2) */}
+        {/* Date */}
         <div className="lg:col-span-2">
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-            Purchase Date
+          <label className="block text-[11px] text-zinc-400 font-medium mb-1">
+            Date
           </label>
-          <div className="relative">
-            <input
-              type="date"
-              value={purchaseDate}
-              onChange={(e) => setPurchaseDate(e.target.value)}
-              className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700 text-zinc-100 font-mono focus:outline-none focus:border-amber-500"
-            />
-          </div>
+          <input
+            type="date"
+            value={purchaseDate}
+            onChange={(e) => setPurchaseDate(e.target.value)}
+            className="w-full h-8 px-2.5 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 font-mono focus:outline-none"
+          />
         </div>
 
-        {/* INVOICE NUMBER (INV-NO) (COL-SPAN 2) */}
+        {/* Bill # */}
         <div className="lg:col-span-2">
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-            Invoice / Bill #
+          <label className="block text-[11px] text-zinc-400 font-medium mb-1">
+            Bill #
           </label>
           <input
             type="text"
             value={invoiceNumber}
             onChange={(e) => setInvoiceNumber(e.target.value)}
-            placeholder="INV-9021"
-            className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700 text-zinc-100 font-mono uppercase focus:outline-none focus:border-amber-500"
+            className="w-full h-8 px-2.5 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 font-mono uppercase focus:outline-none"
           />
         </div>
 
-        {/* SMALL DOCUMENT UPLOAD FIELD (COL-SPAN 3) */}
+        {/* Document */}
         <div className="lg:col-span-3">
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-            Attach Bill / Document
+          <label className="block text-[11px] text-zinc-400 font-medium mb-1">
+            Document
           </label>
           {uploadedDocument ? (
-            <div className="h-8 px-2 bg-zinc-900 border border-emerald-500/50 flex items-center justify-between text-xs text-emerald-400">
-              <div className="flex items-center gap-1.5 truncate">
-                <FileText className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate font-mono text-[11px]">
-                  {uploadedDocument.name} ({uploadedDocument.size})
-                </span>
-              </div>
+            <div className="h-8 px-2.5 bg-zinc-900/70 rounded-lg flex items-center justify-between text-xs text-emerald-400">
+              <span className="truncate font-mono text-[11px]">
+                {uploadedDocument.name}
+              </span>
               <button
                 type="button"
                 onClick={() => setUploadedDocument(null)}
-                className="text-zinc-400 hover:text-white p-0.5 cursor-pointer ml-1"
-                title="Remove attachment"
+                className="text-zinc-500 hover:text-white p-0.5 ml-1"
               >
                 <X className="w-3 h-3" />
               </button>
             </div>
           ) : (
-            <label className="h-8 px-2 bg-zinc-900 border border-zinc-700 border-dashed hover:border-zinc-500 flex items-center justify-center gap-1.5 text-xs text-zinc-400 cursor-pointer transition-colors">
-              <Upload className="w-3 h-3 text-amber-500" />
-              <span className="text-[11px]">Choose File / PDF</span>
+            <label className="h-8 px-2.5 bg-zinc-900/70 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded-lg flex items-center justify-center gap-1.5 text-xs cursor-pointer transition-colors">
+              <Upload className="w-3.5 h-3.5 text-amber-500" />
+              <span>Attach File</span>
               <input
                 type="file"
                 accept="image/*,.pdf,.doc,.docx"
@@ -579,13 +519,12 @@ export const PurchaseInwardWorkbench: React.FC<{
           )}
         </div>
 
-        {/* ADD ROW BUTTON (COL-SPAN 1) */}
+        {/* Add Row */}
         <div className="lg:col-span-1">
           <button
             type="button"
             onClick={handleAddRow}
-            className="w-full h-8 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold flex items-center justify-center gap-1 border border-zinc-700 cursor-pointer"
-            title="Add another item row"
+            className="w-full h-8 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg flex items-center justify-center gap-1 cursor-pointer transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Row</span>
@@ -593,33 +532,30 @@ export const PurchaseInwardWorkbench: React.FC<{
         </div>
       </div>
 
-      {/* -------------------------------------------------------------
-          EXCEL-STYLE PRODUCTS TABULAR DATA ENTRY GRID
-      ------------------------------------------------------------- */}
-      <div className="overflow-x-auto border border-zinc-800">
+      {/* Borderless Product Rows Table */}
+      <div className="overflow-x-auto rounded-lg">
         <table className="w-full text-left text-xs border-collapse">
-          <thead className="bg-zinc-900 text-zinc-400 uppercase text-[10px] font-bold tracking-wider border-b border-zinc-800">
-            <tr>
-              <th className="py-2 px-2 w-7 text-center">#</th>
-              <th className="py-2 px-2 w-64">Product Name (Auto-Suggest / New)</th>
-              <th className="py-2 px-2 w-36">Category</th>
-              <th className="py-2 px-2 w-20 text-center">Qty</th>
-              <th className="py-2 px-2 w-20">Unit</th>
-              <th className="py-2 px-2 w-24 text-right">CP (Rate)</th>
-              <th className="py-2 px-2 w-24 text-right">Gross</th>
-              <th className="py-2 px-2 w-20 text-right">Disc (Rs.)</th>
-              <th className="py-2 px-2 w-24 text-right">Net Total</th>
-              <th className="py-2 px-2 w-24">Batch #</th>
-              <th className="py-2 px-2 w-28">Expiry Date</th>
-              <th className="py-2 px-1 w-8 text-center"></th>
+          <thead>
+            <tr className="bg-zinc-900/60 text-zinc-400 text-[11px] font-semibold">
+              <th className="py-2.5 px-2.5 w-7 text-center">#</th>
+              <th className="py-2.5 px-2.5 w-60">Item</th>
+              <th className="py-2.5 px-2.5 w-36">Category</th>
+              <th className="py-2.5 px-2.5 w-20 text-center">Qty</th>
+              <th className="py-2.5 px-2.5 w-20">Unit</th>
+              <th className="py-2.5 px-2.5 w-24 text-right">Cost</th>
+              <th className="py-2.5 px-2.5 w-24 text-right">Gross</th>
+              <th className="py-2.5 px-2.5 w-20 text-right">Discount</th>
+              <th className="py-2.5 px-2.5 w-24 text-right">Total</th>
+              <th className="py-2.5 px-2.5 w-24">Batch</th>
+              <th className="py-2.5 px-2.5 w-28">Expiry</th>
+              <th className="py-2.5 px-1 w-8 text-center"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800 bg-[#141417]">
+          <tbody className="divide-y divide-zinc-800/30">
             {rows.map((row, idx) => {
               const rowGross = (row.quantity || 0) * (row.costPrice || 0);
               const rowNet = Math.max(0, rowGross - (row.discount || 0));
 
-              // Filter matching existing inventory items for this row
               const matchingInventoryItems = inventory.filter((inv) =>
                 row.productName.trim()
                   ? inv.name.toLowerCase().includes(row.productName.toLowerCase())
@@ -627,13 +563,12 @@ export const PurchaseInwardWorkbench: React.FC<{
               );
 
               return (
-                <tr key={row.id} className="hover:bg-zinc-900/40">
-                  {/* Row Index */}
-                  <td className="py-1.5 px-2 text-center font-mono text-[11px] text-zinc-500">
+                <tr key={row.id} className="hover:bg-zinc-900/30">
+                  <td className="py-1.5 px-2.5 text-center font-mono text-[11px] text-zinc-500">
                     {idx + 1}
                   </td>
 
-                  {/* Product Field (Select / Search with Auto-focus) */}
+                  {/* Product Field */}
                   <td className="py-1.5 px-2 relative">
                     <input
                       ref={(el) => {
@@ -653,28 +588,21 @@ export const PurchaseInwardWorkbench: React.FC<{
                         setActiveSearchRowId(row.id);
                       }}
                       onFocus={() => setActiveSearchRowId(row.id)}
-                      placeholder="Type product name..."
-                      className="w-full h-7 px-2 text-xs bg-zinc-900 border border-zinc-700 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-amber-500"
+                      className="w-full h-7 px-2 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 focus:outline-none"
                     />
 
-                    {/* Product Suggestions Dropdown */}
                     {activeSearchRowId === row.id && (
-                      <div className="absolute left-2 right-2 top-full mt-1 z-20 bg-[#18181b] border border-zinc-700 shadow-xl max-h-48 overflow-y-auto text-xs divide-y divide-zinc-800">
+                      <div className="absolute left-2 right-2 top-full mt-1 z-20 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded-lg max-h-48 overflow-y-auto text-xs divide-y divide-zinc-800/40">
                         {matchingInventoryItems.slice(0, 6).map((inv) => (
                           <div
                             key={inv.id}
                             onMouseDown={() => handleSelectProduct(row.id, inv)}
-                            className="p-1.5 hover:bg-amber-500/15 cursor-pointer flex items-center justify-between text-zinc-200"
+                            className="p-1.5 hover:bg-zinc-800/60 cursor-pointer flex items-center justify-between text-zinc-200"
                           >
-                            <div>
-                              <span className="font-bold text-zinc-100">{inv.name}</span>
-                              <span className="text-[10px] text-zinc-400 ml-1.5">
-                                ({inv.category})
-                              </span>
-                            </div>
-                            <div className="font-mono text-[10px] text-zinc-400">
-                              Stock: {inv.currentStock} {inv.unit} | CP: Rs. {inv.costPerUnit}
-                            </div>
+                            <span className="font-semibold text-zinc-100">{inv.name}</span>
+                            <span className="font-mono text-[10px] text-zinc-400">
+                              Stock: {inv.currentStock} {inv.unit}
+                            </span>
                           </div>
                         ))}
 
@@ -687,19 +615,16 @@ export const PurchaseInwardWorkbench: React.FC<{
                               onMouseDown={() =>
                                 handleCreateNewProduct(row.id, row.productName)
                               }
-                              className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold cursor-pointer flex items-center justify-between text-[11px]"
+                              className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold cursor-pointer text-[11px]"
                             >
-                              <span>+ Create "{row.productName.trim()}" as new SKU</span>
-                              <span className="text-[9px] text-zinc-400 font-mono">
-                                New Item
-                              </span>
+                              + Create "{row.productName.trim()}" as new SKU
                             </div>
                           )}
                       </div>
                     )}
                   </td>
 
-                  {/* Category Field */}
+                  {/* Category */}
                   <td className="py-1.5 px-2">
                     <select
                       value={row.category}
@@ -708,7 +633,7 @@ export const PurchaseInwardWorkbench: React.FC<{
                           category: e.target.value as InventoryCategory,
                         })
                       }
-                      className="w-full h-7 px-1 text-xs bg-zinc-900 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+                      className="w-full h-7 px-1 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-200 focus:outline-none cursor-pointer"
                     >
                       {DEFAULT_CATEGORIES.map((cat) => (
                         <option key={cat} value={cat}>
@@ -718,7 +643,7 @@ export const PurchaseInwardWorkbench: React.FC<{
                     </select>
                   </td>
 
-                  {/* Quantity Field */}
+                  {/* Quantity */}
                   <td className="py-1.5 px-2">
                     <input
                       type="number"
@@ -731,11 +656,11 @@ export const PurchaseInwardWorkbench: React.FC<{
                           quantity: Math.max(0, parseFloat(e.target.value) || 0),
                         })
                       }
-                      className="w-full h-7 px-1 text-xs bg-zinc-900 border border-zinc-700 text-zinc-100 font-mono text-center focus:outline-none focus:border-amber-500 font-bold"
+                      className="w-full h-7 px-1 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 font-mono text-center font-bold focus:outline-none"
                     />
                   </td>
 
-                  {/* Unit Field */}
+                  {/* Unit */}
                   <td className="py-1.5 px-2">
                     <select
                       value={row.unit}
@@ -744,7 +669,7 @@ export const PurchaseInwardWorkbench: React.FC<{
                           unit: e.target.value as any,
                         })
                       }
-                      className="w-full h-7 px-1 text-xs bg-zinc-900 border border-zinc-700 text-zinc-200 focus:outline-none focus:border-amber-500 cursor-pointer font-mono"
+                      className="w-full h-7 px-1 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-200 focus:outline-none cursor-pointer font-mono"
                     >
                       {DEFAULT_UNITS.map((u) => (
                         <option key={u} value={u}>
@@ -754,7 +679,7 @@ export const PurchaseInwardWorkbench: React.FC<{
                     </select>
                   </td>
 
-                  {/* CP (Cost Price / Rate) */}
+                  {/* Cost */}
                   <td className="py-1.5 px-2">
                     <input
                       type="number"
@@ -767,17 +692,16 @@ export const PurchaseInwardWorkbench: React.FC<{
                           costPrice: Math.max(0, parseFloat(e.target.value) || 0),
                         })
                       }
-                      placeholder="0"
-                      className="w-full h-7 px-2 text-xs bg-zinc-900 border border-zinc-700 text-zinc-100 font-mono text-right focus:outline-none focus:border-amber-500"
+                      className="w-full h-7 px-2 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-100 font-mono text-right focus:outline-none"
                     />
                   </td>
 
-                  {/* Gross Total (Calculated) */}
+                  {/* Gross */}
                   <td className="py-1.5 px-2 text-right font-mono text-zinc-300 text-xs font-semibold">
                     {formatNPR(rowGross)}
                   </td>
 
-                  {/* Row Discount (Rs.) */}
+                  {/* Discount */}
                   <td className="py-1.5 px-2">
                     <input
                       type="number"
@@ -789,17 +713,16 @@ export const PurchaseInwardWorkbench: React.FC<{
                           discount: Math.max(0, parseFloat(e.target.value) || 0),
                         })
                       }
-                      placeholder="0"
-                      className="w-full h-7 px-1.5 text-xs bg-zinc-900 border border-zinc-700 text-rose-400 font-mono text-right focus:outline-none focus:border-amber-500"
+                      className="w-full h-7 px-1.5 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-rose-400 font-mono text-right focus:outline-none"
                     />
                   </td>
 
-                  {/* Row Net Total */}
-                  <td className="py-1.5 px-2 text-right font-mono text-amber-400 text-xs font-black">
+                  {/* Net Total */}
+                  <td className="py-1.5 px-2 text-right font-mono text-amber-400 text-xs font-bold">
                     {formatNPR(rowNet)}
                   </td>
 
-                  {/* Batch Number */}
+                  {/* Batch */}
                   <td className="py-1.5 px-2">
                     <input
                       type="text"
@@ -807,12 +730,11 @@ export const PurchaseInwardWorkbench: React.FC<{
                       onChange={(e) =>
                         handleUpdateRow(row.id, { batchNo: e.target.value })
                       }
-                      placeholder="B-901"
-                      className="w-full h-7 px-1.5 text-xs bg-zinc-900 border border-zinc-700 text-zinc-300 font-mono uppercase focus:outline-none focus:border-amber-500"
+                      className="w-full h-7 px-1.5 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-300 font-mono uppercase focus:outline-none"
                     />
                   </td>
 
-                  {/* Expiry Date */}
+                  {/* Expiry */}
                   <td className="py-1.5 px-2">
                     <input
                       type="date"
@@ -820,17 +742,16 @@ export const PurchaseInwardWorkbench: React.FC<{
                       onChange={(e) =>
                         handleUpdateRow(row.id, { expiryDate: e.target.value })
                       }
-                      className="w-full h-7 px-1 text-xs bg-zinc-900 border border-zinc-700 text-zinc-300 font-mono focus:outline-none focus:border-amber-500"
+                      className="w-full h-7 px-1 text-xs bg-zinc-900/60 hover:bg-zinc-900 focus:bg-zinc-900 border-0 focus:ring-1 focus:ring-amber-500/50 rounded text-zinc-300 font-mono focus:outline-none"
                     />
                   </td>
 
-                  {/* Row Action (Delete) */}
+                  {/* Delete */}
                   <td className="py-1.5 px-1 text-center">
                     <button
                       type="button"
                       onClick={() => handleRemoveRow(row.id)}
                       className="p-1 text-zinc-500 hover:text-rose-400 cursor-pointer"
-                      title="Delete row"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -842,28 +763,25 @@ export const PurchaseInwardWorkbench: React.FC<{
         </table>
       </div>
 
-      {/* -------------------------------------------------------------
-          FINANCIAL TOTALS, DISCOUNT, PAYMENT METHOD & SETTLEMENT
-      ------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 pt-2 items-end">
-        {/* Remarks / Notes (Col-Span 4) */}
+      {/* Settlement Row (Borderless, Clean 5-col layout) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 pt-1 items-end">
+        {/* Notes */}
         <div className="lg:col-span-4">
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-            Supplier Delivery Remarks / Notes
+          <label className="block text-[11px] text-zinc-400 font-medium mb-1">
+            Notes
           </label>
           <input
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Fresh morning lot inspection verified by storekeeper..."
-            className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-amber-500"
+            className="w-full h-8 px-2.5 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-200 focus:outline-none"
           />
         </div>
 
-        {/* Overall Bill Discount (Col-Span 2) */}
+        {/* Overall Discount */}
         <div className="lg:col-span-2">
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-            Overall Bill Discount (Rs.)
+          <label className="block text-[11px] text-zinc-400 font-medium mb-1">
+            Overall Discount
           </label>
           <input
             type="number"
@@ -873,17 +791,16 @@ export const PurchaseInwardWorkbench: React.FC<{
             onChange={(e) =>
               setOverallDiscount(Math.max(0, parseFloat(e.target.value) || 0))
             }
-            placeholder="0"
-            className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700 text-rose-400 font-mono text-right font-bold focus:outline-none focus:border-amber-500"
+            className="w-full h-8 px-2 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-rose-400 font-mono text-right font-bold focus:outline-none"
           />
         </div>
 
-        {/* Paid Amount (Col-Span 2) */}
+        {/* Paid Amount */}
         <div className="lg:col-span-2">
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+          <label className="block text-[11px] text-zinc-400 font-medium mb-1 flex items-center justify-between">
             <span>Paid Amount</span>
             {dueCreditAmount > 0 && (
-              <span className="text-amber-400 font-mono text-[9px]">
+              <span className="text-amber-400 font-mono text-[10px]">
                 Due: {formatNPR(dueCreditAmount)}
               </span>
             )}
@@ -897,13 +814,13 @@ export const PurchaseInwardWorkbench: React.FC<{
               setIsPaidManuallySet(true);
               setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0));
             }}
-            className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700 text-emerald-400 font-mono text-right font-bold focus:outline-none focus:border-amber-500"
+            className="w-full h-8 px-2 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-emerald-400 font-mono text-right font-bold focus:outline-none"
           />
         </div>
 
-        {/* Payment Method (Col-Span 2) */}
+        {/* Payment Method */}
         <div className="lg:col-span-2">
-          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
+          <label className="block text-[11px] text-zinc-400 font-medium mb-1">
             Payment Method
           </label>
           <select
@@ -918,45 +835,45 @@ export const PurchaseInwardWorkbench: React.FC<{
                 setPaidAmount(netPayable);
               }
             }}
-            className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700 text-zinc-100 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
+            className="w-full h-8 px-2 text-xs bg-zinc-900/70 border-0 focus:ring-1 focus:ring-amber-500/50 rounded-lg text-zinc-100 font-medium focus:outline-none cursor-pointer"
           >
-            <option value="CASH">Cash Settlement</option>
+            <option value="CASH">Cash</option>
             <option value="FONEPAY">FonePay QR</option>
             <option value="BANK_TRANSFER">Bank Transfer</option>
             <option value="CHEQUE">Cheque</option>
-            <option value="CREDIT">📒 100% Credit (Khata)</option>
+            <option value="CREDIT">Khata (Credit)</option>
           </select>
         </div>
 
-        {/* SAVE BUTTON (COL-SPAN 2) */}
+        {/* Save Button */}
         <div className="lg:col-span-2">
           <button
             type="button"
             onClick={handleSavePurchase}
-            className="w-full h-8 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-colors"
+            className="w-full h-8 bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-xs rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-colors"
           >
             <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-            <span>Save Purchase</span>
+            <span>Save Bill</span>
           </button>
         </div>
       </div>
 
-      {/* Inline Quick Totals Strip */}
-      <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-1.5 border-t border-zinc-800/80 font-medium">
+      {/* Quick Summary Strip */}
+      <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-1 font-medium">
         <div className="flex items-center gap-4">
           <span>
-            Gross Subtotal: <strong className="font-mono text-zinc-200">{formatNPR(grossSubtotal)}</strong>
+            Subtotal: <strong className="font-mono text-zinc-200">{formatNPR(grossSubtotal)}</strong>
           </span>
           {(itemDiscountsTotal > 0 || overallDiscount > 0) && (
             <span>
-              Total Discounts:{" "}
+              Discounts:{" "}
               <strong className="font-mono text-rose-400">
                 -{formatNPR(itemDiscountsTotal + overallDiscount)}
               </strong>
             </span>
           )}
           <span>
-            Net Payable: <strong className="font-mono text-amber-400 font-bold">{formatNPR(netPayable)}</strong>
+            Net: <strong className="font-mono text-amber-400 font-bold">{formatNPR(netPayable)}</strong>
           </span>
         </div>
 
@@ -965,8 +882,8 @@ export const PurchaseInwardWorkbench: React.FC<{
             Paid: <strong className="font-mono text-emerald-400">{formatNPR(paidAmount)}</strong>
           </span>
           {dueCreditAmount > 0 && (
-            <span className="text-amber-400 font-bold">
-              Khata Credit Due: <span className="font-mono">{formatNPR(dueCreditAmount)}</span>
+            <span className="text-amber-400 font-semibold">
+              Credit Due: <span className="font-mono">{formatNPR(dueCreditAmount)}</span>
             </span>
           )}
         </div>
