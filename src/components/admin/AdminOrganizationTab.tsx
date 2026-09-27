@@ -27,6 +27,15 @@ const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "WALLET", label: "Wallets" },
 ];
 
+const CURRENCY_OPTIONS = [
+  { code: "NPR", label: "NPR (रु - Nepalese Rupee)" },
+  { code: "USD", label: "USD ($ - US Dollar)" },
+  { code: "INR", label: "INR (₹ - Indian Rupee)" },
+  { code: "EUR", label: "EUR (€ - Euro)" },
+  { code: "GBP", label: "GBP (£ - British Pound)" },
+  { code: "AED", label: "AED (د.إ - UAE Dirham)" },
+];
+
 export const AdminOrganizationTab: React.FC = () => {
   const { orgSettings, updateOrgSettings, currentOutlet, addActivityLog, addToast } = useApp();
   const { authOutlet, authUser } = useAuth();
@@ -51,6 +60,7 @@ export const AdminOrganizationTab: React.FC = () => {
   const [serviceChargePercent, setServiceChargePercent] = useState(
     (orgSettings.serviceChargePercent ?? 0).toString()
   );
+  const [defaultCurrency, setDefaultCurrency] = useState(orgSettings.defaultCurrency || "NPR");
   const [acceptedPaymentMethods, setAcceptedPaymentMethods] = useState<PaymentMethod[]>(
     orgSettings.acceptedPaymentMethods || ["ESEWA", "FONEPAY_QR", "CASH_ON_PICKUP", "CARD", "WALLET"]
   );
@@ -82,6 +92,7 @@ export const AdminOrganizationTab: React.FC = () => {
         setHeadquartersAddress(remote.headquartersAddress || "");
         setVatRatePercent(remote.vatRatePercent.toString());
         setServiceChargePercent(remote.serviceChargePercent.toString());
+        if (remote.defaultCurrency) setDefaultCurrency(remote.defaultCurrency);
         setAcceptedPaymentMethods(remote.acceptedPaymentMethods);
 
         if (isManual) {
@@ -125,6 +136,9 @@ export const AdminOrganizationTab: React.FC = () => {
     setHeadquartersAddress(orgSettings.headquartersAddress || "");
     setVatRatePercent((orgSettings.vatRatePercent ?? 13).toString());
     setServiceChargePercent((orgSettings.serviceChargePercent ?? 0).toString());
+    if (orgSettings.defaultCurrency) {
+      setDefaultCurrency(orgSettings.defaultCurrency);
+    }
     if (orgSettings.acceptedPaymentMethods) {
       setAcceptedPaymentMethods(orgSettings.acceptedPaymentMethods);
     }
@@ -195,6 +209,7 @@ export const AdminOrganizationTab: React.FC = () => {
     setHeadquartersAddress(orgSettings.headquartersAddress || "");
     setVatRatePercent((orgSettings.vatRatePercent ?? 13).toString());
     setServiceChargePercent((orgSettings.serviceChargePercent ?? 0).toString());
+    setDefaultCurrency(orgSettings.defaultCurrency || "NPR");
     setAcceptedPaymentMethods(
       orgSettings.acceptedPaymentMethods || ["ESEWA", "FONEPAY_QR", "CASH_ON_PICKUP", "CARD", "WALLET"]
     );
@@ -221,6 +236,7 @@ export const AdminOrganizationTab: React.FC = () => {
       headquartersAddress: headquartersAddress.trim(),
       vatRatePercent: parseFloat(vatRatePercent) || 0,
       serviceChargePercent: parseFloat(serviceChargePercent) || 0,
+      defaultCurrency,
       acceptedPaymentMethods,
     };
 
@@ -323,7 +339,7 @@ export const AdminOrganizationTab: React.FC = () => {
             ROW 1: IDENTITY & LOGO (5 COLUMNS)
         ------------------------------------------------------------- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 items-end">
-          {/* Col 1: Logo Upload */}
+          {/* Col 1: Brand Logo (Click box to upload or change) */}
           <div>
             <label className="text-[11px] font-medium text-zinc-400 block mb-1">
               Brand Logo
@@ -335,7 +351,11 @@ export const AdminOrganizationTab: React.FC = () => {
               accept="image/png,image/jpeg,image/webp,image/svg+xml"
               className="hidden"
             />
-            <div className="flex items-center gap-2 h-9 px-2 bg-zinc-900 border border-zinc-800 rounded">
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 h-9 px-2 bg-zinc-900 hover:bg-zinc-800/80 border border-zinc-800 hover:border-amber-500/60 rounded cursor-pointer transition-colors group select-none"
+              title="Click to choose a brand logo image file"
+            >
               <div className="w-7 h-7 rounded bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center shrink-0">
                 {logoPreviewUrl ? (
                   <img
@@ -345,22 +365,25 @@ export const AdminOrganizationTab: React.FC = () => {
                     onError={() => setLogoPreviewUrl("")}
                   />
                 ) : (
-                  <Building2 className="w-3.5 h-3.5 text-zinc-600" />
+                  <Upload className="w-3.5 h-3.5 text-zinc-500 group-hover:text-amber-400 transition-colors" />
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 truncate"
-              >
-                {selectedLogoFile ? "Replace" : logoPreviewUrl ? "Change" : "Upload"}
-              </button>
+              <span className="text-[11px] font-medium text-zinc-300 group-hover:text-amber-400 truncate flex-1">
+                {selectedLogoFile
+                  ? selectedLogoFile.name
+                  : logoPreviewUrl
+                  ? "Change Logo"
+                  : "Upload Logo"}
+              </span>
               {logoPreviewUrl && (
                 <button
                   type="button"
-                  onClick={handleRemoveLogo}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveLogo();
+                  }}
                   title="Remove Logo"
-                  className="text-zinc-500 hover:text-rose-400 ml-auto shrink-0 p-1"
+                  className="text-zinc-500 hover:text-rose-400 p-1 shrink-0 rounded transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -494,9 +517,21 @@ export const AdminOrganizationTab: React.FC = () => {
             <label className="text-[11px] font-medium text-zinc-400 block mb-1">
               Currency
             </label>
-            <div className="h-9 px-3 bg-zinc-900 border border-zinc-800 rounded flex items-center justify-between text-xs text-zinc-300 font-mono">
-              <span>Nepalese Rupee</span>
-              <span className="text-amber-400 font-bold">NPR (रु)</span>
+            <div className="relative">
+              <select
+                value={defaultCurrency}
+                onChange={(e) => setDefaultCurrency(e.target.value)}
+                className="w-full h-9 px-2.5 pr-7 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 focus:border-amber-500 rounded text-xs text-zinc-200 font-mono focus:outline-none cursor-pointer appearance-none"
+              >
+                {CURRENCY_OPTIONS.map((c) => (
+                  <option key={c.code} value={c.code} className="bg-zinc-900 text-zinc-200">
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400 text-[10px]">
+                ▼
+              </div>
             </div>
           </div>
         </div>
