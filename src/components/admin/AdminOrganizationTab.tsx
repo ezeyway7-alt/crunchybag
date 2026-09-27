@@ -20,11 +20,11 @@ import { Input } from "../common/Input";
 import { organizationApi, extractErrorMessage } from "../../lib/api";
 
 const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
-  { id: "ESEWA", label: "eSewa QR & Web" },
+  { id: "ESEWA", label: "eSewa" },
   { id: "FONEPAY_QR", label: "Fonepay QR" },
-  { id: "CASH_ON_PICKUP", label: "Cash on Counter" },
-  { id: "CARD", label: "POS Terminal (Card)" },
-  { id: "WALLET", label: "Khalti / Wallets" },
+  { id: "CASH_ON_PICKUP", label: "Cash" },
+  { id: "CARD", label: "Card (POS)" },
+  { id: "WALLET", label: "Wallets" },
 ];
 
 export const AdminOrganizationTab: React.FC = () => {
@@ -260,357 +260,340 @@ export const AdminOrganizationTab: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12 text-zinc-200">
+    <div className="w-full text-zinc-200">
       {/* -------------------------------------------------------------
-          CLEAN HEADER BAR (Minimal & Direct)
+          SINGLE UNIFIED FORM BOX (ALL IN ONE BOX, 5-COLUMN HIGH-DENSITY ROWS)
       ------------------------------------------------------------- */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <Building2 className="w-5 h-5 text-amber-500" />
-            <h1 className="text-base font-bold text-white tracking-tight">Organization Profile</h1>
+      <form
+        onSubmit={handleSaveOrg}
+        className="bg-[#121214] border border-zinc-800 rounded-lg p-5 space-y-5 shadow-sm"
+      >
+        {/* SINGLE BOX HEADER */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-amber-500 shrink-0" />
+            <span className="text-sm font-bold text-white tracking-tight">Organization Settings</span>
             <span className="text-xs text-zinc-500 font-mono">
               • Branch: {branchDisplayName}
             </span>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => fetchRemoteSettings(true)}
-            disabled={isFetchingRemote}
-            className="text-xs h-8 px-3"
-            leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${isFetchingRemote ? "animate-spin text-amber-500" : ""}`} />}
-          >
-            {isFetchingRemote ? "Syncing..." : "Sync"}
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleReset}
-            disabled={isSaving}
-            className="text-xs h-8 px-3"
-            leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
-          >
-            Reset
-          </Button>
-
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleSaveOrg}
-            disabled={isSaving}
-            className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-8 px-4"
-            leftIcon={<Save className="w-3.5 h-3.5" />}
-          >
-            {isSaving ? "Saving..." : "Save Changes"}
-          </Button>
-        </div>
-      </div>
-
-      {/* -------------------------------------------------------------
-          MAIN FORM CONTAINER
-      ------------------------------------------------------------- */}
-      <form onSubmit={handleSaveOrg} className="space-y-6">
-        {/* BRAND LOGO ROW */}
-        <div className="bg-[#121214] border border-zinc-800/80 rounded-lg p-5">
-          <div className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-4">
-            Brand Logo
-          </div>
-
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
-              {logoPreviewUrl ? (
-                <img
-                  src={logoPreviewUrl}
-                  alt="Logo"
-                  className="w-full h-full object-contain p-1.5"
-                  onError={() => setLogoPreviewUrl("")}
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fetchRemoteSettings(true)}
+              disabled={isFetchingRemote}
+              className="text-xs h-7 px-2.5"
+              leftIcon={
+                <RefreshCw
+                  className={`w-3 h-3 ${isFetchingRemote ? "animate-spin text-amber-500" : ""}`}
                 />
-              ) : (
-                <Building2 className="w-8 h-8 text-zinc-700" />
-              )}
-            </div>
+              }
+            >
+              {isFetchingRemote ? "Syncing..." : "Sync"}
+            </Button>
 
-            <div className="space-y-2">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                className="hidden"
-              />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              disabled={isSaving}
+              className="text-xs h-7 px-2.5"
+              leftIcon={<RotateCcw className="w-3 h-3" />}
+            >
+              Reset
+            </Button>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-xs h-8"
-                  leftIcon={<Upload className="w-3.5 h-3.5 text-amber-500" />}
-                >
-                  Upload New Logo
-                </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSaving}
+              className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-7 px-3.5"
+              leftIcon={<Save className="w-3 h-3" />}
+            >
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </div>
 
-                {logoPreviewUrl && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={handleRemoveLogo}
-                    className="text-xs h-8 text-zinc-400 hover:text-rose-400"
-                    leftIcon={<Trash2 className="w-3.5 h-3.5" />}
-                  >
-                    Remove
-                  </Button>
+        {/* -------------------------------------------------------------
+            ROW 1: IDENTITY & LOGO (5 COLUMNS)
+        ------------------------------------------------------------- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 items-end">
+          {/* Col 1: Logo Upload */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Brand Logo
+            </label>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              className="hidden"
+            />
+            <div className="flex items-center gap-2 h-9 px-2 bg-zinc-900 border border-zinc-800 rounded">
+              <div className="w-7 h-7 rounded bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center shrink-0">
+                {logoPreviewUrl ? (
+                  <img
+                    src={logoPreviewUrl}
+                    alt="Logo"
+                    className="w-full h-full object-contain"
+                    onError={() => setLogoPreviewUrl("")}
+                  />
+                ) : (
+                  <Building2 className="w-3.5 h-3.5 text-zinc-600" />
                 )}
               </div>
-
-              <div className="text-[11px] text-zinc-500 font-mono">
-                {selectedLogoFile
-                  ? `${selectedLogoFile.name} (${(selectedLogoFile.size / 1024).toFixed(0)} KB)`
-                  : "Supports PNG, JPG, or SVG up to 5MB."}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* GENERAL INFORMATION */}
-        <div className="bg-[#121214] border border-zinc-800/80 rounded-lg p-5 space-y-4">
-          <div className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
-            General Information
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                Brand Name *
-              </label>
-              <Input
-                value={brandName}
-                onChange={(e) => setBrandName(e.target.value)}
-                placeholder="Crunchy Bag"
-                required
-                className="text-xs font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                PAN / VAT Number *
-              </label>
-              <Input
-                value={panNumber}
-                onChange={(e) => setPanNumber(e.target.value)}
-                placeholder="123456789"
-                required
-                className="text-xs font-mono font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                Legal Entity Name
-              </label>
-              <Input
-                value={legalEntity}
-                onChange={(e) => setLegalEntity(e.target.value)}
-                placeholder="Crunchy Bag Food & Beverages Pvt. Ltd."
-                className="text-xs"
-              />
-            </div>
-
-            <div className="sm:col-span-2 lg:col-span-3">
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                Description / Tagline
-              </label>
-              <Input
-                value={tagline}
-                onChange={(e) => setTagline(e.target.value)}
-                placeholder="Crispy Fried Chicken & Gourmet Smash Burgers"
-                className="text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* CONTACT & LOCATION */}
-        <div className="bg-[#121214] border border-zinc-800/80 rounded-lg p-5 space-y-4">
-          <div className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
-            Contact & Location
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                Phone Number
-              </label>
-              <div className="relative">
-                <Phone className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="9805996874"
-                  className="text-xs font-mono pl-9"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="crunchybag@gmail.com"
-                  className="text-xs pl-9"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                Official Website
-              </label>
-              <div className="relative">
-                <Globe className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder="https://crunchybag.com/"
-                  className="text-xs font-mono pl-9"
-                />
-              </div>
-            </div>
-
-            <div className="sm:col-span-3">
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                Headquarters Address
-              </label>
-              <Input
-                value={headquartersAddress}
-                onChange={(e) => setHeadquartersAddress(e.target.value)}
-                placeholder="Durbar Marg, Kathmandu, Nepal"
-                className="text-xs"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* TAX & FISCAL RATES */}
-        <div className="bg-[#121214] border border-zinc-800/80 rounded-lg p-5 space-y-4">
-          <div className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
-            Tax Rates & Currency
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                VAT Rate (%)
-              </label>
-              <div className="relative">
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={vatRatePercent}
-                  onChange={(e) => setVatRatePercent(e.target.value)}
-                  className="text-xs font-mono pr-7"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
-                  %
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                Service Charge (%)
-              </label>
-              <div className="relative">
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={serviceChargePercent}
-                  onChange={(e) => setServiceChargePercent(e.target.value)}
-                  className="text-xs font-mono pr-7"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
-                  %
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                Currency
-              </label>
-              <div className="h-9 px-3 bg-zinc-900 border border-zinc-800 rounded flex items-center justify-between text-xs text-zinc-300 font-mono">
-                <span>Nepalese Rupee</span>
-                <span className="text-amber-400 font-bold">NPR (रु)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* PAYMENT METHODS */}
-        <div className="bg-[#121214] border border-zinc-800/80 rounded-lg p-5 space-y-3">
-          <div className="text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
-            Accepted Payment Channels
-          </div>
-
-          <div className="flex flex-wrap gap-2.5">
-            {ALL_METHODS.map((m) => {
-              const isEnabled = acceptedPaymentMethods.includes(m.id);
-              return (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 truncate"
+              >
+                {selectedLogoFile ? "Replace" : logoPreviewUrl ? "Change" : "Upload"}
+              </button>
+              {logoPreviewUrl && (
                 <button
-                  key={m.id}
                   type="button"
-                  onClick={() => togglePaymentMethod(m.id)}
-                  className={`px-3.5 py-2 rounded-md border text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer ${
-                    isEnabled
-                      ? "bg-amber-500/10 border-amber-500/60 text-amber-300"
-                      : "bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200"
-                  }`}
+                  onClick={handleRemoveLogo}
+                  title="Remove Logo"
+                  className="text-zinc-500 hover:text-rose-400 ml-auto shrink-0 p-1"
                 >
-                  <div
-                    className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0 ${
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Col 2: Brand Name */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Brand Name *
+            </label>
+            <Input
+              value={brandName}
+              onChange={(e) => setBrandName(e.target.value)}
+              placeholder="Crunchy Bag"
+              required
+              className="text-xs h-9 font-medium"
+            />
+          </div>
+
+          {/* Col 3: PAN / VAT */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              PAN / VAT Number *
+            </label>
+            <Input
+              value={panNumber}
+              onChange={(e) => setPanNumber(e.target.value)}
+              placeholder="123456789"
+              required
+              className="text-xs h-9 font-mono font-medium"
+            />
+          </div>
+
+          {/* Col 4: Legal Entity */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Legal Entity Name
+            </label>
+            <Input
+              value={legalEntity}
+              onChange={(e) => setLegalEntity(e.target.value)}
+              placeholder="Crunchy Bag Pvt. Ltd."
+              className="text-xs h-9"
+            />
+          </div>
+
+          {/* Col 5: Description / Tagline */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Description / Slogan
+            </label>
+            <Input
+              value={tagline}
+              onChange={(e) => setTagline(e.target.value)}
+              placeholder="Crispy Fast Casual Dining"
+              className="text-xs h-9"
+            />
+          </div>
+        </div>
+
+        {/* -------------------------------------------------------------
+            ROW 2: CONTACT & ADDRESS (5 COLUMNS)
+        ------------------------------------------------------------- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          {/* Col 1: Phone */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Contact Phone
+            </label>
+            <div className="relative">
+              <Phone className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Input
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="9805996874"
+                className="text-xs h-9 font-mono pl-8"
+              />
+            </div>
+          </div>
+
+          {/* Col 2: Email */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Official Email
+            </label>
+            <div className="relative">
+              <Mail className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Input
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="crunchybag@gmail.com"
+                className="text-xs h-9 pl-8"
+              />
+            </div>
+          </div>
+
+          {/* Col 3: Website */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Website URL
+            </label>
+            <div className="relative">
+              <Globe className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Input
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                placeholder="https://crunchybag.com/"
+                className="text-xs h-9 font-mono pl-8"
+              />
+            </div>
+          </div>
+
+          {/* Col 4: Headquarters Address */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Headquarters Address
+            </label>
+            <Input
+              value={headquartersAddress}
+              onChange={(e) => setHeadquartersAddress(e.target.value)}
+              placeholder="Durbar Marg, Kathmandu"
+              className="text-xs h-9"
+            />
+          </div>
+
+          {/* Col 5: Currency */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Currency
+            </label>
+            <div className="h-9 px-3 bg-zinc-900 border border-zinc-800 rounded flex items-center justify-between text-xs text-zinc-300 font-mono">
+              <span>Nepalese Rupee</span>
+              <span className="text-amber-400 font-bold">NPR (रु)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* -------------------------------------------------------------
+            ROW 3: TAX RATES & PAYMENT CHANNELS (5 COLUMNS: 2 TAX + 3 PAYMENT)
+        ------------------------------------------------------------- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 items-end pt-1">
+          {/* Col 1: VAT % */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              VAT Rate (%)
+            </label>
+            <div className="relative">
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={vatRatePercent}
+                onChange={(e) => setVatRatePercent(e.target.value)}
+                className="text-xs h-9 font-mono pr-7"
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-bold">
+                %
+              </span>
+            </div>
+          </div>
+
+          {/* Col 2: Service Charge % */}
+          <div>
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Service Charge (%)
+            </label>
+            <div className="relative">
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={serviceChargePercent}
+                onChange={(e) => setServiceChargePercent(e.target.value)}
+                className="text-xs h-9 font-mono pr-7"
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-bold">
+                %
+              </span>
+            </div>
+          </div>
+
+          {/* Col 3, 4, 5: Payment Channels (Spanning 3 columns) */}
+          <div className="lg:col-span-3">
+            <label className="text-[11px] font-medium text-zinc-400 block mb-1">
+              Accepted Payment Channels
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5 h-auto min-h-9">
+              {ALL_METHODS.map((m) => {
+                const isEnabled = acceptedPaymentMethods.includes(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => togglePaymentMethod(m.id)}
+                    className={`h-9 px-2.5 rounded border text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer select-none ${
                       isEnabled
-                        ? "bg-amber-500 border-amber-500 text-black"
-                        : "border-zinc-700 bg-zinc-800"
+                        ? "bg-amber-500/10 border-amber-500/60 text-amber-300"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300"
                     }`}
                   >
-                    {isEnabled && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                  </div>
-                  <span>{m.label}</span>
-                </button>
-              );
-            })}
+                    <div
+                      className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0 ${
+                        isEnabled
+                          ? "bg-amber-500 border-amber-500 text-black"
+                          : "border-zinc-700 bg-zinc-800"
+                      }`}
+                    >
+                      {isEnabled && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                    </div>
+                    <span>{m.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        {/* BOTTOM SAVE BAR */}
-        <div className="flex items-center justify-end gap-3 pt-2">
+        {/* -------------------------------------------------------------
+            BOTTOM ACTIONS ROW (Inside the single container)
+        ------------------------------------------------------------- */}
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800/80">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={handleReset}
             disabled={isSaving}
-            className="text-xs h-9 px-4"
+            className="text-xs h-8 px-4"
           >
             Cancel
           </Button>
@@ -619,8 +602,8 @@ export const AdminOrganizationTab: React.FC = () => {
             type="submit"
             size="sm"
             disabled={isSaving}
-            className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-9 px-5"
-            leftIcon={<Save className="w-4 h-4" />}
+            className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-8 px-5"
+            leftIcon={<Save className="w-3.5 h-3.5" />}
           >
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>
