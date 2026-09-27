@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Building2,
   FileCheck,
   CreditCard,
   Percent,
   CheckCircle2,
+  AlertCircle,
   ShieldCheck,
   Store,
   Phone,
@@ -16,12 +17,19 @@ import {
   Sparkles,
   ExternalLink,
   Check,
+  Upload,
+  Image as ImageIcon,
+  Trash2,
+  Receipt,
+  FileText,
+  RefreshCw,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
 import { PaymentMethod } from "../../types";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
+import { organizationApi, extractErrorMessage } from "../../lib/api";
 
 const ALL_METHODS: { id: PaymentMethod; label: string; sub: string; icon: string }[] = [
   { id: "ESEWA", label: "eSewa Wallet", sub: "Merchant QR & Web Gateway", icon: "🟢" },
@@ -34,6 +42,7 @@ const ALL_METHODS: { id: PaymentMethod; label: string; sub: string; icon: string
 export const AdminOrganizationTab: React.FC = () => {
   const { orgSettings, updateOrgSettings, currentOutlet, addActivityLog, addToast } = useApp();
   const { authOutlet, authUser } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Scoped branch display
   const activeBranchName = authOutlet?.name || currentOutlet?.name || "Durbar Marg HQ";
@@ -58,8 +67,68 @@ export const AdminOrganizationTab: React.FC = () => {
     orgSettings.acceptedPaymentMethods || ["ESEWA", "FONEPAY_QR", "CASH_ON_PICKUP", "CARD", "WALLET"]
   );
 
+  // File Upload State
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string>(orgSettings.logoUrl || "");
+  const [showUrlFallback, setShowUrlFallback] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const [isSavedRecently, setIsSavedRecently] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFetchingRemote, setIsFetchingRemote] = useState(false);
+  const [apiStatusMessage, setApiStatusMessage] = useState<{ text: string; type: "success" | "info" | "warning" } | null>(null);
+
+  // Fetch settings from live backend
+  const fetchRemoteSettings = async (isManual = false) => {
+    setIsFetchingRemote(true);
+    try {
+      const remote = await organizationApi.getSettings();
+      if (remote) {
+        updateOrgSettings(remote);
+        setBrandName(remote.brandName);
+        setTagline(remote.tagline || "");
+        setLegalEntity(remote.legalEntity);
+        setPanNumber(remote.panNumber);
+        setLogoUrl(remote.logoUrl || "");
+        setLogoPreviewUrl(remote.logoUrl || "");
+        setSelectedLogoFile(null);
+        setWebsiteUrl(remote.websiteUrl || "");
+        setContactEmail(remote.contactEmail || "");
+        setContactPhone(remote.contactPhone || "");
+        setHeadquartersAddress(remote.headquartersAddress || "");
+        setVatRatePercent(remote.vatRatePercent.toString());
+        setServiceChargePercent(remote.serviceChargePercent.toString());
+        setAcceptedPaymentMethods(remote.acceptedPaymentMethods);
+        setApiStatusMessage({
+          text: "Synchronized with live backend at /api/v1/organization/",
+          type: "success",
+        });
+        if (isManual) {
+          addToast({
+            title: "Settings Refreshed",
+            description: "Loaded latest organization profile & fiscal configuration from backend.",
+            type: "success",
+          });
+        }
+      }
+    } catch (err) {
+      const errMsg = extractErrorMessage(err);
+      if (isManual) {
+        addToast({
+          title: "Remote Sync Failed",
+          description: errMsg,
+          type: "warning",
+        });
+      }
+    } finally {
+      setIsFetchingRemote(false);
+    }
+  };
+
+  // Initial fetch from backend on mount
+  useEffect(() => {
+    fetchRemoteSettings(false);
+  }, []);
 
   // Sync state if orgSettings changes externally
   useEffect(() => {
@@ -68,6 +137,9 @@ export const AdminOrganizationTab: React.FC = () => {
     setLegalEntity(orgSettings.legalEntity || "");
     setPanNumber(orgSettings.panNumber || "");
     setLogoUrl(orgSettings.logoUrl || "");
+    if (!selectedLogoFile) {
+      setLogoPreviewUrl(orgSettings.logoUrl || "");
+    }
     setWebsiteUrl(orgSettings.websiteUrl || "");
     setContactEmail(orgSettings.contactEmail || "");
     setContactPhone(orgSettings.contactPhone || "");
@@ -78,6 +150,58 @@ export const AdminOrganizationTab: React.FC = () => {
       setAcceptedPaymentMethods(orgSettings.acceptedPaymentMethods);
     }
   }, [orgSettings]);
+
+  // Handle local file selection
+  const handleFileProcess = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      addToast({
+        title: "Invalid File Type",
+        description: "Please choose an image file (PNG, JPG, WEBP, or SVG).",
+        type: "error",
+      });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      addToast({
+        title: "File Too Large",
+        description: "Logo image should be under 5MB for optimal POS performance.",
+        type: "warning",
+      });
+      return;
+    }
+
+    setSelectedLogoFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setLogoPreviewUrl(dataUrl);
+      setLogoUrl(dataUrl); // Also set in local state so preview components pick it up
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileProcess(e.target.files[0]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileProcess(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setSelectedLogoFile(null);
+    setLogoPreviewUrl("");
+    setLogoUrl("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const togglePaymentMethod = (method: PaymentMethod) => {
     setAcceptedPaymentMethods((prev) =>
@@ -91,6 +215,9 @@ export const AdminOrganizationTab: React.FC = () => {
     setLegalEntity(orgSettings.legalEntity || "");
     setPanNumber(orgSettings.panNumber || "");
     setLogoUrl(orgSettings.logoUrl || "");
+    setLogoPreviewUrl(orgSettings.logoUrl || "");
+    setSelectedLogoFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setWebsiteUrl(orgSettings.websiteUrl || "");
     setContactEmail(orgSettings.contactEmail || "");
     setContactPhone(orgSettings.contactPhone || "");
@@ -107,16 +234,17 @@ export const AdminOrganizationTab: React.FC = () => {
     });
   };
 
-  const handleSaveOrg = (e: React.FormEvent) => {
+  const handleSaveOrg = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    setApiStatusMessage(null);
 
-    const updated = {
+    const updatedSettings = {
       brandName: brandName.trim(),
       tagline: tagline.trim(),
       legalEntity: legalEntity.trim(),
       panNumber: panNumber.trim(),
-      logoUrl: logoUrl.trim(),
+      logoUrl: logoUrl.trim() || logoPreviewUrl,
       websiteUrl: websiteUrl.trim(),
       contactEmail: contactEmail.trim(),
       contactPhone: contactPhone.trim(),
@@ -126,20 +254,50 @@ export const AdminOrganizationTab: React.FC = () => {
       acceptedPaymentMethods,
     };
 
-    updateOrgSettings(updated);
+    // Always update client state & localStorage first for instant responsiveness
+    updateOrgSettings(updatedSettings);
 
-    // Record audit log entry
-    if (addActivityLog) {
-      addActivityLog(
-        "ORGANIZATION_UPDATE",
-        `Updated company profile for ${brandName.trim()} (PAN: ${panNumber.trim()})`,
-        authUser?.name || "Branch Admin"
-      );
+    // Attempt to persist to live backend
+    try {
+      const remoteSaved = await organizationApi.updateSettings(updatedSettings, selectedLogoFile);
+      if (remoteSaved) {
+        if (remoteSaved.logoUrl) {
+          setLogoUrl(remoteSaved.logoUrl);
+          setLogoPreviewUrl(remoteSaved.logoUrl);
+        }
+        updateOrgSettings(remoteSaved);
+      }
+      setSelectedLogoFile(null);
+      setApiStatusMessage({
+        text: "Organization and logo saved to server database",
+        type: "success",
+      });
+    } catch (err) {
+      // If backend endpoint is not implemented yet or returned an error,
+      // the local storage and AppContext already have the data saved.
+      const errMsg = extractErrorMessage(err);
+      if (errMsg.includes("404") || errMsg.includes("not found")) {
+        setApiStatusMessage({
+          text: "Saved locally. Backend /api/v1/organization/ endpoint will sync once provisioned.",
+          type: "info",
+        });
+      } else {
+        console.warn("Backend org sync warning:", errMsg);
+      }
+    } finally {
+      // Record audit log entry
+      if (addActivityLog) {
+        addActivityLog(
+          "ORGANIZATION_UPDATE",
+          `Updated company profile for ${brandName.trim()} (PAN: ${panNumber.trim()})`,
+          authUser?.name || "Branch Admin"
+        );
+      }
+
+      setIsSaving(false);
+      setIsSavedRecently(true);
+      setTimeout(() => setIsSavedRecently(false), 3500);
     }
-
-    setIsSaving(false);
-    setIsSavedRecently(true);
-    setTimeout(() => setIsSavedRecently(false), 3000);
   };
 
   return (
@@ -147,7 +305,7 @@ export const AdminOrganizationTab: React.FC = () => {
       {/* -------------------------------------------------------------
           TOP HIGH-DENSITY HEADER & CONTEXT BAR
       ------------------------------------------------------------- */}
-      <div className="bg-[#121214] border border-zinc-800 p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-[#121214] border border-zinc-800 p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-sm">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <Building2 className="w-5 h-5 text-amber-500 shrink-0" />
@@ -159,12 +317,23 @@ export const AdminOrganizationTab: React.FC = () => {
             </span>
           </div>
           <p className="text-[11px] text-zinc-400 mt-1">
-            Central company identity, legal entity registration, and Inland Revenue Department (IRD) Nepal fiscal policies.
+            Central company identity, legal entity registration, logo asset management, and Inland Revenue Department (IRD) Nepal fiscal policies.
           </p>
         </div>
 
-        {/* Read-only Scoped Branch Badge */}
+        {/* Top Header Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => fetchRemoteSettings(true)}
+            disabled={isFetchingRemote}
+            title="Fetch latest organization settings from backend"
+            className="px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 rounded flex items-center gap-1.5 transition-colors cursor-pointer text-[11px] font-bold disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-amber-500 ${isFetchingRemote ? "animate-spin" : ""}`} />
+            <span>{isFetchingRemote ? "Syncing..." : "Sync Backend"}</span>
+          </button>
+
           <div className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded flex items-center gap-2">
             <Store className="w-3.5 h-3.5 text-amber-500" />
             <div className="text-left">
@@ -179,10 +348,35 @@ export const AdminOrganizationTab: React.FC = () => {
         </div>
       </div>
 
+      {/* API sync notice if applicable */}
+      {apiStatusMessage && (
+        <div
+          className={`px-3 py-2 text-[11px] rounded border flex items-center justify-between gap-2 ${
+            apiStatusMessage.type === "success"
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              : apiStatusMessage.type === "warning"
+              ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+              : "bg-sky-500/10 border-sky-500/30 text-sky-400"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <span>{apiStatusMessage.text}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setApiStatusMessage(null)}
+            className="text-[10px] opacity-70 hover:opacity-100 uppercase font-bold"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* -------------------------------------------------------------
           TOP HIGH-DENSITY METRIC STRIP (COMPLIANCE & FISCAL STATUS)
       ------------------------------------------------------------- */}
-      <div className="bg-[#101012] border border-zinc-800 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-y-2 gap-x-6 text-[11px]">
+      <div className="bg-[#101012] border border-zinc-800 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-y-2 gap-x-6 text-[11px] rounded-sm">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-zinc-400">
           <div className="flex items-center gap-1.5 whitespace-nowrap">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -226,13 +420,13 @@ export const AdminOrganizationTab: React.FC = () => {
           MAIN EDITABLE FORM (ORGANIZATION DETAILS UPDATABLE BY ADMIN)
       ------------------------------------------------------------- */}
       <form onSubmit={handleSaveOrg} className="space-y-4">
-        {/* CARD 1: CORPORATE & BRAND IDENTITY */}
-        <div className="bg-[#121214] border border-zinc-800 p-4 space-y-3.5 rounded-sm">
+        {/* CARD 1: CORPORATE & BRAND IDENTITY + DIRECT LOGO UPLOAD */}
+        <div className="bg-[#121214] border border-zinc-800 p-4 space-y-4 rounded-sm">
           <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-amber-500" />
               <span className="text-xs font-black uppercase tracking-wider text-zinc-100">
-                Corporate Identity & Legal Entity
+                Corporate Identity & Brand Assets
               </span>
             </div>
             <span className="text-[10px] text-zinc-500">
@@ -240,6 +434,130 @@ export const AdminOrganizationTab: React.FC = () => {
             </span>
           </div>
 
+          {/* SECTION A: DIRECT LOGO UPLOAD COMPONENT (NO URL REQUIRED) */}
+          <div className="bg-zinc-900/60 border border-zinc-800 p-3.5 rounded-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-zinc-200 flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
+                Brand Logo (Direct File Upload)
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowUrlFallback(!showUrlFallback)}
+                className="text-[10px] text-amber-400 hover:underline font-medium cursor-pointer"
+              >
+                {showUrlFallback ? "Hide URL Option" : "Or use image URL"}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-center">
+              {/* Logo Preview Avatar */}
+              <div className="md:col-span-3 flex flex-col items-center justify-center p-3 bg-[#101012] border border-zinc-800 rounded text-center">
+                <div className="w-20 h-20 rounded-lg bg-zinc-800 border-2 border-dashed border-zinc-700 overflow-hidden flex items-center justify-center shadow-inner relative group">
+                  {logoPreviewUrl ? (
+                    <img
+                      src={logoPreviewUrl}
+                      alt="Brand Logo Preview"
+                      className="w-full h-full object-contain p-1"
+                      onError={() => setLogoPreviewUrl("")}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-zinc-500 p-2">
+                      <ImageIcon className="w-6 h-6 stroke-1 mb-1" />
+                      <span className="text-[9px]">No Logo</span>
+                    </div>
+                  )}
+                </div>
+                <span className="text-[10px] text-zinc-400 font-mono mt-1.5">
+                  {selectedLogoFile ? selectedLogoFile.name : logoPreviewUrl ? "Current Active Logo" : "Upload PNG/JPG"}
+                </span>
+                {selectedLogoFile && (
+                  <span className="text-[9px] text-amber-400 font-mono">
+                    ({(selectedLogoFile.size / 1024).toFixed(0)} KB • Ready to save)
+                  </span>
+                )}
+              </div>
+
+              {/* Drag & Drop Upload Dropzone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(true);
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`md:col-span-9 p-4 border-2 border-dashed rounded flex flex-col items-center justify-center text-center cursor-pointer transition-all select-none ${
+                  isDragOver
+                    ? "border-amber-500 bg-amber-500/10 text-amber-300"
+                    : "border-zinc-700/80 hover:border-amber-500/60 bg-zinc-900/40 hover:bg-zinc-900/80 text-zinc-400"
+                }`}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  className="hidden"
+                />
+
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mb-1.5">
+                  <Upload className="w-4 h-4" />
+                </div>
+                <div className="text-xs font-bold text-zinc-200">
+                  Click to select brand logo, or drag & drop image file here
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-1">
+                  Supports PNG, JPG, WEBP or SVG up to 5MB. Automatically optimized for receipt thermal printers.
+                </div>
+
+                <div className="flex items-center gap-2 mt-2.5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-black rounded cursor-pointer"
+                  >
+                    Select Image File
+                  </button>
+
+                  {logoPreviewUrl && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveLogo();
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-zinc-800 hover:bg-rose-950/40 hover:text-rose-400 text-zinc-400 border border-zinc-700 rounded flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Remove Logo
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Optional URL input toggle */}
+            {showUrlFallback && (
+              <div className="pt-2 border-t border-zinc-800 flex items-center gap-2">
+                <span className="text-[10px] text-zinc-400 whitespace-nowrap">External CDN URL:</span>
+                <Input
+                  value={logoUrl}
+                  onChange={(e) => {
+                    setLogoUrl(e.target.value);
+                    setLogoPreviewUrl(e.target.value);
+                  }}
+                  placeholder="https://.../brand-logo.png"
+                  className="text-xs font-mono flex-1 h-7"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 4-COLUMN ROW 1 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             <div>
               <label className="text-[11px] font-bold text-zinc-300 block mb-1">
@@ -293,37 +611,9 @@ export const AdminOrganizationTab: React.FC = () => {
             </div>
           </div>
 
-          {/* Logo & Website with live visual thumbnail */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+          {/* Website URL */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div className="sm:col-span-2">
-              <label className="text-[11px] font-bold text-zinc-300 block mb-1">
-                Official Brand Logo URL
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded bg-zinc-800 border border-zinc-700 shrink-0 overflow-hidden flex items-center justify-center">
-                  {logoUrl ? (
-                    <img
-                      src={logoUrl}
-                      alt="Brand Logo"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <Building2 className="w-4 h-4 text-zinc-500" />
-                  )}
-                </div>
-                <Input
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="https://.../logo.png"
-                  className="text-xs font-mono flex-1"
-                />
-              </div>
-            </div>
-
-            <div>
               <label className="text-[11px] font-bold text-zinc-300 block mb-1">
                 Official Website URL
               </label>
@@ -336,6 +626,30 @@ export const AdminOrganizationTab: React.FC = () => {
                   className="text-xs font-mono pl-8"
                 />
               </div>
+            </div>
+
+            {/* Quick Live Preview Mockup Box */}
+            <div className="p-2.5 bg-zinc-900 border border-zinc-800 rounded flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <div className="w-8 h-8 rounded bg-black border border-zinc-700 shrink-0 flex items-center justify-center overflow-hidden">
+                  {logoPreviewUrl ? (
+                    <img src={logoPreviewUrl} alt="" className="w-full h-full object-contain p-0.5" />
+                  ) : (
+                    <Store className="w-4 h-4 text-amber-500" />
+                  )}
+                </div>
+                <div className="truncate">
+                  <span className="text-[11px] font-bold text-white block truncate">
+                    {brandName || "Crunchy"}
+                  </span>
+                  <span className="text-[9px] text-zinc-400 font-mono">
+                    PAN: {panNumber || "609823145"}
+                  </span>
+                </div>
+              </div>
+              <span className="text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded shrink-0">
+                Receipt Ready
+              </span>
             </div>
           </div>
         </div>

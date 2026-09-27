@@ -7,6 +7,7 @@ import {
   RefreshPayload,
   RefreshResponse,
 } from "../types/auth";
+import { OrganizationSettings, PaymentMethod } from "../types";
 import { authStorage } from "./authStorage";
 
 // Production backend live endpoints
@@ -562,6 +563,126 @@ export const authApi = {
    */
   logout(): void {
     authStorage.clearSession();
+  },
+};
+
+/**
+ * Organization Profile & Logo Endpoints
+ */
+export const organizationApi = {
+  async getSettings(): Promise<OrganizationSettings> {
+    const raw = await baseRequest<any>("/organization/");
+    const data = raw?.data || raw?.organization || raw?.result || raw || {};
+    
+    let parsedMethods: PaymentMethod[] = ["ESEWA", "FONEPAY_QR", "CASH_ON_PICKUP", "CARD", "WALLET"];
+    const rawMethods = data.accepted_payment_methods ?? data.acceptedPaymentMethods;
+    if (Array.isArray(rawMethods)) {
+      parsedMethods = rawMethods;
+    } else if (typeof rawMethods === "string") {
+      try {
+        const parsed = JSON.parse(rawMethods);
+        if (Array.isArray(parsed)) parsedMethods = parsed;
+      } catch {}
+    }
+
+    return {
+      brandName: data.brand_name || data.brandName || "Crunchy",
+      tagline: data.tagline ?? data.tagLine ?? "",
+      legalEntity: data.legal_entity || data.legalEntity || "",
+      panNumber: data.pan_number || data.panNumber || "",
+      logoUrl: data.logo_url || data.logo || data.logoUrl || "",
+      websiteUrl: data.website_url || data.websiteUrl || "",
+      contactEmail: data.contact_email || data.contactEmail || "",
+      contactPhone: data.contact_phone || data.contactPhone || "",
+      headquartersAddress: data.headquarters_address || data.headquartersAddress || "",
+      vatRatePercent: parseFloat(data.vat_rate_percent ?? data.vatRatePercent ?? 13) || 13,
+      serviceChargePercent: parseFloat(data.service_charge_percent ?? data.serviceChargePercent ?? 0) || 0,
+      defaultCurrency: data.default_currency || data.defaultCurrency || "NPR",
+      acceptedPaymentMethods: parsedMethods,
+    };
+  },
+
+  async updateSettings(settings: Partial<OrganizationSettings>, logoFile?: File | null): Promise<OrganizationSettings> {
+    let data: any;
+    if (logoFile) {
+      const formData = new FormData();
+      if (settings.brandName) formData.append("brand_name", settings.brandName);
+      if (settings.tagline !== undefined) formData.append("tagline", settings.tagline);
+      if (settings.legalEntity) formData.append("legal_entity", settings.legalEntity);
+      if (settings.panNumber) formData.append("pan_number", settings.panNumber);
+      if (settings.websiteUrl !== undefined) formData.append("website_url", settings.websiteUrl);
+      if (settings.contactEmail !== undefined) formData.append("contact_email", settings.contactEmail);
+      if (settings.contactPhone !== undefined) formData.append("contact_phone", settings.contactPhone);
+      if (settings.headquartersAddress !== undefined) formData.append("headquarters_address", settings.headquartersAddress);
+      if (settings.vatRatePercent !== undefined) formData.append("vat_rate_percent", String(settings.vatRatePercent));
+      if (settings.serviceChargePercent !== undefined) formData.append("service_charge_percent", String(settings.serviceChargePercent));
+      if (settings.acceptedPaymentMethods) {
+        formData.append("accepted_payment_methods", JSON.stringify(settings.acceptedPaymentMethods));
+      }
+      formData.append("logo", logoFile);
+
+      const raw = await baseRequest<any>("/organization/", {
+        method: "PATCH",
+        body: formData,
+      });
+      data = raw?.data || raw?.organization || raw?.result || raw || {};
+    } else {
+      const payload: any = {};
+      if (settings.brandName) payload.brand_name = settings.brandName;
+      if (settings.tagline !== undefined) payload.tagline = settings.tagline;
+      if (settings.legalEntity) payload.legal_entity = settings.legalEntity;
+      if (settings.panNumber) payload.pan_number = settings.panNumber;
+      if (settings.logoUrl !== undefined) payload.logo_url = settings.logoUrl;
+      if (settings.websiteUrl !== undefined) payload.website_url = settings.websiteUrl;
+      if (settings.contactEmail !== undefined) payload.contact_email = settings.contactEmail;
+      if (settings.contactPhone !== undefined) payload.contact_phone = settings.contactPhone;
+      if (settings.headquartersAddress !== undefined) payload.headquarters_address = settings.headquartersAddress;
+      if (settings.vatRatePercent !== undefined) payload.vat_rate_percent = settings.vatRatePercent;
+      if (settings.serviceChargePercent !== undefined) payload.service_charge_percent = settings.serviceChargePercent;
+      if (settings.acceptedPaymentMethods) payload.accepted_payment_methods = settings.acceptedPaymentMethods;
+
+      const raw = await baseRequest<any>("/organization/", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      data = raw?.data || raw?.organization || raw?.result || raw || {};
+    }
+
+    let parsedMethods: PaymentMethod[] = settings.acceptedPaymentMethods || ["ESEWA", "FONEPAY_QR", "CASH_ON_PICKUP", "CARD", "WALLET"];
+    const rawMethods = data.accepted_payment_methods ?? data.acceptedPaymentMethods;
+    if (Array.isArray(rawMethods)) {
+      parsedMethods = rawMethods;
+    } else if (typeof rawMethods === "string") {
+      try {
+        const parsed = JSON.parse(rawMethods);
+        if (Array.isArray(parsed)) parsedMethods = parsed;
+      } catch {}
+    }
+
+    return {
+      brandName: data.brand_name || data.brandName || settings.brandName || "Crunchy",
+      tagline: data.tagline ?? data.tagLine ?? settings.tagline ?? "",
+      legalEntity: data.legal_entity || data.legalEntity || settings.legalEntity || "",
+      panNumber: data.pan_number || data.panNumber || settings.panNumber || "",
+      logoUrl: data.logo_url || data.logo || data.logoUrl || settings.logoUrl || "",
+      websiteUrl: data.website_url ?? data.websiteUrl ?? settings.websiteUrl ?? "",
+      contactEmail: data.contact_email ?? data.contactEmail ?? settings.contactEmail ?? "",
+      contactPhone: data.contact_phone ?? data.contactPhone ?? settings.contactPhone ?? "",
+      headquartersAddress: data.headquarters_address ?? data.headquartersAddress ?? settings.headquartersAddress ?? "",
+      vatRatePercent: parseFloat(data.vat_rate_percent ?? data.vatRatePercent ?? settings.vatRatePercent ?? 13) || 13,
+      serviceChargePercent: parseFloat(data.service_charge_percent ?? data.serviceChargePercent ?? settings.serviceChargePercent ?? 0) || 0,
+      defaultCurrency: data.default_currency || data.defaultCurrency || settings.defaultCurrency || "NPR",
+      acceptedPaymentMethods: parsedMethods,
+    };
+  },
+
+  async uploadLogo(file: File): Promise<{ logo_url: string }> {
+    const formData = new FormData();
+    formData.append("logo", file);
+    return baseRequest<{ logo_url: string }>("/organization/logo/", {
+      method: "POST",
+      body: formData,
+    });
   },
 };
 
