@@ -23,6 +23,7 @@ export const StaffInventoryTab: React.FC = () => {
     inventory,
     stockMovements,
     purchases,
+    clearInventoryDummyData,
     addToast,
   } = useApp();
 
@@ -153,10 +154,21 @@ export const StaffInventoryTab: React.FC = () => {
           </span>
         </div>
 
-        {/* Operating Branch Scope Badge */}
-        <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          <span>Crunchy Flagship - Durbar Marg (DM-01)</span>
+        {/* Operating Branch Scope Badge & Clear Demo Data Action */}
+        <div className="flex items-center gap-3">
+          <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>Crunchy Flagship - Durbar Marg (DM-01)</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={clearInventoryDummyData}
+            title="Wipe demo dummy items and reset to 0 for live backend recording"
+            className="text-[10px] text-zinc-500 hover:text-rose-400 underline font-mono cursor-pointer transition-colors"
+          >
+            Clear Demo Data
+          </button>
         </div>
       </div>
 

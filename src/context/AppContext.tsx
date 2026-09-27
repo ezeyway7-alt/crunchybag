@@ -372,6 +372,7 @@ interface AppContextType {
   updateInventoryStock: (id: string, newStock: number, reason?: string, note?: string) => void;
   updateInventoryItem: (id: string, updates: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
+  clearInventoryDummyData: () => void;
   stockMovements: StockMovementRecord[];
   recordStockMovement: (movement: Omit<StockMovementRecord, "id" | "timestamp">) => void;
 
@@ -509,8 +510,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Organization Suite States
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
-  const [purchases, setPurchases] = useState<PurchaseRecord[]>(INITIAL_PURCHASES);
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("crunchy_real_inventory");
+        if (saved !== null) return JSON.parse(saved);
+      } catch {}
+    }
+    return INITIAL_INVENTORY;
+  });
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("crunchy_real_purchases");
+        if (saved !== null) return JSON.parse(saved);
+      } catch {}
+    }
+    return INITIAL_PURCHASES;
+  });
   const [daybookExpenses, setDaybookExpenses] = useState<DaybookExpense[]>(INITIAL_DAYBOOK_EXPENSES);
   const [parties, setParties] = useState<Party[]>(INITIAL_PARTIES);
   const [customPartyTypes, setCustomPartyTypes] = useState<string[]>([
@@ -536,7 +553,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_ORG_SETTINGS;
   });
   const [stockAudits, setStockAudits] = useState<StockAuditRecord[]>(INITIAL_STOCK_AUDITS);
-  const [stockMovements, setStockMovements] = useState<StockMovementRecord[]>(INITIAL_STOCK_MOVEMENTS);
+  const [stockMovements, setStockMovements] = useState<StockMovementRecord[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("crunchy_real_movements");
+        if (saved !== null) return JSON.parse(saved);
+      } catch {}
+    }
+    return INITIAL_STOCK_MOVEMENTS;
+  });
+
+  // Sync inventory persistence
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("crunchy_real_inventory", JSON.stringify(inventory));
+      } catch {}
+    }
+  }, [inventory]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("crunchy_real_purchases", JSON.stringify(purchases));
+      } catch {}
+    }
+  }, [purchases]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("crunchy_real_movements", JSON.stringify(stockMovements));
+      } catch {}
+    }
+  }, [stockMovements]);
 
   // Table QR Ordering & Running Tabs State
   const [tableNumber, setTableNumber] = useState<string | null>(null);
@@ -1914,6 +1964,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const clearInventoryDummyData = () => {
+    setInventory([]);
+    setPurchases([]);
+    setStockMovements([]);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("crunchy_real_inventory", JSON.stringify([]));
+        localStorage.setItem("crunchy_real_purchases", JSON.stringify([]));
+        localStorage.setItem("crunchy_real_movements", JSON.stringify([]));
+      } catch {}
+    }
+    addToast({
+      title: "Demo Data Cleared",
+      description: "All dummy inventory, purchase bills, and movements removed.",
+      type: "info",
+    });
+  };
+
   // Purchases Management
   const addPurchaseRecord = (record: Omit<PurchaseRecord, "id">) => {
     const newRecord: PurchaseRecord = {
@@ -2597,6 +2665,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateInventoryStock,
         updateInventoryItem,
         deleteInventoryItem,
+        clearInventoryDummyData,
         purchases,
         addPurchaseRecord,
         daybookExpenses,
