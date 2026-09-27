@@ -80,9 +80,10 @@ export async function ensureCsrfToken(): Promise<string | null> {
     try {
       // Candidate endpoints on Django backend that issue csrftoken cookies
       const candidates = [
-        "/admin/login/",
+        "/superuser/login/",
+        "/django-admin/login/",
         "/csrf/",
-        `${LIVE_API_ORIGIN}/admin/login/`,
+        `${LIVE_API_ORIGIN}/superuser/login/`,
       ];
 
       for (const endpoint of candidates) {
