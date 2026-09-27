@@ -14,8 +14,6 @@ import {
   Layers,
   Upload,
   Link2,
-  Percent,
-  Tag,
   Check,
   Zap,
 } from "lucide-react";
@@ -24,7 +22,6 @@ import {
   Product,
   ModifierGroup,
   ModifierOption,
-  ProductTimePricingSlot,
   ProductIngredientRecipe,
   DietaryTag,
   ComboPackageItem,
@@ -77,14 +74,14 @@ export const AdminMenuManagerTab: React.FC = () => {
   // FORM STATES: REGULAR MENU ITEM
   // -------------------------------------------------------------
   const [formName, setFormName] = useState("");
-  const [formCategoryId, setFormCategoryId] = useState(categories[0]?.id || "cat-burgers");
-  const [formBasePrice, setFormBasePrice] = useState("450");
-  const [formCostPrice, setFormCostPrice] = useState("220");
-  const [formDietary, setFormDietary] = useState<DietaryTag[]>(["Chef's Choice"]);
-  const [formPrepTime, setFormPrepTime] = useState("12");
+  const [formCategoryId, setFormCategoryId] = useState("");
+  const [formBasePrice, setFormBasePrice] = useState("");
+  const [formCostPrice, setFormCostPrice] = useState("");
+  const [formDietary, setFormDietary] = useState<DietaryTag[]>([]);
+  const [formPrepTime, setFormPrepTime] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formDiscountPercent, setFormDiscountPercent] = useState("0");
-  const [formCalories, setFormCalories] = useState("540");
+  const [formCalories, setFormCalories] = useState("");
 
   // 3 Distinct Channel Visibility Toggles
   const [formShowOnPos, setFormShowOnPos] = useState(true);
@@ -96,16 +93,13 @@ export const AdminMenuManagerTab: React.FC = () => {
   const [formLinkedInventoryId, setFormLinkedInventoryId] = useState<string>("");
 
   // Multiple Images with Main Image selection
-  const [formImages, setFormImages] = useState<string[]>([SAMPLE_FOOD_PRESETS[0]]);
+  const [formImages, setFormImages] = useState<string[]>([]);
   const [formMainImageIndex, setFormMainImageIndex] = useState<number>(0);
 
   // Dynamic Custom Modifier Sections (Section 3: Size, Bun, Cheese, Sauces, Addons etc.)
   const [formModifierSections, setFormModifierSections] = useState<ModifierGroup[]>([]);
 
-  // 24-Hour Non-Overlapping Pricing Timing Table (Section 4)
-  const [formTimePricings, setFormTimePricings] = useState<ProductTimePricingSlot[]>([]);
-
-  // Recipe / Ingredient Stock Deduction (Section 5)
+  // Recipe / Ingredient Stock Deduction (Section 4)
   const [formRecipeIngredients, setFormRecipeIngredients] = useState<ProductIngredientRecipe[]>([]);
 
   // -------------------------------------------------------------
@@ -164,25 +158,25 @@ export const AdminMenuManagerTab: React.FC = () => {
   // -------------------------------------------------------------
   const handleSelectLinkedInventoryItem = (invId: string) => {
     setFormLinkedInventoryId(invId);
-    if (!invId) return;
+    if (!invId) {
+      setFormRecipeIngredients((prev) => prev.filter((item) => !item.id.startsWith("ing-direct-")));
+      setFormRequiresKitchen(true);
+      setFormPrepTime("");
+      return;
+    }
 
     const inv = inventory.find((i) => i.id === invId);
     if (!inv) return;
 
     // Auto-fill fields for retail items
-    if (!formName.trim() || formName === "New Product") {
+    if (!formName.trim()) {
       setFormName(inv.name);
     }
     const cost = inv.costPerUnit || 0;
     setFormCostPrice(cost.toString());
-    // Default retail markup: e.g. 25% or min 20 NPR above cost
-    const retailSuggested = Math.max(cost + 20, Math.round(cost * 1.25));
-    if (!formBasePrice || formBasePrice === "450") {
-      setFormBasePrice(retailSuggested.toString());
-    }
     // Retail item like cigarettes or canned drinks don't require kitchen KDS
     setFormRequiresKitchen(false);
-    setFormPrepTime("1");
+    setFormPrepTime("0");
 
     // Automatically set ingredient recipe so 1 unit is deducted on checkout
     setFormRecipeIngredients([
@@ -257,80 +251,24 @@ export const AdminMenuManagerTab: React.FC = () => {
   const handleOpenCreateNewItem = () => {
     setEditingProductId(null);
     setFormName("");
-    setFormCategoryId(categories[0]?.id || "cat-burgers");
-    setFormBasePrice("450");
-    setFormCostPrice("220");
-    setFormDietary(["Chef's Choice"]);
-    setFormPrepTime("12");
-    setFormDescription("Freshly flame-grilled gourmet smash patty seasoned to perfection.");
+    setFormCategoryId("");
+    setFormBasePrice("");
+    setFormCostPrice("");
+    setFormDietary([]);
+    setFormPrepTime("");
+    setFormDescription("");
     setFormDiscountPercent("0");
-    setFormCalories("540");
+    setFormCalories("");
     setFormShowOnPos(true);
     setFormShowOnQr(true);
     setFormShowOnWeb(true);
     setFormRequiresKitchen(true);
     setFormLinkedInventoryId("");
 
-    setFormImages([SAMPLE_FOOD_PRESETS[0]]);
+    setFormImages([]);
     setFormMainImageIndex(0);
 
-    // Default dynamic sections as requested by user
-    setFormModifierSections([
-      {
-        id: `sec-${Date.now()}-1`,
-        name: "Size",
-        required: true,
-        minSelections: 1,
-        maxSelections: 1,
-        options: [
-          { id: `opt-${Date.now()}-1`, name: "Double Smash (160g)", priceDelta: 0, isDefault: true },
-          { id: `opt-${Date.now()}-2`, name: "Triple Smash (240g)", priceDelta: 240, isDefault: false },
-        ],
-      },
-      {
-        id: `sec-${Date.now()}-2`,
-        name: "Select Artisan Bun",
-        required: true,
-        minSelections: 1,
-        maxSelections: 1,
-        options: [
-          { id: `opt-${Date.now()}-3`, name: "Butter Toasted Brioche", priceDelta: 0, isDefault: true },
-          { id: `opt-${Date.now()}-4`, name: "Soft Potato Roll", priceDelta: 25, isDefault: false },
-          { id: `opt-${Date.now()}-5`, name: "Low-Carb Crisp Lettuce Wrap", priceDelta: 0, isDefault: false },
-        ],
-      },
-      {
-        id: `sec-${Date.now()}-3`,
-        name: "Cheese Level",
-        required: false,
-        minSelections: 0,
-        maxSelections: 2,
-        options: [
-          { id: `opt-${Date.now()}-6`, name: "Double Melted Swiss Raclette", priceDelta: 90, isDefault: false },
-        ],
-      },
-    ]);
-
-    setFormTimePricings([
-      {
-        id: `tp-${Date.now()}-1`,
-        slotName: "Breakfast Rush (07:00 - 11:00)",
-        startTime: "07:00",
-        endTime: "11:00",
-        price: 390,
-        days: "All Days",
-        isActive: true,
-      },
-      {
-        id: `tp-${Date.now()}-2`,
-        slotName: "Regular Day (11:00 - 21:00)",
-        startTime: "11:00",
-        endTime: "21:00",
-        price: 450,
-        days: "All Days",
-        isActive: true,
-      },
-    ]);
+    setFormModifierSections([]);
 
     setFormRecipeIngredients([]);
     setViewMode("item_form");
@@ -347,23 +285,22 @@ export const AdminMenuManagerTab: React.FC = () => {
     setFormName(p.name);
     setFormCategoryId(p.categoryId);
     setFormBasePrice(p.basePrice.toString());
-    setFormCostPrice((p.costPrice || Math.round(p.basePrice * 0.45)).toString());
-    setFormDietary(p.dietary || ["Chef's Choice"]);
-    setFormPrepTime((p.prepTimeMinutes || 12).toString());
+    setFormCostPrice(p.costPrice?.toString() ?? "");
+    setFormDietary(p.dietary || []);
+    setFormPrepTime(p.prepTimeMinutes?.toString() ?? "");
     setFormDescription(p.description || "");
     setFormDiscountPercent((p.discountPercent || 0).toString());
-    setFormCalories((p.calories || 480).toString());
+    setFormCalories(p.calories?.toString() ?? "");
     setFormShowOnPos(p.showOnPos !== false);
     setFormShowOnQr(p.showOnQr !== false);
     setFormShowOnWeb(p.isWebVisible !== false);
     setFormRequiresKitchen(p.requiresKitchen !== false);
     setFormLinkedInventoryId(p.linkedInventoryItemId || "");
 
-    setFormImages(p.images && p.images.length > 0 ? p.images : [SAMPLE_FOOD_PRESETS[0]]);
+    setFormImages(p.images || []);
     setFormMainImageIndex(p.mainImageIndex || 0);
 
     setFormModifierSections(p.modifierGroups || []);
-    setFormTimePricings(p.timePricings || []);
     setFormRecipeIngredients(p.recipeIngredients || []);
 
     setViewMode("item_form");
@@ -428,12 +365,12 @@ export const AdminMenuManagerTab: React.FC = () => {
     }
 
     const bPrice = parseFloat(formBasePrice) || 0;
-    const cPrice = parseFloat(formCostPrice) || Math.round(bPrice * 0.45);
-    const pTime = parseInt(formPrepTime, 10) || 10;
+    const cPrice = formCostPrice === "" ? undefined : Number(formCostPrice);
+    const pTime = parseInt(formPrepTime, 10) || 0;
     const disc = parseFloat(formDiscountPercent) || 0;
-    const cal = parseInt(formCalories, 10) || 450;
+    const cal = formCalories === "" ? undefined : Number(formCalories);
 
-    const sanitizedImages = formImages.length > 0 ? formImages : [SAMPLE_FOOD_PRESETS[0]];
+    const sanitizedImages = formImages;
     const safeMainIndex =
       formMainImageIndex >= 0 && formMainImageIndex < sanitizedImages.length
         ? formMainImageIndex
@@ -468,7 +405,6 @@ export const AdminMenuManagerTab: React.FC = () => {
         },
       ],
       modifierGroups: formModifierSections,
-      timePricings: formTimePricings,
       recipeIngredients: formRecipeIngredients,
     };
 
@@ -591,14 +527,11 @@ export const AdminMenuManagerTab: React.FC = () => {
   const handleAddModifierSection = () => {
     const newSec: ModifierGroup = {
       id: `sec-${Date.now()}`,
-      name: "New Custom Section",
+      name: "",
       required: false,
       minSelections: 0,
       maxSelections: 1,
-      options: [
-        { id: `opt-${Date.now()}-1`, name: "Standard Choice", priceDelta: 0, isDefault: true },
-        { id: `opt-${Date.now()}-2`, name: "Extra Choice", priceDelta: 40, isDefault: false },
-      ],
+      options: [],
     };
     setFormModifierSections((prev) => [...prev, newSec]);
   };
@@ -626,7 +559,7 @@ export const AdminMenuManagerTab: React.FC = () => {
   const handleAddOptionToSection = (secId: string) => {
     const newOpt: ModifierOption = {
       id: `opt-${Date.now()}`,
-      name: "Choice Name",
+      name: "",
       priceDelta: 0,
       isDefault: false,
     };
@@ -667,42 +600,17 @@ export const AdminMenuManagerTab: React.FC = () => {
   };
 
   // -------------------------------------------------------------
-  // TIME PRICING ACTIONS (SECTION 4)
-  // -------------------------------------------------------------
-  const handleAddTimePricing = () => {
-    const newSlot: ProductTimePricingSlot = {
-      id: `tp-${Date.now()}`,
-      slotName: "Late Night Happy Hours (21:00 - 02:00)",
-      startTime: "21:00",
-      endTime: "02:00",
-      price: Math.max(50, (parseFloat(formBasePrice) || 450) - 40),
-      days: "All Days",
-      isActive: true,
-    };
-    setFormTimePricings((prev) => [...prev, newSlot]);
-  };
-
-  const handleUpdateTimePricing = (id: string, field: string, val: any) => {
-    setFormTimePricings((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, [field]: val } : s))
-    );
-  };
-
-  const handleRemoveTimePricing = (id: string) => {
-    setFormTimePricings((prev) => prev.filter((s) => s.id !== id));
-  };
-
-  // -------------------------------------------------------------
-  // RECIPE INGREDIENTS (SECTION 5)
+  // RECIPE INGREDIENTS (SECTION 4)
   // -------------------------------------------------------------
   const handleAddRecipeIngredient = () => {
     const invItem = inventory[0];
+    if (!invItem) return;
     const newIng: ProductIngredientRecipe = {
       id: `ing-${Date.now()}`,
-      inventoryItemId: invItem?.id || "inv-1",
-      inventoryItemName: invItem?.name || "Inventory Raw Material",
+      inventoryItemId: invItem.id,
+      inventoryItemName: invItem.name,
       quantityRequired: 1,
-      unit: invItem?.unit || "pcs",
+      unit: invItem.unit,
     };
     setFormRecipeIngredients((prev) => [...prev, newIng]);
   };
@@ -1201,7 +1109,7 @@ export const AdminMenuManagerTab: React.FC = () => {
     return (
       <div className="space-y-3 font-sans text-xs pb-12">
         {/* Sticky Header */}
-        <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-2.5 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+        <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-2.5 flex flex-wrap gap-3 items-center justify-between sticky top-0 z-30 shadow-sm">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1226,8 +1134,8 @@ export const AdminMenuManagerTab: React.FC = () => {
               Cancel
             </button>
             <button
-              type="button"
-              onClick={handleSaveItem}
+              type="submit"
+              form="menu-item-form"
               className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs transition-colors flex items-center gap-1.5 shadow-sm"
             >
               <CheckCircle2 className="w-4 h-4" />
@@ -1236,42 +1144,49 @@ export const AdminMenuManagerTab: React.FC = () => {
           </div>
         </div>
 
-        <form onSubmit={handleSaveItem} className="space-y-3">
-          {/* Quick Inventory / Purchase Item Link Banner */}
-          <div className="bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 p-2.5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-[240px]">
-              <Package className="w-4 h-4 text-amber-500 shrink-0" />
-              <div>
-                <span className="font-bold text-zinc-800 dark:text-zinc-200 block text-xs">
-                  Sell Existing Purchase / Inventory Item (Direct Counter Goods)
-                </span>
-                <span className="text-[10px] text-zinc-400">
-                  e.g. Cigarettes (Surya/Shikhar), Canned Red Bull, Bottled Water, Chips. Auto-deducts 1 stock on sale.
-                </span>
+        <form id="menu-item-form" onSubmit={handleSaveItem} className="space-y-3">
+          <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-4">
+            <div className="grid gap-4 sm:grid-cols-[1fr_minmax(0,1fr)] sm:items-center">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-amber-500/10 p-2.5 text-amber-500">
+                  <Link2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <label htmlFor="counter-inventory" className="block text-sm font-semibold text-zinc-900 dark:text-white">
+                    Link counter item
+                  </label>
+                  <p className="mt-1 text-xs text-zinc-500">Deduct one inventory unit per sale.</p>
+                </div>
+              </div>
+              <div className="min-w-0 space-y-2">
+                <select
+                  id="counter-inventory"
+                  value={formLinkedInventoryId}
+                  onChange={(e) => handleSelectLinkedInventoryItem(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 px-3 py-2.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-amber-500"
+                >
+                  <option value="">No inventory link</option>
+                  {inventory.map((inv) => (
+                    <option key={inv.id} value={inv.id}>
+                      {inv.name} ({inv.currentStock} {inv.unit} available)
+                    </option>
+                  ))}
+                </select>
+                {formLinkedInventoryId ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Linked to counter
+                    </span>
+                    <button type="button" onClick={() => handleSelectLinkedInventoryItem("")} className="text-xs font-medium text-zinc-500 hover:text-rose-500">
+                      Unlink
+                    </button>
+                  </div>
+                ) : inventory.length === 0 ? (
+                  <p className="text-xs text-zinc-500">No inventory items available.</p>
+                ) : null}
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={formLinkedInventoryId}
-                onChange={(e) => handleSelectLinkedInventoryItem(e.target.value)}
-                className="px-2 py-1 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white"
-              >
-                <option value="">-- Optional: Link to Inventory Item --</option>
-                {inventory.map((inv) => (
-                  <option key={inv.id} value={inv.id}>
-                    {inv.name} (Stock: {inv.currentStock} {inv.unit} | Cost: NPR {inv.costPerUnit})
-                  </option>
-                ))}
-              </select>
-
-              {formLinkedInventoryId && (
-                <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
-                  Linked (Direct Counter)
-                </span>
-              )}
-            </div>
-          </div>
+          </section>
 
           {/* =============================================================
               SECTION 1: CORE DETAILS (4 TO 5 COLUMNS IN A ROW)
@@ -1279,7 +1194,7 @@ export const AdminMenuManagerTab: React.FC = () => {
           <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-3 space-y-2.5">
             <div className="text-[10px] font-black uppercase text-amber-500 tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>1. Basic Product Information (4-5 Columns)</span>
+              <span>1. Item details</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
@@ -1291,7 +1206,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Double Truffle Smash Burger"
+                  placeholder="Item name"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   className="w-full px-2 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-white focus:border-amber-500 outline-none"
@@ -1304,10 +1219,12 @@ export const AdminMenuManagerTab: React.FC = () => {
                   Category *
                 </label>
                 <select
+                  required
                   value={formCategoryId}
                   onChange={(e) => setFormCategoryId(e.target.value)}
                   className="w-full px-2 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-white focus:border-amber-500 outline-none"
                 >
+                  <option value="">Select category</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -1326,7 +1243,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                     type="number"
                     required
                     min={0}
-                    placeholder="450"
+                    placeholder="Selling price"
                     value={formBasePrice}
                     onChange={(e) => setFormBasePrice(e.target.value)}
                     className="w-full px-2 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-bold text-zinc-900 dark:text-white focus:border-amber-500 outline-none"
@@ -1350,10 +1267,11 @@ export const AdminMenuManagerTab: React.FC = () => {
                 </label>
                 <div className="flex gap-1">
                   <select
-                    value={formDietary[0] || "Chef's Choice"}
-                    onChange={(e) => setFormDietary([e.target.value as DietaryTag])}
+                    value={formDietary[0] || ""}
+                    onChange={(e) => setFormDietary(e.target.value ? [e.target.value as DietaryTag] : [])}
                     className="w-full px-1.5 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white"
                   >
+                    <option value="">No dietary tag</option>
                     <option value="Chef's Choice">Chef's Choice</option>
                     <option value="Popular">Popular Hit</option>
                     <option value="Spicy">Spicy 🔥</option>
@@ -1362,7 +1280,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                   </select>
                   <input
                     type="number"
-                    min={1}
+                    min={0}
                     value={formPrepTime}
                     onChange={(e) => setFormPrepTime(e.target.value)}
                     title="Prep Time (Minutes)"
@@ -1375,7 +1293,7 @@ export const AdminMenuManagerTab: React.FC = () => {
               {/* Column 5: 3 SEPARATE CHANNELS (POS vs QR vs WEB) */}
               <div>
                 <label className="text-[10px] font-bold text-zinc-500 block mb-1">
-                  Display Channels (POS / QR / Web)
+                  Visible on
                 </label>
                 <div className="flex flex-col gap-1 text-[11px] font-medium">
                   <label className="inline-flex items-center gap-1.5 cursor-pointer">
@@ -1413,11 +1331,11 @@ export const AdminMenuManagerTab: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800/80">
               <div className="md:col-span-3">
                 <label className="text-[10px] font-bold text-zinc-400 block mb-0.5">
-                  Item Description & Story
+                  Description
                 </label>
                 <input
                   type="text"
-                  placeholder="Ingredients highlights, cooking technique, taste profile..."
+                  placeholder="Item description"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-white"
@@ -1440,7 +1358,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <label className="text-[10px] font-bold text-zinc-400 block mb-0.5">
-                    Kitchen KDS Route
+                    Kitchen
                   </label>
                   <label className="inline-flex items-center gap-1.5 cursor-pointer pt-1 text-[11px]">
                     <input
@@ -1449,7 +1367,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                       onChange={(e) => setFormRequiresKitchen(e.target.checked)}
                       className="accent-amber-500"
                     />
-                    <span className="text-zinc-600 dark:text-zinc-400">Requires Cook</span>
+                    <span className="text-zinc-600 dark:text-zinc-400">Requires preparation</span>
                   </label>
                 </div>
               </div>
@@ -1460,10 +1378,10 @@ export const AdminMenuManagerTab: React.FC = () => {
               SECTION 2: MULTIPLE IMAGES WITH DIRECT FILE UPLOAD
           ============================================================= */}
           <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-3 space-y-2.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center justify-between">
               <div className="text-[10px] font-black uppercase text-amber-500 tracking-wider flex items-center gap-1.5">
                 <Upload className="w-3.5 h-3.5" />
-                <span>2. Product Images (Direct Upload from Device, One Main Image Always)</span>
+                <span>2. Images</span>
               </div>
               <input
                 type="file"
@@ -1479,7 +1397,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                 className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-1"
               >
                 <Upload className="w-3 h-3" />
-                <span>+ Upload Direct From Device</span>
+                <span>Upload images</span>
               </button>
             </div>
 
@@ -1517,15 +1435,13 @@ export const AdminMenuManagerTab: React.FC = () => {
                     </button>
 
                     {/* Delete button (if more than 1 image) */}
-                    {formImages.length > 1 && (
+                    {formImages.length > 0 && (
                       <button
                         type="button"
                         onClick={() => {
                           const updated = formImages.filter((_, i) => i !== idx);
                           setFormImages(updated);
-                          if (formMainImageIndex >= updated.length) {
-                            setFormMainImageIndex(0);
-                          }
+                          setFormMainImageIndex((current) => current === idx ? 0 : current > idx ? current - 1 : current);
                         }}
                         className="absolute top-1 right-1 p-1 bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Remove image"
@@ -1555,14 +1471,14 @@ export const AdminMenuManagerTab: React.FC = () => {
               (Replaces redundant static sauces/addons sections)
           ============================================================= */}
           <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-3 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center justify-between">
               <div>
                 <div className="text-[10px] font-black uppercase text-amber-500 tracking-wider flex items-center gap-1.5">
                   <Sliders className="w-3.5 h-3.5" />
-                  <span>3. Dynamic Custom Modifier Sections (Size, Buns, Cheeses, Sauces, Add-ons)</span>
+                  <span>3. Modifiers</span>
                 </div>
                 <p className="text-[10px] text-zinc-400 mt-0.5">
-                  Create any custom section (Size, Artisan Bun, Extra Sauces, Gourmet Add-ons). If price is same write 0, or specify extra charge (+NPR 240, +NPR 25, +NPR 90).
+                  Add choices and optional extra charges.
                 </p>
               </div>
 
@@ -1589,7 +1505,8 @@ export const AdminMenuManagerTab: React.FC = () => {
                       </span>
                       <input
                         type="text"
-                        placeholder="Section Label (e.g. Size, Select Artisan Bun, Cheese Level, Sauces)"
+                        required
+                        placeholder="Section name"
                         value={sec.name}
                         onChange={(e) => handleUpdateSectionName(sec.id, e.target.value)}
                         className="flex-1 max-w-xs px-2 py-1 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white"
@@ -1641,7 +1558,8 @@ export const AdminMenuManagerTab: React.FC = () => {
                           <div className="flex-1 min-w-0 space-y-1">
                             <input
                               type="text"
-                              placeholder="Choice name (e.g. Double Smash 160g)"
+                              required
+                              placeholder="Choice name"
                               value={opt.name}
                               onChange={(e) =>
                                 handleUpdateOption(sec.id, opt.id, "name", e.target.value)
@@ -1700,143 +1618,24 @@ export const AdminMenuManagerTab: React.FC = () => {
           </div>
 
           {/* =============================================================
-              SECTION 4: PRICING TIMING TABLE (NON-OVERLAPPING 24H SLOTS)
+              SECTION 4: RECIPE / RAW MATERIALS (BOM) STOCK DEDUCTION
           ============================================================= */}
           <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-3 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-[10px] font-black uppercase text-amber-500 tracking-wider flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>4. Pricing Timing Table (Non-Overlapping 24-Hour Windows)</span>
-                </div>
-                <p className="text-[10px] text-zinc-400 mt-0.5">
-                  Override prices for specific time windows (Breakfast Rush, Regular, Late Night). Falls back to base price NPR {formBasePrice} if no timing matches.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleAddTimePricing}
-                className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-amber-500 hover:text-black text-xs font-bold transition-colors flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" />
-                <span>+ Add Timing Slot</span>
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-zinc-100 dark:bg-zinc-900 text-zinc-500 uppercase text-[9px] font-black tracking-wider border-b border-zinc-200 dark:border-zinc-800">
-                  <tr>
-                    <th className="p-2">Slot Description</th>
-                    <th className="p-2">Start Time</th>
-                    <th className="p-2">End Time</th>
-                    <th className="p-2">Days</th>
-                    <th className="p-2 text-right">Window Price (NPR)</th>
-                    <th className="p-2 text-center">Status</th>
-                    <th className="p-2 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono">
-                  {formTimePricings.map((slot) => (
-                    <tr key={slot.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
-                      <td className="p-2">
-                        <input
-                          type="text"
-                          value={slot.slotName}
-                          onChange={(e) =>
-                            handleUpdateTimePricing(slot.id, "slotName", e.target.value)
-                          }
-                          className="w-full px-1.5 py-0.5 bg-transparent border-b border-zinc-200 dark:border-zinc-700 text-xs font-sans font-bold text-zinc-900 dark:text-white"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="time"
-                          value={slot.startTime}
-                          onChange={(e) =>
-                            handleUpdateTimePricing(slot.id, "startTime", e.target.value)
-                          }
-                          className="px-1.5 py-0.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="time"
-                          value={slot.endTime}
-                          onChange={(e) =>
-                            handleUpdateTimePricing(slot.id, "endTime", e.target.value)
-                          }
-                          className="px-1.5 py-0.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <select
-                          value={slot.days || "All Days"}
-                          onChange={(e) =>
-                            handleUpdateTimePricing(slot.id, "days", e.target.value)
-                          }
-                          className="px-1.5 py-0.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-sans"
-                        >
-                          <option value="All Days">All Days</option>
-                          <option value="Mon-Fri">Mon-Fri Only</option>
-                          <option value="Weekends">Weekends Only</option>
-                        </select>
-                      </td>
-                      <td className="p-2 text-right">
-                        <input
-                          type="number"
-                          value={slot.price}
-                          onChange={(e) =>
-                            handleUpdateTimePricing(slot.id, "price", parseFloat(e.target.value) || 0)
-                          }
-                          className="w-24 px-1.5 py-0.5 text-right font-bold text-amber-500 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-mono"
-                        />
-                      </td>
-                      <td className="p-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={slot.isActive}
-                          onChange={(e) =>
-                            handleUpdateTimePricing(slot.id, "isActive", e.target.checked)
-                          }
-                          className="accent-amber-500"
-                        />
-                      </td>
-                      <td className="p-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTimePricing(slot.id)}
-                          className="text-zinc-400 hover:text-rose-500"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* =============================================================
-              SECTION 5: RECIPE / RAW MATERIALS (BOM) STOCK DEDUCTION
-          ============================================================= */}
-          <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-3 space-y-2.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap gap-3 items-center justify-between">
               <div>
                 <div className="text-[10px] font-black uppercase text-amber-500 tracking-wider flex items-center gap-1.5">
                   <Package className="w-3.5 h-3.5" />
-                  <span>5. Recipe & Inventory Linkage (Auto-Deducts from Stock When Sold)</span>
+                  <span>4. Recipe & inventory</span>
                 </div>
                 <p className="text-[10px] text-zinc-400 mt-0.5">
-                  Map raw materials or direct inventory items (buns, patties, cigarettes, cans) to reduce stock automatically on every order checkout.
+                  Set the quantity deducted per sale.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={handleAddRecipeIngredient}
+                disabled={inventory.length === 0}
                 className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-amber-500 hover:text-black text-xs font-bold transition-colors flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" />
@@ -2020,7 +1819,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                 const mainImg =
                   product.images && product.images.length > 0
                     ? product.images[product.mainImageIndex || 0] || product.images[0]
-                    : SAMPLE_FOOD_PRESETS[0];
+                    : "";
 
                 const catObj = categories.find((c) => c.id === product.categoryId);
 
@@ -2031,12 +1830,18 @@ export const AdminMenuManagerTab: React.FC = () => {
                   >
                     {/* Image Box */}
                     <div className="relative h-32 w-full bg-zinc-100 dark:bg-zinc-900 overflow-hidden">
-                      <img
-                        src={mainImg}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        referrerPolicy="no-referrer"
-                      />
+                      {mainImg ? (
+                        <img
+                          src={mainImg}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-zinc-300 dark:text-zinc-700">
+                          <Package className="h-10 w-10" aria-label="No image" />
+                        </div>
+                      )}
 
                       {/* Out of Stock Overlay */}
                       {!product.isAvailable && (
@@ -2061,7 +1866,7 @@ export const AdminMenuManagerTab: React.FC = () => {
 
                       <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-black/75 backdrop-blur-sm text-zinc-300 text-[9px] font-mono flex items-center gap-0.5">
                         <Clock className="w-2.5 h-2.5 text-amber-500" />
-                        <span>{product.prepTimeMinutes || 12}m</span>
+                        <span>{product.prepTimeMinutes ?? 0}m</span>
                       </div>
 
                       {/* Price Badge */}
@@ -2079,7 +1884,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                           </h4>
                         </div>
                         <p className="text-[10px] text-zinc-500 line-clamp-1 mt-0.5">
-                          {product.description || "Gourmet recipe prepared with premium ingredients."}
+                          {product.description}
                         </p>
                       </div>
 
