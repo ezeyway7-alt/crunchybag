@@ -373,6 +373,7 @@ interface AppContextType {
   updateInventoryItem: (id: string, updates: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
   clearInventoryDummyData: () => void;
+  syncBackendInventory: (items: any[]) => void;
   stockMovements: StockMovementRecord[];
   recordStockMovement: (movement: Omit<StockMovementRecord, "id" | "timestamp">) => void;
 
@@ -1926,7 +1927,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         newStock: newStock,
         reason: defaultReason,
         note: note || undefined,
-        timestamp: "Just now",
+        timestamp: new Date().toISOString(),
         outletId: currentOutlet.id,
         recordedBy: "Staff Member",
       };
@@ -1944,7 +1945,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newRecord: StockMovementRecord = {
       ...movement,
       id: `mov-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      timestamp: "Just now",
+      timestamp: new Date().toISOString(),
     };
     setStockMovements((prev) => [newRecord, ...prev]);
   };
@@ -1979,6 +1980,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       title: "Demo Data Cleared",
       description: "All dummy inventory, purchase bills, and movements removed.",
       type: "info",
+    });
+  };
+
+  const syncBackendInventory = (backendItems: any[]) => {
+    if (!Array.isArray(backendItems) || backendItems.length === 0) return;
+
+    setInventory((prev) => {
+      const updated = [...prev];
+      backendItems.forEach((bItem: any) => {
+        const bId = String(bItem.id);
+        const bSku = bItem.sku ? String(bItem.sku).toLowerCase() : "";
+        const bName = String(bItem.name || "").toLowerCase().trim();
+        const bStock = parseFloat(bItem.current_stock ?? bItem.currentStock) || 0;
+        const bCost = parseFloat(bItem.cost_per_unit ?? bItem.costPerUnit) || 0;
+        const bMin = parseFloat(bItem.min_threshold ?? bItem.minThreshold) || 5;
+        const bUnit = String(bItem.unit || "KG").toLowerCase();
+        const bCategory = bItem.category_name || (typeof bItem.category === "string" ? bItem.category : "Raw Meat & Poultry");
+        const bSupplier = bItem.supplier_name || bItem.supplierName || "";
+
+        const matchIdx = updated.findIndex(
+          (loc) =>
+            loc.id === bId ||
+            (loc.sku && bSku && loc.sku.toLowerCase() === bSku) ||
+            loc.name.toLowerCase().trim() === bName
+        );
+
+        if (matchIdx >= 0) {
+          updated[matchIdx] = {
+            ...updated[matchIdx],
+            currentStock: bStock,
+            costPerUnit: bCost > 0 ? bCost : updated[matchIdx].costPerUnit,
+            minThreshold: bMin,
+            supplierName: bSupplier || updated[matchIdx].supplierName,
+            category: bCategory || updated[matchIdx].category,
+          };
+        } else {
+          updated.push({
+            id: bId.startsWith("inv-") ? bId : `inv-${bId}`,
+            sku: bItem.sku || `SKU-${bId.slice(0, 8).toUpperCase()}`,
+            name: bItem.name,
+            category: bCategory as any,
+            currentStock: bStock,
+            unit: bUnit as any,
+            minThreshold: bMin,
+            costPerUnit: bCost,
+            supplierName: bSupplier,
+            lastRestocked: bItem.last_restocked || "Live Backend Sync",
+            outletId: currentOutlet.id,
+          });
+        }
+      });
+      return updated;
     });
   };
 
@@ -2666,6 +2719,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateInventoryItem,
         deleteInventoryItem,
         clearInventoryDummyData,
+        syncBackendInventory,
         purchases,
         addPurchaseRecord,
         daybookExpenses,

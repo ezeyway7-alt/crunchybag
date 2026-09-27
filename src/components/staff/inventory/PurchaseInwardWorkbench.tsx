@@ -258,19 +258,33 @@ const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
 };
 
 // ============================================================================
-// SELECT2 CATEGORY COMBOBOX (LIVE API FETCH + AUTO-DISCOVERY)
+// SELECT2 CATEGORY COMBOBOX (LIVE API FETCH + AUTO-DISCOVERY + DELETE/DEACTIVATE)
 // ============================================================================
 interface CategorySelect2Props {
   value: string;
   onChange: (category: string) => void;
+  onCategoryDeleted?: (category: string) => void;
 }
 
-const CategorySelect2: React.FC<CategorySelect2Props> = ({ value, onChange }) => {
+const CategorySelect2: React.FC<CategorySelect2Props> = ({
+  value,
+  onChange,
+  onCategoryDeleted,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const excluded = JSON.parse(localStorage.getItem("crunchy_excluded_categories") || "[]");
+        return DEFAULT_CATEGORIES.filter((c) => !excluded.includes(c));
+      } catch {}
+    }
+    return DEFAULT_CATEGORIES;
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { addToast } = useApp();
 
   useEffect(() => {
     if (!isOpen) {
@@ -284,8 +298,12 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({ value, onChange }) =>
       try {
         const list = await inventoryApi.fetchCategories(search);
         if (active && list && list.length > 0) {
-          const names = list.map((c) => c.name);
-          setCategories(Array.from(new Set([...names, ...DEFAULT_CATEGORIES])));
+          const excluded: string[] = typeof window !== "undefined"
+            ? JSON.parse(localStorage.getItem("crunchy_excluded_categories") || "[]")
+            : [];
+          const names = list.map((c) => c.name).filter((n) => !excluded.includes(n));
+          const base = DEFAULT_CATEGORIES.filter((c) => !excluded.includes(c));
+          setCategories(Array.from(new Set([...names, ...base])));
         }
       } catch {
         // Fallback to defaults
@@ -332,6 +350,60 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({ value, onChange }) =>
     setIsOpen(false);
   };
 
+  const handleDeleteCategory = async (catToDelete: string) => {
+    // 1. Remove from local list immediately
+    setCategories((prev) => prev.filter((c) => c !== catToDelete));
+
+    // 2. Persist in excluded list
+    if (typeof window !== "undefined") {
+      try {
+        const excluded: string[] = JSON.parse(
+          localStorage.getItem("crunchy_excluded_categories") || "[]"
+        );
+        if (!excluded.includes(catToDelete)) {
+          excluded.push(catToDelete);
+          localStorage.setItem("crunchy_excluded_categories", JSON.stringify(excluded));
+        }
+      } catch {}
+    }
+
+    // 3. If currently selected, reset value
+    if (value === catToDelete) {
+      const remaining = categories.filter((c) => c !== catToDelete);
+      const fallback = remaining[0] || "Raw Meat & Poultry";
+      onChange(fallback);
+      setSearch(fallback);
+    }
+
+    if (onCategoryDeleted) {
+      onCategoryDeleted(catToDelete);
+    }
+
+    // 4. Call backend API endpoint to delete or deactivate category
+    try {
+      const result = await inventoryApi.deleteOrDeactivateCategory(catToDelete);
+      if (result.success) {
+        addToast({
+          title: "Category Removed",
+          description: result.message,
+          type: "success",
+        });
+      } else {
+        addToast({
+          title: "Category Removed from UI",
+          description: `${result.message} Backend endpoint DELETE /api/v1/inventory/categories/<id>/ will be called on backend update.`,
+          type: "info",
+        });
+      }
+    } catch {
+      addToast({
+        title: "Category Removed from UI",
+        description: `Category "${catToDelete}" hidden from selection.`,
+        type: "info",
+      });
+    }
+  };
+
   return (
     <div ref={containerRef} className="relative w-full">
       <div className="relative flex items-center">
@@ -375,7 +447,7 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({ value, onChange }) =>
       </div>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-0.5 w-44 z-50 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded max-h-44 overflow-y-auto text-xs divide-y divide-zinc-800/40">
+        <div className="absolute left-0 top-full mt-0.5 w-48 z-50 bg-zinc-900 border-0 ring-1 ring-zinc-800 shadow-2xl rounded max-h-48 overflow-y-auto text-xs divide-y divide-zinc-800/40">
           {filtered.map((cat) => (
             <div
               key={cat}
@@ -383,12 +455,26 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({ value, onChange }) =>
                 e.preventDefault();
                 handleSelect(cat);
               }}
-              className="p-1 hover:bg-zinc-800/80 cursor-pointer flex items-center justify-between text-zinc-200 text-[11px]"
+              className="p-1 hover:bg-zinc-800/80 cursor-pointer flex items-center justify-between text-zinc-200 text-[11px] group"
             >
-              <span className="font-medium truncate">{cat}</span>
-              {value === cat && (
-                <span className="text-amber-400 font-bold text-[9px] ml-1">Active</span>
-              )}
+              <span className="font-medium truncate pr-1">{cat}</span>
+              <div className="flex items-center gap-1 shrink-0 ml-1">
+                {value === cat && (
+                  <span className="text-amber-400 font-bold text-[9px]">Active</span>
+                )}
+                <button
+                  type="button"
+                  title={`Delete or deactivate category "${cat}"`}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleDeleteCategory(cat);
+                  }}
+                  className="opacity-40 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded transition-opacity cursor-pointer text-zinc-400 hover:bg-rose-500/10"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </div>
             </div>
           ))}
 
@@ -644,7 +730,7 @@ export const PurchaseInwardWorkbench: React.FC<{
           addInventoryItem({
             name: row.productName.trim(),
             category: row.category,
-            currentStock: row.quantity,
+            currentStock: 0, // Initialized to 0; addPurchaseRecord below adds row.quantity once
             unit: row.unit.toLowerCase() as any,
             minThreshold: 5,
             costPerUnit: row.costPrice || 0,

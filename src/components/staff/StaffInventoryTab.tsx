@@ -17,12 +17,29 @@ import { PurchaseInwardWorkbench } from "./inventory/PurchaseInwardWorkbench";
 import { PurchaseBillsDatatable } from "./inventory/PurchaseBillsDatatable";
 import { StockAuditWorkbench } from "./inventory/StockAuditWorkbench";
 
+const formatMovementTimestamp = (val?: string | number) => {
+  if (!val) return "Today, 10:00 AM";
+  const s = String(val).trim();
+  if (s.startsWith("Today") || s.startsWith("Yesterday") || s.includes("ago") || s.includes("mins")) {
+    return s;
+  }
+  const d = new Date(val);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return s || "Just now";
+};
+
 export const StaffInventoryTab: React.FC = () => {
   const {
     inventory,
     stockMovements,
     purchases,
-    clearInventoryDummyData,
     addToast,
   } = useApp();
 
@@ -40,13 +57,6 @@ export const StaffInventoryTab: React.FC = () => {
   const [movementPage, setMovementPage] = useState(1);
   const [movementPageSize] = useState(15);
   const [movementTypeFilter, setMovementTypeFilter] = useState<"ALL" | "INCREASE" | "DECREASE">("ALL");
-
-  // Overall Inventory Stats
-  const totalItemsCount = inventory.length;
-  const lowStockCount = inventory.filter((i) => i.currentStock <= i.minThreshold).length;
-  const totalValuation = inventory.reduce((sum, i) => sum + i.currentStock * i.costPerUnit, 0);
-  const totalPurchasesCount = purchases.length;
-  const totalMovementsCount = stockMovements.length;
 
   // Filtered Movements
   const filteredMovements = useMemo(() => {
@@ -73,74 +83,6 @@ export const StaffInventoryTab: React.FC = () => {
 
   return (
     <div className="space-y-3">
-      {/* -------------------------------------------------------------
-          TOP METRICS STRIP (CLEAN, BORDERLESS INLINE TEXT)
-      ------------------------------------------------------------- */}
-      <div className="flex flex-wrap items-center justify-between gap-2 py-0.5 text-xs text-zinc-400 font-medium">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 overflow-x-auto no-scrollbar">
-          <span className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            <span className="text-zinc-500">Tracked SKUs:</span>
-            <strong className="font-mono text-zinc-100 font-bold">{totalItemsCount}</strong>
-          </span>
-
-          <span className="flex items-center gap-1.5 whitespace-nowrap">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                lowStockCount > 0 ? "bg-rose-500" : "bg-zinc-600"
-              }`}
-            />
-            <span className={lowStockCount > 0 ? "text-rose-400 font-semibold" : "text-zinc-500"}>
-              Low Stock:
-            </span>
-            <strong
-              className={`font-mono font-bold ${
-                lowStockCount > 0 ? "text-rose-400" : "text-zinc-300"
-              }`}
-            >
-              {lowStockCount}
-            </strong>
-          </span>
-
-          <span className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="text-zinc-500">Valuation:</span>
-            <strong className="font-mono text-emerald-400 font-bold">
-              {formatNPR(totalValuation)}
-            </strong>
-          </span>
-
-          <span className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-            <span className="text-zinc-500">Inward Bills:</span>
-            <strong className="font-mono text-zinc-200 font-bold">{totalPurchasesCount}</strong>
-          </span>
-
-          <span className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
-            <span className="text-zinc-500">Movements:</span>
-            <strong className="font-mono text-zinc-300 font-bold">{totalMovementsCount}</strong>
-          </span>
-        </div>
-
-        {/* Operating Branch Scope Badge & Clear Demo Data Action */}
-        <div className="flex items-center gap-3">
-          <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>Crunchy Flagship - Durbar Marg (DM-01)</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={clearInventoryDummyData}
-            title="Wipe demo dummy items and reset to 0 for live backend recording"
-            className="text-[10px] text-zinc-500 hover:text-rose-400 underline font-mono cursor-pointer transition-colors"
-          >
-            Clear Demo Data
-          </button>
-        </div>
-      </div>
-
       {/* -------------------------------------------------------------
           CLEAN VIEW NAVIGATION TABS & COLLAPSE TOGGLE
       ------------------------------------------------------------- */}
@@ -316,12 +258,7 @@ export const StaffInventoryTab: React.FC = () => {
                   paginatedMovements.map((m) => (
                     <tr key={m.id} className="hover:bg-zinc-900/40">
                       <td className="py-1.5 px-2 font-mono text-[11px] text-zinc-400">
-                        {new Date(m.timestamp).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatMovementTimestamp(m.timestamp)}
                       </td>
                       <td className="py-1.5 px-2">
                         {m.type === "INCREASE" ? (

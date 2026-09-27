@@ -190,6 +190,89 @@ export const inventoryApi = {
   },
 
   /**
+   * Delete or Deactivate Category
+   * 1. Looks up category ID if only name was passed
+   * 2. Attempts DELETE /api/v1/inventory/categories/<id>/
+   * 3. Fallback: PATCH /api/v1/inventory/categories/<id>/ with { is_active: false }
+   */
+  async deleteOrDeactivateCategory(
+    categoryNameOrId: string | number
+  ): Promise<{ success: boolean; method: string; message: string; id?: string | number }> {
+    let targetId: string | number | undefined = undefined;
+
+    if (typeof categoryNameOrId === "number" || (!isNaN(Number(categoryNameOrId)) && !categoryNameOrId.toString().includes(" "))) {
+      targetId = categoryNameOrId;
+    } else {
+      try {
+        const categories = await this.fetchCategories(String(categoryNameOrId));
+        const matched = categories.find(
+          (c) => String(c.name).toLowerCase() === String(categoryNameOrId).toLowerCase()
+        );
+        if (matched && matched.id) {
+          targetId = matched.id;
+        }
+      } catch {
+        // Ignored
+      }
+    }
+
+    if (targetId !== undefined) {
+      // 1. Try DELETE
+      try {
+        await baseRequest(`/inventory/categories/${targetId}/`, {
+          method: "DELETE",
+        });
+        return {
+          success: true,
+          method: "DELETE",
+          id: targetId,
+          message: `Category #${targetId} deleted from backend database.`,
+        };
+      } catch (delErr: any) {
+        // 2. Try PATCH deactivate
+        try {
+          await baseRequest(`/inventory/categories/${targetId}/`, {
+            method: "PATCH",
+            body: JSON.stringify({ is_active: false }),
+          });
+          return {
+            success: true,
+            method: "PATCH",
+            id: targetId,
+            message: `Category #${targetId} deactivated in backend database.`,
+          };
+        } catch {
+          // 3. Try POST deactivate endpoint
+          try {
+            await baseRequest(`/inventory/categories/${targetId}/deactivate/`, {
+              method: "POST",
+            });
+            return {
+              success: true,
+              method: "POST_DEACTIVATE",
+              id: targetId,
+              message: `Category #${targetId} marked inactive.`,
+            };
+          } catch {
+            return {
+              success: false,
+              method: "FAILED",
+              id: targetId,
+              message: `Backend returned error deleting category #${targetId}. Deactivated in UI.`,
+            };
+          }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      method: "LOCAL",
+      message: `Category "${categoryNameOrId}" removed from UI selection.`,
+    };
+  },
+
+  /**
    * Submit Inward Purchase Bill
    * POST /api/v1/inventory/purchases/
    * Headers: Idempotency-Key: <unique-uuid>

@@ -9,8 +9,7 @@ import {
   RotateCcw,
   Loader2,
   TrendingDown,
-  Boxes,
-  FileSpreadsheet,
+  ChevronDown,
 } from "lucide-react";
 import { useApp } from "../../../context/AppContext";
 import { formatNPR } from "../../../lib/utils";
@@ -28,6 +27,7 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
     inventory,
     addInventoryItem,
     updateInventoryStock,
+    syncBackendInventory,
     currentOutlet,
     addToast,
   } = useApp();
@@ -204,6 +204,8 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
           low_stock_count: data.low_stock_count,
           total_valuation: data.total_valuation,
         });
+        // Synchronize live backend items into AppContext so Stock Audit & movements have identical stock
+        syncBackendInventory(data.results);
       }
     } catch {
       // Local fallback
@@ -257,6 +259,12 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
 
   // Dynamic Category Pills
   const categoriesList = useMemo(() => {
+    let excluded: string[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        excluded = JSON.parse(localStorage.getItem("crunchy_excluded_categories") || "[]");
+      } catch {}
+    }
     const set = new Set<string>([
       "ALL",
       "Raw Meat & Poultry",
@@ -275,7 +283,7 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
       const cat = i.category_name || (typeof i.category === "string" ? i.category : "");
       if (cat.trim()) set.add(cat.trim());
     });
-    return Array.from(set);
+    return Array.from(set).filter((c) => c === "ALL" || !excluded.includes(c));
   }, [inventory, catalogResults]);
 
   // Open Physical Stock Audit Reconcile Modal
@@ -390,10 +398,26 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
     setTimeout(() => loadCatalog(), 100);
   };
 
-  const handleSaveAdjust = (item: any) => {
+  const handleSaveAdjust = async (item: any) => {
     const val = parseFloat(adjustValue);
     if (isNaN(val) || val < 0) return;
-    updateInventoryStock(String(item.id), val);
+
+    // Send reconcile to live backend REST API
+    try {
+      await inventoryApi.reconcileAudit({
+        items: [
+          {
+            item_id: item.id,
+            physical_stock: val.toFixed(3),
+            note: "Quick adjust from Stock Catalog",
+          },
+        ],
+      });
+    } catch {
+      // Reconciled locally if offline
+    }
+
+    updateInventoryStock(String(item.id), val, "Quick stock adjustment");
     addToast({
       title: "Stock Updated",
       description: `${item.name} set to ${val} ${item.unit}`,
@@ -406,82 +430,36 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
   return (
     <div className="bg-zinc-900/60 p-3 rounded-lg space-y-3">
       {/* -------------------------------------------------------------
-          TOP METRICS CARDS (Valuation, Active SKUs, Low Stock Alerts)
+          TOP METRICS (CLEAN, SMALL PLAIN TEXT)
       ------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {/* Card 1: Total Valuation */}
-        <div className="bg-zinc-900/80 p-2.5 rounded-lg border-0 ring-1 ring-zinc-800/40 flex items-center justify-between">
-          <div>
-            <span className="block text-[10px] text-zinc-400 uppercase font-semibold tracking-wider">
-              Total Inventory Valuation
-            </span>
-            <div className="text-base font-bold font-mono text-emerald-400 mt-0.5">
-              {formatNPR(metrics.total_valuation)}
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-            <Boxes className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Card 2: Total Active SKUs */}
-        <div className="bg-zinc-900/80 p-2.5 rounded-lg border-0 ring-1 ring-zinc-800/40 flex items-center justify-between">
-          <div>
-            <span className="block text-[10px] text-zinc-400 uppercase font-semibold tracking-wider">
-              Total Active SKUs
-            </span>
-            <div className="text-base font-bold font-mono text-zinc-100 mt-0.5">
-              {metrics.count}
-            </div>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
-            <FileSpreadsheet className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Card 3: Low Stock Alerts */}
-        <div
-          className={`p-2.5 rounded-lg border-0 ring-1 flex items-center justify-between ${
-            metrics.low_stock_count > 0
-              ? "bg-rose-950/20 ring-rose-500/40"
-              : "bg-zinc-900/80 ring-zinc-800/40"
-          }`}
-        >
-          <div>
-            <span
-              className={`block text-[10px] uppercase font-semibold tracking-wider ${
-                metrics.low_stock_count > 0 ? "text-rose-400 font-bold" : "text-zinc-400"
-              }`}
-            >
-              Low Stock Alerts
-            </span>
-            <div
-              className={`text-base font-bold font-mono mt-0.5 ${
-                metrics.low_stock_count > 0 ? "text-rose-400" : "text-zinc-300"
-              }`}
-            >
+      <div className="flex flex-wrap items-center justify-between gap-2 py-0.5 text-xs text-zinc-400">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px]">
+          <span>
+            <span className="text-zinc-500 font-sans">Valuation:</span>{" "}
+            <strong className="text-emerald-400 font-semibold">{formatNPR(metrics.total_valuation)}</strong>
+          </span>
+          <span className="text-zinc-700">•</span>
+          <span>
+            <span className="text-zinc-500 font-sans">Active SKUs:</span>{" "}
+            <strong className="text-zinc-200 font-semibold">{metrics.count}</strong>
+          </span>
+          <span className="text-zinc-700">•</span>
+          <span>
+            <span className="text-zinc-500 font-sans">Low Stock:</span>{" "}
+            <strong className={metrics.low_stock_count > 0 ? "text-rose-400 font-semibold" : "text-zinc-300 font-semibold"}>
               {metrics.low_stock_count}
-            </div>
-          </div>
-          <div
-            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              metrics.low_stock_count > 0
-                ? "bg-rose-500/20 text-rose-400"
-                : "bg-zinc-800 text-zinc-400"
-            }`}
-          >
-            <AlertTriangle className="w-4 h-4" />
-          </div>
+            </strong>
+          </span>
         </div>
       </div>
 
       {/* -------------------------------------------------------------
-          FILTER & ACTIONS STRIP (Search, Low Stock Toggle, Action Buttons)
+          FILTER & ACTIONS STRIP (Search, Category Dropdown, Low Stock Toggle, Action Buttons)
       ------------------------------------------------------------- */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-1 min-w-[240px] max-w-md">
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
           {/* Search Box (No Placeholder) */}
-          <div className="relative w-full">
+          <div className="relative w-44 sm:w-56">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
             <input
               type="text"
@@ -498,6 +476,22 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
                 <X className="w-3 h-3" />
               </button>
             )}
+          </div>
+
+          {/* Category Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="h-7 pl-2.5 pr-7 text-xs bg-zinc-900/90 border-0 ring-1 ring-zinc-800 rounded text-zinc-200 focus:outline-none focus:ring-amber-500/50 cursor-pointer appearance-none"
+            >
+              {categoriesList.map((cat) => (
+                <option key={cat} value={cat} className="bg-zinc-900 text-zinc-200">
+                  {cat === "ALL" ? "All Categories" : cat}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
           </div>
 
           {/* Low Stock Toggle Button */}
@@ -535,26 +529,6 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
             <span>Add SKU</span>
           </button>
         </div>
-      </div>
-
-      {/* -------------------------------------------------------------
-          CATEGORY FILTER PILLS (Borderless, Tiny UI)
-      ------------------------------------------------------------- */}
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-        {categoriesList.map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-2 py-0.5 text-[11px] rounded whitespace-nowrap transition-colors cursor-pointer font-medium ${
-              selectedCategory === cat
-                ? "bg-zinc-800 text-white font-bold"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
       </div>
 
       {/* -------------------------------------------------------------

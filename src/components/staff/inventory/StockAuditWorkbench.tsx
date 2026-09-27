@@ -10,6 +10,7 @@ import { useApp } from "../../../context/AppContext";
 import { InventoryItem } from "../../../types";
 import { formatNPR } from "../../../lib/utils";
 import { Modal } from "../../common/Modal";
+import { inventoryApi } from "../../../lib/inventoryApi";
 
 const AUDIT_MINUS_REASONS = [
   { value: "Kitchen spoilage / Burnt / Prep waste", label: "Kitchen spoilage / Prep waste" },
@@ -34,6 +35,7 @@ export const StockAuditWorkbench: React.FC = () => {
     inventory,
     updateInventoryStock,
     updateInventoryItem,
+    syncBackendInventory,
     addToast,
   } = useApp();
 
@@ -61,6 +63,23 @@ export const StockAuditWorkbench: React.FC = () => {
   const [batchNoInput, setBatchNoInput] = useState("");
   const [expiryDateInput, setExpiryDateInput] = useState("");
 
+  // Fetch live backend inventory items on mount to ensure audit tab has identical stock as catalog
+  useEffect(() => {
+    let active = true;
+    const fetchLive = async () => {
+      try {
+        const data = await inventoryApi.fetchItems({ page_size: 100 });
+        if (active && data?.results && data.results.length > 0) {
+          syncBackendInventory(data.results);
+        }
+      } catch {}
+    };
+    fetchLive();
+    return () => {
+      active = false;
+    };
+  }, [syncBackendInventory]);
+
   useEffect(() => {
     setPhysicalCounts((prev) => {
       const next = { ...prev };
@@ -74,7 +93,13 @@ export const StockAuditWorkbench: React.FC = () => {
   }, [inventory]);
 
   const categories = useMemo(() => {
-    const set = new Set(inventory.map((i) => i.category));
+    let excluded: string[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        excluded = JSON.parse(localStorage.getItem("crunchy_excluded_categories") || "[]");
+      } catch {}
+    }
+    const set = new Set(inventory.map((i) => i.category).filter((c) => !excluded.includes(c)));
     return Array.from(set);
   }, [inventory]);
 
@@ -163,7 +188,7 @@ export const StockAuditWorkbench: React.FC = () => {
     return filteredItems.slice(startIdx, startIdx + pageSize);
   }, [filteredItems, currentPage, pageSize]);
 
-  const handleReconcileSingleItem = (item: InventoryItem, physicalCount: number) => {
+  const handleReconcileSingleItem = async (item: InventoryItem, physicalCount: number) => {
     const variance = physicalCount - item.currentStock;
     if (variance === 0) return;
 
@@ -171,6 +196,19 @@ export const StockAuditWorkbench: React.FC = () => {
       variance < 0
         ? "Physical recount discrepancy (-)"
         : "Physical count correction (+)";
+
+    const cleanItemId = item.id.replace("inv-", "");
+    try {
+      await inventoryApi.reconcileAudit({
+        items: [
+          {
+            item_id: cleanItemId,
+            physical_stock: physicalCount.toFixed(3),
+            note: countReasons[item.id] || defaultReason,
+          },
+        ],
+      });
+    } catch {}
 
     updateInventoryStock(
       item.id,
@@ -186,9 +224,19 @@ export const StockAuditWorkbench: React.FC = () => {
     });
   };
 
-  const handleReconcileAllDiscrepancies = () => {
+  const handleReconcileAllDiscrepancies = async () => {
     const itemsToReconcile = auditedItems.filter((a) => a.hasDiscrepancy);
     if (itemsToReconcile.length === 0) return;
+
+    try {
+      await inventoryApi.reconcileAudit({
+        items: itemsToReconcile.map(({ item, physical, variance }) => ({
+          item_id: item.id.replace("inv-", ""),
+          physical_stock: physical.toFixed(3),
+          note: countReasons[item.id] || `Batch Audit (${variance > 0 ? "+" : ""}${variance} ${item.unit})`,
+        })),
+      });
+    } catch {}
 
     itemsToReconcile.forEach(({ item, physical, variance }) => {
       const defaultReason =
@@ -206,12 +254,12 @@ export const StockAuditWorkbench: React.FC = () => {
 
     addToast({
       title: "Batch Audit Completed",
-      description: `Reconciled ${itemsToReconcile.length} items.`,
+      description: `Reconciled ${itemsToReconcile.length} items with backend.`,
       type: "success",
     });
   };
 
-  const handleExecuteQuickAdjustment = () => {
+  const handleExecuteQuickAdjustment = async () => {
     if (!activeAdjustModal) return;
     const { item, type } = activeAdjustModal;
 
@@ -228,6 +276,19 @@ export const StockAuditWorkbench: React.FC = () => {
 
     const delta = type === "PLUS" ? Number(adjustQty) : -Number(adjustQty);
     const newStock = Math.max(0, Number((item.currentStock + delta).toFixed(2)));
+
+    const cleanItemId = item.id.replace("inv-", "");
+    try {
+      await inventoryApi.reconcileAudit({
+        items: [
+          {
+            item_id: cleanItemId,
+            physical_stock: newStock.toFixed(3),
+            note: `${adjustReason}${adjustNote ? ` - ${adjustNote}` : ""}`,
+          },
+        ],
+      });
+    } catch {}
 
     updateInventoryStock(
       item.id,
