@@ -45,6 +45,14 @@ import {
   OrderStatus,
   Order,
 } from "../../types";
+import {
+  usePosSession,
+  usePosCommand,
+  usePosOrders,
+  posOrderToOrder,
+  printPosReceipt,
+  PosLine,
+} from "../../lib/posApi";
 import { formatNPR, formatTimer } from "../../lib/utils";
 import { Badge } from "../common/Badge";
 import { Drawer } from "../common/Drawer";
@@ -82,18 +90,34 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     simulateIncomingOrder,
   } = useApp();
 
+  // Backend POS session — WebSocket live, fetches meta (tables, perms, payment methods)
+  const posSession = usePosSession();
+  const posCommand = usePosCommand(posSession);
+  // Fetch backend open tabs; only runs when authenticated & outlet set
+  const backendOngoingQuery = usePosOrders(posSession, { open_tabs: true, page_size: 100 });
+  const backendOrders: Order[] = useMemo(() => {
+    if (!backendOngoingQuery.data?.results?.length) return [];
+    return backendOngoingQuery.data.results.map((po) => posOrderToOrder(po, currentOutlet.name));
+  }, [backendOngoingQuery.data, currentOutlet.name]);
+
   // -------------------------------------------------------------
   // POS MODE & ONGOING ORDER TAB STATE
   // -------------------------------------------------------------
   const [posMode, setPosMode] = useState<"NEW_ORDER" | "ADD_TO_ONGOING" | "FLOOR_TABLES">("NEW_ORDER");
   const [selectedOngoingOrderId, setSelectedOngoingOrderId] = useState<string>("");
 
+  // Merge backend orders (primary) + local orders (fallback when offline/unauthenticated)
+  const mergedOrders = useMemo(() => {
+    if (backendOrders.length > 0) return backendOrders;
+    return orders;
+  }, [backendOrders, orders]);
+
   // Filter open running orders for ongoing addition
   const ongoingOrders = useMemo(() => {
-    return orders.filter(
+    return mergedOrders.filter(
       (o) => o.status !== "CANCELLED" && (o.isBilled === false || o.status !== "COMPLETED")
     );
-  }, [orders]);
+  }, [mergedOrders]);
 
   const targetOngoingOrder = useMemo(() => {
     if (selectedOngoingOrderId) {
@@ -244,7 +268,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     setSelectedItems((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (selectedItems.length === 0) {
       addToast({
         title: "Cart is Empty",
@@ -291,19 +315,75 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
         : "UNPAID"
       : paymentStatus;
 
-    createStaffOrder({
-      customerName: effectiveName,
-      customerPhone: customerPhone.trim() || undefined,
-      fulfillmentType,
-      tableNumber: fulfillmentType === "DINE_IN" ? tableNumber : undefined,
-      items: selectedItems,
-      paymentMethod: effectivePaymentMethod,
-      paymentStatus: effectivePaymentStatus,
-      notes: orderNotes.trim() || undefined,
-      discountAmount: orderDiscountAmount,
-      isSplitPayment: isSplitMode,
-      splitPayments: isSplitMode ? posSplits : undefined,
-    });
+    // --- BACKEND ORDER PLACEMENT (when authenticated) ---
+    if (posSession.enabled) {
+      // Map cart items to POS line format
+      const lines: PosLine[] = selectedItems.map((item) => ({
+        product_id: String(item.product.id),
+        variant_id: item.variant?.id && item.variant.id !== "" ? item.variant.id : null,
+        quantity: item.quantity,
+        modifier_option_ids: [],
+      }));
+
+      // Map payment method to backend format
+      const backendPaymentMethod = effectivePaymentMethod === "CASH_ON_PICKUP" ? "CASH" : effectivePaymentMethod;
+
+      // Build tenders for payment
+      const tenders = isSplitMode
+        ? posSplits
+            .filter((s) => s.amount > 0)
+            .map((s) => ({
+              method: s.method === "CASH_ON_PICKUP" ? "CASH" : s.method,
+              amount: String(s.amount),
+              reference: "",
+            }))
+        : effectivePaymentStatus === "PAID"
+        ? [{ method: backendPaymentMethod, amount: String(orderTotal), reference: "" }]
+        : [];
+
+      // Find table backend ID from session meta
+      const tableId = fulfillmentType === "DINE_IN" && posSession.meta?.tables
+        ? posSession.meta.tables.find((t) => t.table_number === tableNumber)?.id ?? null
+        : null;
+
+      const payload = {
+        fulfillment_type: fulfillmentType === "ONLINE_DELIVERY" ? "DELIVERY" : fulfillmentType,
+        customer_name: effectiveName,
+        customer_phone: customerPhone.trim() || "",
+        table_id: tableId,
+        notes: orderNotes.trim() || "",
+        discount_amount: orderDiscountAmount > 0 ? String(orderDiscountAmount) : "0",
+        lines,
+        tenders,
+      };
+
+      const result = await posCommand.run("", payload);
+      if (result) {
+        addToast({
+          title: "Order Placed",
+          description: `Order #${result.order_number} created successfully.`,
+          type: "success",
+        });
+      } else if (posCommand.error) {
+        addToast({ title: "Order Failed", description: posCommand.error, type: "error" });
+        return;
+      }
+    } else {
+      // --- LOCAL FALLBACK (offline / unauthenticated) ---
+      createStaffOrder({
+        customerName: effectiveName,
+        customerPhone: customerPhone.trim() || undefined,
+        fulfillmentType,
+        tableNumber: fulfillmentType === "DINE_IN" ? tableNumber : undefined,
+        items: selectedItems,
+        paymentMethod: effectivePaymentMethod,
+        paymentStatus: effectivePaymentStatus,
+        notes: orderNotes.trim() || undefined,
+        discountAmount: orderDiscountAmount,
+        isSplitPayment: isSplitMode,
+        splitPayments: isSplitMode ? posSplits : undefined,
+      });
+    }
 
     if (orderDiscountAmount > 0 && appliedLoyaltyOfferName && customerPhone.trim()) {
       recordAppliedLoyaltyDiscount({
@@ -337,7 +417,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   };
 
   // Add Items to Running/Ongoing Order Handler
-  const handleAddItemsToOngoingOrder = () => {
+  const handleAddItemsToOngoingOrder = async () => {
     if (!targetOngoingOrder) {
       addToast({
         title: "No Target Tab Selected",
@@ -358,14 +438,36 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     const kitchenCount = selectedItems.filter((i) => i.product.requiresKitchen !== false).length;
     const directCount = selectedItems.filter((i) => i.product.requiresKitchen === false).length;
 
-    addItemsToRunningOrder(targetOngoingOrder.id, selectedItems);
+    // Use backend append when order came from backend (_posOrder attached)
+    const backendOrderId = (targetOngoingOrder as any)._posOrder?.id;
+    if (posSession.enabled && backendOrderId) {
+      const lines: PosLine[] = selectedItems.map((item) => ({
+        product_id: String(item.product.id),
+        variant_id: item.variant?.id && item.variant.id !== "" ? item.variant.id : null,
+        quantity: item.quantity,
+        modifier_option_ids: [],
+      }));
+      const result = await posCommand.run(`${backendOrderId}/append/`, { lines });
+      if (result) {
+        addToast({
+          title: "Tab Updated",
+          description: `Order #${result.order_number}: ${kitchenCount > 0 ? `${kitchenCount} sent to kitchen. ` : ""}${directCount > 0 ? `${directCount} direct items ready.` : ""}`,
+          type: "success",
+        });
+      } else if (posCommand.error) {
+        addToast({ title: "Append Failed", description: posCommand.error, type: "error" });
+        return;
+      }
+    } else {
+      addItemsToRunningOrder(targetOngoingOrder.id, selectedItems);
+      addToast({
+        title: "Tab Updated Successfully",
+        description: `Updated #${targetOngoingOrder.orderNumber}: ${kitchenCount > 0 ? `${kitchenCount} sent to kitchen cook line. ` : ""}${directCount > 0 ? `${directCount} direct counter items ready.` : ""}`,
+        type: "success",
+      });
+    }
 
     setSelectedItems([]);
-    addToast({
-      title: "Tab Updated Successfully",
-      description: `Updated #${targetOngoingOrder.orderNumber}: ${kitchenCount > 0 ? `${kitchenCount} sent to kitchen cook line. ` : ""}${directCount > 0 ? `${directCount} direct counter items ready.` : ""}`,
-      type: "success",
-    });
   };
 
   // Remove Item from Running Order Handler
@@ -678,6 +780,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
 
         {posMode === "FLOOR_TABLES" ? (
           <StaffTableGrid
+            posMeta={posSession.meta}
             onSelectTableForNewOrder={(tableId) => {
               setFulfillmentType("DINE_IN");
               setTableNumber(tableId);

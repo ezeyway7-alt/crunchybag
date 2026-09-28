@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Order, PaymentMethod, SplitPaymentEntry } from "../../types";
+import { usePosSession, usePosCommand, usePosOrders, posOrderToOrder, printPosReceipt } from "../../lib/posApi";
 import { formatNPR, formatTimer } from "../../lib/utils";
 import { Modal } from "../common/Modal";
 
@@ -40,6 +41,20 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
     orgSettings,
     addToast,
   } = useApp();
+
+  // Backend POS session for real-time order data and settlement
+  const posSession = usePosSession();
+  const posCommand = usePosCommand(posSession);
+  // Fetch all backend orders (today, all statuses for billing view)
+  const backendOrdersQuery = usePosOrders(posSession, { page_size: 100 });
+  const backendOrders = useMemo<Order[]>(() => {
+    if (!backendOrdersQuery.data?.results?.length) return [];
+    return backendOrdersQuery.data.results.map((po) => posOrderToOrder(po, currentOutlet.name));
+  }, [backendOrdersQuery.data, currentOutlet.name]);
+  // Prefer backend orders; fall back to local when offline
+  const allOrders = useMemo(() =>
+    backendOrders.length > 0 ? backendOrders : orders,
+  [backendOrders, orders]);
 
   // Selected Order for Billing Workbench
   const [selectedOrderId, setSelectedOrderId] = useState<string>(
