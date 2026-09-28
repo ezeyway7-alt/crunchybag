@@ -49,6 +49,8 @@ export const AdminMenuManagerTab: React.FC = () => {
     deleteProduct,
     toggleProductAvailability,
     addToast,
+    timePricingSchedules,
+    currentOutlet,
   } = useApp();
 
   // Top level views:
@@ -1683,7 +1685,17 @@ export const AdminMenuManagerTab: React.FC = () => {
       <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-2.5 flex flex-wrap items-center justify-between gap-2 shadow-sm">
         {/* Left: Main Tabs (Menu Items vs Packages & Combos) */}
         <div className="flex items-center gap-1 border border-zinc-200 dark:border-zinc-800 p-0.5 bg-zinc-100 dark:bg-zinc-900">
-          <button type="button" onClick={() => setActiveMainTab("tiers")} className={`px-3 py-1 font-bold ${activeMainTab === "tiers" ? "bg-amber-500 text-black" : ""}`}>Pricing tiers</button>
+          <button
+            type="button"
+            onClick={() => setActiveMainTab("tiers")}
+            className={`px-3 py-1 text-xs font-black uppercase transition-colors ${
+              activeMainTab === "tiers"
+                ? "bg-amber-500 text-black shadow-sm"
+                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+            }`}
+          >
+            ⏰ Pricing Tiers ({timePricingSchedules.filter((s) => s.outletId === currentOutlet.id).length})
+          </button>
           <button
             type="button"
             onClick={() => setActiveMainTab("items")}
@@ -1733,7 +1745,7 @@ export const AdminMenuManagerTab: React.FC = () => {
             <span>Convert Stock to Menu</span>
           </button>
 
-          {activeMainTab === "items" ? (
+          {activeMainTab === "items" && (
             <button
               type="button"
               onClick={handleOpenCreateNewItem}
@@ -1742,7 +1754,8 @@ export const AdminMenuManagerTab: React.FC = () => {
               <Plus className="w-3.5 h-3.5" />
               <span>+ New Menu Item</span>
             </button>
-          ) : (
+          )}
+          {activeMainTab === "combos" && (
             <button
               type="button"
               onClick={handleOpenCreateNewCombo}
