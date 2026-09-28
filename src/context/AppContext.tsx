@@ -1,3 +1,4 @@
+import { useCatalog } from "./useCatalog";
 import React, { createContext, useContext, useState, useEffect } from "react";
 import {
   PortalType,
@@ -201,9 +202,11 @@ interface AppContextType {
 
   // Catalog State
   categories: Category[];
-  createCategory: (name: string) => Category;
+  createCategory: (name: string) => Promise<Category>;
+  catalogLoading: boolean;
+  catalogError: string;
   setCategoryArchived: (id: string, archived: boolean) => void;
-  saveTimePricing: (schedule: TimePricingSchedule) => void;
+  saveTimePricing: (schedule: TimePricingSchedule) => Promise<void>;
   deleteTimePricing: (id: string) => void;
   products: Product[];
   draftChangesCount: number;
@@ -223,6 +226,8 @@ interface AppContextType {
     quantity: number
   ) => void;
   addCustomComboToCart: (combo: {
+    productId: string;
+    comboSelections: { product_id: string; variant_id: string | null; modifier_option_ids: string[]; quantity: number }[];
     title: string;
     image: string;
     unitPrice: number;
@@ -420,8 +425,8 @@ interface AppContextType {
   orgSettings: OrganizationSettings;
   updateOrgSettings: (settings: Partial<OrganizationSettings>) => void;
 
-  createProduct: (prod: Omit<Product, "id">) => Product;
-  updateProductFull: (id: string, updates: Partial<Product>) => void;
+  createProduct: (prod: Omit<Product, "id">) => Promise<Product>;
+  updateProductFull: (id: string, updates: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => void;
 
   createOutlet: (outlet: Omit<Outlet, "id">) => void;
@@ -485,7 +490,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         phone: saved.phone || MOCK_OUTLETS[0].phone,
       };
     }
-    return MOCK_OUTLETS[0];
+    const configured = new URLSearchParams(window.location.search).get("outlet_id") || (import.meta as any).env.VITE_DEFAULT_OUTLET_ID;
+    return { ...MOCK_OUTLETS[0], id: configured || "" };
   });
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("DELIVERY");
 
@@ -624,32 +630,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  // Catalog
-  const readCatalog = <T,>(key: string, fallback: T): T => {
-    try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; } catch { return fallback; }
-  };
-  const [categories, setCategories] = useState<Category[]>(() => readCatalog("crunchy_categories", MOCK_CATEGORIES));
-  const [products, setProducts] = useState<Product[]>(() => readCatalog("crunchy_products", MOCK_PRODUCTS));
-  const [draftChangesCount, setDraftChangesCount] = useState<number>(2); // Seeded with 2 draft changes
-  const [timePricingSchedules, setTimePricingSchedules] = useState<TimePricingSchedule[]>(() => readCatalog("crunchy_tiers", MOCK_TIME_PRICING));
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("crunchy_categories", JSON.stringify(categories));
-      localStorage.setItem("crunchy_products", JSON.stringify(products));
-      localStorage.setItem("crunchy_tiers", JSON.stringify(timePricingSchedules));
-    } catch { addToast({ title: "Local catalog could not be saved", type: "error" }); }
-  }, [categories, products, timePricingSchedules]);
-  const createCategory = (name: string): Category => {
-    const existing = categories.find(c => c.name.toLowerCase() === name.trim().toLowerCase());
-    if (existing) { setCategories(prev => prev.map(c => c.id === existing.id ? { ...c, isArchived: false } : c)); return existing; }
-    const category = { id: crypto.randomUUID(), name: name.trim(), iconName: "Utensils", displayOrder: categories.length };
-    setCategories(prev => [...prev, category]);
-    return category;
-  };
-  const setCategoryArchived = (id: string, archived: boolean) => setCategories(prev => prev.map(c => c.id === id ? { ...c, isArchived: archived } : c));
-  const saveTimePricing = (schedule: TimePricingSchedule) => setTimePricingSchedules(prev => prev.some(s => s.id === schedule.id) ? prev.map(s => s.id === schedule.id ? schedule : s) : [...prev, schedule]);
-  const deleteTimePricing = (id: string) => setTimePricingSchedules(prev => prev.filter(s => s.id !== id));
+  // Persisted catalog: backend snapshots and live invalidation.
+  const { categories, products, setProducts, timePricingSchedules, catalogLoading, catalogError,
+    createCategory, setCategoryArchived, saveTimePricing, deleteTimePricing, toggleTimePricing,
+    createProduct, updateProductFull, deleteProduct, toggleProductAvailability } = useCatalog(currentOutlet.id, activePortal, isTableOrderMode, (toast) => addToast(toast));
+  const [draftChangesCount, setDraftChangesCount] = useState(0);
 
   // Cart
   const [cartItems, setCartItems] = useState<CartLineItem[]>([]);
@@ -825,6 +810,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addCustomComboToCart = (combo: {
+    productId: string;
+    comboSelections: { product_id: string; variant_id: string | null; modifier_option_ids: string[]; quantity: number }[];
     title: string;
     image: string;
     unitPrice: number;
@@ -845,7 +832,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const newItem: CartLineItem = {
       cartItemId: `ci-combo-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      productId: `combo-pack-${Date.now()}`,
+      productId: combo.productId,
+      comboSelections: combo.comboSelections,
       productName: combo.title,
       image: combo.image,
       variant: {
@@ -1747,59 +1735,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // Product availability toggling
-  const toggleProductAvailability = (productId: string) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, isAvailable: !p.isAvailable } : p))
-    );
-    setDraftChangesCount((prev) => prev + 1);
-    const prod = products.find((p) => p.id === productId);
-    if (prod) {
-      const newStatus = !prod.isAvailable;
-      // Record audit event
-      const audit: AuditEvent = {
-        id: `aud-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        actorName: currentStaff.name,
-        actorRole: currentStaff.role,
-        action: "CATALOG_PRODUCT_AVAILABILITY_CHANGED",
-        entityType: "CATALOG_PRODUCT",
-        entityId: productId,
-        outletName: currentOutlet.name,
-        beforeState: { isAvailable: prod.isAvailable, name: prod.name },
-        afterState: { isAvailable: newStatus, name: prod.name },
-      };
-      setAuditLogs((prev) => [audit, ...prev]);
-
-      addToast({
-        title: `Product Marked ${newStatus ? "Available" : "Sold Out"}`,
-        description: `${prod.name} updated for ${currentOutlet.code}`,
-        type: newStatus ? "success" : "warning",
-      });
-    }
-  };
-
   const publishMenuDraft = () => {
-    const updatedCount = draftChangesCount;
-    setDraftChangesCount(0);
-    const checksum = `sha256_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
-    addToast({
-      title: "Menu Published Globally",
-      description: `Immutable catalog revision ${checksum.substring(0, 12)}... published to all POS/KDS`,
-      type: "success",
-    });
-    return { checksum, updatedCount };
-  };
-
-  const toggleTimePricing = (id: string) => {
-    setTimePricingSchedules((prev) =>
-      prev.map((tp) => (tp.id === id ? { ...tp, isActive: !tp.isActive } : tp))
-    );
-    addToast({
-      title: "Time-Pricing Schedule Updated",
-      description: "Effective promotional prices recalculated",
-      type: "info",
-    });
+    addToast({ title: "Menu changes are saved automatically", type: "info" });
+    return { checksum: "", updatedCount: 0 };
   };
 
   // Device provisioning
@@ -2346,40 +2284,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // Product CRUD
-  const createProduct = (prod: Omit<Product, "id">): Product => {
-    const newProd: Product = {
-      ...prod,
-      id: `prod-${Date.now()}`,
-      isWebVisible: prod.isWebVisible ?? true,
-    };
-    setProducts((prev) => [newProd, ...prev]);
-    addToast({
-      title: "Product Created",
-      description: `${newProd.name} added to catalog`,
-      type: "success",
-    });
-    return newProd;
-  };
-
-  const updateProductFull = (id: string, updates: Partial<Product>) => {
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
-    addToast({
-      title: "Product Updated",
-      description: "Menu item details and custom attributes saved",
-      type: "success",
-    });
-  };
-
-  const deleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    addToast({
-      title: "Product Deleted",
-      description: "Item removed from menu",
-      type: "info",
-    });
-  };
-
   // Outlets CRUD
   const createOutlet = (outletData: Omit<Outlet, "id">) => {
     const newOutlet: Outlet = {
@@ -2660,7 +2564,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentOutlet,
         fulfillmentType,
         setFulfillmentType,
-        categories, createCategory, setCategoryArchived, saveTimePricing, deleteTimePricing,
+        categories, catalogLoading, catalogError, createCategory, setCategoryArchived, saveTimePricing, deleteTimePricing,
         products,
         draftChangesCount,
         toggleProductAvailability,

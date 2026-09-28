@@ -1,3 +1,5 @@
+import { apiClient } from "../../lib/api";
+import { catalogPath } from "../../lib/catalogApi";
 import React, { useState, useEffect, useMemo } from "react";
 import { Modal } from "../common/Modal";
 import {
@@ -48,6 +50,8 @@ export interface ComboPackageModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddToCartCustom?: (comboData: {
+    productId: string;
+    comboSelections: { product_id: string; variant_id: string | null; modifier_option_ids: string[]; quantity: number }[];
     title: string;
     image: string;
     unitPrice: number;
@@ -68,7 +72,8 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
   onAddToCartCustom,
   addLabel,
 }) => {
-  const { products, addCustomComboToCart } = useApp();
+  const { products, addCustomComboToCart, currentOutlet, activePortal, isTableOrderMode, addToast } = useApp();
+  const [isQuoting, setIsQuoting] = useState(false);
 
   // Selected items in the combo
   const [items, setItems] = useState<ComboItemConfig[]>([]);
@@ -124,7 +129,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
       .filter(Boolean) as ComboItemConfig[];
 
     setItems(initialItems);
-  }, [combo, isOpen, products]);
+  }, [combo?.id, isOpen]);
 
   // Active items (not removed and quantity > 0)
   const activeItems = useMemo(
@@ -317,13 +322,29 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
   };
 
   // Add Combo to Cart
-  const handleAddToCart = () => {
-    if (activeItems.length === 0) return;
-
+  const handleAddToCart = async () => {
+    if (activeItems.length === 0 || isQuoting) return;
+    setIsQuoting(true);
+    const selections = activeItems.map(it => ({ product_id: it.product.id, variant_id: it.selectedVariant.id || null,
+      modifier_option_ids: it.selectedModifiers.map(m => m.optionId), quantity: it.quantity }));
+    let confirmedPrice: number;
+    try {
+      const channel = activePortal === "kiosk" ? "kiosk" : activePortal === "staff" || activePortal === "admin" ? "pos" : isTableOrderMode ? "qr" : "web";
+      const quoted = await apiClient.post<any>(catalogPath('quote/', currentOutlet.id), {
+        channel, items: [{ product_id: combo.id, quantity: 1, combo_selections: selections }],
+      });
+      confirmedPrice = Number(quoted.items[0].unit_price);
+    } catch {
+      addToast({ title: "Combo could not be priced", description: "Check availability and required choices, then try again.", type: "error" });
+      setIsQuoting(false); return;
+    }
+    setIsQuoting(false);
     const comboPayload = {
       title: combo.title,
       image: combo.image,
-      unitPrice: comboTotalPrice,
+      unitPrice: confirmedPrice,
+      productId: combo.id,
+      comboSelections: selections,
       quantity: 1,
       items: activeItems.map((it) => ({
         productName: it.quantity > 1 ? `${it.quantity}x ${it.product.name}` : it.product.name,
@@ -418,7 +439,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
               <button
                 type="button"
                 onClick={handleAddToCart}
-                disabled={activeItems.length === 0}
+                disabled={isQuoting || activeItems.length === 0}
                 className="h-8 sm:h-8.5 px-3 sm:px-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wide cursor-pointer transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 border border-amber-600"
               >
                 <ShoppingBag className="w-3.5 h-3.5 stroke-[2.5]" />

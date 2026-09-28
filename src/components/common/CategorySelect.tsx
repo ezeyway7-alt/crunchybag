@@ -15,10 +15,10 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
   const canCreate = !!query.trim() && !categories.some(c => c.name.toLowerCase() === query.trim().toLowerCase());
   const count = matches.length + Number(canCreate);
   useEffect(() => { list.current?.querySelectorAll('[role="option"]')[active]?.scrollIntoView({ block: "nearest" }); }, [active, open]);
-  const choose = (index: number) => {
+  const choose = async (index: number) => {
     const category = matches[index];
     if (category) { if (category.isArchived) setCategoryArchived(category.id, false); onChange(category.id); }
-    else if (canCreate) onChange(createCategory(query).id);
+    else if (canCreate) { try { onChange((await createCategory(query)).id); } catch { return; } }
     setQuery(""); setOpen(false); input.current?.focus();
   };
   return <div className="relative" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>

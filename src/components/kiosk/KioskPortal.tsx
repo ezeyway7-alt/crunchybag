@@ -44,7 +44,7 @@ import { CrunchyLogo } from "../common/CrunchyLogo";
 import { formatNPR } from "../../lib/utils";
 import { ComboPackageModal, ComboPackageDefinition } from "../customer/ComboPackageModal";
 import { SkeletonProductGrid } from "../common/Skeleton";
-import { BANNER_SLIDES } from "../customer/HeroBannerSlider";
+import { comboDefinitions } from "../../lib/catalogApi";
 
 // Kiosk Order Step Flow
 type KioskStep = "ATTRACT" | "FULFILLMENT" | "MENU" | "CUSTOMIZE" | "CART_REVIEW" | "PAYMENT" | "RECEIPT_TOKEN";
@@ -61,6 +61,7 @@ export const KioskPortal: React.FC = () => {
     orders,
     isLoadingSkeleton,
   } = useApp();
+  const BANNER_SLIDES = comboDefinitions(products);
 
   // Navigation State
   const [step, setStep] = useState<KioskStep>("ATTRACT");
@@ -406,6 +407,8 @@ export const KioskPortal: React.FC = () => {
   };
 
   const handleAddComboToKioskCart = (comboData: {
+    productId: string;
+    comboSelections: { product_id: string; variant_id: string | null; modifier_option_ids: string[]; quantity: number }[];
     title: string;
     image: string;
     unitPrice: number;
@@ -429,7 +432,7 @@ export const KioskPortal: React.FC = () => {
     }));
 
     const comboProduct: Product = {
-      id: `combo-pack-${Date.now()}`,
+      id: comboData.productId,
       categoryId: "cat-combos",
       name: comboData.title,
       description: `Customized Combo Package with ${comboData.items.length} items`,

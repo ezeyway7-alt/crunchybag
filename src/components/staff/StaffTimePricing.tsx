@@ -127,7 +127,7 @@ export const StaffTimePricing: React.FC = () => {
     update({ productIds: [] });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
       !draft ||
@@ -143,12 +143,12 @@ export const StaffTimePricing: React.FC = () => {
       );
       return;
     }
-    saveTimePricing({
+    try { await saveTimePricing({
       ...draft,
       title: draft.title.trim(),
       discountPercentage: -(draft.adjustmentPercentage || 0),
       productNames: products.filter((p) => draft.productIds.includes(p.id)).map((p) => p.name),
-    });
+    }); } catch { setError("Pricing tier could not be saved. Check the values and try again."); return; }
     setDraft(null);
     addToast({ title: "Pricing tier saved", type: "success" });
   };

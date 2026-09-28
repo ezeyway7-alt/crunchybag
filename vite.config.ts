@@ -4,6 +4,7 @@ import path from 'path';
 import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
+  const backend = process.env.VITE_BACKEND_ORIGIN || 'https://crunchybag.com';
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -14,19 +15,21 @@ export default defineConfig(() => {
     server: {
       allowedHosts: true,
       proxy: {
+        '/ws': { target: backend, ws: true, changeOrigin: true },
+        '/media': { target: backend, changeOrigin: true },
         '/api': {
-          target: 'https://crunchybag.com',
+          target: backend,
           changeOrigin: true,
           secure: true,
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq) => {
-              proxyReq.setHeader('Host', 'crunchybag.com');
+              proxyReq.setHeader('Host', new URL(backend).host);
               proxyReq.removeHeader('x-forwarded-host');
             });
           },
         },
         '/admin/login': {
-          target: 'https://crunchybag.com',
+          target: backend,
           changeOrigin: true,
           secure: true,
         },

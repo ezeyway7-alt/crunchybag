@@ -42,6 +42,7 @@ const SAMPLE_FOOD_PRESETS = [
 export const AdminMenuManagerTab: React.FC = () => {
   const {
     products,
+    catalogLoading, catalogError,
     categories,
     inventory,
     createProduct,
@@ -52,6 +53,10 @@ export const AdminMenuManagerTab: React.FC = () => {
     timePricingSchedules,
     currentOutlet,
   } = useApp();
+
+  React.useEffect(() => {
+    if (catalogError) addToast({ title: "Menu unavailable", description: catalogError, type: "error" });
+  }, [catalogError]);
 
   // Top level views:
   // "catalog" -> List standard individual menu items
@@ -201,10 +206,10 @@ export const AdminMenuManagerTab: React.FC = () => {
   };
 
   // Quick Convert directly from Inventory item
-  const handleQuickConvertInventoryItem = (invItem: any, sellPrice: number) => {
+  const handleQuickConvertInventoryItem = async (invItem: any, sellPrice: number) => {
     const payload: Omit<Product, "id"> = {
       name: invItem.name,
-      categoryId: "cat-drinks",
+      categoryId: categories.find(c => !c.isArchived)?.id || "",
       basePrice: sellPrice,
       costPrice: invItem.costPerUnit,
       prepTimeMinutes: 1,
@@ -240,7 +245,7 @@ export const AdminMenuManagerTab: React.FC = () => {
       ],
     };
 
-    createProduct(payload);
+    try { await createProduct(payload); } catch { return; }
     setShowQuickConvertModal(false);
     addToast({
       title: "Inventory Item Converted",
@@ -361,7 +366,7 @@ export const AdminMenuManagerTab: React.FC = () => {
   // -------------------------------------------------------------
   // SAVE MENU ITEM HANDLER
   // -------------------------------------------------------------
-  const handleSaveItem = (e: React.FormEvent) => {
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) {
       addToast({ title: "Product name required", type: "error" });
@@ -401,27 +406,22 @@ export const AdminMenuManagerTab: React.FC = () => {
       linkedInventoryItemId: formLinkedInventoryId || undefined,
       discountPercent: disc,
       calories: cal,
-      variants: [
-        {
-          id: `var-${Date.now()}`,
-          name: "Standard",
-          price: bPrice,
-          isDefault: true,
-        },
-      ],
+      variants: editingProductId && products.find(p => p.id === editingProductId)?.variants.length
+        ? products.find(p => p.id === editingProductId)!.variants.map(v => ({ ...v, price: v.isDefault ? bPrice : v.price }))
+        : [{ id: crypto.randomUUID(), name: "Standard", price: bPrice, isDefault: true }],
       modifierGroups: formModifierSections,
       recipeIngredients: formRecipeIngredients,
     };
 
     if (editingProductId) {
-      updateProductFull(editingProductId, payload);
+      try { await updateProductFull(editingProductId, payload); } catch { return; }
       addToast({
         title: "Product Updated",
         description: `"${formName}" updated successfully.`,
         type: "success",
       });
     } else {
-      createProduct(payload);
+      try { await createProduct(payload); } catch { return; }
       addToast({
         title: "Product Created",
         description: `"${formName}" added to catalog.`,
@@ -455,7 +455,7 @@ export const AdminMenuManagerTab: React.FC = () => {
     return { comboFinalPrice: final, comboSavingsAmount: savings };
   }, [comboSumOriginal, comboDiscountType, comboDiscountValue]);
 
-  const handleSaveCombo = (e: React.FormEvent) => {
+  const handleSaveCombo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!comboName.trim()) {
       addToast({ title: "Package name required", type: "error" });
@@ -509,14 +509,14 @@ export const AdminMenuManagerTab: React.FC = () => {
     };
 
     if (editingProductId) {
-      updateProductFull(editingProductId, payload);
+      try { await updateProductFull(editingProductId, payload); } catch { return; }
       addToast({
         title: "Package Updated",
         description: `"${comboName}" updated with ${comboItems.length} bundled items.`,
         type: "success",
       });
     } else {
-      createProduct(payload);
+      try { await createProduct(payload); } catch { return; }
       addToast({
         title: "Package Created",
         description: `Combo "${comboName}" published at ${formatNPR(comboFinalPrice)}.`,

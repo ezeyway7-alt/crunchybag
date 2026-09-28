@@ -1,3 +1,5 @@
+import { useApp } from "../../context/AppContext";
+import { comboDefinitions } from "../../lib/catalogApi";
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { ArrowRight, Sparkles, SlidersHorizontal, Eye } from "lucide-react";
 import { ComboPackageModal, ComboPackageDefinition } from "./ComboPackageModal";
@@ -5,89 +7,13 @@ import { formatNPR } from "../../lib/utils";
 
 export interface BannerSlide extends ComboPackageDefinition {}
 
-export const BANNER_SLIDES: BannerSlide[] = [
-  {
-    id: "slide-1",
-    badge: "",
-    badgeType: "chef",
-    title: "CRUNCH ON DEMAND",
-    subtitle: "",
-    promoText: "SAVE NPR 280 (SPECIAL COMBO)",
-    buttonLabel: "Customize",
-    targetCategory: "cat-combos",
-    bgGradient: "from-amber-600 via-amber-500 to-yellow-500",
-    image: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=800&auto=format&fit=crop&q=80",
-    basePrice: 1280,
-    originalPrice: 1560,
-    includedProductIds: ["prod-01", "prod-04", "prod-05", "prod-06"],
-  },
-  {
-    id: "slide-2",
-    badge: "Chef's Signature Smash",
-    badgeType: "hot",
-    title: "DOUBLE TRUFFLE SMASH",
-    subtitle: "Angus beef chucks smashed crisp with balsamic shallots & black truffle raclette, fries, tenders & shake.",
-    promoText: "TOP RATED COMBO",
-    buttonLabel: "Customize",
-    targetCategory: "cat-combos",
-    bgGradient: "from-zinc-900 via-zinc-800 to-amber-950",
-    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80",
-    basePrice: 1420,
-    originalPrice: 1740,
-    includedProductIds: ["prod-02", "prod-05", "prod-06", "prod-04"],
-  },
-  {
-    id: "slide-3",
-    badge: "Limited Value Deal",
-    badgeType: "deal",
-    title: "FEAST SAVER COMBO",
-    subtitle: "4 crispy tenders, 2 smash burgers, seasoned waffle fries, 2 dips & Lotus Biscoff craft shake.",
-    promoText: "SAVE NPR 340 TODAY",
-    buttonLabel: "Customize",
-    targetCategory: "cat-combos",
-    bgGradient: "from-rose-700 via-rose-600 to-amber-600",
-    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80",
-    basePrice: 1850,
-    originalPrice: 2190,
-    includedProductIds: ["prod-01", "prod-02", "prod-04", "prod-05", "prod-06"],
-  },
-  {
-    id: "slide-4",
-    badge: "Nashville Spicy Drop",
-    badgeType: "hot",
-    title: "GHOST CHILI GLAZE",
-    subtitle: "Fiery dry rub tenders dunked in smoked chili oil, spicy paneer tikka crunch, animal fries & sweet shake.",
-    promoText: "WARNING: VERY SPICY",
-    buttonLabel: "Customize",
-    targetCategory: "cat-combos",
-    bgGradient: "from-red-900 via-red-800 to-orange-700",
-    image: "https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=800&auto=format&fit=crop&q=80",
-    basePrice: 1290,
-    originalPrice: 1580,
-    includedProductIds: ["prod-04", "prod-03", "prod-05", "prod-06"],
-  },
-  {
-    id: "slide-5",
-    badge: "Hand-Spun Shakes",
-    badgeType: "shake",
-    title: "LOTUS SPECULOOS SHAKE",
-    subtitle: "Slow-churned soft serve blended with genuine Biscoff cookie spread paired with burger & truffle fries.",
-    promoText: "SWEET & SAVORY PACK",
-    buttonLabel: "Customize",
-    targetCategory: "cat-combos",
-    bgGradient: "from-amber-900 via-stone-800 to-yellow-900",
-    image: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=800&auto=format&fit=crop&q=80",
-    basePrice: 1040,
-    originalPrice: 1280,
-    includedProductIds: ["prod-06", "prod-01", "prod-05"],
-  },
-];
-
 interface HeroBannerSliderProps {
   onSelectCategory?: (categoryId: string) => void;
 }
 
 export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCategory }) => {
+  const { products } = useApp();
+  const BANNER_SLIDES = comboDefinitions(products);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -103,7 +29,7 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
     const slideWidth = el.querySelector<HTMLElement>("[data-slide]")?.offsetWidth || el.clientWidth / 2.5;
     const currentSlide = Math.round(el.scrollLeft / (slideWidth + 16));
     setActiveIndex(Math.min(Math.max(currentSlide, 0), BANNER_SLIDES.length - 1));
-  }, []);
+  }, [BANNER_SLIDES.length]);
 
   useEffect(() => {
     const el = scrollContainerRef.current;

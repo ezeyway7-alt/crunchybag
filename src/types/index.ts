@@ -169,6 +169,7 @@ export interface SelectedModifier {
 }
 
 export interface CartLineItem {
+  comboSelections?: { product_id: string; variant_id: string | null; modifier_option_ids: string[]; quantity: number }[];
   cartItemId: string;
   productId: string;
   productName: string;
