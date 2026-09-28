@@ -9,7 +9,7 @@ import {
   ROLE_ROUTE_MAP,
 } from "../types/auth";
 import { authStorage } from "../lib/authStorage";
-import { authApi, extractErrorMessage } from "../lib/api";
+import { authApi, extractErrorMessage, normalizeOutletId } from "../lib/api";
 
 interface AuthContextType {
   authUser: BackendUser | null;
@@ -50,16 +50,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // meResult can be { user: ..., outlet: ... } or direct user object
           const rawMe = meResult as any;
           const userObj: BackendUser | null = rawMe?.user || (rawMe?.role ? rawMe : null);
-          const outletObj: BackendOutlet | null = rawMe?.outlet || null;
+          const rawOutlet = rawMe?.outlet;
+          const userAssigned = (userObj as any)?.assigned_outlet || (userObj as any)?.outlet;
+          const userOutletId = userObj?.outlet_id || (userObj as any)?.assignedOutletId;
+
+          const outletId = normalizeOutletId(rawOutlet?.id || userAssigned?.id || userOutletId || "1");
+          const outletName = rawOutlet?.name || userAssigned?.name || "Main Branch";
+
+          const outletObj: BackendOutlet = {
+            ...(userAssigned || {}),
+            ...(rawOutlet || {}),
+            id: outletId,
+            name: outletName,
+            branch_code: rawOutlet?.branch_code || userAssigned?.branch_code || "01",
+          };
           
           if (userObj) {
             setAuthUser(userObj);
             authStorage.setUser(userObj);
           }
-          if (outletObj) {
-            setAuthOutlet(outletObj);
-            authStorage.setOutlet(outletObj);
-          }
+          setAuthOutlet(outletObj);
+          authStorage.setOutlet(outletObj);
         }
       } catch (err) {
         // If 401 and refresh also failed, clear session
@@ -138,8 +149,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       "GENERAL_MANAGER",
     ].includes(rawRole);
 
-    const route = isAdmin ? "/admin" : (ROLE_ROUTE_MAP[rawRole] || "/menu");
+    let route = isAdmin ? "/admin" : (ROLE_ROUTE_MAP[rawRole] || "/menu");
     if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      let nextUrl = searchParams.get("next");
+      const tabParam = searchParams.get("tab");
+      if (nextUrl) {
+        try { nextUrl = decodeURIComponent(nextUrl); } catch {}
+        if (tabParam && !nextUrl.includes("tab=")) {
+          nextUrl += (nextUrl.includes("?") ? "&" : "?") + `tab=${encodeURIComponent(tabParam)}`;
+        }
+        route = nextUrl;
+      } else if (tabParam && isAdmin) {
+        route = `/admin?tab=${encodeURIComponent(tabParam)}`;
+      }
+
+      if (tabParam) {
+        localStorage.setItem("crunchy_admin_active_tab", tabParam);
+      }
+
       window.history.pushState(null, "", route);
       window.dispatchEvent(new PopStateEvent("popstate"));
     }
@@ -147,8 +175,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (credentials: LoginPayload): Promise<LoginResponse> => {
     const res = await authApi.login(credentials);
+    const rawOutlet = res.outlet;
+    const rawUser = res.user as any;
+    const userAssigned = rawUser?.assigned_outlet || rawUser?.outlet;
+    const userOutletId = rawUser?.outlet_id || rawUser?.assignedOutletId;
+
+    const outletId = normalizeOutletId(rawOutlet?.id || userAssigned?.id || userOutletId || "1");
+    const outletName = rawOutlet?.name || userAssigned?.name || "Main Branch";
+
+    const resolvedOutlet: BackendOutlet = {
+      ...(userAssigned || {}),
+      ...(rawOutlet || {}),
+      id: outletId,
+      name: outletName,
+      branch_code: rawOutlet?.branch_code || userAssigned?.branch_code || "01",
+    };
+
     setAuthUser(res.user);
-    setAuthOutlet(res.outlet || null);
+    setAuthOutlet(resolvedOutlet);
     setIsLoginModalOpen(false);
     return res;
   };
@@ -169,15 +213,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (meResult) {
         const rawMe = meResult as any;
         const userObj: BackendUser | null = rawMe?.user || (rawMe?.role ? rawMe : null);
-        const outletObj: BackendOutlet | null = rawMe?.outlet || null;
+        const rawOutlet = rawMe?.outlet;
+        const userAssigned = (userObj as any)?.assigned_outlet || (userObj as any)?.outlet;
+        const userOutletId = userObj?.outlet_id || (userObj as any)?.assignedOutletId;
+
+        const outletId = normalizeOutletId(rawOutlet?.id || userAssigned?.id || userOutletId || "1");
+        const outletName = rawOutlet?.name || userAssigned?.name || "Main Branch";
+
+        const outletObj: BackendOutlet = {
+          ...(userAssigned || {}),
+          ...(rawOutlet || {}),
+          id: outletId,
+          name: outletName,
+          branch_code: rawOutlet?.branch_code || userAssigned?.branch_code || "01",
+        };
         if (userObj) {
           setAuthUser(userObj);
           authStorage.setUser(userObj);
         }
-        if (outletObj) {
-          setAuthOutlet(outletObj);
-          authStorage.setOutlet(outletObj);
-        }
+        setAuthOutlet(outletObj);
+        authStorage.setOutlet(outletObj);
       }
     } catch (err) {
       console.warn("Could not refresh profile", err);

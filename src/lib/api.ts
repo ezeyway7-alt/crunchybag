@@ -497,6 +497,35 @@ async function performTokenRefresh(refreshToken: string): Promise<string> {
 /**
  * Authentication Endpoints
  */
+export function normalizeOutletId(id?: string | number | null): string {
+  if (id === null || id === undefined) return "1";
+  const str = String(id).trim();
+  if (!str) return "1";
+  if (/^\d+$/.test(str)) return str;
+  const digits = str.replace(/\D/g, "");
+  if (digits) {
+    const num = parseInt(digits, 10);
+    if (!Number.isNaN(num) && num > 0) return String(num);
+  }
+  return "1";
+}
+
+export const branchApi = {
+  async getBranches(restaurantId: string | number = 1): Promise<BackendOutlet[]> {
+    try {
+      const raw = await baseRequest<any>(`/restaurants/${restaurantId}/branches/`, {
+        skipAuth: true,
+      });
+      if (Array.isArray(raw)) return raw;
+      if (raw?.results && Array.isArray(raw.results)) return raw.results;
+      return [];
+    } catch (e) {
+      console.warn("Failed to fetch branches from backend:", e);
+      return [];
+    }
+  },
+};
+
 export const authApi = {
   /**
    * POST /api/v1/auth/login/
@@ -517,11 +546,27 @@ export const authApi = {
     });
 
     if (result && result.access && result.user) {
+      const rawOutlet = result.outlet;
+      const rawUser = result.user as any;
+      const userAssigned = rawUser?.assigned_outlet || rawUser?.outlet;
+      const userOutletId = rawUser?.outlet_id || rawUser?.assignedOutletId;
+
+      const outletId = normalizeOutletId(rawOutlet?.id || userAssigned?.id || userOutletId || "1");
+      const outletName = rawOutlet?.name || userAssigned?.name || "Main Branch";
+
+      const resolvedOutlet: BackendOutlet = {
+        ...(userAssigned || {}),
+        ...(rawOutlet || {}),
+        id: outletId,
+        name: outletName,
+        branch_code: rawOutlet?.branch_code || userAssigned?.branch_code || "01",
+      };
+
       authStorage.setSession({
         access: result.access,
         refresh: result.refresh || "",
         user: result.user,
-        outlet: (result.outlet || {}) as BackendOutlet,
+        outlet: resolvedOutlet,
       });
     }
 

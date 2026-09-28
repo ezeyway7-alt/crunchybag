@@ -69,6 +69,7 @@ import {
   INITIAL_DAYBOOK_ENTRIES,
 } from "../mock/adminData";
 import { authStorage } from "../lib/authStorage";
+import { branchApi, normalizeOutletId } from "../lib/api";
 
 export interface ToastItem {
   id: string;
@@ -480,40 +481,109 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [outlets, setOutlets] = useState<Outlet[]>(MOCK_OUTLETS);
   const [currentOutlet, setCurrentOutlet] = useState<Outlet>(() => {
     const saved = authStorage.getOutlet();
-    if (saved && saved.name) {
-      return {
-        ...MOCK_OUTLETS[0],
-        id: String(saved.id || MOCK_OUTLETS[0].id),
-        name: saved.name || MOCK_OUTLETS[0].name,
-        code: saved.branch_code || saved.code || MOCK_OUTLETS[0].code,
-        address: saved.address || MOCK_OUTLETS[0].address,
-        phone: saved.phone || MOCK_OUTLETS[0].phone,
-      };
-    }
-    const configured = new URLSearchParams(window.location.search).get("outlet_id") || (import.meta as any).env.VITE_DEFAULT_OUTLET_ID;
-    return { ...MOCK_OUTLETS[0], id: configured || "" };
+    const user = authStorage.getUser();
+    const userAssigned = (user as any)?.assigned_outlet || (user as any)?.outlet;
+    const userOutletId = user?.outlet_id || (user as any)?.assignedOutletId;
+
+    const urlOutletId =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("outlet_id")
+        : null;
+
+    const rawId = urlOutletId || saved?.id || userAssigned?.id || userOutletId || (import.meta as any).env.VITE_DEFAULT_OUTLET_ID || "1";
+    const normalizedId = normalizeOutletId(rawId);
+
+    const name = saved?.name || userAssigned?.name || MOCK_OUTLETS[0].name;
+    const code = saved?.branch_code || saved?.code || userAssigned?.branch_code || MOCK_OUTLETS[0].code;
+    const address = saved?.address || userAssigned?.address || MOCK_OUTLETS[0].address;
+    const phone = saved?.phone || userAssigned?.phone || MOCK_OUTLETS[0].phone;
+
+    return {
+      ...MOCK_OUTLETS[0],
+      id: normalizedId,
+      name,
+      code,
+      address,
+      phone,
+    };
   });
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("DELIVERY");
 
-  // Sync with authStorage outlet changes
+  // Sync with authStorage outlet changes & load live branches from backend
   useEffect(() => {
+    let mounted = true;
+
     const handleOutletSync = () => {
       const saved = authStorage.getOutlet();
-      if (saved && saved.name) {
-        setCurrentOutlet((prev) => ({
-          ...prev,
-          id: String(saved.id || prev.id),
-          name: saved.name || prev.name,
-          code: saved.branch_code || saved.code || prev.code,
-          address: saved.address || prev.address,
-          phone: saved.phone || prev.phone,
-        }));
-      }
+      const user = authStorage.getUser();
+      const userAssigned = (user as any)?.assigned_outlet || (user as any)?.outlet;
+      const userOutletId = user?.outlet_id || (user as any)?.assignedOutletId;
+
+      const rawId = saved?.id || userAssigned?.id || userOutletId;
+      const normalizedId = normalizeOutletId(rawId);
+      const name = saved?.name || userAssigned?.name;
+      const code = saved?.branch_code || saved?.code || userAssigned?.branch_code;
+      const address = saved?.address || userAssigned?.address;
+      const phone = saved?.phone || userAssigned?.phone;
+
+      setCurrentOutlet((prev) => ({
+        ...prev,
+        id: normalizedId || prev.id || "1",
+        ...(name ? { name } : {}),
+        ...(code ? { code } : {}),
+        ...(address ? { address } : {}),
+        ...(phone ? { phone } : {}),
+      }));
     };
 
     window.addEventListener("crunchy:outlet_change", handleOutletSync);
     window.addEventListener("crunchy:auth_change", handleOutletSync);
+
+    // Fetch live restaurant branches from backend on startup
+    const fetchBranches = async () => {
+      try {
+        const liveBranches = await branchApi.getBranches(1);
+        if (mounted && Array.isArray(liveBranches) && liveBranches.length > 0) {
+          const mapped: Outlet[] = liveBranches.map((b: any) => ({
+            id: String(b.id),
+            name: b.name ? (b.name === "Main" ? "Crunchy Main - Kathmandu" : b.name) : "Main Branch",
+            code: b.branch_code || `0${b.id}`,
+            address: b.address_line || "Kathmandu, Nepal",
+            city: b.city || "Kathmandu",
+            phone: b.phone_number || "+977 1-4229988",
+            isOpen: b.accepting_orders ?? b.is_active ?? true,
+            timezone: "Asia/Kathmandu (NPT +05:45)",
+            operatingHours: "10:30 AM – 11:00 PM",
+            estimatedPrepTimeMin: 15,
+            serviceModes: ["Dine-in", "Takeaway", "Delivery"],
+          }));
+          setOutlets(mapped);
+
+          // Auto-select or hydrate currentOutlet to the user's branch
+          setCurrentOutlet((prev) => {
+            const saved = authStorage.getOutlet();
+            const user = authStorage.getUser();
+            const targetId = normalizeOutletId(saved?.id || user?.outlet_id || prev.id || "1");
+            const matched = mapped.find((o) => o.id === targetId) || mapped[0];
+            return {
+              ...prev,
+              id: matched.id,
+              name: prev.name && prev.name !== "Crunchy Flagship - Durbar Marg" ? prev.name : matched.name,
+              code: matched.code || prev.code,
+              address: matched.address || prev.address,
+              phone: matched.phone || prev.phone,
+            };
+          });
+        }
+      } catch (err) {
+        console.warn("Could not fetch branches from backend:", err);
+      }
+    };
+
+    fetchBranches();
+
     return () => {
+      mounted = false;
       window.removeEventListener("crunchy:outlet_change", handleOutletSync);
       window.removeEventListener("crunchy:auth_change", handleOutletSync);
     };

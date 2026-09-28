@@ -52,10 +52,14 @@ export const AdminMenuManagerTab: React.FC = () => {
     addToast,
     timePricingSchedules,
     currentOutlet,
+    outlets,
+    setCurrentOutlet,
   } = useApp();
 
   React.useEffect(() => {
-    if (catalogError) addToast({ title: "Menu unavailable", description: catalogError, type: "error" });
+    if (catalogError && !catalogError.includes("Choose an outlet")) {
+      addToast({ title: "Menu unavailable", description: catalogError, type: "error" });
+    }
   }, [catalogError]);
 
   // Top level views:
@@ -1730,6 +1734,32 @@ export const AdminMenuManagerTab: React.FC = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-2 py-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-medium"
           />
+        </div>
+
+        {/* Branch / Outlet Selector / Indicator */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs">
+          <span className="text-[10px] font-black uppercase text-amber-500 tracking-wider">Branch:</span>
+          {outlets.length > 1 ? (
+            <select
+              aria-label="Active Branch"
+              value={currentOutlet.id}
+              onChange={(e) => {
+                const found = outlets.find((o) => o.id === e.target.value);
+                if (found) setCurrentOutlet(found);
+              }}
+              className="bg-transparent font-bold text-zinc-900 dark:text-zinc-100 border-none outline-none cursor-pointer pr-1 text-xs"
+            >
+              {outlets.map((o) => (
+                <option key={o.id} value={o.id} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="font-bold text-zinc-900 dark:text-zinc-100 text-xs">
+              {currentOutlet.name || "Main Branch"}
+            </span>
+          )}
         </div>
 
         {/* Right: Quick Actions */}

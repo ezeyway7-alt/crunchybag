@@ -13,7 +13,7 @@ import {
 
 export const MOCK_OUTLETS: Outlet[] = [
   {
-    id: "out-01",
+    id: "1",
     name: "Crunchy Flagship - Durbar Marg",
     code: "DM-01",
     address: "Kings Way, Durbar Marg, Ward 1",
@@ -26,7 +26,7 @@ export const MOCK_OUTLETS: Outlet[] = [
     serviceModes: ["Dine-in", "Takeaway", "Delivery"],
   },
   {
-    id: "out-02",
+    id: "2",
     name: "Crunchy Jhamsikhel Artisanal",
     code: "JK-02",
     address: "Restaurant Lane, Jhamsikhel",
@@ -39,7 +39,7 @@ export const MOCK_OUTLETS: Outlet[] = [
     serviceModes: ["Dine-in", "Takeaway", "Delivery"],
   },
   {
-    id: "out-03",
+    id: "3",
     name: "Crunchy Thamel Express",
     code: "TH-03",
     address: "Chaksibari Marg, Thamel",

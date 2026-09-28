@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Category, Product, TimePricingSchedule } from '../types';
-import { apiClient, extractErrorMessage } from '../lib/api';
+import { apiClient, extractErrorMessage, normalizeOutletId } from '../lib/api';
 import { authStorage } from '../lib/authStorage';
 import { catalogPath, fromCategory, fromProduct, fromSchedule, productPayload, schedulePayload, menuSocket } from '../lib/catalogApi';
 
@@ -16,8 +16,11 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   const deadline = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const management = portal === 'admin' && !!authStorage.getAccessToken();
   const channel = portal === 'kiosk' ? 'kiosk' : portal === 'staff' || portal === 'admin' ? 'pos' : tableMode ? 'qr' : 'web';
-  const activeScope = useRef(outletId); activeScope.current = outletId;
-  const validOutlet = /^\d+$/.test(outletId);
+  
+  // Normalize outlet ID: extracts numeric ID or defaults to "1"
+  const effectiveOutletId = normalizeOutletId(outletId);
+  const activeScope = useRef(effectiveOutletId); activeScope.current = effectiveOutletId;
+  const validOutlet = /^\d+$/.test(effectiveOutletId);
 
   useEffect(() => {
     const changed = () => setAuthVersion(v => v + 1);
@@ -30,7 +33,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
     const seq = ++sequence.current;
     setLoading(true);
     try {
-      const data = await apiClient.get<any>(catalogPath(management ? 'management/' : `menu/`, outletId) + (management ? '' : `&channel=${channel}`), { skipAuth: !management && channel !== 'pos' });
+      const data = await apiClient.get<any>(catalogPath(management ? 'management/' : `menu/`, effectiveOutletId) + (management ? '' : `&channel=${channel}`), { skipAuth: !management && channel !== 'pos' });
       if (seq !== sequence.current) return;
       const nextProducts = (management ? data.products : data.categories.flatMap((c: any) => c.products)).map(fromProduct);
       if (management) for (const product of nextProducts) {
@@ -38,7 +41,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
         if (override) product.isAvailable = product.isAvailable && override.is_available;
       }
       setCategories(data.categories.map(fromCategory)); setProducts(nextProducts);
-      setTimePricingSchedules(management ? data.schedules.map((s: any) => fromSchedule(s, outletId, nextProducts)) : []);
+      setTimePricingSchedules(management ? data.schedules.map((s: any) => fromSchedule(s, effectiveOutletId, nextProducts)) : []);
       setError('');
       clearTimeout(deadline.current);
       if (!management) deadline.current = setTimeout(() => { void reload(); }, Math.max(1000, data.valid_until * 1000 - Date.now() + 150));
@@ -49,7 +52,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
       clearTimeout(deadline.current);
       deadline.current = setTimeout(() => { void reload(); }, 5000);
     } finally { if (seq === sequence.current) setLoading(false); }
-  }, [outletId, management, channel, validOutlet, authVersion]);
+  }, [effectiveOutletId, management, channel, validOutlet, authVersion]);
 
   useEffect(() => {
     setCategories([]); setProducts([]); setTimePricingSchedules([]);
@@ -59,7 +62,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
     let retry: ReturnType<typeof setTimeout>;
     const connect = () => {
       if (closed || !validOutlet) return;
-      socket = new WebSocket(menuSocket(outletId));
+      socket = new WebSocket(menuSocket(effectiveOutletId));
       socket.onopen = () => { attempts = 0; void reload(); };
       socket.onmessage = event => {
         try { if (JSON.parse(event.data).event === 'MENU_UPDATED') void reload(); } catch { /* Ignore non-domain frames. */ }
@@ -72,13 +75,13 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
     document.addEventListener('visibilitychange', foreground);
     window.addEventListener('online', foreground);
     return () => { closed = true; ++sequence.current; clearTimeout(retry); clearTimeout(deadline.current); socket?.close(); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); };
-  }, [reload, outletId, validOutlet]);
+  }, [reload, effectiveOutletId, validOutlet]);
 
   const mutate = async <T,>(operation: () => Promise<T>): Promise<T> => {
     if (!validOutlet) throw new Error('Choose a configured outlet before saving.');
     try {
       const result = await operation();
-      if (activeScope.current === outletId) await reload();
+      if (activeScope.current === effectiveOutletId) await reload();
       return result;
     } catch (error) {
       notifyRef.current({ title: 'Menu change could not be saved', description: extractErrorMessage(error), type: 'error' });
@@ -89,22 +92,22 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   const createCategory = async (name: string) => {
     const existing = categories.find(c => c.name.toLowerCase() === name.trim().toLowerCase());
     const row = await mutate(() => existing
-      ? apiClient.patch(catalogPath(`categories/${existing.id}/`, outletId), { is_archived: false })
-      : apiClient.post(catalogPath('categories/', outletId), { name: name.trim() }));
+      ? apiClient.patch(catalogPath(`categories/${existing.id}/`, effectiveOutletId), { is_archived: false })
+      : apiClient.post(catalogPath('categories/', effectiveOutletId), { name: name.trim() }));
     return fromCategory(row);
   };
-  const setCategoryArchived = (id: string, archived: boolean) => quiet(() => apiClient.patch(catalogPath(`categories/${id}/`, outletId), { is_archived: archived }));
-  const createProduct = async (product: Omit<Product, 'id'>) => fromProduct(await mutate(async () => apiClient.post(catalogPath('products/', outletId), await productPayload(product, outletId))));
-  const updateProductFull = async (id: string, product: Partial<Product>) => { await mutate(async () => apiClient.patch(catalogPath(`products/${id}/`, outletId), await productPayload(product, outletId))); };
-  const deleteProduct = (id: string) => quiet(() => apiClient.delete(catalogPath(`products/${id}/`, outletId)));
-  const toggleProductAvailability = (id: string) => quiet(() => apiClient.post(catalogPath(`outlets/me/products/${id}/toggle-stock/`, outletId), { is_available: !products.find(p => p.id === id)?.isAvailable }));
+  const setCategoryArchived = (id: string, archived: boolean) => quiet(() => apiClient.patch(catalogPath(`categories/${id}/`, effectiveOutletId), { is_archived: archived }));
+  const createProduct = async (product: Omit<Product, 'id'>) => fromProduct(await mutate(async () => apiClient.post(catalogPath('products/', effectiveOutletId), await productPayload(product, effectiveOutletId))));
+  const updateProductFull = async (id: string, product: Partial<Product>) => { await mutate(async () => apiClient.patch(catalogPath(`products/${id}/`, effectiveOutletId), await productPayload(product, effectiveOutletId))); };
+  const deleteProduct = (id: string) => quiet(() => apiClient.delete(catalogPath(`products/${id}/`, effectiveOutletId)));
+  const toggleProductAvailability = (id: string) => quiet(() => apiClient.post(catalogPath(`outlets/me/products/${id}/toggle-stock/`, effectiveOutletId), { is_available: !products.find(p => p.id === id)?.isAvailable }));
   const saveTimePricing = async (schedule: TimePricingSchedule) => {
     await mutate(() => timePricingSchedules.some(s => s.id === schedule.id)
-      ? apiClient.patch(catalogPath(`schedules/${schedule.id}/`, outletId), schedulePayload(schedule))
-      : apiClient.post(catalogPath('schedules/', outletId), schedulePayload(schedule)));
+      ? apiClient.patch(catalogPath(`schedules/${schedule.id}/`, effectiveOutletId), schedulePayload(schedule))
+      : apiClient.post(catalogPath('schedules/', effectiveOutletId), schedulePayload(schedule)));
   };
-  const deleteTimePricing = (id: string) => quiet(() => apiClient.delete(catalogPath(`schedules/${id}/`, outletId)));
-  const toggleTimePricing = (id: string) => quiet(() => apiClient.patch(catalogPath(`schedules/${id}/`, outletId), { is_active: !timePricingSchedules.find(s => s.id === id)?.isActive }));
+  const deleteTimePricing = (id: string) => quiet(() => apiClient.delete(catalogPath(`schedules/${id}/`, effectiveOutletId)));
+  const toggleTimePricing = (id: string) => quiet(() => apiClient.patch(catalogPath(`schedules/${id}/`, effectiveOutletId), { is_active: !timePricingSchedules.find(s => s.id === id)?.isActive }));
   return { categories, products, setProducts, timePricingSchedules, catalogLoading, catalogError, createCategory, setCategoryArchived,
     createProduct, updateProductFull, deleteProduct, toggleProductAvailability, saveTimePricing, deleteTimePricing, toggleTimePricing };
 }

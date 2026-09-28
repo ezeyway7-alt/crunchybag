@@ -72,23 +72,30 @@ const AppContent: React.FC = () => {
     currentPath === "/admin-login" ||
     currentPath.startsWith("/admin-login") ||
     currentPath === "/login" ||
-    currentPath.startsWith("/login");
+    currentPath.startsWith("/login") ||
+    currentPath === "/admin/login" ||
+    currentPath.startsWith("/admin/login");
 
   // All administrative manager and superadmin routes lead directly to the full Admin Dashboard (AdminPortal)
   const isAdminRoute =
-    currentPath === "/admin" ||
-    (currentPath.startsWith("/admin") && currentPath !== "/admin-login" && !currentPath.startsWith("/admin-login")) ||
-    currentPath === "/admin-portal" ||
-    currentPath.startsWith("/admin-portal") ||
-    currentPath === "/superadmin" ||
-    currentPath.startsWith("/superadmin") ||
-    currentPath === "/brand/dashboard" ||
-    currentPath.startsWith("/brand") ||
-    currentPath === "/outlet/dashboard" ||
-    currentPath.startsWith("/outlet") ||
-    currentPath === "/dashboard" ||
-    currentPath.startsWith("/dashboard") ||
-    activePortal === "admin";
+    (currentPath === "/admin" ||
+      (currentPath.startsWith("/admin") &&
+        currentPath !== "/admin-login" &&
+        !currentPath.startsWith("/admin-login") &&
+        currentPath !== "/admin/login" &&
+        !currentPath.startsWith("/admin/login")) ||
+      currentPath === "/admin-portal" ||
+      currentPath.startsWith("/admin-portal") ||
+      currentPath === "/superadmin" ||
+      currentPath.startsWith("/superadmin") ||
+      currentPath === "/brand/dashboard" ||
+      currentPath.startsWith("/brand") ||
+      currentPath === "/outlet/dashboard" ||
+      currentPath.startsWith("/outlet") ||
+      currentPath === "/dashboard" ||
+      currentPath.startsWith("/dashboard") ||
+      activePortal === "admin") &&
+    !isLoginRoute;
 
   const isPosRoute = currentPath === "/pos" || currentPath.startsWith("/pos") || activePortal === "staff";
   const isKdsRoute = currentPath === "/kds" || currentPath.startsWith("/kds") || activePortal === "kitchen";
@@ -102,8 +109,28 @@ const AppContent: React.FC = () => {
     isWaiterRoute ||
     isRiderRoute;
 
-  // 1. Direct Login Page route (/admin-login or /login)
+  // 1. Direct Login Page route (/admin-login, /admin/login, or /login)
   if (isLoginRoute) {
+    if (isAuthenticated) {
+      if (typeof window !== "undefined") {
+        const searchParams = new URLSearchParams(window.location.search);
+        let nextUrl = searchParams.get("next");
+        const tabParam = searchParams.get("tab");
+        if (nextUrl) {
+          try { nextUrl = decodeURIComponent(nextUrl); } catch {}
+          if (tabParam && !nextUrl.includes("tab=")) {
+            nextUrl += (nextUrl.includes("?") ? "&" : "?") + `tab=${encodeURIComponent(tabParam)}`;
+          }
+        } else if (tabParam) {
+          nextUrl = `/admin?tab=${encodeURIComponent(tabParam)}`;
+        } else {
+          nextUrl = "/admin";
+        }
+        window.history.replaceState(null, "", nextUrl);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
+      return null;
+    }
     return (
       <div className="min-h-screen bg-[#09090b] text-zinc-100 antialiased selection:bg-amber-500 selection:text-black">
         <UnifiedLoginModal
