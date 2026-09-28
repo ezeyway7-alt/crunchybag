@@ -14,6 +14,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   const sequence = useRef(0);
   const notifyRef = useRef(notify); notifyRef.current = notify;
   const deadline = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const reloadRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const isAdminRoute = typeof window !== 'undefined' && (/^\/(admin|superadmin|brand|outlet|dashboard)/i.test(window.location.pathname) || window.location.pathname.startsWith('/admin'));
   const isManagementPortal = portal === 'admin' || isAdminRoute;
   const management = isManagementPortal && !!authStorage.getAccessToken();
@@ -52,38 +53,60 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
       setTimePricingSchedules(management ? (data.schedules || []).map((s: any) => fromSchedule(s, effectiveOutletId, nextProducts)) : []);
       setError('');
       clearTimeout(deadline.current);
-      if (!management) deadline.current = setTimeout(() => { void reload(); }, Math.max(1000, data.valid_until * 1000 - Date.now() + 150));
+      if (!management && typeof data?.valid_until === 'number' && Number.isFinite(data.valid_until)) {
+        const delay = Math.max(1000, data.valid_until * 1000 - Date.now() + 150);
+        deadline.current = setTimeout(() => { void reloadRef.current(); }, delay);
+      }
     } catch (error) {
       if (seq !== sequence.current) return;
       setError(extractErrorMessage(error));
       // Retry reads with a bounded delay, including cold-cache 503s; never retry writes blindly.
       clearTimeout(deadline.current);
-      deadline.current = setTimeout(() => { void reload(); }, 5000);
+      deadline.current = setTimeout(() => { void reloadRef.current(); }, 5000);
     } finally { if (seq === sequence.current) setLoading(false); }
   }, [effectiveOutletId, management, channel, validOutlet, authVersion]);
 
+  reloadRef.current = reload;
+
+  // Real-time WebSocket connection scoped strictly to outlet ID
   useEffect(() => {
     setCategories([]); setProducts([]); setTimePricingSchedules([]);
-    void reload();
     let closed = false, attempts = 0;
     let socket: WebSocket | undefined;
     let retry: ReturnType<typeof setTimeout>;
     const connect = () => {
       if (closed || !validOutlet) return;
       socket = new WebSocket(menuSocket(effectiveOutletId));
-      socket.onopen = () => { attempts = 0; void reload(); };
+      socket.onopen = () => {
+        const wasReconnect = attempts > 0;
+        attempts = 0;
+        if (wasReconnect) void reloadRef.current();
+      };
       socket.onmessage = event => {
-        try { if (JSON.parse(event.data).event === 'MENU_UPDATED') void reload(); } catch { /* Ignore non-domain frames. */ }
+        try { if (JSON.parse(event.data).event === 'MENU_UPDATED') void reloadRef.current(); } catch { /* Ignore non-domain frames. */ }
       };
       socket.onclose = () => { if (!closed) retry = setTimeout(connect, Math.min(30000, 1000 * 2 ** attempts++) + Math.random() * 500); };
       socket.onerror = () => socket?.close();
     };
     connect();
-    const foreground = () => { if (!document.hidden) void reload(); };
+    const foreground = () => { if (!document.hidden) void reloadRef.current(); };
     document.addEventListener('visibilitychange', foreground);
     window.addEventListener('online', foreground);
-    return () => { closed = true; ++sequence.current; clearTimeout(retry); clearTimeout(deadline.current); socket?.close(); document.removeEventListener('visibilitychange', foreground); window.removeEventListener('online', foreground); };
-  }, [reload, effectiveOutletId, validOutlet]);
+    return () => {
+      closed = true;
+      ++sequence.current;
+      clearTimeout(retry);
+      clearTimeout(deadline.current);
+      socket?.close();
+      document.removeEventListener('visibilitychange', foreground);
+      window.removeEventListener('online', foreground);
+    };
+  }, [effectiveOutletId, validOutlet]);
+
+  // Fetch catalog whenever scope, channel, or auth version updates
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const mutate = async <T,>(operation: () => Promise<T>): Promise<T> => {
     if (!validOutlet) throw new Error('Choose a configured outlet before saving.');

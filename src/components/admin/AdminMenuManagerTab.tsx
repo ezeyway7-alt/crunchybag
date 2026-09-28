@@ -62,8 +62,12 @@ export const AdminMenuManagerTab: React.FC = () => {
   const [isSavingItem, setIsSavingItem] = useState(false);
   const [isSavingCombo, setIsSavingCombo] = useState(false);
 
-  // Sync real live backend inventory items so recipe ingredients map correctly
+  const loadedOutletRef = useRef<string | null>(null);
+
+  // Sync real live backend inventory items so recipe ingredients map correctly (only once per outlet)
   useEffect(() => {
+    if (loadedOutletRef.current === currentOutlet.id) return;
+    loadedOutletRef.current = currentOutlet.id;
     let mounted = true;
     const loadInventory = async () => {
       try {
@@ -79,7 +83,7 @@ export const AdminMenuManagerTab: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [syncBackendInventory]);
+  }, [currentOutlet.id, syncBackendInventory]);
 
   React.useEffect(() => {
     if (catalogError && !catalogError.includes("Choose an outlet")) {
