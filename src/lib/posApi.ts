@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient, DEFAULT_API_BASE, extractErrorMessage, ApiError } from './api';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
+import { Order, OrderItemSnapshot, FulfillmentType, OrderStatus, PaymentMethod, SplitPaymentEntry } from '../types';
 export interface PosLine {
     product_id: string;
     variant_id?: string | null;
@@ -109,6 +110,74 @@ export const posPath = (outlet: string, path = '') => `/orders/pos/${path}?outle
 export const posError = (e: unknown) => extractErrorMessage(e);
 export const todayNepal = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kathmandu', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 export const activeOrder = (o: PosOrder) => !['COMPLETED', 'CANCELLED'].includes(o.status);
+
+export function posOrderToOrder(posOrder: PosOrder, outletName?: string): Order & { _posOrder: PosOrder } {
+    const isPaid = posOrder.settlement === 'PAID' || Number(posOrder.due_amount || 0) <= 0;
+    const isCredit = posOrder.settlement === 'CREDIT' || Number(posOrder.credit_amount || 0) > 0;
+    let fulfillmentType: FulfillmentType = 'TAKEAWAY';
+    if (posOrder.fulfillment_type === 'DINE_IN') fulfillmentType = 'DINE_IN';
+    else if (posOrder.fulfillment_type === 'DELIVERY' || posOrder.fulfillment_type === 'ONLINE_DELIVERY') fulfillmentType = 'ONLINE_DELIVERY';
+
+    let status: OrderStatus = 'CONFIRMED';
+    if (posOrder.status === 'PENDING' || posOrder.status === 'ACCEPTED') status = 'CONFIRMED';
+    else if (posOrder.status === 'PREPARING') status = 'PREPARING';
+    else if (posOrder.status === 'READY') status = 'READY';
+    else if (posOrder.status === 'OUT_FOR_DELIVERY') status = 'OUT_FOR_DELIVERY';
+    else if (posOrder.status === 'COMPLETED') status = 'COMPLETED';
+    else if (posOrder.status === 'CANCELLED') status = 'CANCELLED';
+
+    const items: OrderItemSnapshot[] = (posOrder.items || []).map((item, idx) => ({
+        id: `pos-item-${item.id || idx}`,
+        productName: item.product_name,
+        variantName: item.variant_name || '',
+        modifiersSummary: (item.modifiers || []).map(m => m.name),
+        unitPrice: Number(item.unit_price) || 0,
+        quantity: item.quantity,
+        lineTotal: Number(item.line_total) || 0,
+        roundNumber: item.round_number || 1,
+        requiresKitchen: item.requires_kitchen ?? true,
+        sentToKitchen: item.requires_kitchen ?? true,
+        addedLater: (item.round_number || 1) > 1,
+        addedAt: posOrder.created_at,
+    }));
+
+    const splitPayments: SplitPaymentEntry[] = (posOrder.payments || []).map(p => ({
+        method: (p.method === 'CASH' ? 'CASH_ON_PICKUP' : p.method) as PaymentMethod,
+        amount: Number(p.amount) || 0,
+        reference: p.reference || undefined,
+    }));
+
+    return {
+        id: String(posOrder.id),
+        orderNumber: posOrder.order_number,
+        kioskToken: posOrder.receipts?.find(r => r.kind === 'TOKEN')?.number || `TK-${posOrder.id}`,
+        outletId: String(posOrder.id),
+        outletName: outletName || 'Crunchy Bag',
+        customerName: posOrder.customer_name || 'Walk-in Guest',
+        customerPhone: posOrder.customer_phone || '',
+        fulfillmentType,
+        orderSource: 'POS_COUNTER',
+        status,
+        items,
+        subtotal: Number(posOrder.subtotal) || 0,
+        discountAmount: Number(posOrder.discount_amount) || 0,
+        vatIncludedAmount: Number(posOrder.vat_included_amount) || 0,
+        totalAmount: Number(posOrder.total_payable) || 0,
+        createdAt: posOrder.created_at || new Date().toISOString(),
+        estimatedPickupTime: 'Ready at Counter',
+        elapsedSeconds: 0,
+        notes: posOrder.notes || '',
+        paymentMethod: (posOrder.payment_method === 'CASH' ? 'CASH_ON_PICKUP' : posOrder.payment_method) as PaymentMethod,
+        paymentStatus: isPaid ? 'PAID' : 'UNPAID',
+        isBilled: isPaid || isCredit,
+        settledAt: isPaid ? posOrder.created_at : undefined,
+        isSplitPayment: splitPayments.length > 1,
+        splitPayments: splitPayments.length > 0 ? splitPayments : undefined,
+        tableNumber: posOrder.table_number ? (posOrder.table_number.startsWith('T-') ? posOrder.table_number : `T-${posOrder.table_number}`) : undefined,
+        deliveryAddress: posOrder.delivery_address || undefined,
+        _posOrder: posOrder,
+    } as Order & { _posOrder: PosOrder };
+}
 export function usePosSession() {
     const { authUser, isAuthenticated, isLoading } = useAuth();
     const { currentOutlet } = useApp();
