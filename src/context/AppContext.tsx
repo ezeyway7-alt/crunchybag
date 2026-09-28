@@ -615,15 +615,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Organization Suite States
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("crunchy_real_inventory");
-        if (saved !== null) return JSON.parse(saved);
-      } catch {}
-    }
-    return INITIAL_INVENTORY;
-  });
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -668,14 +660,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_STOCK_MOVEMENTS;
   });
 
-  // Sync inventory persistence
+  // Clear any stale cached inventory from localStorage so dummy data never leaks back
   useEffect(() => {
     if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("crunchy_real_inventory", JSON.stringify(inventory));
-      } catch {}
+      try { localStorage.removeItem("crunchy_real_inventory"); } catch {}
     }
-  }, [inventory]);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
