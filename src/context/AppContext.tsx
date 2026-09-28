@@ -468,7 +468,30 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Navigation & theme - permanently default to dark/black theme everywhere
-  const [activePortal, setActivePortal] = useState<PortalType>("customer");
+  const [activePortal, setActivePortal] = useState<PortalType>(() => {
+    if (typeof window !== "undefined") {
+      const p = window.location.pathname.toLowerCase();
+      if (
+        p === "/admin" ||
+        p.startsWith("/admin/") ||
+        p.startsWith("/superadmin") ||
+        p.startsWith("/brand") ||
+        p.startsWith("/outlet") ||
+        p.startsWith("/dashboard") ||
+        p.startsWith("/admin-portal")
+      ) {
+        return "admin";
+      }
+      if (p.startsWith("/pos")) return "staff";
+      if (p.startsWith("/kds")) return "kitchen";
+      if (p.startsWith("/waiter")) return "staff";
+      if (p.startsWith("/rider")) return "staff";
+      if (p.startsWith("/tv")) return "tv";
+      if (p.startsWith("/table-qr")) return "table-qr";
+      if (p.startsWith("/kiosk")) return "kiosk";
+    }
+    return "customer";
+  });
   const [isDark, setIsDark] = useState<boolean>(true);
 
   // Authentication & Role Access

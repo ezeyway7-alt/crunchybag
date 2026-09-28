@@ -1846,7 +1846,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                     ? product.images[product.mainImageIndex || 0] || product.images[0]
                     : "";
 
-                const catObj = categories.find((c) => c.id === product.categoryId);
+                const catObj = categories.find((c) => String(c.id) === String(product.categoryId));
 
                 return (
                   <div

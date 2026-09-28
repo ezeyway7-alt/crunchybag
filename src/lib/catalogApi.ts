@@ -2,7 +2,14 @@ import { apiClient, DEFAULT_API_BASE } from './api';
 import { Product, Category, TimePricingSchedule } from '../types';
 
 export function fromCategory(row: any): Category {
-  return { id: row.id, name: row.name, iconName: row.icon_name, displayOrder: row.display_order, isArchived: row.is_archived };
+  const data = row?.category || row?.data || row || {};
+  return {
+    id: String(data.id ?? ''),
+    name: String(data.name || ''),
+    iconName: data.icon_name || 'Utensils',
+    displayOrder: Number(data.display_order ?? 0),
+    isArchived: Boolean(data.is_archived),
+  };
 }
 export function fromProduct(row: any): Product {
   return {

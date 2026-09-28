@@ -14,8 +14,10 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   const sequence = useRef(0);
   const notifyRef = useRef(notify); notifyRef.current = notify;
   const deadline = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const management = portal === 'admin' && !!authStorage.getAccessToken();
-  const channel = portal === 'kiosk' ? 'kiosk' : portal === 'staff' || portal === 'admin' ? 'pos' : tableMode ? 'qr' : 'web';
+  const isAdminRoute = typeof window !== 'undefined' && (/^\/(admin|superadmin|brand|outlet|dashboard)/i.test(window.location.pathname) || window.location.pathname.startsWith('/admin'));
+  const isManagementPortal = portal === 'admin' || isAdminRoute;
+  const management = isManagementPortal && !!authStorage.getAccessToken();
+  const channel = portal === 'kiosk' ? 'kiosk' : portal === 'staff' || portal === 'admin' || isManagementPortal ? 'pos' : tableMode ? 'qr' : 'web';
   
   // Normalize outlet ID: extracts numeric ID or defaults to "1"
   const effectiveOutletId = normalizeOutletId(outletId);
@@ -40,8 +42,14 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
         const override = data.overrides?.[product.id];
         if (override) product.isAvailable = product.isAvailable && override.is_available;
       }
-      setCategories(data.categories.map(fromCategory)); setProducts(nextProducts);
-      setTimePricingSchedules(management ? data.schedules.map((s: any) => fromSchedule(s, effectiveOutletId, nextProducts)) : []);
+      const nextCategories = (data.categories || []).map(fromCategory);
+      setCategories(prev => {
+        const fetchedIds = new Set(nextCategories.map(c => String(c.id)));
+        const pending = prev.filter(c => !c.isArchived && !fetchedIds.has(String(c.id)));
+        return [...nextCategories, ...pending];
+      });
+      setProducts(nextProducts);
+      setTimePricingSchedules(management ? (data.schedules || []).map((s: any) => fromSchedule(s, effectiveOutletId, nextProducts)) : []);
       setError('');
       clearTimeout(deadline.current);
       if (!management) deadline.current = setTimeout(() => { void reload(); }, Math.max(1000, data.valid_until * 1000 - Date.now() + 150));
@@ -90,13 +98,35 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   };
   const quiet = (operation: () => Promise<unknown>) => { void mutate(operation).catch(() => {}); };
   const createCategory = async (name: string) => {
-    const existing = categories.find(c => c.name.toLowerCase() === name.trim().toLowerCase());
-    const row = await mutate(() => existing
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Category name cannot be empty.');
+    const existing = categories.find(c => c.name.toLowerCase() === trimmed.toLowerCase());
+    const row = await mutate(async () => existing
       ? apiClient.patch(catalogPath(`categories/${existing.id}/`, effectiveOutletId), { is_archived: false })
-      : apiClient.post(catalogPath('categories/', effectiveOutletId), { name: name.trim() }));
-    return fromCategory(row);
+      : apiClient.post(catalogPath('categories/', effectiveOutletId), { name: trimmed }));
+    
+    const created = fromCategory(row);
+    if (!created.id && existing) created.id = String(existing.id);
+    if (!created.id) created.id = `cat-${Date.now()}`;
+    if (!created.name) created.name = trimmed;
+
+    setCategories(prev => {
+      const exists = prev.some(c => String(c.id) === String(created.id) || c.name.toLowerCase() === trimmed.toLowerCase());
+      if (exists) {
+        return prev.map(c => (String(c.id) === String(created.id) || c.name.toLowerCase() === trimmed.toLowerCase())
+          ? { ...c, ...created, isArchived: false }
+          : c
+        );
+      }
+      return [...prev, created];
+    });
+
+    return created;
   };
-  const setCategoryArchived = (id: string, archived: boolean) => quiet(() => apiClient.patch(catalogPath(`categories/${id}/`, effectiveOutletId), { is_archived: archived }));
+  const setCategoryArchived = (id: string, archived: boolean) => {
+    setCategories(prev => prev.map(c => String(c.id) === String(id) ? { ...c, isArchived: archived } : c));
+    quiet(() => apiClient.patch(catalogPath(`categories/${id}/`, effectiveOutletId), { is_archived: archived }));
+  };
   const createProduct = async (product: Omit<Product, 'id'>) => fromProduct(await mutate(async () => apiClient.post(catalogPath('products/', effectiveOutletId), await productPayload(product, effectiveOutletId))));
   const updateProductFull = async (id: string, product: Partial<Product>) => { await mutate(async () => apiClient.patch(catalogPath(`products/${id}/`, effectiveOutletId), await productPayload(product, effectiveOutletId))); };
   const deleteProduct = (id: string) => quiet(() => apiClient.delete(catalogPath(`products/${id}/`, effectiveOutletId)));

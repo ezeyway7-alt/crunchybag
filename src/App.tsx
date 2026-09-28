@@ -109,6 +109,12 @@ const AppContent: React.FC = () => {
     isWaiterRoute ||
     isRiderRoute;
 
+  React.useEffect(() => {
+    if (isAdminRoute && activePortal !== "admin") {
+      setActivePortal("admin");
+    }
+  }, [isAdminRoute, activePortal, setActivePortal]);
+
   // 1. Direct Login Page route (/admin-login, /admin/login, or /login)
   if (isLoginRoute) {
     if (isAuthenticated) {
