@@ -16,46 +16,33 @@ import { Order } from "../../types";
 import { formatNPR } from "../../lib/utils";
 
 interface Props {
-  outlet?: string;
-  tables?: any[];
-  orders?: Order[] | any[];
-  onSelectTableForNewOrder: (tableId: string | any) => void;
-  onSelectOngoingOrder: (order: Order | any) => void;
-  onOpenBillingForOrder?: (order: Order | any) => void;
+  onSelectTableForNewOrder: (tableId: string) => void;
+  onSelectOngoingOrder: (order: Order) => void;
+  onOpenBillingForOrder?: (order: Order) => void;
 }
 
 export const StaffTableGrid: React.FC<Props> = ({
-  tables: propTables,
-  orders: propOrders,
   onSelectTableForNewOrder,
   onSelectOngoingOrder,
   onOpenBillingForOrder,
 }) => {
-  const { orders: contextOrders } = useApp();
-  const effectiveOrders: any[] = propOrders || contextOrders;
+  const { orders, updateOrderStatus, addToast } = useApp();
 
-  // 16 Standard Tables in the restaurant (T-01 to T-16), or prop tables
-  const allTables = React.useMemo(() => {
-    if (propTables && propTables.length > 0) {
-      return propTables.map((t) => {
-        if (typeof t === "string") return t;
-        const num = t.table_number || t.id;
-        return String(num).startsWith("T-") ? String(num) : `T-${String(num).padStart(2, "0")}`;
-      });
-    }
-    return Array.from({ length: 16 }, (_, i) => `T-${String(i + 1).padStart(2, "0")}`);
-  }, [propTables]);
+  // 16 Standard Tables in the restaurant (T-01 to T-16)
+  const allTables = Array.from({ length: 16 }, (_, i) => `T-${String(i + 1).padStart(2, "0")}`);
 
   // Find active orders for each table
-  const tableOrderMap: Record<string, any> = {};
-  effectiveOrders.forEach((o) => {
-    const tableNum = o.tableNumber || o.table_number;
-    const isCancelled = o.status === "CANCELLED";
-    const isCompleted = o.status === "COMPLETED";
-    const isBilled = o.isBilled || o.settlement === "PAID";
-    const isDineIn = o.fulfillmentType === "DINE_IN" || o.fulfillment_type === "DINE_IN";
-    if (!isCancelled && !isCompleted && !isBilled && isDineIn && tableNum) {
-      const raw = String(tableNum).trim().toUpperCase();
+  const tableOrderMap: Record<string, Order> = {};
+  orders.forEach((o) => {
+    if (
+      o.status !== "CANCELLED" &&
+      o.status !== "COMPLETED" &&
+      !o.isBilled &&
+      o.fulfillmentType === "DINE_IN" &&
+      o.tableNumber
+    ) {
+      // Normalize table format (e.g. "Table 04", "T-04", "T-4")
+      const raw = o.tableNumber.trim().toUpperCase();
       let norm = raw;
       const numMatch = raw.match(/\d+/);
       if (numMatch) {
@@ -67,10 +54,7 @@ export const StaffTableGrid: React.FC<Props> = ({
 
   const occupiedCount = Object.keys(tableOrderMap).length;
   const vacantCount = allTables.length - occupiedCount;
-  const totalOnTables = Object.values(tableOrderMap).reduce(
-    (sum, o) => sum + (Number(o.totalAmount || o.total_payable) || 0),
-    0
-  );
+  const totalOnTables = Object.values(tableOrderMap).reduce((sum, o) => sum + o.totalAmount, 0);
 
   return (
     <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-3 space-y-3">
@@ -139,10 +123,7 @@ export const StaffTableGrid: React.FC<Props> = ({
           }
 
           // Occupied Table Card
-          const itemCount = (activeOrder.items || []).reduce((sum: number, i: any) => sum + (i.quantity || 1), 0);
-          const custName = activeOrder.customerName || activeOrder.customer_name || "Guest";
-          const totalAmt = Number(activeOrder.totalAmount || activeOrder.total_payable) || 0;
-          const orderNum = activeOrder.orderNumber || activeOrder.order_number || "";
+          const itemCount = activeOrder.items.reduce((sum, i) => sum + i.quantity, 0);
 
           return (
             <div
@@ -162,13 +143,13 @@ export const StaffTableGrid: React.FC<Props> = ({
 
               <div className="my-1 space-y-0.5 text-left">
                 <div className="text-[10px] font-bold text-zinc-900 dark:text-white truncate">
-                  {custName}
+                  {activeOrder.customerName}
                 </div>
                 <div className="text-[10px] font-mono font-extrabold text-amber-600 dark:text-amber-400">
-                  {formatNPR(totalAmt)}
+                  {formatNPR(activeOrder.totalAmount)}
                 </div>
                 <div className="text-[9px] text-zinc-500 font-medium">
-                  {itemCount} items • #{orderNum}
+                  {itemCount} items • #{activeOrder.orderNumber}
                 </div>
               </div>
 

@@ -24,19 +24,11 @@ import {
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Order, PaymentMethod, SplitPaymentEntry } from "../../types";
-import {
-  usePosSession,
-  usePosCommand,
-  usePosOrders,
-  posOrderToOrder,
-  printPosReceipt,
-  PosOrder,
-} from "../../lib/posApi";
 import { formatNPR, formatTimer } from "../../lib/utils";
 import { Modal } from "../common/Modal";
 
 interface Props {
-  initialSelectedOrder?: Order | PosOrder | any | null;
+  initialSelectedOrder?: Order | null;
 }
 
 export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
@@ -49,17 +41,14 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
     addToast,
   } = useApp();
 
-  const posSession = usePosSession();
-  const posCommand = usePosCommand(posSession);
-
   // Selected Order for Billing Workbench
   const [selectedOrderId, setSelectedOrderId] = useState<string>(
-    initialSelectedOrder?.id ? String(initialSelectedOrder.id) : ""
+    initialSelectedOrder?.id || ""
   );
 
   useEffect(() => {
     if (initialSelectedOrder) {
-      setSelectedOrderId(String(initialSelectedOrder.id));
+      setSelectedOrderId(initialSelectedOrder.id);
     }
   }, [initialSelectedOrder]);
 
@@ -106,43 +95,19 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   // Hovered split index for tooltip
   const [hoveredSplitIndex, setHoveredSplitIndex] = useState<number | null>(null);
 
-  const backendBillsQuery = usePosOrders(posSession, {
-    start_date: startDate || undefined,
-    end_date: endDate || undefined,
-    settlement: settlementFilter === "ALL" ? undefined : settlementFilter,
-    page: 1,
-    page_size: 100,
-  });
-
-  const effectiveBills = useMemo(() => {
-    if (!posSession.enabled || !backendBillsQuery.data?.results?.length) {
-      return orders;
-    }
-    const backendMapped = backendBillsQuery.data.results.map((bo) =>
-      posOrderToOrder(bo, currentOutlet.name)
-    );
-    const backendIds = new Set(backendMapped.map((b) => b.orderNumber));
-    const localRemaining = orders.filter((o) => !backendIds.has(o.orderNumber));
-    return [...backendMapped, ...localRemaining];
-  }, [posSession.enabled, backendBillsQuery.data, currentOutlet.name, orders]);
-
   // Target Active Order for Workbench
   const activeOrder = useMemo(() => {
     if (selectedOrderId) {
-      return (
-        effectiveBills.find(
-          (o) => o.id === selectedOrderId || o.orderNumber === selectedOrderId
-        ) || null
-      );
+      return orders.find((o) => o.id === selectedOrderId) || null;
     }
     // Default to first open/unbilled order
-    const firstUnsettled = effectiveBills.find(
+    const firstUnsettled = orders.find(
       (o) =>
         o.status !== "CANCELLED" &&
         (o.isBilled === false || o.paymentStatus === "UNPAID")
     );
-    return firstUnsettled || effectiveBills[0] || null;
-  }, [effectiveBills, selectedOrderId]);
+    return firstUnsettled || orders[0] || null;
+  }, [orders, selectedOrderId]);
 
   // Synchronize initial splits and customer info when target order changes
   useEffect(() => {
@@ -173,14 +138,14 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
 
   // Unsettled / Open Orders list for fast picking
   const openOrders = useMemo(() => {
-    return effectiveBills.filter(
+    return orders.filter(
       (o) =>
         o.status !== "CANCELLED" &&
         (o.isBilled === false ||
           o.paymentStatus === "UNPAID" ||
           o.status !== "COMPLETED")
     );
-  }, [effectiveBills]);
+  }, [orders]);
 
   // Customer Loyalty Check
   const effectivePhone = customerPhone || activeOrder?.customerPhone;
@@ -353,28 +318,6 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
       }
     }
 
-    if (posSession.enabled) {
-      const backendId =
-        (activeOrder as any)._posOrder?.id ||
-        Number(activeOrder.id.replace(/\D/g, "")) ||
-        activeOrder.id;
-      const backendVersion = (activeOrder as any)._posOrder?.version || 1;
-      const tenderRows = splits.map((s) => ({
-        method: s.method === "CASH_ON_PICKUP" ? "CASH" : s.method,
-        amount: String(s.amount),
-        reference: "",
-      }));
-      void posCommand.run(`${backendId}/settle/`, {
-        version: backendVersion,
-        tenders: tenderRows,
-        customer_name: customerName.trim() || activeOrder.customerName,
-        customer_phone: customerPhone.trim() || activeOrder.customerPhone,
-        discount_amount: String(effectiveDiscount || 0),
-        discount_reason: discountReason || "",
-      });
-      void posCommand.run(`${backendId}/bill/`, { version: backendVersion });
-    }
-
     const settled = settleSplitPaymentOrder(
       activeOrder.id,
       splits,
@@ -395,7 +338,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   // FILTERED BILLS DATATABLE
   // -------------------------------------------------------------
   const filteredBills = useMemo(() => {
-    return effectiveBills.filter((o) => {
+    return orders.filter((o) => {
       if (o.status === "CANCELLED") return false;
 
       // Date Range Filter (Default: today)
@@ -477,7 +420,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
       return true;
     });
   }, [
-    effectiveBills,
+    orders,
     startDate,
     endDate,
     orderTypeFilter,
@@ -623,12 +566,6 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
               ) : (
                 <span className="px-1.5 py-0.2 text-[9px] font-black uppercase bg-emerald-500 text-black">
                   Settled
-                </span>
-              )}
-              {posSession.enabled && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>{posSession.connection === "Live" ? "Backend Live" : posSession.connection}</span>
                 </span>
               )}
             </div>
@@ -1756,20 +1693,8 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
             <div className="pt-2">
               <button
                 type="button"
-                onClick={async () => {
-                  const backendReceipt =
-                    (invoiceOrder as any)._posOrder?.receipts?.find(
-                      (r: any) => r.kind === "BILL"
-                    ) || (invoiceOrder as any)._posOrder?.receipts?.[0];
-                  if (posSession.enabled && backendReceipt?.id) {
-                    try {
-                      await printPosReceipt(posSession.outlet, backendReceipt.id);
-                    } catch {
-                      window.print?.();
-                    }
-                  } else {
-                    window.print?.();
-                  }
+                onClick={() => {
+                  window.print?.();
                   setInvoiceOrder(null);
                 }}
                 className="w-full py-2 bg-black text-white font-bold text-xs uppercase tracking-wider cursor-pointer"

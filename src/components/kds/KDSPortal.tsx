@@ -21,12 +21,6 @@ import {
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { KdsColumn, FulfillmentType } from "../../types";
-import {
-  usePosSession,
-  usePosCommand,
-  usePosOrders,
-  posOrderToOrder,
-} from "../../lib/posApi";
 import { formatTimer } from "../../lib/utils";
 import { SkeletonTicketGrid } from "../common/Skeleton";
 
@@ -86,9 +80,6 @@ export const KDSPortal: React.FC = () => {
     triggerKitchenCall,
   } = useApp();
 
-  const posSession = usePosSession();
-  const posCommand = usePosCommand(posSession);
-
   // Queue stage filter for mobile (All, Incoming, In Prep, Ready)
   const [activeStage, setActiveStage] = useState<KdsColumn | "ALL">("ALL");
   const [isStageLoading, setIsStageLoading] = useState(false);
@@ -135,29 +126,6 @@ export const KDSPortal: React.FC = () => {
         playKitchenChime("complete");
       } else {
         playKitchenChime("advance");
-      }
-    }
-    const ticket = kdsTickets.find((t) => t.id === ticketId);
-    if (posSession.enabled && ticket) {
-      const relatedOrder = orders.find((o) => o.orderNumber === ticket.orderNumber);
-      const backendId =
-        (relatedOrder as any)?._posOrder?.id ||
-        Number(relatedOrder?.id.replace(/\D/g, "")) ||
-        relatedOrder?.id;
-      const backendVersion = (relatedOrder as any)?._posOrder?.version || 1;
-      let nextStatus = "PREPARING";
-      if (currentColumn === "QUEUED") {
-        nextStatus = "PREPARING";
-      } else if (currentColumn === "PREPARING") {
-        nextStatus = "READY";
-      } else if (currentColumn === "READY") {
-        nextStatus = ticket.fulfillmentType === "DELIVERY" ? "OUT_FOR_DELIVERY" : "COMPLETED";
-      }
-      if (backendId) {
-        void posCommand.run(`${backendId}/transition/`, {
-          version: backendVersion,
-          status: nextStatus,
-        });
       }
     }
     bumpKdsTicket(ticketId);
@@ -253,12 +221,6 @@ export const KDSPortal: React.FC = () => {
                 </h1>
                 <p className="text-[10px] text-zinc-400 mt-0.5">
                   {currentOutlet.name} • <span className="text-amber-400 font-bold">{kdsTickets.length} ACTIVE</span>
-                  {posSession.enabled && (
-                    <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.2 text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>{posSession.connection === "Live" ? "Live KDS" : posSession.connection}</span>
-                    </span>
-                  )}
                 </p>
               </div>
             </div>
