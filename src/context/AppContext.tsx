@@ -201,6 +201,10 @@ interface AppContextType {
 
   // Catalog State
   categories: Category[];
+  createCategory: (name: string) => Category;
+  setCategoryArchived: (id: string, archived: boolean) => void;
+  saveTimePricing: (schedule: TimePricingSchedule) => void;
+  deleteTimePricing: (id: string) => void;
   products: Product[];
   draftChangesCount: number;
   toggleProductAvailability: (productId: string) => void;
@@ -621,10 +625,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Catalog
-  const [categories] = useState<Category[]>(MOCK_CATEGORIES);
-  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
+  const readCatalog = <T,>(key: string, fallback: T): T => {
+    try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; } catch { return fallback; }
+  };
+  const [categories, setCategories] = useState<Category[]>(() => readCatalog("crunchy_categories", MOCK_CATEGORIES));
+  const [products, setProducts] = useState<Product[]>(() => readCatalog("crunchy_products", MOCK_PRODUCTS));
   const [draftChangesCount, setDraftChangesCount] = useState<number>(2); // Seeded with 2 draft changes
-  const [timePricingSchedules, setTimePricingSchedules] = useState<TimePricingSchedule[]>(MOCK_TIME_PRICING);
+  const [timePricingSchedules, setTimePricingSchedules] = useState<TimePricingSchedule[]>(() => readCatalog("crunchy_tiers", MOCK_TIME_PRICING));
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("crunchy_categories", JSON.stringify(categories));
+      localStorage.setItem("crunchy_products", JSON.stringify(products));
+      localStorage.setItem("crunchy_tiers", JSON.stringify(timePricingSchedules));
+    } catch { addToast({ title: "Local catalog could not be saved", type: "error" }); }
+  }, [categories, products, timePricingSchedules]);
+  const createCategory = (name: string): Category => {
+    const existing = categories.find(c => c.name.toLowerCase() === name.trim().toLowerCase());
+    if (existing) { setCategories(prev => prev.map(c => c.id === existing.id ? { ...c, isArchived: false } : c)); return existing; }
+    const category = { id: crypto.randomUUID(), name: name.trim(), iconName: "Utensils", displayOrder: categories.length };
+    setCategories(prev => [...prev, category]);
+    return category;
+  };
+  const setCategoryArchived = (id: string, archived: boolean) => setCategories(prev => prev.map(c => c.id === id ? { ...c, isArchived: archived } : c));
+  const saveTimePricing = (schedule: TimePricingSchedule) => setTimePricingSchedules(prev => prev.some(s => s.id === schedule.id) ? prev.map(s => s.id === schedule.id ? schedule : s) : [...prev, schedule]);
+  const deleteTimePricing = (id: string) => setTimePricingSchedules(prev => prev.filter(s => s.id !== id));
 
   // Cart
   const [cartItems, setCartItems] = useState<CartLineItem[]>([]);
@@ -2635,7 +2660,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentOutlet,
         fulfillmentType,
         setFulfillmentType,
-        categories,
+        categories, createCategory, setCategoryArchived, saveTimePricing, deleteTimePricing,
         products,
         draftChangesCount,
         toggleProductAvailability,
