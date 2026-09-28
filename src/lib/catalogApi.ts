@@ -13,10 +13,10 @@ export function fromCategory(row: any): Category {
 }
 export function fromProduct(row: any): Product {
   return {
-    id: String(row.id), categoryId: String(row.category_id || row.category?.id || row.category),
-    name: row.name, description: row.description || '', basePrice: Number(row.base_price),
-    costPrice: row.cost_price == null ? undefined : Number(row.cost_price), images: row.images || [],
-    mainImageIndex: row.main_image_index, dietary: row.dietary_tags || [],
+    id: row.id, categoryId: row.category_id || row.category?.id || row.category,
+    name: row.name, description: row.description, basePrice: Number(row.base_price),
+    costPrice: row.cost_price == null ? undefined : Number(row.cost_price), images: row.images,
+    mainImageIndex: row.main_image_index, dietary: row.dietary_tags,
     isDeliveryEligible: row.is_delivery_eligible, isAvailable: row.is_available,
     isWebVisible: row.is_web_visible, showOnPos: row.show_on_pos, showOnQr: row.show_on_qr,
     discountPercent: Number(row.discount_percent), prepTimeMinutes: row.prep_time_minutes,
@@ -26,9 +26,9 @@ export function fromProduct(row: any): Product {
     isComboPackage: row.is_combo_package, comboDiscountType: row.combo_discount_type,
     comboDiscountValue: row.combo_discount_value == null ? undefined : Number(row.combo_discount_value),
     comboOriginalPrice: row.combo_original_price == null ? undefined : Number(row.combo_original_price),
-    comboItems: (row.combo_items || []).map((r: any) => ({ productId: String(r.product_id), productName: r.product_name, quantity: r.quantity, unitPrice: Number(r.unit_price) })),
-    variants: row.variants?.length ? row.variants.map((v: any) => ({ id: String(v.id), name: v.name, price: Number(v.price), isDefault: v.is_default })) : [{ id: '', name: 'Standard', price: Number(row.base_price), isDefault: true }],
-    modifierGroups: (row.modifier_groups || []).map((g: any) => ({ id: String(g.id), name: g.name, minSelections: g.min_selections, maxSelections: g.max_selections, required: g.required, options: (g.options || []).map((o: any) => ({ id: String(o.id), name: o.name, priceDelta: Number(o.price_delta || 0), isDefault: !!o.is_default })) })),
+    comboItems: (row.combo_items || []).map((r: any) => ({ productId: r.product_id, productName: r.product_name, quantity: r.quantity, unitPrice: Number(r.unit_price) })),
+    variants: row.variants?.length ? row.variants.map((v: any) => ({ id: v.id, name: v.name, price: Number(v.price), isDefault: v.is_default })) : [{ id: '', name: 'Standard', price: Number(row.base_price), isDefault: true }],
+    modifierGroups: (row.modifier_groups || []).map((g: any) => ({ id: g.id, name: g.name, minSelections: g.min_selections, maxSelections: g.max_selections, required: g.required, options: (g.options || []).map((o: any) => ({ id: o.id, name: o.name, priceDelta: Number(o.price_delta || 0), isDefault: !!o.is_default })) })),
     recipeIngredients: (() => {
       const seen = new Set<string>();
       return (row.recipe_ingredients || [])
