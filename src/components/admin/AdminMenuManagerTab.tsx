@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plus,
   Edit2,
@@ -16,6 +16,7 @@ import {
   Link2,
   Check,
   Zap,
+  Loader2,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import {
@@ -29,6 +30,7 @@ import {
 import { CategorySelect } from "../common/CategorySelect";
 import { StaffTimePricing } from "../staff/StaffTimePricing";
 import { formatNPR } from "../../lib/utils";
+import { inventoryApi } from "../../lib/inventoryApi";
 
 const SAMPLE_FOOD_PRESETS = [
   "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80", // Burger
@@ -54,7 +56,30 @@ export const AdminMenuManagerTab: React.FC = () => {
     currentOutlet,
     outlets,
     setCurrentOutlet,
+    syncBackendInventory,
   } = useApp();
+
+  const [isSavingItem, setIsSavingItem] = useState(false);
+  const [isSavingCombo, setIsSavingCombo] = useState(false);
+
+  // Sync real live backend inventory items so recipe ingredients map correctly
+  useEffect(() => {
+    let mounted = true;
+    const loadInventory = async () => {
+      try {
+        const data = await inventoryApi.fetchItems({ page_size: 150 });
+        if (mounted && data?.results?.length) {
+          syncBackendInventory(data.results);
+        }
+      } catch {
+        // Fallback to local inventory
+      }
+    };
+    void loadInventory();
+    return () => {
+      mounted = false;
+    };
+  }, [syncBackendInventory]);
 
   React.useEffect(() => {
     if (catalogError && !catalogError.includes("Choose an outlet")) {
@@ -178,7 +203,8 @@ export const AdminMenuManagerTab: React.FC = () => {
       return;
     }
 
-    const inv = inventory.find((i) => i.id === invId);
+    const normInvId = invId.replace(/^inv-/, "");
+    const inv = inventory.find((i) => String(i.id).replace(/^inv-/, "") === normInvId);
     if (!inv) return;
 
     // Auto-fill fields for retail items
@@ -191,16 +217,22 @@ export const AdminMenuManagerTab: React.FC = () => {
     setFormRequiresKitchen(false);
     setFormPrepTime("0");
 
-    // Automatically set ingredient recipe so 1 unit is deducted on checkout
-    setFormRecipeIngredients([
-      {
-        id: `ing-direct-${Date.now()}`,
-        inventoryItemId: inv.id,
-        inventoryItemName: inv.name,
-        quantityRequired: 1,
-        unit: inv.unit,
-      },
-    ]);
+    // Automatically set ingredient recipe so 1 unit is deducted on checkout without overwriting or duplicating
+    setFormRecipeIngredients((prev) => {
+      const withoutDirect = prev.filter(
+        (item) => !item.id.startsWith("ing-direct-") && String(item.inventoryItemId).replace(/^inv-/, "") !== normInvId
+      );
+      return [
+        ...withoutDirect,
+        {
+          id: `ing-direct-${Date.now()}`,
+          inventoryItemId: normInvId,
+          inventoryItemName: inv.name,
+          quantityRequired: 1,
+          unit: inv.unit,
+        },
+      ];
+    });
 
     addToast({
       title: "Linked to Inventory Item",
@@ -372,68 +404,77 @@ export const AdminMenuManagerTab: React.FC = () => {
   // -------------------------------------------------------------
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingItem) return;
+
     if (!formName.trim()) {
       addToast({ title: "Product name required", type: "error" });
       return;
     }
 
     if (!formCategoryId) { addToast({ title: "Select a category", type: "error" }); return; }
-    const bPrice = parseFloat(formBasePrice) || 0;
-    const cPrice = formCostPrice === "" ? undefined : Number(formCostPrice);
-    const pTime = parseInt(formPrepTime, 10) || 0;
-    const disc = parseFloat(formDiscountPercent) || 0;
-    const cal = formCalories === "" ? undefined : Number(formCalories);
 
-    const sanitizedImages = formImages;
-    const safeMainIndex =
-      formMainImageIndex >= 0 && formMainImageIndex < sanitizedImages.length
-        ? formMainImageIndex
-        : 0;
+    setIsSavingItem(true);
+    try {
+      const bPrice = parseFloat(formBasePrice) || 0;
+      const cPrice = formCostPrice === "" ? undefined : Number(formCostPrice);
+      const pTime = parseInt(formPrepTime, 10) || 0;
+      const disc = parseFloat(formDiscountPercent) || 0;
+      const cal = formCalories === "" ? undefined : Number(formCalories);
 
-    const payload: Omit<Product, "id"> = {
-      name: formName.trim(),
-      categoryId: formCategoryId,
-      basePrice: bPrice,
-      costPrice: cPrice,
-      prepTimeMinutes: pTime,
-      description: formDescription.trim(),
-      images: sanitizedImages,
-      mainImageIndex: safeMainIndex,
-      dietary: formDietary,
-      isDeliveryEligible: true,
-      isAvailable: true,
-      showOnPos: formShowOnPos,
-      showOnQr: formShowOnQr,
-      isWebVisible: formShowOnWeb,
-      requiresKitchen: formRequiresKitchen,
-      isDirectInventoryItem: !!formLinkedInventoryId,
-      linkedInventoryItemId: formLinkedInventoryId || undefined,
-      discountPercent: disc,
-      calories: cal,
-      variants: editingProductId && products.find(p => p.id === editingProductId)?.variants.length
-        ? products.find(p => p.id === editingProductId)!.variants.map(v => ({ ...v, price: v.isDefault ? bPrice : v.price }))
-        : [{ id: crypto.randomUUID(), name: "Standard", price: bPrice, isDefault: true }],
-      modifierGroups: formModifierSections,
-      recipeIngredients: formRecipeIngredients,
-    };
+      const sanitizedImages = formImages;
+      const safeMainIndex =
+        formMainImageIndex >= 0 && formMainImageIndex < sanitizedImages.length
+          ? formMainImageIndex
+          : 0;
 
-    if (editingProductId) {
-      try { await updateProductFull(editingProductId, payload); } catch { return; }
-      addToast({
-        title: "Product Updated",
-        description: `"${formName}" updated successfully.`,
-        type: "success",
-      });
-    } else {
-      try { await createProduct(payload); } catch { return; }
-      addToast({
-        title: "Product Created",
-        description: `"${formName}" added to catalog.`,
-        type: "success",
-      });
+      const payload: Omit<Product, "id"> = {
+        name: formName.trim(),
+        categoryId: formCategoryId,
+        basePrice: bPrice,
+        costPrice: cPrice,
+        prepTimeMinutes: pTime,
+        description: formDescription.trim(),
+        images: sanitizedImages,
+        mainImageIndex: safeMainIndex,
+        dietary: formDietary,
+        isDeliveryEligible: true,
+        isAvailable: true,
+        showOnPos: formShowOnPos,
+        showOnQr: formShowOnQr,
+        isWebVisible: formShowOnWeb,
+        requiresKitchen: formRequiresKitchen,
+        isDirectInventoryItem: !!formLinkedInventoryId,
+        linkedInventoryItemId: formLinkedInventoryId ? formLinkedInventoryId.replace(/^inv-/, "") : undefined,
+        discountPercent: disc,
+        calories: cal,
+        variants: editingProductId && products.find(p => p.id === editingProductId)?.variants.length
+          ? products.find(p => p.id === editingProductId)!.variants.map(v => ({ ...v, price: v.isDefault ? bPrice : v.price }))
+          : [{ id: crypto.randomUUID(), name: "Standard", price: bPrice, isDefault: true }],
+        modifierGroups: formModifierSections,
+        recipeIngredients: formRecipeIngredients,
+      };
+
+      if (editingProductId) {
+        await updateProductFull(editingProductId, payload);
+        addToast({
+          title: "Product Updated",
+          description: `"${formName}" updated successfully.`,
+          type: "success",
+        });
+      } else {
+        await createProduct(payload);
+        addToast({
+          title: "Product Created",
+          description: `"${formName}" added to catalog.`,
+          type: "success",
+        });
+      }
+      setViewMode("list");
+    } catch (err: any) {
+      console.error("Failed to save product:", err);
+    } finally {
+      setIsSavingItem(false);
     }
-
-    setViewMode("list");
   };
 
   // -------------------------------------------------------------
@@ -461,6 +502,8 @@ export const AdminMenuManagerTab: React.FC = () => {
 
   const handleSaveCombo = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingCombo) return;
+
     if (!comboName.trim()) {
       addToast({ title: "Package name required", type: "error" });
       return;
@@ -471,64 +514,71 @@ export const AdminMenuManagerTab: React.FC = () => {
       return;
     }
 
-    const sanitizedImages = comboImages.length > 0 ? comboImages : [SAMPLE_FOOD_PRESETS[0]];
-    const safeMainIndex =
-      comboMainImageIndex >= 0 && comboMainImageIndex < sanitizedImages.length
-        ? comboMainImageIndex
-        : 0;
+    setIsSavingCombo(true);
+    try {
+      const sanitizedImages = comboImages.length > 0 ? comboImages : [SAMPLE_FOOD_PRESETS[0]];
+      const safeMainIndex =
+        comboMainImageIndex >= 0 && comboMainImageIndex < sanitizedImages.length
+          ? comboMainImageIndex
+          : 0;
 
-    const payload: Omit<Product, "id"> = {
-      name: comboName.trim(),
-      categoryId: comboCategoryId,
-      basePrice: comboFinalPrice,
-      costPrice: Math.round(comboFinalPrice * 0.4),
-      prepTimeMinutes: 15,
-      description:
-        comboDescription.trim() ||
-        `Bundle contains: ${comboItems.map((i) => `${i.quantity}x ${i.productName}`).join(", ")}`,
-      images: sanitizedImages,
-      mainImageIndex: safeMainIndex,
-      dietary: ["Chef's Choice", "Popular"],
-      isDeliveryEligible: true,
-      isAvailable: true,
-      showOnPos: comboShowOnPos,
-      showOnQr: comboShowOnQr,
-      isWebVisible: comboShowOnWeb,
-      requiresKitchen: true,
-      isComboPackage: true,
-      comboItems: comboItems,
-      comboOriginalPrice: comboSumOriginal,
-      comboDiscountType: comboDiscountType,
-      comboDiscountValue: parseFloat(comboDiscountValue) || 0,
-      variants: [
-        {
-          id: `var-${Date.now()}`,
-          name: "Package Set",
-          price: comboFinalPrice,
-          isDefault: true,
-        },
-      ],
-      modifierGroups: [],
-      recipeIngredients: [],
-    };
+      const payload: Omit<Product, "id"> = {
+        name: comboName.trim(),
+        categoryId: comboCategoryId,
+        basePrice: comboFinalPrice,
+        costPrice: Math.round(comboFinalPrice * 0.4),
+        prepTimeMinutes: 15,
+        description:
+          comboDescription.trim() ||
+          `Bundle contains: ${comboItems.map((i) => `${i.quantity}x ${i.productName}`).join(", ")}`,
+        images: sanitizedImages,
+        mainImageIndex: safeMainIndex,
+        dietary: ["Chef's Choice", "Popular"],
+        isDeliveryEligible: true,
+        isAvailable: true,
+        showOnPos: comboShowOnPos,
+        showOnQr: comboShowOnQr,
+        isWebVisible: comboShowOnWeb,
+        requiresKitchen: true,
+        isComboPackage: true,
+        comboItems: comboItems,
+        comboOriginalPrice: comboSumOriginal,
+        comboDiscountType: comboDiscountType,
+        comboDiscountValue: parseFloat(comboDiscountValue) || 0,
+        variants: [
+          {
+            id: `var-${Date.now()}`,
+            name: "Package Set",
+            price: comboFinalPrice,
+            isDefault: true,
+          },
+        ],
+        modifierGroups: [],
+        recipeIngredients: [],
+      };
 
-    if (editingProductId) {
-      try { await updateProductFull(editingProductId, payload); } catch { return; }
-      addToast({
-        title: "Package Updated",
-        description: `"${comboName}" updated with ${comboItems.length} bundled items.`,
-        type: "success",
-      });
-    } else {
-      try { await createProduct(payload); } catch { return; }
-      addToast({
-        title: "Package Created",
-        description: `Combo "${comboName}" published at ${formatNPR(comboFinalPrice)}.`,
-        type: "success",
-      });
+      if (editingProductId) {
+        await updateProductFull(editingProductId, payload);
+        addToast({
+          title: "Package Updated",
+          description: `"${comboName}" updated with ${comboItems.length} bundled items.`,
+          type: "success",
+        });
+      } else {
+        await createProduct(payload);
+        addToast({
+          title: "Package Created",
+          description: `Combo "${comboName}" published at ${formatNPR(comboFinalPrice)}.`,
+          type: "success",
+        });
+      }
+
+      setViewMode("list");
+    } catch (err: any) {
+      console.error("Failed to save combo package:", err);
+    } finally {
+      setIsSavingCombo(false);
     }
-
-    setViewMode("list");
   };
 
   // -------------------------------------------------------------
@@ -613,11 +663,18 @@ export const AdminMenuManagerTab: React.FC = () => {
   // RECIPE INGREDIENTS (SECTION 4)
   // -------------------------------------------------------------
   const handleAddRecipeIngredient = () => {
-    const invItem = inventory[0];
+    const existingIds = new Set(
+      formRecipeIngredients.map((i) => String(i.inventoryItemId).replace(/^inv-/, ""))
+    );
+    const invItem =
+      inventory.find((i) => !existingIds.has(String(i.id).replace(/^inv-/, ""))) ||
+      inventory[0];
     if (!invItem) return;
+
+    const normId = String(invItem.id).replace(/^inv-/, "");
     const newIng: ProductIngredientRecipe = {
-      id: `ing-${Date.now()}`,
-      inventoryItemId: invItem.id,
+      id: `ing-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      inventoryItemId: normId,
       inventoryItemName: invItem.name,
       quantityRequired: 1,
       unit: invItem.unit,
@@ -626,13 +683,16 @@ export const AdminMenuManagerTab: React.FC = () => {
   };
 
   const handleUpdateRecipeIngredient = (id: string, invItemId: string) => {
-    const match = inventory.find((i) => i.id === invItemId);
+    const normId = String(invItemId).replace(/^inv-/, "");
+    const match = inventory.find(
+      (i) => String(i.id).replace(/^inv-/, "") === normId
+    );
     setFormRecipeIngredients((prev) =>
       prev.map((ing) => {
         if (ing.id !== id) return ing;
         return {
           ...ing,
-          inventoryItemId: invItemId,
+          inventoryItemId: normId,
           inventoryItemName: match ? match.name : ing.inventoryItemName,
           unit: match ? match.unit : ing.unit,
         };
@@ -724,10 +784,15 @@ export const AdminMenuManagerTab: React.FC = () => {
             <button
               type="button"
               onClick={handleSaveCombo}
-              className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs transition-colors flex items-center gap-1.5 shadow-sm"
+              disabled={isSavingCombo}
+              className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 disabled:cursor-not-allowed text-black font-black text-xs transition-colors flex items-center gap-1.5 shadow-sm"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Save & Publish Package</span>
+              {isSavingCombo ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              <span>{isSavingCombo ? "Publishing..." : "Save & Publish Package"}</span>
             </button>
           </div>
         </div>
@@ -1134,10 +1199,15 @@ export const AdminMenuManagerTab: React.FC = () => {
             <button
               type="submit"
               form="menu-item-form"
-              className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs transition-colors flex items-center gap-1.5 shadow-sm"
+              disabled={isSavingItem}
+              className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 disabled:cursor-not-allowed text-black font-black text-xs transition-colors flex items-center gap-1.5 shadow-sm"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Save & Publish Item</span>
+              {isSavingItem ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              <span>{isSavingItem ? "Saving..." : "Save & Publish Item"}</span>
             </button>
           </div>
         </div>
@@ -1629,50 +1699,65 @@ export const AdminMenuManagerTab: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              {formRecipeIngredients.map((ing) => (
-                <div
-                  key={ing.id}
-                  className="p-2 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2"
-                >
-                  <div className="flex items-center gap-2 flex-1">
-                    <select
-                      value={ing.inventoryItemId}
-                      onChange={(e) => handleUpdateRecipeIngredient(ing.id, e.target.value)}
-                      className="px-2 py-1 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white flex-1 max-w-sm"
-                    >
-                      {inventory.map((inv) => (
-                        <option key={inv.id} value={inv.id}>
-                          {inv.name} ({inv.currentStock} {inv.unit} in stock)
-                        </option>
-                      ))}
-                    </select>
+              {formRecipeIngredients.map((ing) => {
+                const normIngId = String(ing.inventoryItemId).replace(/^inv-/, "");
+                const matchedInv = inventory.find(
+                  (inv) => String(inv.id).replace(/^inv-/, "") === normIngId
+                );
+                const currentSelectValue = matchedInv ? matchedInv.id : ing.inventoryItemId;
 
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-zinc-500">Qty deducted per sale:</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={ing.quantityRequired}
-                        onChange={(e) =>
-                          handleUpdateRecipeQuantity(ing.id, parseFloat(e.target.value) || 0)
-                        }
-                        className="w-20 px-1.5 py-1 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-white"
-                      />
-                      <span className="text-[10px] text-zinc-400 font-mono uppercase">
-                        {ing.unit}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRecipeIngredient(ing.id)}
-                    className="text-zinc-400 hover:text-rose-500 p-1"
+                return (
+                  <div
+                    key={ing.id}
+                    className="p-2 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <select
+                        value={currentSelectValue}
+                        onChange={(e) => handleUpdateRecipeIngredient(ing.id, e.target.value)}
+                        className="px-2 py-1 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white flex-1 max-w-sm truncate"
+                      >
+                        {!matchedInv && ing.inventoryItemId && (
+                          <option value={ing.inventoryItemId}>
+                            {ing.inventoryItemName || `Material #${normIngId}`} (Saved)
+                          </option>
+                        )}
+                        {inventory.map((inv) => (
+                          <option key={inv.id} value={inv.id}>
+                            {inv.name} ({inv.currentStock} {inv.unit} in stock)
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-zinc-500">Qty deducted per sale:</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0.001"
+                          value={ing.quantityRequired}
+                          onChange={(e) =>
+                            handleUpdateRecipeQuantity(ing.id, parseFloat(e.target.value) || 0)
+                          }
+                          className="w-20 px-1.5 py-1 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-white"
+                        />
+                        <span className="text-[10px] text-zinc-400 font-mono uppercase">
+                          {matchedInv ? matchedInv.unit : ing.unit}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRecipeIngredient(ing.id)}
+                      className="text-zinc-400 hover:text-rose-500 p-1"
+                      title="Remove material"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </form>

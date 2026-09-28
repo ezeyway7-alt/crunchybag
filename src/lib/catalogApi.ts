@@ -29,7 +29,26 @@ export function fromProduct(row: any): Product {
     comboItems: (row.combo_items || []).map((r: any) => ({ productId: r.product_id, productName: r.product_name, quantity: r.quantity, unitPrice: Number(r.unit_price) })),
     variants: row.variants?.length ? row.variants.map((v: any) => ({ id: v.id, name: v.name, price: Number(v.price), isDefault: v.is_default })) : [{ id: '', name: 'Standard', price: Number(row.base_price), isDefault: true }],
     modifierGroups: (row.modifier_groups || []).map((g: any) => ({ id: g.id, name: g.name, minSelections: g.min_selections, maxSelections: g.max_selections, required: g.required, options: g.options.map((o: any) => ({ id: o.id, name: o.name, priceDelta: Number(o.price_delta), isDefault: o.is_default })) })),
-    recipeIngredients: (row.recipe_ingredients || []).map((r: any) => ({ id: String(r.id), inventoryItemId: String(r.inventory_item_id), inventoryItemName: r.inventory_item_name, quantityRequired: Number(r.quantity_required), unit: r.unit })),
+    recipeIngredients: (() => {
+      const seen = new Set<string>();
+      return (row.recipe_ingredients || [])
+        .map((r: any) => {
+          const rawInvId = r.inventory_item_id ?? r.inventory_item?.id ?? r.inventory_item;
+          const invId = rawInvId != null ? String(rawInvId).replace(/^inv-/, '') : '';
+          return {
+            id: String(r.id || `ing-${Math.random().toString(36).slice(2, 8)}`),
+            inventoryItemId: invId,
+            inventoryItemName: r.inventory_item_name || r.inventory_item?.name || '',
+            quantityRequired: Number(r.quantity_required || 1),
+            unit: r.unit || r.inventory_item?.unit || 'unit',
+          };
+        })
+        .filter((r: any) => {
+          if (!r.inventoryItemId || seen.has(r.inventoryItemId)) return false;
+          seen.add(r.inventoryItemId);
+          return true;
+        });
+    })(),
   };
 }
 export function fromSchedule(row: any, outletId: string, products: Product[]): TimePricingSchedule {
@@ -43,6 +62,11 @@ export async function productPayload(product: Partial<Product>, outletId: string
   const fields: Record<string, string> = { categoryId: 'category', name: 'name', description: 'description', basePrice: 'base_price', costPrice: 'cost_price', images: 'images', mainImageIndex: 'main_image_index', dietary: 'dietary_tags', isDeliveryEligible: 'is_delivery_eligible', isAvailable: 'is_available', isWebVisible: 'is_web_visible', showOnPos: 'show_on_pos', showOnQr: 'show_on_qr', discountPercent: 'discount_percent', prepTimeMinutes: 'prep_time_minutes', calories: 'calories', requiresKitchen: 'requires_kitchen', isCounterDirect: 'is_counter_direct', isDirectInventoryItem: 'is_direct_inventory_item', linkedInventoryItemId: 'linked_inventory_item', isComboPackage: 'is_combo_package', comboDiscountType: 'combo_discount_type', comboDiscountValue: 'combo_discount_value' };
   const body: any = {};
   for (const [key, value] of Object.entries(product)) if (fields[key]) body[fields[key]] = value ?? null;
+  if ('linkedInventoryItemId' in product) {
+    const rawLinked = String(product.linkedInventoryItemId || '').replace(/^inv-/, '').trim();
+    const numLinked = Number(rawLinked);
+    body.linked_inventory_item = !isNaN(numLinked) && numLinked > 0 ? numLinked : null;
+  }
   if (product.images) body.images = await Promise.all(product.images.map(async url => {
     if (!url.startsWith('data:')) return url;
     const blob = await (await fetch(url)).blob();
@@ -52,7 +76,23 @@ export async function productPayload(product: Partial<Product>, outletId: string
   if (product.variants) body.variants = product.variants.map(v => ({ ...(v.id ? { id: v.id } : {}), name: v.name, price: v.price, is_default: !!v.isDefault }));
   if (product.modifierGroups) body.modifier_groups = product.modifierGroups.map(g => ({ id: g.id, name: g.name, min_selections: g.minSelections, max_selections: g.maxSelections, required: g.required, options: g.options.map(o => ({ id: o.id, name: o.name, price_delta: o.priceDelta, is_default: !!o.isDefault })) }));
   if (product.comboItems) body.combo_items = product.comboItems.map(r => ({ product_id: r.productId, quantity: r.quantity }));
-  if (product.recipeIngredients) body.recipe_ingredients = product.recipeIngredients.map(r => ({ inventory_item_id: Number(r.inventoryItemId), quantity_required: r.quantityRequired }));
+  if (product.recipeIngredients) {
+    const seenPayload = new Set<number>();
+    body.recipe_ingredients = product.recipeIngredients
+      .map(r => {
+        const rawId = String(r.inventoryItemId || '').replace(/^inv-/, '').trim();
+        const numId = Number(rawId);
+        return {
+          inventory_item_id: !isNaN(numId) && numId > 0 ? numId : null,
+          quantity_required: Number(r.quantityRequired) || 1,
+        };
+      })
+      .filter((r): r is { inventory_item_id: number; quantity_required: number } => {
+        if (r.inventory_item_id === null || seenPayload.has(r.inventory_item_id)) return false;
+        seenPayload.add(r.inventory_item_id);
+        return true;
+      });
+  }
   return body;
 }
 export function schedulePayload(s: TimePricingSchedule) {
