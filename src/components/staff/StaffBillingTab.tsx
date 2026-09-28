@@ -113,16 +113,16 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   // Target Active Order for Workbench
   const activeOrder = useMemo(() => {
     if (selectedOrderId) {
-      return orders.find((o) => o.id === selectedOrderId) || null;
+      return allOrders.find((o) => o.id === selectedOrderId || o.orderNumber === selectedOrderId) || null;
     }
     // Default to first open/unbilled order
-    const firstUnsettled = orders.find(
+    const firstUnsettled = allOrders.find(
       (o) =>
         o.status !== "CANCELLED" &&
         (o.isBilled === false || o.paymentStatus === "UNPAID")
     );
-    return firstUnsettled || orders[0] || null;
-  }, [orders, selectedOrderId]);
+    return firstUnsettled || allOrders[0] || null;
+  }, [allOrders, selectedOrderId]);
 
   // Synchronize initial splits and customer info when target order changes
   useEffect(() => {
@@ -153,14 +153,14 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
 
   // Unsettled / Open Orders list for fast picking
   const openOrders = useMemo(() => {
-    return orders.filter(
+    return allOrders.filter(
       (o) =>
         o.status !== "CANCELLED" &&
         (o.isBilled === false ||
           o.paymentStatus === "UNPAID" ||
           o.status !== "COMPLETED")
     );
-  }, [orders]);
+  }, [allOrders]);
 
   // Customer Loyalty Check
   const effectivePhone = customerPhone || activeOrder?.customerPhone;
@@ -333,6 +333,28 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
       }
     }
 
+    if (posSession.enabled) {
+      const backendId =
+        (activeOrder as any)._posOrder?.id ||
+        Number(activeOrder.id.replace(/\D/g, "")) ||
+        activeOrder.id;
+      const backendVersion = (activeOrder as any)._posOrder?.version || 1;
+      const tenderRows = splits.map((s) => ({
+        method: s.method === "CASH_ON_PICKUP" ? "CASH" : s.method,
+        amount: String(s.amount),
+        reference: "",
+      }));
+      void posCommand.run(`${backendId}/settle/`, {
+        version: backendVersion,
+        tenders: tenderRows,
+        customer_name: customerName.trim() || activeOrder.customerName,
+        customer_phone: customerPhone.trim() || activeOrder.customerPhone,
+        discount_amount: String(effectiveDiscount || 0),
+        discount_reason: discountReason || "",
+      });
+      void posCommand.run(`${backendId}/bill/`, { version: backendVersion });
+    }
+
     const settled = settleSplitPaymentOrder(
       activeOrder.id,
       splits,
@@ -353,7 +375,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   // FILTERED BILLS DATATABLE
   // -------------------------------------------------------------
   const filteredBills = useMemo(() => {
-    return orders.filter((o) => {
+    return allOrders.filter((o) => {
       if (o.status === "CANCELLED") return false;
 
       // Date Range Filter (Default: today)
@@ -435,7 +457,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
       return true;
     });
   }, [
-    orders,
+    allOrders,
     startDate,
     endDate,
     orderTypeFilter,
@@ -1216,25 +1238,25 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-1 pb-1 text-xs font-bold border-t border-zinc-800">
           {(
             [
-              { key: "ALL", label: "All Bills", count: orders.length },
+              { key: "ALL", label: "All Bills", count: allOrders.length },
               {
                 key: "UNPAID",
                 label: "Unbilled Due",
-                count: orders.filter(
+                count: allOrders.filter(
                   (o) => !o.isBilled && o.paymentStatus !== "PAID" && o.status !== "CANCELLED"
                 ).length,
               },
               {
                 key: "PAID",
                 label: "Settled Paid",
-                count: orders.filter(
+                count: allOrders.filter(
                   (o) => (o.isBilled || o.paymentStatus === "PAID") && o.status !== "CANCELLED"
                 ).length,
               },
               {
                 key: "CREDIT",
                 label: "Credit (Khata)",
-                count: orders.filter(
+                count: allOrders.filter(
                   (o) =>
                     o.status !== "CANCELLED" &&
                     (o.paymentMethod === "CREDIT" ||
@@ -1249,20 +1271,20 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
               {
                 key: "SPLIT",
                 label: "Split Tender",
-                count: orders.filter(
+                count: allOrders.filter(
                   (o) => o.splitPayments && o.splitPayments.length > 1
                 ).length,
               },
               {
                 key: "DINE_IN",
                 label: "Dine-In",
-                count: orders.filter((o) => o.fulfillmentType === "DINE_IN")
+                count: allOrders.filter((o) => o.fulfillmentType === "DINE_IN")
                   .length,
               },
               {
                 key: "TAKEAWAY",
                 label: "Takeaway",
-                count: orders.filter((o) => o.fulfillmentType === "TAKEAWAY")
+                count: allOrders.filter((o) => o.fulfillmentType === "TAKEAWAY")
                   .length,
               },
             ] as const
@@ -1708,8 +1730,20 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => {
-                  window.print?.();
+                onClick={async () => {
+                  const backendReceipt =
+                    (invoiceOrder as any)._posOrder?.receipts?.find(
+                      (r: any) => r.kind === "BILL"
+                    ) || (invoiceOrder as any)._posOrder?.receipts?.[0];
+                  if (posSession.enabled && backendReceipt?.id) {
+                    try {
+                      await printPosReceipt(posSession.outlet, backendReceipt.id);
+                    } catch {
+                      window.print?.();
+                    }
+                  } else {
+                    window.print?.();
+                  }
                   setInvoiceOrder(null);
                 }}
                 className="w-full py-2 bg-black text-white font-bold text-xs uppercase tracking-wider cursor-pointer"

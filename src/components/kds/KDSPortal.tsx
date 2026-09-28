@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { KdsColumn, FulfillmentType } from "../../types";
+import { usePosSession, usePosCommand } from "../../lib/posApi";
 import { formatTimer } from "../../lib/utils";
 import { SkeletonTicketGrid } from "../common/Skeleton";
 
@@ -80,6 +81,9 @@ export const KDSPortal: React.FC = () => {
     triggerKitchenCall,
   } = useApp();
 
+  const posSession = usePosSession();
+  const posCommand = usePosCommand(posSession);
+
   // Queue stage filter for mobile (All, Incoming, In Prep, Ready)
   const [activeStage, setActiveStage] = useState<KdsColumn | "ALL">("ALL");
   const [isStageLoading, setIsStageLoading] = useState(false);
@@ -126,6 +130,29 @@ export const KDSPortal: React.FC = () => {
         playKitchenChime("complete");
       } else {
         playKitchenChime("advance");
+      }
+    }
+    const ticket = kdsTickets.find((t) => t.id === ticketId);
+    if (posSession.enabled && ticket) {
+      const relatedOrder = orders.find((o) => o.orderNumber === ticket.orderNumber);
+      const backendId =
+        (relatedOrder as any)?._posOrder?.id ||
+        Number(relatedOrder?.id.replace(/\D/g, "")) ||
+        relatedOrder?.id;
+      const backendVersion = (relatedOrder as any)?._posOrder?.version || 1;
+      let nextStatus = "PREPARING";
+      if (currentColumn === "QUEUED") {
+        nextStatus = "PREPARING";
+      } else if (currentColumn === "PREPARING") {
+        nextStatus = "READY";
+      } else if (currentColumn === "READY") {
+        nextStatus = ticket.fulfillmentType === "DELIVERY" ? "OUT_FOR_DELIVERY" : "COMPLETED";
+      }
+      if (backendId) {
+        void posCommand.run(`${backendId}/transition/`, {
+          version: backendVersion,
+          status: nextStatus,
+        });
       }
     }
     bumpKdsTicket(ticketId);

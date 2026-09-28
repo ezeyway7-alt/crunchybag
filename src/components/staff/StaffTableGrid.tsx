@@ -16,20 +16,30 @@ import { Order } from "../../types";
 import { formatNPR } from "../../lib/utils";
 
 interface Props {
+  posMeta?: any;
   onSelectTableForNewOrder: (tableId: string) => void;
   onSelectOngoingOrder: (order: Order) => void;
   onOpenBillingForOrder?: (order: Order) => void;
 }
 
 export const StaffTableGrid: React.FC<Props> = ({
+  posMeta,
   onSelectTableForNewOrder,
   onSelectOngoingOrder,
   onOpenBillingForOrder,
 }) => {
   const { orders, updateOrderStatus, addToast } = useApp();
 
-  // 16 Standard Tables in the restaurant (T-01 to T-16)
-  const allTables = Array.from({ length: 16 }, (_, i) => `T-${String(i + 1).padStart(2, "0")}`);
+  // 16 Standard Tables in the restaurant (T-01 to T-16), or backend tables from posMeta
+  const allTables = React.useMemo(() => {
+    if (posMeta?.tables && posMeta.tables.length > 0) {
+      return posMeta.tables.map((t: any) => {
+        const num = t.table_number || t.id;
+        return String(num).startsWith("T-") ? String(num) : `T-${String(num).padStart(2, "0")}`;
+      });
+    }
+    return Array.from({ length: 16 }, (_, i) => `T-${String(i + 1).padStart(2, "0")}`);
+  }, [posMeta]);
 
   // Find active orders for each table
   const tableOrderMap: Record<string, Order> = {};

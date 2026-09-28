@@ -121,11 +121,11 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
 
   const targetOngoingOrder = useMemo(() => {
     if (selectedOngoingOrderId) {
-      const found = orders.find((o) => o.id === selectedOngoingOrderId);
+      const found = mergedOrders.find((o) => o.id === selectedOngoingOrderId || o.orderNumber === selectedOngoingOrderId);
       if (found) return found;
     }
     return ongoingOrders[0] || null;
-  }, [orders, selectedOngoingOrderId, ongoingOrders]);
+  }, [mergedOrders, selectedOngoingOrderId, ongoingOrders]);
 
   // -------------------------------------------------------------
   // CREATE ORDER STATE
@@ -496,7 +496,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   // DATATABLE FILTERING & PAGINATION
   // -------------------------------------------------------------
   const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
+    return mergedOrders.filter((o) => {
       // Date Range Filter (Default: today)
       if (startDate) {
         const orderDate = (o.createdAt || "").slice(0, 10);
@@ -547,7 +547,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
       }
       return true;
     });
-  }, [orders, startDate, endDate, orderTypeFilter, settlementFilter, statusFilter, tableSearchQuery]);
+  }, [mergedOrders, startDate, endDate, orderTypeFilter, settlementFilter, statusFilter, tableSearchQuery]);
 
   // Statistics reflecting the active filtered dataset
   const datatableStats = useMemo(() => {
@@ -659,22 +659,42 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
 
   // Fast Bump Status
   const handleQuickBumpStatus = (order: Order) => {
+    let nextSt: OrderStatus = "CONFIRMED";
+    let backendSt = "ACCEPTED";
     if (order.status === "CONFIRMED") {
-      updateOrderStatus(order.id, "PROCESSING");
+      nextSt = "PROCESSING";
+      backendSt = "PREPARING";
+    } else if (order.status === "PROCESSING") {
+      nextSt = "READY";
+      backendSt = "READY";
+    } else if (order.status === "READY") {
+      nextSt = "COMPLETED";
+      backendSt = "COMPLETED";
+    }
+
+    if (posSession.enabled) {
+      const backendId = (order as any)._posOrder?.id || Number(order.id.replace(/\D/g, "")) || order.id;
+      const backendVersion = (order as any)._posOrder?.version || 1;
+      void posCommand.run(`${backendId}/transition/`, {
+        version: backendVersion,
+        status: backendSt,
+      });
+    }
+
+    updateOrderStatus(order.id, nextSt);
+    if (nextSt === "PROCESSING") {
       addToast({
         title: "Order Sent to Kitchen",
         description: `Order #${order.orderNumber} is now being prepared.`,
         type: "info",
       });
-    } else if (order.status === "PROCESSING") {
-      updateOrderStatus(order.id, "READY");
+    } else if (nextSt === "READY") {
       addToast({
         title: "Order Marked Ready",
         description: `Token ${order.kioskToken || order.orderNumber} is ready at pickup counter!`,
         type: "success",
       });
-    } else if (order.status === "READY") {
-      updateOrderStatus(order.id, "COMPLETED");
+    } else if (nextSt === "COMPLETED") {
       addToast({
         title: "Order Completed & Dispatched",
         description: `Order #${order.orderNumber} handed over to customer.`,
@@ -2126,7 +2146,26 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                           <select
                             value={order.status}
                             onChange={(e) => {
-                              updateOrderStatus(order.id, e.target.value as OrderStatus);
+                              const newSt = e.target.value as OrderStatus;
+                              if (posSession.enabled) {
+                                const backendId =
+                                  (order as any)._posOrder?.id ||
+                                  Number(order.id.replace(/\D/g, "")) ||
+                                  order.id;
+                                const backendVersion = (order as any)._posOrder?.version || 1;
+                                const statusMap: Record<string, string> = {
+                                  CONFIRMED: "ACCEPTED",
+                                  PROCESSING: "PREPARING",
+                                  READY: "READY",
+                                  COMPLETED: "COMPLETED",
+                                  CANCELLED: "CANCELLED",
+                                };
+                                void posCommand.run(`${backendId}/transition/`, {
+                                  version: backendVersion,
+                                  status: statusMap[newSt] || newSt,
+                                });
+                              }
+                              updateOrderStatus(order.id, newSt);
                               addToast({
                                 title: "Status Updated",
                                 description: `Order #${order.orderNumber} changed to ${e.target.value}`,
@@ -2550,8 +2589,19 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => {
-                  window.print?.();
+                onClick={async () => {
+                  const backendReceipt =
+                    (printSlipOrder as any)._posOrder?.receipts?.find((r: any) => r.kind === "TOKEN") ||
+                    (printSlipOrder as any)._posOrder?.receipts?.[0];
+                  if (posSession.enabled && backendReceipt?.id) {
+                    try {
+                      await printPosReceipt(posSession.outlet, backendReceipt.id);
+                    } catch {
+                      window.print?.();
+                    }
+                  } else {
+                    window.print?.();
+                  }
                   addToast({
                     title: "Slip Sent to Thermal Printer",
                     description: `Token ${printSlipOrder.kioskToken || printSlipOrder.orderNumber} queued.`,
