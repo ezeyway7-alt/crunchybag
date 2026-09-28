@@ -38,19 +38,24 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
     try {
       const data = await apiClient.get<any>(catalogPath(management ? 'management/' : `menu/`, effectiveOutletId) + (management ? '' : `&channel=${channel}`), { skipAuth: !management && channel !== 'pos' });
       if (seq !== sequence.current) return;
-      const nextProducts = (management ? data.products : data.categories.flatMap((c: any) => c.products)).map(fromProduct);
-      if (management) for (const product of nextProducts) {
-        const override = data.overrides?.[product.id];
-        if (override) product.isAvailable = product.isAvailable && override.is_available;
+      const rawProducts = management ? (data?.products || []) : (data?.categories || []).flatMap((c: any) => c?.products || []);
+      const nextProducts = (Array.isArray(rawProducts) ? rawProducts : []).map(fromProduct);
+      if (management && data?.overrides) {
+        for (const product of nextProducts) {
+          const override = data.overrides[product.id];
+          if (override) product.isAvailable = product.isAvailable && override.is_available;
+        }
       }
-      const nextCategories = (data.categories || []).map(fromCategory);
+      const rawCategories = Array.isArray(data?.categories) ? data.categories : [];
+      const nextCategories = rawCategories.map(fromCategory);
       setCategories(prev => {
         const fetchedIds = new Set(nextCategories.map(c => String(c.id)));
         const pending = prev.filter(c => !c.isArchived && !fetchedIds.has(String(c.id)));
         return [...nextCategories, ...pending];
       });
       setProducts(nextProducts);
-      setTimePricingSchedules(management ? (data.schedules || []).map((s: any) => fromSchedule(s, effectiveOutletId, nextProducts)) : []);
+      const rawSchedules = Array.isArray(data?.schedules) ? data.schedules : [];
+      setTimePricingSchedules(management ? rawSchedules.map((s: any) => fromSchedule(s, effectiveOutletId, nextProducts)) : []);
       setError('');
       clearTimeout(deadline.current);
       if (!management && typeof data?.valid_until === 'number' && Number.isFinite(data.valid_until)) {
@@ -60,9 +65,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
     } catch (error) {
       if (seq !== sequence.current) return;
       setError(extractErrorMessage(error));
-      // Retry reads with a bounded delay, including cold-cache 503s; never retry writes blindly.
       clearTimeout(deadline.current);
-      deadline.current = setTimeout(() => { void reloadRef.current(); }, 5000);
     } finally { if (seq === sequence.current) setLoading(false); }
   }, [effectiveOutletId, management, channel, validOutlet, authVersion]);
 

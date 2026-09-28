@@ -28,7 +28,7 @@ export function fromProduct(row: any): Product {
     comboOriginalPrice: row.combo_original_price == null ? undefined : Number(row.combo_original_price),
     comboItems: (row.combo_items || []).map((r: any) => ({ productId: r.product_id, productName: r.product_name, quantity: r.quantity, unitPrice: Number(r.unit_price) })),
     variants: row.variants?.length ? row.variants.map((v: any) => ({ id: v.id, name: v.name, price: Number(v.price), isDefault: v.is_default })) : [{ id: '', name: 'Standard', price: Number(row.base_price), isDefault: true }],
-    modifierGroups: (row.modifier_groups || []).map((g: any) => ({ id: g.id, name: g.name, minSelections: g.min_selections, maxSelections: g.max_selections, required: g.required, options: g.options.map((o: any) => ({ id: o.id, name: o.name, priceDelta: Number(o.price_delta), isDefault: o.is_default })) })),
+    modifierGroups: (row.modifier_groups || []).map((g: any) => ({ id: g.id, name: g.name, minSelections: g.min_selections, maxSelections: g.max_selections, required: g.required, options: (g.options || []).map((o: any) => ({ id: o.id, name: o.name, priceDelta: Number(o.price_delta || 0), isDefault: !!o.is_default })) })),
     recipeIngredients: (() => {
       const seen = new Set<string>();
       return (row.recipe_ingredients || [])
@@ -52,9 +52,20 @@ export function fromProduct(row: any): Product {
   };
 }
 export function fromSchedule(row: any, outletId: string, products: Product[]): TimePricingSchedule {
-  return { id: String(row.id), title: row.name, outletId, startTime: row.start_time.slice(0, 5), endTime: row.end_time.slice(0, 5), daysOfWeek: row.days,
-    channels: row.channels?.length ? row.channels : ['web', 'qr', 'pos', 'kiosk'], adjustmentPercentage: row.adjustment_percentage == null ? -Number(row.discount_percentage) : Number(row.adjustment_percentage),
-    discountPercentage: Number(row.discount_percentage), productIds: row.product_ids, productNames: products.filter(p => row.product_ids.includes(p.id)).map(p => p.name), isActive: row.is_active };
+  return {
+    id: String(row.id),
+    title: row.name || 'Schedule',
+    outletId,
+    startTime: (row.start_time || '').slice(0, 5),
+    endTime: (row.end_time || '').slice(0, 5),
+    daysOfWeek: row.days || [],
+    channels: row.channels?.length ? row.channels : ['web', 'qr', 'pos', 'kiosk'],
+    adjustmentPercentage: row.adjustment_percentage == null ? -Number(row.discount_percentage || 0) : Number(row.adjustment_percentage),
+    discountPercentage: Number(row.discount_percentage || 0),
+    productIds: row.product_ids || [],
+    productNames: (products || []).filter(p => (row.product_ids || []).includes(p.id)).map(p => p.name),
+    isActive: Boolean(row.is_active),
+  };
 }
 export const catalogPath = (path: string, outletId: string) => `/catalog/${path}?outlet_id=${encodeURIComponent(outletId)}`;
 
