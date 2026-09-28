@@ -51,7 +51,6 @@ import {
   usePosOrders,
   posOrderToOrder,
   printPosReceipt,
-  PosOrder,
   PosLine,
 } from "../../lib/posApi";
 import { formatNPR, formatTimer } from "../../lib/utils";
@@ -69,7 +68,7 @@ interface SelectedCartItem {
 }
 
 interface Props {
-  onOpenBillingForOrder?: (order: Order | any) => void;
+  onOpenBillingForOrder?: (order: Order) => void;
 }
 
 export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => {
@@ -91,24 +90,15 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     simulateIncomingOrder,
   } = useApp();
 
+  // Backend POS session — WebSocket live, fetches meta (tables, perms, payment methods)
   const posSession = usePosSession();
   const posCommand = usePosCommand(posSession);
-  const backendOngoingQuery = usePosOrders(posSession, {
-    open_tabs: true,
-    page_size: 100,
-  });
-
-  const effectiveOrders = useMemo(() => {
-    if (!posSession.enabled || !backendOngoingQuery.data?.results?.length) {
-      return orders;
-    }
-    const backendMapped = backendOngoingQuery.data.results.map((bo) =>
-      posOrderToOrder(bo, currentOutlet.name)
-    );
-    const backendNumbers = new Set(backendMapped.map((b) => b.orderNumber));
-    const localRemaining = orders.filter((o) => !backendNumbers.has(o.orderNumber));
-    return [...backendMapped, ...localRemaining];
-  }, [posSession.enabled, backendOngoingQuery.data, currentOutlet.name, orders]);
+  // Fetch backend open tabs; only runs when authenticated & outlet set
+  const backendOngoingQuery = usePosOrders(posSession, { open_tabs: true, page_size: 100 });
+  const backendOrders: Order[] = useMemo(() => {
+    if (!backendOngoingQuery.data?.results?.length) return [];
+    return backendOngoingQuery.data.results.map((po) => posOrderToOrder(po, currentOutlet.name));
+  }, [backendOngoingQuery.data, currentOutlet.name]);
 
   // -------------------------------------------------------------
   // POS MODE & ONGOING ORDER TAB STATE
@@ -116,22 +106,26 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const [posMode, setPosMode] = useState<"NEW_ORDER" | "ADD_TO_ONGOING" | "FLOOR_TABLES">("NEW_ORDER");
   const [selectedOngoingOrderId, setSelectedOngoingOrderId] = useState<string>("");
 
+  // Merge backend orders (primary) + local orders (fallback when offline/unauthenticated)
+  const mergedOrders = useMemo(() => {
+    if (backendOrders.length > 0) return backendOrders;
+    return orders;
+  }, [backendOrders, orders]);
+
   // Filter open running orders for ongoing addition
   const ongoingOrders = useMemo(() => {
-    return effectiveOrders.filter(
+    return mergedOrders.filter(
       (o) => o.status !== "CANCELLED" && (o.isBilled === false || o.status !== "COMPLETED")
     );
-  }, [effectiveOrders]);
+  }, [mergedOrders]);
 
   const targetOngoingOrder = useMemo(() => {
     if (selectedOngoingOrderId) {
-      const found = effectiveOrders.find(
-        (o) => o.id === selectedOngoingOrderId || o.orderNumber === selectedOngoingOrderId
-      );
+      const found = orders.find((o) => o.id === selectedOngoingOrderId);
       if (found) return found;
     }
     return ongoingOrders[0] || null;
-  }, [effectiveOrders, selectedOngoingOrderId, ongoingOrders]);
+  }, [orders, selectedOngoingOrderId, ongoingOrders]);
 
   // -------------------------------------------------------------
   // CREATE ORDER STATE
@@ -274,7 +268,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     setSelectedItems((prev) => prev.filter((_, idx) => idx !== index));
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (selectedItems.length === 0) {
       addToast({
         title: "Cart is Empty",
@@ -321,68 +315,75 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
         : "UNPAID"
       : paymentStatus;
 
-    if (posSession.enabled && posSession.meta?.permissions.orders) {
-      const posLines: PosLine[] = selectedItems.map((item) => ({
-        product_id: item.product.id,
-        variant_id: item.variant.id || null,
+    // --- BACKEND ORDER PLACEMENT (when authenticated) ---
+    if (posSession.enabled) {
+      // Map cart items to POS line format
+      const lines: PosLine[] = selectedItems.map((item) => ({
+        product_id: String(item.product.id),
+        variant_id: item.variant?.id && item.variant.id !== "" ? item.variant.id : null,
         quantity: item.quantity,
-        modifier_option_ids: item.modifiers || [],
-        item_notes: "",
+        modifier_option_ids: [],
       }));
 
+      // Map payment method to backend format
+      const backendPaymentMethod = effectivePaymentMethod === "CASH_ON_PICKUP" ? "CASH" : effectivePaymentMethod;
+
+      // Build tenders for payment
       const tenders = isSplitMode
-        ? posSplits.map((s) => ({
-            method: s.method === "CASH_ON_PICKUP" ? "CASH" : s.method,
-            amount: String(s.amount),
-            reference: "",
-          }))
-        : effectivePaymentStatus === "PAID"
-        ? [
-            {
-              method:
-                effectivePaymentMethod === "CASH_ON_PICKUP"
-                  ? "CASH"
-                  : effectivePaymentMethod,
-              amount: String(orderTotal),
+        ? posSplits
+            .filter((s) => s.amount > 0)
+            .map((s) => ({
+              method: s.method === "CASH_ON_PICKUP" ? "CASH" : s.method,
+              amount: String(s.amount),
               reference: "",
-            },
-          ]
+            }))
+        : effectivePaymentStatus === "PAID"
+        ? [{ method: backendPaymentMethod, amount: String(orderTotal), reference: "" }]
         : [];
 
-      void posCommand.run("", {
-        items: posLines,
-        expected_total: String(orderTotal),
-        payment_method:
-          effectivePaymentMethod === "CASH_ON_PICKUP"
-            ? "CASH"
-            : effectivePaymentMethod,
-        fulfillment_type:
-          fulfillmentType === "ONLINE_DELIVERY" ? "DELIVERY" : fulfillmentType,
-        table_id:
-          fulfillmentType === "DINE_IN" && tableNumber
-            ? Number(tableNumber.replace(/\D/g, "")) || null
-            : null,
+      // Find table backend ID from session meta
+      const tableId = fulfillmentType === "DINE_IN" && posSession.meta?.tables
+        ? posSession.meta.tables.find((t) => t.table_number === tableNumber)?.id ?? null
+        : null;
+
+      const payload = {
+        fulfillment_type: fulfillmentType === "ONLINE_DELIVERY" ? "DELIVERY" : fulfillmentType,
         customer_name: effectiveName,
-        customer_phone: customerPhone.trim(),
-        notes: orderNotes.trim(),
-        delivery_address: "",
+        customer_phone: customerPhone.trim() || "",
+        table_id: tableId,
+        notes: orderNotes.trim() || "",
+        discount_amount: orderDiscountAmount > 0 ? String(orderDiscountAmount) : "0",
+        lines,
         tenders,
+      };
+
+      const result = await posCommand.run("", payload);
+      if (result) {
+        addToast({
+          title: "Order Placed",
+          description: `Order #${result.order_number} created successfully.`,
+          type: "success",
+        });
+      } else if (posCommand.error) {
+        addToast({ title: "Order Failed", description: posCommand.error, type: "error" });
+        return;
+      }
+    } else {
+      // --- LOCAL FALLBACK (offline / unauthenticated) ---
+      createStaffOrder({
+        customerName: effectiveName,
+        customerPhone: customerPhone.trim() || undefined,
+        fulfillmentType,
+        tableNumber: fulfillmentType === "DINE_IN" ? tableNumber : undefined,
+        items: selectedItems,
+        paymentMethod: effectivePaymentMethod,
+        paymentStatus: effectivePaymentStatus,
+        notes: orderNotes.trim() || undefined,
+        discountAmount: orderDiscountAmount,
+        isSplitPayment: isSplitMode,
+        splitPayments: isSplitMode ? posSplits : undefined,
       });
     }
-
-    createStaffOrder({
-      customerName: effectiveName,
-      customerPhone: customerPhone.trim() || undefined,
-      fulfillmentType,
-      tableNumber: fulfillmentType === "DINE_IN" ? tableNumber : undefined,
-      items: selectedItems,
-      paymentMethod: effectivePaymentMethod,
-      paymentStatus: effectivePaymentStatus,
-      notes: orderNotes.trim() || undefined,
-      discountAmount: orderDiscountAmount,
-      isSplitPayment: isSplitMode,
-      splitPayments: isSplitMode ? posSplits : undefined,
-    });
 
     if (orderDiscountAmount > 0 && appliedLoyaltyOfferName && customerPhone.trim()) {
       recordAppliedLoyaltyDiscount({
@@ -416,7 +417,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   };
 
   // Add Items to Running/Ongoing Order Handler
-  const handleAddItemsToOngoingOrder = () => {
+  const handleAddItemsToOngoingOrder = async () => {
     if (!targetOngoingOrder) {
       addToast({
         title: "No Target Tab Selected",
@@ -437,53 +438,43 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     const kitchenCount = selectedItems.filter((i) => i.product.requiresKitchen !== false).length;
     const directCount = selectedItems.filter((i) => i.product.requiresKitchen === false).length;
 
-    if (posSession.enabled) {
-      const backendId =
-        (targetOngoingOrder as any)._posOrder?.id ||
-        Number(targetOngoingOrder.id.replace(/\D/g, "")) ||
-        targetOngoingOrder.id;
-      const backendVersion = (targetOngoingOrder as any)._posOrder?.version || 1;
-      const posLines: PosLine[] = selectedItems.map((item) => ({
-        product_id: item.product.id,
-        variant_id: item.variant.id || null,
+    // Use backend append when order came from backend (_posOrder attached)
+    const backendOrderId = (targetOngoingOrder as any)._posOrder?.id;
+    if (posSession.enabled && backendOrderId) {
+      const lines: PosLine[] = selectedItems.map((item) => ({
+        product_id: String(item.product.id),
+        variant_id: item.variant?.id && item.variant.id !== "" ? item.variant.id : null,
         quantity: item.quantity,
-        modifier_option_ids: item.modifiers || [],
-        item_notes: "",
+        modifier_option_ids: [],
       }));
-      const addedTotal = selectedItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
-      void posCommand.run(`${backendId}/append/`, {
-        version: backendVersion,
-        items: posLines,
-        expected_total: String(targetOngoingOrder.totalAmount + addedTotal),
+      const result = await posCommand.run(`${backendOrderId}/append/`, { lines });
+      if (result) {
+        addToast({
+          title: "Tab Updated",
+          description: `Order #${result.order_number}: ${kitchenCount > 0 ? `${kitchenCount} sent to kitchen. ` : ""}${directCount > 0 ? `${directCount} direct items ready.` : ""}`,
+          type: "success",
+        });
+      } else if (posCommand.error) {
+        addToast({ title: "Append Failed", description: posCommand.error, type: "error" });
+        return;
+      }
+    } else {
+      addItemsToRunningOrder(targetOngoingOrder.id, selectedItems);
+      addToast({
+        title: "Tab Updated Successfully",
+        description: `Updated #${targetOngoingOrder.orderNumber}: ${kitchenCount > 0 ? `${kitchenCount} sent to kitchen cook line. ` : ""}${directCount > 0 ? `${directCount} direct counter items ready.` : ""}`,
+        type: "success",
       });
     }
 
-    addItemsToRunningOrder(targetOngoingOrder.id, selectedItems);
-
     setSelectedItems([]);
-    addToast({
-      title: "Tab Updated Successfully",
-      description: `Updated #${targetOngoingOrder.orderNumber}: ${kitchenCount > 0 ? `${kitchenCount} sent to kitchen cook line. ` : ""}${directCount > 0 ? `${directCount} direct counter items ready.` : ""}`,
-      type: "success",
-    });
   };
 
   // Remove Item from Running Order Handler
   const handleRemoveItemFromRunningOrder = (orderId: string, itemId: string) => {
-    if (posSession.enabled) {
-      const order = effectiveOrders.find((o) => o.id === orderId);
-      const backendId = (order as any)?._posOrder?.id || Number(orderId.replace(/\D/g, "")) || orderId;
-      const backendVersion = (order as any)?._posOrder?.version || 1;
-      const numItemId = Number(itemId.replace(/\D/g, "")) || itemId;
-      void posCommand.run(`${backendId}/void/`, {
-        version: backendVersion,
-        item_id: numItemId,
-        reason: "Item removed by staff",
-      });
-    }
     const success = removeItemFromRunningOrder(orderId, itemId);
     if (success && selectedOrderForDrawer && selectedOrderForDrawer.id === orderId) {
-      const updated = effectiveOrders.find((o) => o.id === orderId);
+      const updated = orders.find((o) => o.id === orderId);
       if (updated) setSelectedOrderForDrawer(updated);
     }
   };
@@ -505,7 +496,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   // DATATABLE FILTERING & PAGINATION
   // -------------------------------------------------------------
   const filteredOrders = useMemo(() => {
-    return effectiveOrders.filter((o) => {
+    return orders.filter((o) => {
       // Date Range Filter (Default: today)
       if (startDate) {
         const orderDate = (o.createdAt || "").slice(0, 10);
@@ -556,7 +547,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
       }
       return true;
     });
-  }, [effectiveOrders, startDate, endDate, orderTypeFilter, settlementFilter, statusFilter, tableSearchQuery]);
+  }, [orders, startDate, endDate, orderTypeFilter, settlementFilter, statusFilter, tableSearchQuery]);
 
   // Statistics reflecting the active filtered dataset
   const datatableStats = useMemo(() => {
@@ -668,42 +659,22 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
 
   // Fast Bump Status
   const handleQuickBumpStatus = (order: Order) => {
-    let nextSt: OrderStatus = "CONFIRMED";
-    let backendSt = "ACCEPTED";
     if (order.status === "CONFIRMED") {
-      nextSt = "PROCESSING";
-      backendSt = "PREPARING";
-    } else if (order.status === "PROCESSING") {
-      nextSt = "READY";
-      backendSt = "READY";
-    } else if (order.status === "READY") {
-      nextSt = "COMPLETED";
-      backendSt = "COMPLETED";
-    }
-
-    if (posSession.enabled) {
-      const backendId = (order as any)._posOrder?.id || Number(order.id.replace(/\D/g, "")) || order.id;
-      const backendVersion = (order as any)._posOrder?.version || 1;
-      void posCommand.run(`${backendId}/transition/`, {
-        version: backendVersion,
-        status: backendSt,
-      });
-    }
-
-    updateOrderStatus(order.id, nextSt);
-    if (nextSt === "PROCESSING") {
+      updateOrderStatus(order.id, "PROCESSING");
       addToast({
         title: "Order Sent to Kitchen",
         description: `Order #${order.orderNumber} is now being prepared.`,
         type: "info",
       });
-    } else if (nextSt === "READY") {
+    } else if (order.status === "PROCESSING") {
+      updateOrderStatus(order.id, "READY");
       addToast({
         title: "Order Marked Ready",
         description: `Token ${order.kioskToken || order.orderNumber} is ready at pickup counter!`,
         type: "success",
       });
-    } else if (nextSt === "COMPLETED") {
+    } else if (order.status === "READY") {
+      updateOrderStatus(order.id, "COMPLETED");
       addToast({
         title: "Order Completed & Dispatched",
         description: `Order #${order.orderNumber} handed over to customer.`,
@@ -783,32 +754,6 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
               <Zap className="w-3.5 h-3.5 fill-black" />
               <span>⚡ Test Incoming Order</span>
             </button>
-
-            {posSession.enabled && (
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{posSession.connection === "Live" ? "Backend Live" : posSession.connection}</span>
-              </span>
-            )}
-            {posCommand.hasPending && (
-              <button
-                type="button"
-                disabled={posCommand.busy}
-                onClick={async () => {
-                  const rec = await posCommand.recover();
-                  if (rec) {
-                    addToast({
-                      title: "Action Recovered",
-                      description: `Order ${rec.order_number} recovered.`,
-                      type: "success",
-                    });
-                  }
-                }}
-                className="px-2 py-0.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black border border-amber-400"
-              >
-                Recover Action
-              </button>
-            )}
           </div>
 
           <div className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -835,6 +780,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
 
         {posMode === "FLOOR_TABLES" ? (
           <StaffTableGrid
+            posMeta={posSession.meta}
             onSelectTableForNewOrder={(tableId) => {
               setFulfillmentType("DINE_IN");
               setTableNumber(tableId);
@@ -2180,26 +2126,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                           <select
                             value={order.status}
                             onChange={(e) => {
-                              const newSt = e.target.value as OrderStatus;
-                              if (posSession.enabled) {
-                                const backendId =
-                                  (order as any)._posOrder?.id ||
-                                  Number(order.id.replace(/\D/g, "")) ||
-                                  order.id;
-                                const backendVersion = (order as any)._posOrder?.version || 1;
-                                const statusMap: Record<string, string> = {
-                                  CONFIRMED: "ACCEPTED",
-                                  PROCESSING: "PREPARING",
-                                  READY: "READY",
-                                  COMPLETED: "COMPLETED",
-                                  CANCELLED: "CANCELLED",
-                                };
-                                void posCommand.run(`${backendId}/transition/`, {
-                                  version: backendVersion,
-                                  status: statusMap[newSt] || newSt,
-                                });
-                              }
-                              updateOrderStatus(order.id, newSt);
+                              updateOrderStatus(order.id, e.target.value as OrderStatus);
                               addToast({
                                 title: "Status Updated",
                                 description: `Order #${order.orderNumber} changed to ${e.target.value}`,
@@ -2246,23 +2173,15 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                           {/* Kitchen Call / Ring Pickup Bell */}
                           <button
                             type="button"
-                            onClick={() => {
-                              if (posSession.enabled) {
-                                const backendId =
-                                  (order as any)._posOrder?.id ||
-                                  Number(order.id.replace(/\D/g, "")) ||
-                                  order.id;
-                                const backendVersion = (order as any)._posOrder?.version || 1;
-                                void posCommand.run(`${backendId}/call/`, { version: backendVersion });
-                              }
+                            onClick={() =>
                               triggerKitchenCall({
                                 orderNumber: order.orderNumber,
                                 kioskToken: order.kioskToken,
                                 customerName: order.customerName,
                                 fulfillmentType: order.fulfillmentType,
                                 tableNumber: order.tableNumber,
-                              });
-                            }}
+                              })
+                            }
                             className="p-1 hover:bg-amber-500/20 text-zinc-400 hover:text-amber-500 border border-zinc-200 dark:border-zinc-800 hover:border-amber-500/40 rounded cursor-pointer transition-colors"
                             title="Ring Bell & Announce on TV Screen"
                           >
@@ -2631,19 +2550,8 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
             <div className="pt-2">
               <button
                 type="button"
-                onClick={async () => {
-                  const backendReceipt =
-                    (printSlipOrder as any)._posOrder?.receipts?.find((r: any) => r.kind === "TOKEN") ||
-                    (printSlipOrder as any)._posOrder?.receipts?.[0];
-                  if (posSession.enabled && backendReceipt?.id) {
-                    try {
-                      await printPosReceipt(posSession.outlet, backendReceipt.id);
-                    } catch {
-                      window.print?.();
-                    }
-                  } else {
-                    window.print?.();
-                  }
+                onClick={() => {
+                  window.print?.();
                   addToast({
                     title: "Slip Sent to Thermal Printer",
                     description: `Token ${printSlipOrder.kioskToken || printSlipOrder.orderNumber} queued.`,

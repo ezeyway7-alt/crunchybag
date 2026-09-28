@@ -148,7 +148,7 @@ export function posOrderToOrder(posOrder: PosOrder, outletName?: string): Order 
     }));
 
     return {
-        id: String(posOrder.id),
+        id: `pos-${posOrder.id}`,
         orderNumber: posOrder.order_number,
         kioskToken: posOrder.receipts?.find(r => r.kind === 'TOKEN')?.number || `TK-${posOrder.id}`,
         outletId: String(posOrder.id),
@@ -178,6 +178,7 @@ export function posOrderToOrder(posOrder: PosOrder, outletName?: string): Order 
         _posOrder: posOrder,
     } as Order & { _posOrder: PosOrder };
 }
+
 export function usePosSession() {
     const { authUser, isAuthenticated, isLoading } = useAuth();
     const { currentOutlet } = useApp();
