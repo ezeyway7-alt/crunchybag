@@ -445,7 +445,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
             <span>Specials</span>
           </button>
 
-          {categories.map((cat) => (
+          {categories.filter(c => !c.isArchived).map((cat) => (
             <button
               key={cat.id}
               onClick={() => handleCategorySelect(cat.id)}

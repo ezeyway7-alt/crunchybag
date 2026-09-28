@@ -26,6 +26,8 @@ import {
   DietaryTag,
   ComboPackageItem,
 } from "../../types";
+import { CategorySelect } from "../common/CategorySelect";
+import { StaffTimePricing } from "../staff/StaffTimePricing";
 import { formatNPR } from "../../lib/utils";
 
 const SAMPLE_FOOD_PRESETS = [
@@ -54,7 +56,7 @@ export const AdminMenuManagerTab: React.FC = () => {
   // "combos"  -> List packages & combos
   // "item_form"  -> Add / Edit menu item page
   // "combo_form" -> Add / Edit combo package page
-  const [activeMainTab, setActiveMainTab] = useState<"items" | "combos">("items");
+  const [activeMainTab, setActiveMainTab] = useState<"items" | "combos" | "tiers">("items");
   const [viewMode, setViewMode] = useState<"list" | "item_form" | "combo_form">("list");
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
@@ -107,7 +109,7 @@ export const AdminMenuManagerTab: React.FC = () => {
   // -------------------------------------------------------------
   const [comboName, setComboName] = useState("");
   const [comboDescription, setComboDescription] = useState("");
-  const [comboCategoryId, setComboCategoryId] = useState("cat-combos");
+  const [comboCategoryId, setComboCategoryId] = useState("");
   const [comboImages, setComboImages] = useState<string[]>([
     "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=600&auto=format&fit=crop&q=80",
   ]);
@@ -313,7 +315,7 @@ export const AdminMenuManagerTab: React.FC = () => {
     setEditingProductId(null);
     setComboName("");
     setComboDescription("Value combo deal with curated selection of our finest items.");
-    setComboCategoryId("cat-combos");
+    setComboCategoryId("");
     setComboImages([
       "https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=600&auto=format&fit=crop&q=80",
     ]);
@@ -364,6 +366,7 @@ export const AdminMenuManagerTab: React.FC = () => {
       return;
     }
 
+    if (!formCategoryId) { addToast({ title: "Select a category", type: "error" }); return; }
     const bPrice = parseFloat(formBasePrice) || 0;
     const cPrice = formCostPrice === "" ? undefined : Number(formCostPrice);
     const pTime = parseInt(formPrepTime, 10) || 0;
@@ -456,6 +459,7 @@ export const AdminMenuManagerTab: React.FC = () => {
       addToast({ title: "Package name required", type: "error" });
       return;
     }
+    if (!comboCategoryId) { addToast({ title: "Select a category", type: "error" }); return; }
     if (comboItems.length === 0) {
       addToast({ title: "Select at least 1 menu item to bundle", type: "error" });
       return;
@@ -469,7 +473,7 @@ export const AdminMenuManagerTab: React.FC = () => {
 
     const payload: Omit<Product, "id"> = {
       name: comboName.trim(),
-      categoryId: comboCategoryId || "cat-combos",
+      categoryId: comboCategoryId,
       basePrice: comboFinalPrice,
       costPrice: Math.round(comboFinalPrice * 0.4),
       prepTimeMinutes: 15,
@@ -749,18 +753,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                 <label className="text-[10px] font-bold text-zinc-500 block mb-1">
                   Category *
                 </label>
-                <select
-                  value={comboCategoryId}
-                  onChange={(e) => setComboCategoryId(e.target.value)}
-                  className="w-full px-2 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-white"
-                >
-                  <option value="cat-combos">Combos & Value Packs</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                <CategorySelect value={comboCategoryId} onChange={setComboCategoryId} />
               </div>
 
               <div>
@@ -837,8 +830,7 @@ export const AdminMenuManagerTab: React.FC = () => {
               <label className="text-[10px] font-bold text-zinc-400 block mb-0.5">
                 Package Story / Included Highlights
               </label>
-              <input
-                type="text"
+              <textarea rows={4}
                 placeholder="e.g. Complete meal with gourmet burger, hot peri-peri fries and a chilled drink."
                 value={comboDescription}
                 onChange={(e) => setComboDescription(e.target.value)}
@@ -1218,19 +1210,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                 <label className="text-[10px] font-bold text-zinc-500 block mb-1">
                   Category *
                 </label>
-                <select
-                  required
-                  value={formCategoryId}
-                  onChange={(e) => setFormCategoryId(e.target.value)}
-                  className="w-full px-2 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-white focus:border-amber-500 outline-none"
-                >
-                  <option value="">Select category</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                <CategorySelect value={formCategoryId} onChange={setFormCategoryId} />
               </div>
 
               {/* Column 3: Base Selling Price & Cost Price */}
@@ -1333,8 +1313,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                 <label className="text-[10px] font-bold text-zinc-400 block mb-0.5">
                   Description
                 </label>
-                <input
-                  type="text"
+                <textarea rows={4}
                   placeholder="Item description"
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
@@ -1704,6 +1683,7 @@ export const AdminMenuManagerTab: React.FC = () => {
       <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-2.5 flex flex-wrap items-center justify-between gap-2 shadow-sm">
         {/* Left: Main Tabs (Menu Items vs Packages & Combos) */}
         <div className="flex items-center gap-1 border border-zinc-200 dark:border-zinc-800 p-0.5 bg-zinc-100 dark:bg-zinc-900">
+          <button type="button" onClick={() => setActiveMainTab("tiers")} className={`px-3 py-1 font-bold ${activeMainTab === "tiers" ? "bg-amber-500 text-black" : ""}`}>Pricing tiers</button>
           <button
             type="button"
             onClick={() => setActiveMainTab("items")}
@@ -1775,6 +1755,8 @@ export const AdminMenuManagerTab: React.FC = () => {
         </div>
       </div>
 
+      {activeMainTab === "tiers" && <StaffTimePricing />}
+
       {/* Category Pills Strip (for Items) */}
       {activeMainTab === "items" && (
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
@@ -1788,7 +1770,7 @@ export const AdminMenuManagerTab: React.FC = () => {
           >
             All Categories ({regularItems.length})
           </button>
-          {categories.map((cat) => (
+          {categories.filter(c => !c.isArchived).map((cat) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}

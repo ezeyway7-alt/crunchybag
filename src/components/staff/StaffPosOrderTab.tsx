@@ -736,7 +736,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                 >
                   All Items
                 </button>
-                {categories.map((cat) => (
+                {categories.filter(c => !c.isArchived).map((cat) => (
                   <button
                     key={cat.id}
                     type="button"

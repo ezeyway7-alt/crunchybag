@@ -258,7 +258,7 @@ export const CustomerPortal: React.FC = () => {
                 </button>
 
                 {/* 4. Category List (Gourmet Burgers, Crispy Chicken, etc.) */}
-                {categories.map((category) => {
+                {categories.filter(c => !c.isArchived).map((category) => {
                   const isActive = selectedCategory === category.id;
                   return (
                     <button

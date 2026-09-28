@@ -353,7 +353,11 @@ export interface AuditEvent {
   afterState: Record<string, unknown>;
 }
 
+export type PricingChannel = "web" | "qr" | "pos" | "kiosk";
+
 export interface TimePricingSchedule {
+  adjustmentPercentage?: number;
+  channels?: PricingChannel[];
   id: string;
   title: string;
   outletId: string;

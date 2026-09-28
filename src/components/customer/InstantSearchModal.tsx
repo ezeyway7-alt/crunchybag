@@ -86,7 +86,7 @@ export const InstantSearchModal: React.FC<InstantSearchModalProps> = ({
         >
           All Items
         </button>
-        {categories.map((c) => (
+        {categories.filter(c => !c.isArchived).map((c) => (
           <button
             key={c.id}
             onClick={() => setSelectedCategory(selectedCategory === c.id ? null : c.id)}
