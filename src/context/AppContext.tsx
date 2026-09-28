@@ -207,6 +207,7 @@ interface AppContextType {
   catalogLoading: boolean;
   catalogError: string;
   setCategoryArchived: (id: string, archived: boolean) => void;
+  deleteCategory: (id: string) => Promise<any>;
   saveTimePricing: (schedule: TimePricingSchedule) => Promise<void>;
   deleteTimePricing: (id: string) => void;
   products: Product[];
@@ -725,7 +726,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Persisted catalog: backend snapshots and live invalidation.
   const { categories, products, setProducts, timePricingSchedules, catalogLoading, catalogError,
-    createCategory, setCategoryArchived, saveTimePricing, deleteTimePricing, toggleTimePricing,
+    createCategory, setCategoryArchived, deleteCategory, saveTimePricing, deleteTimePricing, toggleTimePricing,
     createProduct, updateProductFull, deleteProduct, toggleProductAvailability } = useCatalog(currentOutlet.id, activePortal, isTableOrderMode, (toast) => addToast(toast));
   const [draftChangesCount, setDraftChangesCount] = useState(0);
 
@@ -2657,7 +2658,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentOutlet,
         fulfillmentType,
         setFulfillmentType,
-        categories, catalogLoading, catalogError, createCategory, setCategoryArchived, saveTimePricing, deleteTimePricing,
+        categories, catalogLoading, catalogError, createCategory, setCategoryArchived, deleteCategory, saveTimePricing, deleteTimePricing,
         products,
         draftChangesCount,
         toggleProductAvailability,

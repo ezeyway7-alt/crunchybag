@@ -1,20 +1,23 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { X, ChevronDown, Check, Loader2 } from "lucide-react";
+import { X, ChevronDown, Check, Loader2, Trash2 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 
 export function CategorySelect({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  const { categories, createCategory, setCategoryArchived, addToast } = useApp();
+  const { categories, createCategory, deleteCategory, addToast } = useApp();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const id = useId();
 
+  // Show active categories (plus selected if archived)
+  const visibleCategories = categories.filter(c => !c.isArchived || String(c.id) === String(value));
   const selected = categories.find(c => String(c.id) === String(value));
-  const matches = categories.filter(c => c.name.toLowerCase().includes(query.trim().toLowerCase()));
-  const canCreate = !!query.trim() && !categories.some(c => c.name.toLowerCase() === query.trim().toLowerCase());
+  const matches = visibleCategories.filter(c => c.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const canCreate = !!query.trim() && !visibleCategories.some(c => c.name.toLowerCase() === query.trim().toLowerCase());
   const count = matches.length + Number(canCreate);
 
   useEffect(() => {
@@ -25,7 +28,6 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
     if (index < matches.length) {
       const category = matches[index];
       if (category) {
-        if (category.isArchived) setCategoryArchived(category.id, false);
         onChange(String(category.id));
       }
       setQuery("");
@@ -56,6 +58,33 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
         setOpen(false);
         input.current?.focus();
       }
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, cat: { id: string; name: string }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (deletingId) return;
+
+    setDeletingId(cat.id);
+    try {
+      if (String(value) === String(cat.id)) {
+        onChange("");
+      }
+      await deleteCategory(cat.id);
+      addToast?.({
+        title: "Category Deleted",
+        description: `"${cat.name}" has been completely removed.`,
+        type: "success",
+      });
+    } catch (err: any) {
+      addToast?.({
+        title: "Could not delete category",
+        description: err?.message || "Failed to remove category. Please try again.",
+        type: "error",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -137,7 +166,12 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
         <div className="absolute z-30 w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 shadow-xl">
           <div id={id} role="listbox" ref={list} className="max-h-56 overflow-y-auto">
             {matches.map((c, i) => (
-              <div key={c.id} className="flex items-center">
+              <div
+                key={c.id}
+                className={`flex items-center group/item transition-colors ${
+                  active === i ? "bg-amber-500 text-black font-semibold" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                }`}
+              >
                 <div
                   id={`${id}-${i}`}
                   role="option"
@@ -145,13 +179,11 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
                   onMouseEnter={() => setActive(i)}
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => choose(i)}
-                  className={`flex-1 cursor-pointer p-2 text-xs flex items-center justify-between ${
-                    active === i ? "bg-amber-500 text-black font-semibold" : ""
-                  }`}
+                  className="flex-1 cursor-pointer p-2 text-xs flex items-center justify-between min-w-0"
                 >
-                  <span>
+                  <span className="truncate">
                     {c.name}
-                    {c.isArchived ? " (inactive · select to restore)" : ""}
+                    {c.isArchived ? " (inactive)" : ""}
                   </span>
                   {String(c.id) === String(value) && (
                     <Check size={14} className={active === i ? "text-black" : "text-amber-500"} />
@@ -159,14 +191,24 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
                 </div>
                 <button
                   type="button"
-                  aria-label={`${c.isArchived ? "Restore" : "Deactivate"} ${c.name}`}
-                  className="p-2 text-zinc-400 hover:text-zinc-200"
-                  onClick={() => {
-                    setCategoryArchived(c.id, !c.isArchived);
-                    if (String(value) === String(c.id) && !c.isArchived) onChange("");
+                  title={`Delete "${c.name}" category`}
+                  aria-label={`Delete ${c.name}`}
+                  className={`p-2 transition-colors ${
+                    active === i
+                      ? "text-black/70 hover:text-black"
+                      : "text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10"
+                  }`}
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
                   }}
+                  onClick={e => handleDelete(e, c)}
                 >
-                  {c.isArchived ? "+" : <X size={14} />}
+                  {deletingId === c.id ? (
+                    <Loader2 size={13} className="animate-spin text-rose-500" />
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
                 </button>
               </div>
             ))}

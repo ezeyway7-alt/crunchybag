@@ -127,6 +127,20 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
     setCategories(prev => prev.map(c => String(c.id) === String(id) ? { ...c, isArchived: archived } : c));
     quiet(() => apiClient.patch(catalogPath(`categories/${id}/`, effectiveOutletId), { is_archived: archived }));
   };
+  const deleteCategory = async (id: string) => {
+    setCategories(prev => prev.filter(c => String(c.id) !== String(id)));
+    return await mutate(async () => {
+      try {
+        return await apiClient.delete(catalogPath(`categories/${id}/`, effectiveOutletId));
+      } catch (err: any) {
+        try {
+          return await apiClient.patch(catalogPath(`categories/${id}/`, effectiveOutletId), { is_archived: true });
+        } catch {
+          throw err;
+        }
+      }
+    });
+  };
   const createProduct = async (product: Omit<Product, 'id'>) => fromProduct(await mutate(async () => apiClient.post(catalogPath('products/', effectiveOutletId), await productPayload(product, effectiveOutletId))));
   const updateProductFull = async (id: string, product: Partial<Product>) => { await mutate(async () => apiClient.patch(catalogPath(`products/${id}/`, effectiveOutletId), await productPayload(product, effectiveOutletId))); };
   const deleteProduct = (id: string) => quiet(() => apiClient.delete(catalogPath(`products/${id}/`, effectiveOutletId)));
@@ -138,6 +152,6 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   };
   const deleteTimePricing = (id: string) => quiet(() => apiClient.delete(catalogPath(`schedules/${id}/`, effectiveOutletId)));
   const toggleTimePricing = (id: string) => quiet(() => apiClient.patch(catalogPath(`schedules/${id}/`, effectiveOutletId), { is_active: !timePricingSchedules.find(s => s.id === id)?.isActive }));
-  return { categories, products, setProducts, timePricingSchedules, catalogLoading, catalogError, createCategory, setCategoryArchived,
+  return { categories, products, setProducts, timePricingSchedules, catalogLoading, catalogError, createCategory, setCategoryArchived, deleteCategory,
     createProduct, updateProductFull, deleteProduct, toggleProductAvailability, saveTimePricing, deleteTimePricing, toggleTimePricing };
 }
