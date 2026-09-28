@@ -29,6 +29,7 @@ import {
 import { CategorySelect } from "../common/CategorySelect";
 import { StaffTimePricing } from "../staff/StaffTimePricing";
 import { formatNPR } from "../../lib/utils";
+import { inventoryApi, BackendInventoryItem } from "../../lib/inventoryApi";
 
 const SAMPLE_FOOD_PRESETS = [
   "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80", // Burger
@@ -45,6 +46,7 @@ export const AdminMenuManagerTab: React.FC = () => {
     catalogLoading, catalogError,
     categories,
     inventory,
+    createCategory,
     createProduct,
     updateProductFull,
     deleteProduct,
@@ -52,6 +54,7 @@ export const AdminMenuManagerTab: React.FC = () => {
     addToast,
     timePricingSchedules,
     currentOutlet,
+    syncBackendInventory,
   } = useApp();
 
   React.useEffect(() => {
@@ -78,6 +81,58 @@ export const AdminMenuManagerTab: React.FC = () => {
   // File input refs for direct image upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const comboFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Pending category text from CategorySelect
+  const [categoryInputText, setCategoryInputText] = useState("");
+  const [comboCategoryInputText, setComboCategoryInputText] = useState("");
+
+  // Live Inventory Items from /api/v1/inventory/items/
+  const [liveInventory, setLiveInventory] = useState<BackendInventoryItem[]>([]);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+
+  const loadLiveInventory = React.useCallback(async () => {
+    setIsLoadingInventory(true);
+    try {
+      const data = await inventoryApi.fetchItems({ page_size: 200 });
+      if (data && Array.isArray(data.results)) {
+        setLiveInventory(data.results);
+        syncBackendInventory(data.results);
+      }
+    } catch (err) {
+      console.warn("Live inventory fetch for menu manager:", err);
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  }, [syncBackendInventory]);
+
+  React.useEffect(() => {
+    loadLiveInventory();
+  }, [loadLiveInventory]);
+
+  // Normalized available inventory for recipe mapping and counter items (no random dummy items)
+  const availableInventoryItems = useMemo(() => {
+    if (liveInventory.length > 0) {
+      return liveInventory.map((item) => ({
+        id: String(item.id),
+        name: item.name,
+        currentStock: parseFloat(String(item.current_stock)) || 0,
+        unit: item.unit || "unit",
+        costPerUnit: parseFloat(String(item.cost_per_unit)) || 0,
+        category: item.category_name || (typeof item.category === "string" ? item.category : ""),
+      }));
+    }
+    // Fallback to AppContext inventory, filtering out mock items
+    return inventory
+      .filter((inv) => !inv.id.startsWith("inv-0"))
+      .map((inv) => ({
+        id: String(inv.id),
+        name: inv.name,
+        currentStock: inv.currentStock,
+        unit: inv.unit,
+        costPerUnit: inv.costPerUnit,
+        category: inv.category,
+      }));
+  }, [liveInventory, inventory]);
 
   // -------------------------------------------------------------
   // FORM STATES: REGULAR MENU ITEM
@@ -174,7 +229,7 @@ export const AdminMenuManagerTab: React.FC = () => {
       return;
     }
 
-    const inv = inventory.find((i) => i.id === invId);
+    const inv = availableInventoryItems.find((i) => String(i.id) === String(invId));
     if (!inv) return;
 
     // Auto-fill fields for retail items
@@ -191,7 +246,7 @@ export const AdminMenuManagerTab: React.FC = () => {
     setFormRecipeIngredients([
       {
         id: `ing-direct-${Date.now()}`,
-        inventoryItemId: inv.id,
+        inventoryItemId: String(inv.id),
         inventoryItemName: inv.name,
         quantityRequired: 1,
         unit: inv.unit,
@@ -209,7 +264,7 @@ export const AdminMenuManagerTab: React.FC = () => {
   const handleQuickConvertInventoryItem = async (invItem: any, sellPrice: number) => {
     const payload: Omit<Product, "id"> = {
       name: invItem.name,
-      categoryId: categories.find(c => !c.isArchived)?.id || "",
+      categoryId: categories.find(c => !c.isArchived)?.id || (categories[0]?.id ? String(categories[0].id) : ""),
       basePrice: sellPrice,
       costPrice: invItem.costPerUnit,
       prepTimeMinutes: 1,
@@ -224,7 +279,7 @@ export const AdminMenuManagerTab: React.FC = () => {
       isWebVisible: true,
       requiresKitchen: false, // direct retail counter
       isDirectInventoryItem: true,
-      linkedInventoryItemId: invItem.id,
+      linkedInventoryItemId: String(invItem.id),
       variants: [
         {
           id: `var-${Date.now()}`,
@@ -237,7 +292,7 @@ export const AdminMenuManagerTab: React.FC = () => {
       recipeIngredients: [
         {
           id: `ing-quick-${Date.now()}`,
-          inventoryItemId: invItem.id,
+          inventoryItemId: String(invItem.id),
           inventoryItemName: invItem.name,
           quantityRequired: 1,
           unit: invItem.unit,
@@ -373,7 +428,28 @@ export const AdminMenuManagerTab: React.FC = () => {
       return;
     }
 
-    if (!formCategoryId) { addToast({ title: "Select a category", type: "error" }); return; }
+    let effectiveCategoryId = formCategoryId;
+    if (!effectiveCategoryId && categoryInputText.trim()) {
+      try {
+        const createdCat = await createCategory(categoryInputText.trim());
+        if (createdCat && createdCat.id) {
+          effectiveCategoryId = String(createdCat.id);
+          setFormCategoryId(effectiveCategoryId);
+        }
+      } catch (err) {
+        console.error("Auto-create category in handleSaveItem failed:", err);
+      }
+    }
+
+    if (!effectiveCategoryId) {
+      addToast({
+        title: "Select a category",
+        description: "Please select or type a category for this menu item.",
+        type: "error",
+      });
+      return;
+    }
+
     const bPrice = parseFloat(formBasePrice) || 0;
     const cPrice = formCostPrice === "" ? undefined : Number(formCostPrice);
     const pTime = parseInt(formPrepTime, 10) || 0;
@@ -388,7 +464,7 @@ export const AdminMenuManagerTab: React.FC = () => {
 
     const payload: Omit<Product, "id"> = {
       name: formName.trim(),
-      categoryId: formCategoryId,
+      categoryId: effectiveCategoryId,
       basePrice: bPrice,
       costPrice: cPrice,
       prepTimeMinutes: pTime,
@@ -461,7 +537,29 @@ export const AdminMenuManagerTab: React.FC = () => {
       addToast({ title: "Package name required", type: "error" });
       return;
     }
-    if (!comboCategoryId) { addToast({ title: "Select a category", type: "error" }); return; }
+
+    let effectiveComboCatId = comboCategoryId;
+    if (!effectiveComboCatId && comboCategoryInputText.trim()) {
+      try {
+        const createdCat = await createCategory(comboCategoryInputText.trim());
+        if (createdCat && createdCat.id) {
+          effectiveComboCatId = String(createdCat.id);
+          setComboCategoryId(effectiveComboCatId);
+        }
+      } catch (err) {
+        console.error("Auto-create combo category in handleSaveCombo failed:", err);
+      }
+    }
+
+    if (!effectiveComboCatId) {
+      addToast({
+        title: "Select a category",
+        description: "Please select or type a category for this package.",
+        type: "error",
+      });
+      return;
+    }
+
     if (comboItems.length === 0) {
       addToast({ title: "Select at least 1 menu item to bundle", type: "error" });
       return;
@@ -475,7 +573,7 @@ export const AdminMenuManagerTab: React.FC = () => {
 
     const payload: Omit<Product, "id"> = {
       name: comboName.trim(),
-      categoryId: comboCategoryId,
+      categoryId: effectiveComboCatId,
       basePrice: comboFinalPrice,
       costPrice: Math.round(comboFinalPrice * 0.4),
       prepTimeMinutes: 15,
@@ -609,11 +707,18 @@ export const AdminMenuManagerTab: React.FC = () => {
   // RECIPE INGREDIENTS (SECTION 4)
   // -------------------------------------------------------------
   const handleAddRecipeIngredient = () => {
-    const invItem = inventory[0];
-    if (!invItem) return;
+    const invItem = availableInventoryItems[0];
+    if (!invItem) {
+      addToast({
+        title: "No raw material items available",
+        description: "Please inward or add inventory items under the Inventory tab first.",
+        type: "warning",
+      });
+      return;
+    }
     const newIng: ProductIngredientRecipe = {
       id: `ing-${Date.now()}`,
-      inventoryItemId: invItem.id,
+      inventoryItemId: String(invItem.id),
       inventoryItemName: invItem.name,
       quantityRequired: 1,
       unit: invItem.unit,
@@ -622,13 +727,13 @@ export const AdminMenuManagerTab: React.FC = () => {
   };
 
   const handleUpdateRecipeIngredient = (id: string, invItemId: string) => {
-    const match = inventory.find((i) => i.id === invItemId);
+    const match = availableInventoryItems.find((i) => String(i.id) === String(invItemId));
     setFormRecipeIngredients((prev) =>
       prev.map((ing) => {
         if (ing.id !== id) return ing;
         return {
           ...ing,
-          inventoryItemId: invItemId,
+          inventoryItemId: String(invItemId),
           inventoryItemName: match ? match.name : ing.inventoryItemName,
           unit: match ? match.unit : ing.unit,
         };
@@ -755,7 +860,11 @@ export const AdminMenuManagerTab: React.FC = () => {
                 <label className="text-[10px] font-bold text-zinc-500 block mb-1">
                   Category *
                 </label>
-                <CategorySelect value={comboCategoryId} onChange={setComboCategoryId} />
+                <CategorySelect
+                  value={comboCategoryId}
+                  onChange={setComboCategoryId}
+                  onPendingTextChange={setComboCategoryInputText}
+                />
               </div>
 
               <div>
@@ -1160,7 +1269,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                   className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 px-3 py-2.5 text-xs text-zinc-900 dark:text-white outline-none focus:border-amber-500"
                 >
                   <option value="">No inventory link</option>
-                  {inventory.map((inv) => (
+                  {availableInventoryItems.map((inv) => (
                     <option key={inv.id} value={inv.id}>
                       {inv.name} ({inv.currentStock} {inv.unit} available)
                     </option>
@@ -1175,7 +1284,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                       Unlink
                     </button>
                   </div>
-                ) : inventory.length === 0 ? (
+                ) : availableInventoryItems.length === 0 ? (
                   <p className="text-xs text-zinc-500">No inventory items available.</p>
                 ) : null}
               </div>
@@ -1212,7 +1321,11 @@ export const AdminMenuManagerTab: React.FC = () => {
                 <label className="text-[10px] font-bold text-zinc-500 block mb-1">
                   Category *
                 </label>
-                <CategorySelect value={formCategoryId} onChange={setFormCategoryId} />
+                <CategorySelect
+                  value={formCategoryId}
+                  onChange={setFormCategoryId}
+                  onPendingTextChange={setCategoryInputText}
+                />
               </div>
 
               {/* Column 3: Base Selling Price & Cost Price */}
@@ -1616,7 +1729,7 @@ export const AdminMenuManagerTab: React.FC = () => {
               <button
                 type="button"
                 onClick={handleAddRecipeIngredient}
-                disabled={inventory.length === 0}
+                disabled={availableInventoryItems.length === 0}
                 className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-amber-500 hover:text-black text-xs font-bold transition-colors flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" />
@@ -1636,7 +1749,7 @@ export const AdminMenuManagerTab: React.FC = () => {
                       onChange={(e) => handleUpdateRecipeIngredient(ing.id, e.target.value)}
                       className="px-2 py-1 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white flex-1 max-w-sm"
                     >
-                      {inventory.map((inv) => (
+                      {availableInventoryItems.map((inv) => (
                         <option key={inv.id} value={inv.id}>
                           {inv.name} ({inv.currentStock} {inv.unit} in stock)
                         </option>
@@ -2138,9 +2251,9 @@ export const AdminMenuManagerTab: React.FC = () => {
             </p>
 
             <div className="max-h-72 overflow-y-auto divide-y divide-zinc-200 dark:divide-zinc-800">
-              {inventory.map((item) => {
+              {availableInventoryItems.map((item) => {
                 const isAlreadyMenu = products.some(
-                  (p) => p.linkedInventoryItemId === item.id || p.name.toLowerCase() === item.name.toLowerCase()
+                  (p) => String(p.linkedInventoryItemId) === String(item.id) || p.name.toLowerCase() === item.name.toLowerCase()
                 );
                 const suggestedSell = Math.max(item.costPerUnit + 25, Math.round(item.costPerUnit * 1.3));
 
@@ -2176,6 +2289,11 @@ export const AdminMenuManagerTab: React.FC = () => {
                   </div>
                 );
               })}
+              {availableInventoryItems.length === 0 && (
+                <div className="py-8 text-center text-xs text-zinc-500">
+                  No inventory items available to convert. Inward or add items under the Inventory tab first.
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end pt-2 border-t border-zinc-200 dark:border-zinc-800">
