@@ -480,20 +480,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [outlets, setOutlets] = useState<Outlet[]>(MOCK_OUTLETS);
   const [currentOutlet, setCurrentOutlet] = useState<Outlet>(() => {
     const saved = authStorage.getOutlet();
-    const configured = new URLSearchParams(window.location.search).get("outlet_id") || (import.meta as any).env.VITE_DEFAULT_OUTLET_ID;
-    const rawId = String(saved?.id || configured || MOCK_OUTLETS[0].id || "1");
-    const normalizedId = /^\d+$/.test(rawId) ? rawId : "1";
     if (saved && saved.name) {
       return {
         ...MOCK_OUTLETS[0],
-        id: normalizedId,
+        id: String(saved.id || MOCK_OUTLETS[0].id),
         name: saved.name || MOCK_OUTLETS[0].name,
         code: saved.branch_code || saved.code || MOCK_OUTLETS[0].code,
         address: saved.address || MOCK_OUTLETS[0].address,
         phone: saved.phone || MOCK_OUTLETS[0].phone,
       };
     }
-    return { ...MOCK_OUTLETS[0], id: normalizedId };
+    const configured = new URLSearchParams(window.location.search).get("outlet_id") || (import.meta as any).env.VITE_DEFAULT_OUTLET_ID;
+    return { ...MOCK_OUTLETS[0], id: configured || "" };
   });
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("DELIVERY");
 
@@ -502,11 +500,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const handleOutletSync = () => {
       const saved = authStorage.getOutlet();
       if (saved && saved.name) {
-        const rawId = String(saved.id || "");
-        const normalizedId = /^\d+$/.test(rawId) ? rawId : "1";
         setCurrentOutlet((prev) => ({
           ...prev,
-          id: normalizedId,
+          id: String(saved.id || prev.id),
           name: saved.name || prev.name,
           code: saved.branch_code || saved.code || prev.code,
           address: saved.address || prev.address,
@@ -1954,10 +1950,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!Array.isArray(backendItems) || backendItems.length === 0) return;
 
     setInventory((prev) => {
-      // If previous only contained INITIAL_INVENTORY dummy items, discard them in favor of live backend items
-      const isOnlyMock = prev.length > 0 && prev.every((it) => it.id.startsWith("inv-0") && INITIAL_INVENTORY.some((m) => m.id === it.id));
-      const updated = isOnlyMock ? [] : [...prev];
-
+      const updated = [...prev];
       backendItems.forEach((bItem: any) => {
         const bId = String(bItem.id);
         const bSku = bItem.sku ? String(bItem.sku).toLowerCase() : "";
@@ -1965,13 +1958,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const bStock = parseFloat(bItem.current_stock ?? bItem.currentStock) || 0;
         const bCost = parseFloat(bItem.cost_per_unit ?? bItem.costPerUnit) || 0;
         const bMin = parseFloat(bItem.min_threshold ?? bItem.minThreshold) || 5;
-        const bUnit = String(bItem.unit || "KG");
+        const bUnit = String(bItem.unit || "KG").toLowerCase();
         const bCategory = bItem.category_name || (typeof bItem.category === "string" ? bItem.category : "Raw Meat & Poultry");
-        const bSupplier = bItem.supplier_name || bItem.supplierName || "Local Verified Supplier";
+        const bSupplier = bItem.supplier_name || bItem.supplierName || "";
 
         const matchIdx = updated.findIndex(
           (loc) =>
-            String(loc.id) === bId ||
+            loc.id === bId ||
             (loc.sku && bSku && loc.sku.toLowerCase() === bSku) ||
             loc.name.toLowerCase().trim() === bName
         );
@@ -1979,7 +1972,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (matchIdx >= 0) {
           updated[matchIdx] = {
             ...updated[matchIdx],
-            id: bId,
             currentStock: bStock,
             costPerUnit: bCost > 0 ? bCost : updated[matchIdx].costPerUnit,
             minThreshold: bMin,
@@ -1988,8 +1980,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         } else {
           updated.push({
-            id: bId,
-            sku: bItem.sku || `SKU-${bId}`,
+            id: bId.startsWith("inv-") ? bId : `inv-${bId}`,
+            sku: bItem.sku || `SKU-${bId.slice(0, 8).toUpperCase()}`,
             name: bItem.name,
             category: bCategory as any,
             currentStock: bStock,
@@ -2002,11 +1994,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       });
-
-      try {
-        localStorage.setItem("crunchy_real_inventory", JSON.stringify(updated));
-      } catch {}
-
       return updated;
     });
   };
