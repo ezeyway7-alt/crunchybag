@@ -1,3 +1,4 @@
+import { PosOrder } from '../../lib/posApi';
 import React, { useState } from "react";
 import {
   TrendingUp,
@@ -141,7 +142,7 @@ export const AdminPortal: React.FC = () => {
   const [isAdminTabLoading, setIsAdminTabLoading] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [selectedBillingOrder, setSelectedBillingOrder] = useState<Order | null>(null);
+  const [selectedBillingOrder, setSelectedBillingOrder] = useState<PosOrder | null>(null);
 
   // Sync tab changes with URL and localStorage
   const handleTabChange = (tab: TabType) => {

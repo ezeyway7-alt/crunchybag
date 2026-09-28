@@ -1,3 +1,4 @@
+import { PosOrder } from '../../lib/posApi';
 import React, { useState } from "react";
 import {
   Menu,
@@ -46,7 +47,7 @@ export const StaffPortal: React.FC = () => {
   const [isSubViewLoading, setIsSubViewLoading] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-  const [selectedBillingOrder, setSelectedBillingOrder] = useState<Order | null>(null);
+  const [selectedBillingOrder, setSelectedBillingOrder] = useState<PosOrder | null>(null);
 
   const handleSubViewChange = (newView: StaffSubView) => {
     if (newView === activeSubView) return;
