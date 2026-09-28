@@ -1,0 +1,69 @@
+import { apiClient, DEFAULT_API_BASE } from './api';
+import { Product, Category, TimePricingSchedule } from '../types';
+
+export function fromCategory(row: any): Category {
+  return { id: row.id, name: row.name, iconName: row.icon_name, displayOrder: row.display_order, isArchived: row.is_archived };
+}
+export function fromProduct(row: any): Product {
+  return {
+    id: row.id, categoryId: row.category_id || row.category?.id || row.category,
+    name: row.name, description: row.description, basePrice: Number(row.base_price),
+    costPrice: row.cost_price == null ? undefined : Number(row.cost_price), images: row.images,
+    mainImageIndex: row.main_image_index, dietary: row.dietary_tags,
+    isDeliveryEligible: row.is_delivery_eligible, isAvailable: row.is_available,
+    isWebVisible: row.is_web_visible, showOnPos: row.show_on_pos, showOnQr: row.show_on_qr,
+    discountPercent: Number(row.discount_percent), prepTimeMinutes: row.prep_time_minutes,
+    calories: row.calories, requiresKitchen: row.requires_kitchen, isCounterDirect: row.is_counter_direct,
+    isDirectInventoryItem: row.is_direct_inventory_item,
+    linkedInventoryItemId: row.linked_inventory_item == null ? undefined : String(row.linked_inventory_item),
+    isComboPackage: row.is_combo_package, comboDiscountType: row.combo_discount_type,
+    comboDiscountValue: row.combo_discount_value == null ? undefined : Number(row.combo_discount_value),
+    comboOriginalPrice: row.combo_original_price == null ? undefined : Number(row.combo_original_price),
+    comboItems: (row.combo_items || []).map((r: any) => ({ productId: r.product_id, productName: r.product_name, quantity: r.quantity, unitPrice: Number(r.unit_price) })),
+    variants: row.variants?.length ? row.variants.map((v: any) => ({ id: v.id, name: v.name, price: Number(v.price), isDefault: v.is_default })) : [{ id: '', name: 'Standard', price: Number(row.base_price), isDefault: true }],
+    modifierGroups: (row.modifier_groups || []).map((g: any) => ({ id: g.id, name: g.name, minSelections: g.min_selections, maxSelections: g.max_selections, required: g.required, options: g.options.map((o: any) => ({ id: o.id, name: o.name, priceDelta: Number(o.price_delta), isDefault: o.is_default })) })),
+    recipeIngredients: (row.recipe_ingredients || []).map((r: any) => ({ id: String(r.id), inventoryItemId: String(r.inventory_item_id), inventoryItemName: r.inventory_item_name, quantityRequired: Number(r.quantity_required), unit: r.unit })),
+  };
+}
+export function fromSchedule(row: any, outletId: string, products: Product[]): TimePricingSchedule {
+  return { id: String(row.id), title: row.name, outletId, startTime: row.start_time.slice(0, 5), endTime: row.end_time.slice(0, 5), daysOfWeek: row.days,
+    channels: row.channels?.length ? row.channels : ['web', 'qr', 'pos', 'kiosk'], adjustmentPercentage: row.adjustment_percentage == null ? -Number(row.discount_percentage) : Number(row.adjustment_percentage),
+    discountPercentage: Number(row.discount_percentage), productIds: row.product_ids, productNames: products.filter(p => row.product_ids.includes(p.id)).map(p => p.name), isActive: row.is_active };
+}
+export const catalogPath = (path: string, outletId: string) => `/catalog/${path}?outlet_id=${encodeURIComponent(outletId)}`;
+
+export async function productPayload(product: Partial<Product>, outletId: string) {
+  const fields: Record<string, string> = { categoryId: 'category', name: 'name', description: 'description', basePrice: 'base_price', costPrice: 'cost_price', images: 'images', mainImageIndex: 'main_image_index', dietary: 'dietary_tags', isDeliveryEligible: 'is_delivery_eligible', isAvailable: 'is_available', isWebVisible: 'is_web_visible', showOnPos: 'show_on_pos', showOnQr: 'show_on_qr', discountPercent: 'discount_percent', prepTimeMinutes: 'prep_time_minutes', calories: 'calories', requiresKitchen: 'requires_kitchen', isCounterDirect: 'is_counter_direct', isDirectInventoryItem: 'is_direct_inventory_item', linkedInventoryItemId: 'linked_inventory_item', isComboPackage: 'is_combo_package', comboDiscountType: 'combo_discount_type', comboDiscountValue: 'combo_discount_value' };
+  const body: any = {};
+  for (const [key, value] of Object.entries(product)) if (fields[key]) body[fields[key]] = value ?? null;
+  if (product.images) body.images = await Promise.all(product.images.map(async url => {
+    if (!url.startsWith('data:')) return url;
+    const blob = await (await fetch(url)).blob();
+    const form = new FormData(); form.append('image', blob, 'menu-image');
+    return (await apiClient.post<{url: string}>(catalogPath('images/', outletId), form)).url;
+  }));
+  if (product.variants) body.variants = product.variants.map(v => ({ ...(v.id ? { id: v.id } : {}), name: v.name, price: v.price, is_default: !!v.isDefault }));
+  if (product.modifierGroups) body.modifier_groups = product.modifierGroups.map(g => ({ id: g.id, name: g.name, min_selections: g.minSelections, max_selections: g.maxSelections, required: g.required, options: g.options.map(o => ({ id: o.id, name: o.name, price_delta: o.priceDelta, is_default: !!o.isDefault })) }));
+  if (product.comboItems) body.combo_items = product.comboItems.map(r => ({ product_id: r.productId, quantity: r.quantity }));
+  if (product.recipeIngredients) body.recipe_ingredients = product.recipeIngredients.map(r => ({ inventory_item_id: Number(r.inventoryItemId), quantity_required: r.quantityRequired }));
+  return body;
+}
+export function schedulePayload(s: TimePricingSchedule) {
+  return { name: s.title, start_time: s.startTime, end_time: s.endTime, days: s.daysOfWeek, channels: s.channels,
+    adjustment_percentage: s.adjustmentPercentage ?? -s.discountPercentage, product_ids: s.productIds, is_active: s.isActive };
+}
+export function menuSocket(outletId: string) {
+  const configured = (import.meta as any).env.VITE_MENU_WS_ORIGIN;
+  const base = new URL(configured || DEFAULT_API_BASE, window.location.origin);
+  base.protocol = base.protocol === 'https:' || base.protocol === 'wss:' ? 'wss:' : 'ws:';
+  base.pathname = `/ws/outlets/${encodeURIComponent(outletId)}/menu/`; base.search = '';
+  return base.toString();
+}
+export function comboDefinitions(products: Product[]) {
+  return products.filter(p => p.isComboPackage && p.isAvailable).map(p => ({
+    id: p.id, title: p.name, subtitle: p.description, badge: 'Combo', badgeType: 'deal' as const,
+    promoText: '', buttonLabel: 'Customize', targetCategory: p.categoryId, bgGradient: 'from-amber-600 via-amber-500 to-yellow-500',
+    image: p.images[p.mainImageIndex || 0] || '', basePrice: p.basePrice, originalPrice: p.comboOriginalPrice ?? p.basePrice,
+    includedProductIds: (p.comboItems || []).flatMap(item => Array(item.quantity).fill(item.productId)),
+  }));
+}
