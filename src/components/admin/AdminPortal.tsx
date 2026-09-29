@@ -407,47 +407,8 @@ export const AdminPortal: React.FC = () => {
             })}
           </nav>
 
-          {/* Footer - Quick Add Log & Navigation */}
-          <div className="p-2 border-t border-zinc-800 bg-[#0D0D0F] shrink-0 space-y-1">
-            <button
-              type="button"
-              title="Add Staff Note / Log"
-              onClick={() => handleTabChange("logs")}
-              className="w-full h-9 px-3 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 rounded-md flex items-center cursor-pointer relative"
-            >
-              <div className="w-6 flex items-center justify-center shrink-0">
-                <Plus className="w-4 h-4 text-amber-500" />
-              </div>
-              <div
-                className={`flex-1 flex items-center justify-between ml-2.5 overflow-hidden transition-opacity duration-200 ${
-                  isSidebarHovered ? "opacity-100" : "opacity-0 pointer-events-none"
-                }`}
-              >
-                <span className="truncate whitespace-nowrap font-medium">Add Staff Log</span>
-                <span className="font-mono text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">
-                  NEW
-                </span>
-              </div>
-            </button>
-
-            {/* Return to Customer Storefront */}
-            <button
-              type="button"
-              title="Return to Customer Storefront"
-              onClick={handleReturnToCustomer}
-              className="w-full h-9 px-3 text-xs text-zinc-400 hover:text-amber-400 hover:bg-zinc-800/50 rounded-md flex items-center cursor-pointer"
-            >
-              <div className="w-6 flex items-center justify-center shrink-0">
-                <ArrowLeft className="w-4 h-4 text-zinc-400" />
-              </div>
-              <div
-                className={`flex-1 ml-2.5 overflow-hidden transition-opacity duration-200 ${
-                  isSidebarHovered ? "opacity-100" : "opacity-0 pointer-events-none"
-                }`}
-              >
-                <span className="truncate whitespace-nowrap font-medium">Customer Menu</span>
-              </div>
-            </button>
+          {/* Footer - Sign Out */}
+          <div className="p-2 border-t border-zinc-800 bg-[#0D0D0F] shrink-0">
 
             {/* Sign Out */}
             <button
@@ -540,31 +501,7 @@ export const AdminPortal: React.FC = () => {
               </nav>
             </div>
 
-            <div className="pt-2 border-t border-zinc-800 space-y-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileSidebarOpen(false);
-                  handleTabChange("logs");
-                }}
-                className="w-full h-9 px-3 text-xs bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-md flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Staff Log</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMobileSidebarOpen(false);
-                  handleReturnToCustomer();
-                }}
-                className="w-full h-9 px-3 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium rounded-md flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Customer Menu</span>
-              </button>
-
+            <div className="pt-2 border-t border-zinc-800">
               <button
                 type="button"
                 onClick={() => {
