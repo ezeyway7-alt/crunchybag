@@ -38,38 +38,114 @@ export const Skeleton: React.FC<SkeletonProps> = ({
    ========================================================================= */
 
 /**
+ * Hero Slider Skeleton matching HeroBannerSlider.tsx exact HTML structure & dimensions
+ */
+export const SkeletonHeroSlider: React.FC<{ className?: string }> = ({ className }) => {
+  return (
+    <div className={cn("relative w-full group/slider mt-2 sm:mt-2.5 pt-0", className)}>
+      {/* Slider Viewport Track */}
+      <div
+        className="flex items-stretch gap-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pt-0 pb-1"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div
+            key={index}
+            className="relative shrink-0 snap-start select-none overflow-hidden border border-zinc-800 bg-[#121214] shadow-sm
+              w-[86%] sm:w-[65%] md:w-[calc(40%-13px)] min-h-[190px] sm:min-h-[205px] md:min-h-[215px] flex flex-col justify-between"
+          >
+            {/* Background shimmer */}
+            <div className="absolute inset-0 skeleton-shimmer bg-zinc-900/90 z-0" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/20 z-0" />
+
+            {/* Card Content Overlay */}
+            <div className="relative z-10 p-3.5 sm:p-4 flex flex-col justify-between h-full">
+              {/* Top Right: Detail / Eye Icon placeholder */}
+              <div className="flex items-center justify-end">
+                <div className="w-6.5 h-6.5 bg-black/60 border border-white/20 rounded-none" />
+              </div>
+
+              {/* Main Package Name placeholder */}
+              <div className="my-auto py-1 space-y-2">
+                <div className="h-6 sm:h-7 w-3/4 skeleton-shimmer bg-zinc-700/80 rounded-none" />
+                <div className="h-3.5 w-1/2 skeleton-shimmer bg-zinc-800/80 rounded-none" />
+              </div>
+
+              {/* Bottom Action Button & Price */}
+              <div className="pt-2 flex items-center justify-between gap-2 border-t border-white/20">
+                <div className="h-7.5 w-26 bg-zinc-800/90 border border-zinc-700/80 rounded-none flex items-center justify-center">
+                  <div className="h-2.5 w-14 bg-zinc-700/80 rounded-none" />
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <div className="h-3 w-10 skeleton-shimmer bg-zinc-700/60 rounded-none" />
+                  <div className="h-4.5 w-16 skeleton-shimmer bg-amber-500/40 border border-amber-500/30 rounded-none" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Dot Indicators */}
+      <div className="flex items-center justify-center gap-1.5 pt-3">
+        <div className="h-1.5 w-6 bg-amber-500/60" />
+        <div className="h-1.5 w-2 bg-zinc-800" />
+        <div className="h-1.5 w-2 bg-zinc-800" />
+      </div>
+    </div>
+  );
+};
+
+/**
  * Product Card Skeleton (Menu, Catalog, Kiosk, Table QR)
+ * 1:1 match with ProductCard.tsx layout & dimensions
  */
 export const SkeletonProductCard: React.FC<{ className?: string }> = ({ className }) => {
   return (
     <div
       className={cn(
-        "bg-[#121214] border border-zinc-800/80 p-3 sm:p-4 flex flex-col gap-3 rounded-none overflow-hidden",
+        "group relative bg-[#121214] border border-zinc-800 rounded-none overflow-hidden shadow-sm flex flex-col",
         className
       )}
     >
-      {/* Image box */}
-      <Skeleton className="w-full aspect-4/3 rounded-none bg-zinc-800/70" />
+      {/* Product Media with Zero CLS container */}
+      <div className="relative w-full aspect-4/3 sm:aspect-16/11 bg-zinc-900 overflow-hidden skeleton-shimmer">
+        {/* Top-left tag badge placeholder */}
+        <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
+          <div className="h-4.5 w-16 bg-black/80 border border-zinc-700/70 rounded-none" />
+        </div>
 
-      {/* Category tag & spice rating */}
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <Skeleton className="h-4 w-20 rounded-sm" />
-        <Skeleton className="h-4 w-12 rounded-sm" />
+        {/* Top-right action icons placeholder */}
+        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
+          <div className="w-6.5 h-6.5 bg-black/70 border border-zinc-700/60 rounded-none" />
+          <div className="w-6.5 h-6.5 bg-black/70 border border-zinc-700/60 rounded-none" />
+        </div>
+
+        {/* Prep Time */}
+        <div className="absolute bottom-2 right-2 z-10">
+          <div className="h-4.5 w-11 bg-black/85 border border-zinc-700/60 rounded-none" />
+        </div>
       </div>
 
-      {/* Product Title */}
-      <Skeleton className="h-5 w-3/4 rounded-sm" />
+      {/* Card Content */}
+      <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <div className="h-4 sm:h-4.5 w-4/5 skeleton-shimmer bg-zinc-800/90 rounded-none" />
+          </div>
+          <div className="h-3 w-1/2 skeleton-shimmer bg-zinc-800/50 rounded-none mt-1.5" />
+        </div>
 
-      {/* Product Description */}
-      <div className="space-y-1.5 flex-1">
-        <Skeleton className="h-3.5 w-full rounded-sm" />
-        <Skeleton className="h-3.5 w-4/5 rounded-sm" />
-      </div>
+        {/* Pricing & CTA */}
+        <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-zinc-800">
+          <div className="space-y-1">
+            <div className="h-2.5 w-10 skeleton-shimmer bg-zinc-800/60 rounded-none" />
+            <div className="h-4.5 w-16 skeleton-shimmer bg-zinc-800/90 rounded-none" />
+          </div>
 
-      {/* Price & Add Action */}
-      <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60 mt-auto">
-        <Skeleton className="h-6 w-20 rounded-sm" />
-        <Skeleton className="h-8 w-24 rounded-none" />
+          <div className="h-8.5 w-20 sm:w-22 skeleton-shimmer bg-zinc-800/90 border border-zinc-700 rounded-none" />
+        </div>
       </div>
     </div>
   );
@@ -85,7 +161,7 @@ export const SkeletonProductGrid: React.FC<{ count?: number; className?: string 
   return (
     <div
       className={cn(
-        "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5",
+        "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5",
         className
       )}
     >

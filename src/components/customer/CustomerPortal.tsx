@@ -258,23 +258,37 @@ export const CustomerPortal: React.FC = () => {
                 </button>
 
                 {/* 4. Category List (Gourmet Burgers, Crispy Chicken, etc.) */}
-                {categories.filter(c => !c.isArchived).map((category) => {
-                  const isActive = selectedCategory === category.id;
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => handleCategorySelect(category.id)}
-                      className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
-                        isActive
-                          ? "bg-amber-500 text-black border-amber-500 font-black shadow-sm"
-                          : "bg-[#18181B] text-zinc-300 border-zinc-800 hover:border-zinc-700"
-                      }`}
-                    >
-                      {getCategoryIcon(category.iconName)}
-                      <span>{category.name}</span>
-                    </button>
-                  );
-                })}
+                {isLoadingSkeleton && categories.length === 0 ? (
+                  <>
+                    {Array.from({ length: 6 }).map((_, idx) => (
+                      <div
+                        key={idx}
+                        className="h-[31px] w-28 shrink-0 skeleton-shimmer bg-zinc-800/80 border border-zinc-800 flex items-center gap-2 px-3"
+                      >
+                        <div className="w-3.5 h-3.5 bg-zinc-700/60 rounded-xs shrink-0" />
+                        <div className="h-3 w-16 bg-zinc-700/60 rounded-xs" />
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  categories.filter(c => !c.isArchived).map((category) => {
+                    const isActive = selectedCategory === category.id;
+                    return (
+                      <button
+                        key={category.id}
+                        onClick={() => handleCategorySelect(category.id)}
+                        className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+                          isActive
+                            ? "bg-amber-500 text-black border-amber-500 font-black shadow-sm"
+                            : "bg-[#18181B] text-zinc-300 border-zinc-800 hover:border-zinc-700"
+                        }`}
+                      >
+                        {getCategoryIcon(category.iconName)}
+                        <span>{category.name}</span>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
 

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Plus, SlidersHorizontal, Flame, Sparkles, Clock, Heart, Eye, ShoppingCart } from "lucide-react";
 import { Product } from "../../types";
 import { formatNPR } from "../../lib/utils";
-import { Skeleton } from "../common/Skeleton";
+import { SkeletonProductCard } from "../common/Skeleton";
 import { useApp } from "../../context/AppContext";
 import { ProductDetailModal } from "./ProductDetailModal";
 
@@ -25,20 +25,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const favorited = isFavorite(product.id);
 
   if (isLoading) {
-    return (
-      <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 p-4 flex flex-col gap-3 shadow-sm rounded-none">
-        <Skeleton className="w-full aspect-4/3 rounded-none" />
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-3/4 rounded-none" />
-          <Skeleton className="h-4 w-full rounded-none" />
-          <Skeleton className="h-4 w-2/3 rounded-none" />
-        </div>
-        <div className="flex items-center justify-between pt-2 mt-auto">
-          <Skeleton className="h-6 w-24 rounded-none" />
-          <Skeleton className="h-10 w-24 rounded-none" />
-        </div>
-      </div>
-    );
+    return <SkeletonProductCard />;
   }
 
   const hasMultipleVariantsOrModifiers =

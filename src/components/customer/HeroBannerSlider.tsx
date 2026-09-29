@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import { ArrowRight, Sparkles, SlidersHorizontal, Eye } from "lucide-react";
 import { ComboPackageModal, ComboPackageDefinition } from "./ComboPackageModal";
 import { formatNPR } from "../../lib/utils";
+import { SkeletonHeroSlider } from "../common/Skeleton";
 
 export interface BannerSlide extends ComboPackageDefinition {}
 
@@ -12,7 +13,7 @@ interface HeroBannerSliderProps {
 }
 
 export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCategory }) => {
-  const { products } = useApp();
+  const { products, isLoadingSkeleton } = useApp();
   const BANNER_SLIDES = comboDefinitions(products);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -74,6 +75,14 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
     setSelectedCombo(slide);
     setIsComboModalOpen(true);
   };
+
+  if (isLoadingSkeleton) {
+    return <SkeletonHeroSlider />;
+  }
+
+  if (BANNER_SLIDES.length === 0) {
+    return null;
+  }
 
   return (
     <>

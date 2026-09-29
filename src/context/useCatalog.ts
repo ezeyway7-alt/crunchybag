@@ -8,7 +8,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [timePricingSchedules, setTimePricingSchedules] = useState<TimePricingSchedule[]>([]);
-  const [catalogLoading, setLoading] = useState(false);
+  const [catalogLoading, setLoading] = useState(true);
   const [catalogError, setError] = useState('');
   const [authVersion, setAuthVersion] = useState(0);
   const sequence = useRef(0);
@@ -34,7 +34,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   }, []);
 
   const reload = useCallback(async () => {
-    if (!validOutlet) { setError('Choose an outlet to load its menu.'); return; }
+    if (!validOutlet) { setError('Choose an outlet to load its menu.'); setLoading(false); return; }
     const seq = ++sequence.current;
     // Background refreshes must keep the current menu visible.
     setLoading(lastSnapshot.current?.scope !== snapshotScope);
@@ -81,6 +81,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   // Real-time WebSocket connection scoped strictly to outlet ID
   useEffect(() => {
     lastSnapshot.current = null;
+    setLoading(true);
     setCategories([]); setProducts([]); setTimePricingSchedules([]);
     let closed = false, attempts = 0, connectedAt = 0;
     let latestRevision = -1;

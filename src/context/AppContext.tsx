@@ -752,6 +752,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isOffline, setIsOffline] = useState(false);
   const [isStale, setIsStale] = useState(false);
   const [isLoadingSkeleton, setIsLoadingSkeleton] = useState(false);
+  const effectiveIsLoadingSkeleton = isLoadingSkeleton || catalogLoading;
 
   // Customer Navigation, Favorites & Search
   const [customerActiveTab, setCustomerActiveTab] = useState<"menu" | "orders">("menu");
@@ -2702,7 +2703,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsOffline,
         isStale,
         setIsStale,
-        isLoadingSkeleton,
+        isLoadingSkeleton: effectiveIsLoadingSkeleton,
         setIsLoadingSkeleton,
         customerActiveTab,
         setCustomerActiveTab,
