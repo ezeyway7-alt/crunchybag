@@ -18,6 +18,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   onConfigure,
 }) => {
+  const [activeImageIndex, setActiveImageIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    setActiveImageIndex(0);
+  }, [product?.id, isOpen]);
+
   if (!product) return null;
 
   const hasMultipleOptions =
@@ -36,15 +42,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       }
     >
       <div className="space-y-3">
-        {/* Optimized Product Image */}
-        <div className="relative w-full h-44 sm:h-48 overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-900">
+        {/* Optimized Product Image with Proper Food Aspect Ratio */}
+        <div className="relative w-full aspect-16/10 sm:aspect-16/10 min-h-[200px] max-h-[260px] overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-900">
           <img
-            src={product.images[0]}
+            src={product.images[activeImageIndex] || product.images[0]}
             alt={product.name}
-            className="w-full h-full object-cover object-center"
+            className="w-full h-full object-cover object-center transition-all duration-300"
             loading="lazy"
           />
-          <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none" />
+
+          {/* Top Left: Dietary Tags */}
+          <div className="absolute top-2 left-2 flex flex-wrap gap-1 z-10">
             {product.dietary.map((tag) => (
               <span
                 key={tag}
@@ -55,8 +64,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             ))}
           </div>
 
-          {/* Price Tag Overlay */}
-          <div className="absolute bottom-2 right-2 px-2.5 py-1 bg-black/90 backdrop-blur-xs text-amber-400 font-mono font-black text-xs sm:text-sm border border-white/20">
+          {/* Bottom Left: Thumbnails Switcher (if multiple images) */}
+          {product.images.length > 1 && (
+            <div className="absolute bottom-2 left-2 flex gap-1 z-10">
+              {product.images.map((img, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`w-7 h-7 rounded-none overflow-hidden border transition-all cursor-pointer ${
+                    activeImageIndex === idx
+                      ? "border-amber-500 scale-105 shadow-xs"
+                      : "border-white/40 opacity-70 hover:opacity-100"
+                  }`}
+                  aria-label={`View image ${idx + 1}`}
+                >
+                  <img src={img} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Bottom Right: Price Tag Overlay */}
+          <div className="absolute bottom-2 right-2 px-2.5 py-1 bg-black/90 backdrop-blur-xs text-amber-400 font-mono font-black text-xs sm:text-sm border border-white/20 z-10">
             {product.variants.length > 1 ? `From ${formatNPR(product.basePrice)}` : formatNPR(product.basePrice)}
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, SlidersHorizontal, Flame, Sparkles, Clock, Heart, Eye, ShoppingCart } from "lucide-react";
+import { Plus, SlidersHorizontal, Flame, Sparkles, Clock, Heart, Eye, ShoppingCart, ArrowRight } from "lucide-react";
 import { Product } from "../../types";
 import { formatNPR } from "../../lib/utils";
 import { SkeletonProductCard } from "../common/Skeleton";
@@ -142,10 +142,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <button
                 disabled={!product.isAvailable}
                 onClick={() => onSelect(product)}
-                className="flex items-center gap-1 h-7.5 sm:h-8.5 px-2 sm:px-3 text-[11px] sm:text-xs font-bold bg-zinc-800 hover:bg-amber-500 hover:text-black text-zinc-200 rounded-none transition-all disabled:opacity-40 cursor-pointer border border-zinc-700 hover:border-amber-500 whitespace-nowrap"
+                className="flex items-center justify-center gap-1 h-7.5 sm:h-8.5 w-7.5 sm:w-auto px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold bg-zinc-800 hover:bg-amber-500 hover:text-black text-zinc-200 rounded-none transition-all disabled:opacity-40 cursor-pointer border border-zinc-700 hover:border-amber-500 whitespace-nowrap"
+                title="Customize options"
+                aria-label="Customize"
               >
-                <SlidersHorizontal className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
-                <span>Customize</span>
+                <ArrowRight className="h-3.5 w-3.5 sm:hidden shrink-0" />
+                <SlidersHorizontal className="hidden sm:inline-block h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline">Customize</span>
               </button>
             ) : (
               <button

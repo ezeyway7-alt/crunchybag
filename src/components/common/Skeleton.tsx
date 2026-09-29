@@ -144,7 +144,7 @@ export const SkeletonProductCard: React.FC<{ className?: string }> = ({ classNam
             <div className="h-3.5 sm:h-4.5 w-12 sm:w-16 skeleton-shimmer bg-zinc-800/90 rounded-none" />
           </div>
 
-          <div className="h-7.5 sm:h-8.5 w-16 sm:w-20 skeleton-shimmer bg-zinc-800/90 border border-zinc-700 rounded-none" />
+          <div className="h-7.5 sm:h-8.5 w-10 sm:w-20 skeleton-shimmer bg-zinc-800/90 border border-zinc-700 rounded-none shrink-0" />
         </div>
       </div>
     </div>

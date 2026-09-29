@@ -157,44 +157,46 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
       onClose={onClose}
       maxWidth="md"
       showCloseButton={false}
-      className="max-w-[460px] w-full h-[84vh] max-h-[550px] min-h-[380px] border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none"
+      className="max-w-[480px] w-full h-[90vh] max-h-[680px] min-h-[440px] border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none"
       contentClassName="p-0 h-full flex flex-col min-h-0"
     >
       <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#121214] text-zinc-900 dark:text-zinc-100 overflow-hidden">
-        {/* Top Image Showcase (Compact Banner) */}
-        <div className="relative w-full h-24 sm:h-28 bg-zinc-950 shrink-0 overflow-hidden flex flex-col justify-between border-b border-zinc-200 dark:border-zinc-800">
+        {/* Top Image Showcase (Proper Food Dimensions) */}
+        <div className="relative w-full h-44 sm:h-52 bg-zinc-950 shrink-0 overflow-hidden flex flex-col justify-between border-b border-zinc-200 dark:border-zinc-800">
           <img
             src={product.images[activeImageIndex] || product.images[0]}
             alt={product.name}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover object-center transition-all duration-300"
           />
 
           {/* Gentle shadow overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/35 pointer-events-none" />
 
           {/* Floating Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-2 right-2 z-10 w-7 h-7 rounded-none bg-black/80 hover:bg-black text-white border border-white/20 flex items-center justify-center cursor-pointer shadow-md active:scale-95"
+            className="absolute top-2.5 right-2.5 z-10 w-7.5 h-7.5 rounded-none bg-black/80 hover:bg-black text-white border border-white/20 flex items-center justify-center cursor-pointer shadow-md active:scale-95"
             aria-label="Close"
           >
-            <X className="w-3.5 h-3.5 stroke-[2.5]" />
+            <X className="w-4 h-4 stroke-[2.5]" />
           </button>
 
           {/* Bottom Overlays: Thumbnails & Info Pills */}
-          <div className="relative z-10 p-1.5 sm:p-2 mt-auto flex items-end justify-between gap-1.5 w-full">
+          <div className="relative z-10 p-2 sm:p-2.5 mt-auto flex items-end justify-between gap-1.5 w-full">
             {/* Thumbnail switchers (if multiple images) */}
             {product.images.length > 1 ? (
-              <div className="flex gap-1">
+              <div className="flex gap-1.5">
                 {product.images.map((img, idx) => (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => setActiveImageIndex(idx)}
-                    className={`w-6 h-6 rounded-none overflow-hidden border transition-all cursor-pointer ${
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-none overflow-hidden border transition-all cursor-pointer ${
                       activeImageIndex === idx
                         ? "border-amber-500 scale-105 shadow-xs"
                         : "border-white/40 opacity-70 hover:opacity-100"
                     }`}
+                    aria-label={`View image ${idx + 1}`}
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
                   </button>
@@ -203,14 +205,14 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
             ) : <div />}
 
             {/* Prep time & calories pills */}
-            <div className="flex items-center gap-1 shrink-0">
-              <span className="bg-black/80 text-zinc-200 text-[10px] font-bold px-1.5 py-0.5 rounded-none flex items-center gap-1 border border-white/20">
-                <Clock className="h-2.5 w-2.5 text-amber-400" />
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="bg-black/85 text-zinc-200 text-[10px] font-bold px-2 py-0.5 rounded-none flex items-center gap-1 border border-white/20">
+                <Clock className="h-3 w-3 text-amber-400" />
                 <span>{product.prepTimeMinutes}m</span>
               </span>
               {product.calories && (
-                <span className="bg-black/80 text-zinc-200 text-[10px] font-bold px-1.5 py-0.5 rounded-none flex items-center gap-1 border border-white/20">
-                  <Flame className="h-2.5 w-2.5 text-amber-400" />
+                <span className="bg-black/85 text-zinc-200 text-[10px] font-bold px-2 py-0.5 rounded-none flex items-center gap-1 border border-white/20">
+                  <Flame className="h-3 w-3 text-amber-400" />
                   <span>{product.calories} kcal</span>
                 </span>
               )}
