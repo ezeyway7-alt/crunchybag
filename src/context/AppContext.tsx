@@ -47,7 +47,6 @@ import {
   MOCK_CATEGORIES,
   MOCK_PRODUCTS,
   INITIAL_ORDERS,
-  INITIAL_KDS_TICKETS,
   MOCK_STAFF,
   MOCK_ORGANIZATIONS,
   MOCK_DEVICES,
@@ -727,7 +726,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Orders & KDS
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [activeOrder, setActiveOrder] = useState<Order | null>(INITIAL_ORDERS[0] || null);
-  const [kdsTickets, setKdsTickets] = useState<KdsTicket[]>(INITIAL_KDS_TICKETS);
+  const [kdsTickets, setKdsTickets] = useState<KdsTicket[]>([]);
   const [kdsSoundEnabled, setKdsSoundEnabled] = useState(true);
   const [lastKitchenCall, setLastKitchenCall] = useState<{
     orderNumber: string;

@@ -30,7 +30,6 @@ import { KdsColumn, KdsTicket, FulfillmentType, Order } from "../../types";
 import { apiClient, extractErrorMessage } from "../../lib/api";
 import { formatTimer } from "../../lib/utils";
 import { SkeletonTicketGrid } from "../common/Skeleton";
-import { INITIAL_KDS_TICKETS, INITIAL_ORDERS } from "../../mock/data";
 
 // Subtle Web Audio chime for kitchen feedback
 const playKitchenChime = (type: "advance" | "complete" | "toggle" | "bell") => {
@@ -150,8 +149,9 @@ export const KDSPortal: React.FC = () => {
     triggerKitchenCall: appTriggerKitchenCall,
   } = useApp();
 
-  const { authOutlet } = useAuth();
+  const { authUser, authOutlet, isAuthenticated, openLoginModal } = useAuth();
   const effectiveOutletId = authOutlet?.id || currentOutlet?.id || "1";
+  const [authErrorNotice, setAuthErrorNotice] = useState<string | null>(null);
 
   // 1-second live clock for ticket timers
   const [now, setNow] = useState(Date.now());
@@ -179,19 +179,91 @@ export const KDSPortal: React.FC = () => {
    */
   const fetchKitchenTickets = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsSyncing(true);
+    setAuthErrorNotice(null);
     try {
-      const data = await apiClient.get<BackendKitchenTicket[]>("/orders/kitchen/me/");
-      if (Array.isArray(data)) {
-        setServerTickets(data);
-        setLastSyncTime(new Date());
+      let tickets: BackendKitchenTicket[] = [];
+
+      // 1. Primary KDS endpoint: GET /api/v1/orders/kitchen/me/
+      try {
+        const data = await apiClient.get<BackendKitchenTicket[]>("/orders/kitchen/me/");
+        if (Array.isArray(data)) {
+          tickets = data;
+        }
+      } catch (err: any) {
+        const status = err?.status || err?.response?.status;
+        if (status === 401 || status === 403) {
+          setAuthErrorNotice(
+            status === 401
+              ? "Authentication credentials required to access the live kitchen display station."
+              : "Your account does not have Kitchen Staff, Chef, or Admin permissions to view this station."
+          );
+        } else {
+          console.warn("Notice: /api/v1/orders/kitchen/me/ unavailable:", err);
+        }
       }
+
+      // 2. Dual check: Also fetch active POS orders for this outlet
+      // Catches all orders placed from POS, Kiosk, Table QR, or Web
+      try {
+        const posRes = await apiClient.get<any>(
+          `/orders/pos/?outlet_id=${encodeURIComponent(effectiveOutletId)}&status=PENDING,ACCEPTED,PREPARING,READY`
+        );
+        const posOrders: any[] = Array.isArray(posRes?.results)
+          ? posRes.results
+          : Array.isArray(posRes)
+          ? posRes
+          : [];
+
+        const existingIds = new Set(tickets.map((t) => String(t.id)));
+        const existingOrderNums = new Set(tickets.map((t) => t.order_number));
+
+        for (const po of posOrders) {
+          const poId = String(po.id);
+          const poNum = po.order_number;
+          if (!existingIds.has(poId) && !existingOrderNums.has(poNum)) {
+            const kitchenItems = (po.items || []).filter(
+              (i: any) => i.requires_kitchen !== false
+            );
+            if (kitchenItems.length > 0 || (po.items || []).length === 0) {
+              tickets.push({
+                id: po.id,
+                order_number: po.order_number,
+                status: po.status,
+                fulfillment_type: po.fulfillment_type || "TAKEAWAY",
+                table_number: po.table_number,
+                round_number: po.round_number || 1,
+                created_at: po.created_at,
+                notes: po.notes,
+                customer_name: po.customer_name,
+                kiosk_token: po.kiosk_token,
+                items: (po.items || []).map((it: any) => ({
+                  id: it.id,
+                  product_name: it.product_name || it.name,
+                  variant_name: it.variant_name || "",
+                  quantity: it.quantity || 1,
+                  requires_kitchen: it.requires_kitchen !== false,
+                  kitchen_status: it.kitchen_status || "WAITING",
+                  round_number: it.round_number || 1,
+                  item_notes: it.item_notes,
+                  modifiers: it.modifiers,
+                })),
+              });
+            }
+          }
+        }
+      } catch (posErr) {
+        // POS endpoint silent fallback
+      }
+
+      setServerTickets(tickets);
+      setLastSyncTime(new Date());
     } catch (err: any) {
-      console.warn("Could not fetch /api/v1/orders/kitchen/me/:", err);
+      console.warn("Error synchronizing kitchen tickets:", err);
     } finally {
       if (!isSilent) setIsSyncing(false);
       setIsInitialLoading(false);
     }
-  }, []);
+  }, [effectiveOutletId]);
 
   // Initial fetch on mount or when outlet changes
   useEffect(() => {
@@ -398,18 +470,12 @@ export const KDSPortal: React.FC = () => {
       });
     }
 
-    // Fallback: If server returned empty and we have local context or mock tickets for testing
-    const fallbackList =
-      appKdsTickets && appKdsTickets.length > 0 ? appKdsTickets : INITIAL_KDS_TICKETS;
-
-    return fallbackList.map((t) => ({
-      ...t,
-      orderNotes: (t as any).orderNotes || "",
-    }));
-  }, [serverTickets, appKdsTickets, now]);
+    // Pure real queue: When 0 orders are waiting, return empty list (No fake mock tickets)
+    return [];
+  }, [serverTickets, now]);
 
   const orders: Order[] = useMemo(() => {
-    return appOrders && appOrders.length > 0 ? appOrders : INITIAL_ORDERS;
+    return appOrders || [];
   }, [appOrders]);
 
   /**
@@ -1243,19 +1309,53 @@ export const KDSPortal: React.FC = () => {
       <main className="w-full p-2 sm:p-2.5 flex-1 overflow-y-auto">
         {isLoadingSkeleton || isInitialLoading || isStageLoading ? (
           <SkeletonTicketGrid count={6} />
-        ) : filteredTickets.length === 0 ? (
-          <div className="py-16 text-center space-y-2 bg-[#121215] border border-zinc-800 rounded-md p-6 my-2 max-w-xl mx-auto">
-            <div className="w-10 h-10 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded flex items-center justify-center mx-auto">
-              <Flame className="w-5 h-5" />
+        ) : (!isAuthenticated || authErrorNotice) ? (
+          <div className="py-12 px-6 text-center space-y-3 bg-[#121215] border border-amber-500/30 rounded-lg max-w-lg mx-auto my-6 shadow-xl">
+            <div className="w-12 h-12 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-full flex items-center justify-center mx-auto">
+              <ChefHat className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-black text-white uppercase tracking-wider">
-              No Kitchen Tickets in Queue
+            <h3 className="text-base font-black text-white uppercase tracking-wider">
+              Kitchen Station Authentication Required
             </h3>
-            <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+            <p className="text-xs text-zinc-400 leading-relaxed max-w-md mx-auto">
+              {authErrorNotice || "To view and manage live kitchen tickets, please sign in with your Kitchen Staff, Chef, Manager, or Admin credentials."}
+            </p>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={openLoginModal}
+                className="px-5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-black text-xs uppercase tracking-wider rounded-md transition-all shadow-md cursor-pointer"
+              >
+                Sign In to Kitchen Station
+              </button>
+            </div>
+          </div>
+        ) : filteredTickets.length === 0 ? (
+          <div className="py-16 text-center space-y-3 bg-[#121215] border border-zinc-800 rounded-lg p-6 my-4 max-w-xl mx-auto shadow-md">
+            <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center justify-center gap-2">
+              <span>Kitchen All Clear</span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                0 ACTIVE TICKETS
+              </span>
+            </h3>
+            <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
               {searchQuery || fulfillmentFilter !== "ALL" || activeStage !== "ALL"
                 ? "No active orders match the current filters. Try resetting the stage or search query."
-                : "All orders have been prepared and dispatched. Incoming tickets will broadcast via live WebSocket stream with chime."}
+                : "All orders have been prepared and dispatched. The kitchen station is actively listening for incoming tickets via live WebSocket stream with instant audible chimes."}
             </p>
+            <div className="pt-2 flex items-center justify-center gap-3 text-[11px] text-zinc-500 font-mono">
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                {isWsConnected ? "Stream Connected" : "Connecting Stream..."}
+              </span>
+              <span>•</span>
+              <span>Outlet #{effectiveOutletId}</span>
+              <span>•</span>
+              <span>Synced {lastSyncTime.toLocaleTimeString()}</span>
+            </div>
             {(searchQuery || fulfillmentFilter !== "ALL" || activeStage !== "ALL") && (
               <button
                 type="button"
@@ -1264,7 +1364,7 @@ export const KDSPortal: React.FC = () => {
                   setFulfillmentFilter("ALL");
                   setSearchQuery("");
                 }}
-                className="mt-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black uppercase tracking-wider rounded cursor-pointer transition-colors"
+                className="mt-3 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black uppercase tracking-wider rounded cursor-pointer transition-colors"
               >
                 Reset Filters
               </button>
