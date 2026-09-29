@@ -45,21 +45,21 @@ export const SkeletonHeroSlider: React.FC<{ className?: string }> = ({ className
     <div className={cn("relative w-full group/slider mt-2 sm:mt-2.5 pt-0", className)}>
       {/* Slider Viewport Track */}
       <div
-        className="flex items-stretch gap-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pt-0 pb-1"
+        className="flex items-stretch gap-3.5 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pt-0 pb-1"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {Array.from({ length: 3 }).map((_, index) => (
           <div
             key={index}
             className="relative shrink-0 snap-start select-none overflow-hidden border border-zinc-800 bg-[#121214] shadow-sm
-              w-[86%] sm:w-[65%] md:w-[calc(40%-13px)] min-h-[190px] sm:min-h-[205px] md:min-h-[215px] flex flex-col justify-between"
+              w-[82%] sm:w-[65%] md:w-[calc(40%-13px)] min-h-[185px] sm:min-h-[205px] md:min-h-[215px] flex flex-col justify-between"
           >
             {/* Background shimmer */}
             <div className="absolute inset-0 skeleton-shimmer bg-zinc-900/90 z-0" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/20 z-0" />
 
             {/* Card Content Overlay */}
-            <div className="relative z-10 p-3.5 sm:p-4 flex flex-col justify-between h-full">
+            <div className="relative z-10 p-3 sm:p-4 flex flex-col justify-between h-full">
               {/* Top Right: Detail / Eye Icon placeholder */}
               <div className="flex items-center justify-end">
                 <div className="w-6.5 h-6.5 bg-black/60 border border-white/20 rounded-none" />
@@ -67,19 +67,19 @@ export const SkeletonHeroSlider: React.FC<{ className?: string }> = ({ className
 
               {/* Main Package Name placeholder */}
               <div className="my-auto py-1 space-y-2">
-                <div className="h-6 sm:h-7 w-3/4 skeleton-shimmer bg-zinc-700/80 rounded-none" />
-                <div className="h-3.5 w-1/2 skeleton-shimmer bg-zinc-800/80 rounded-none" />
+                <div className="h-5 sm:h-7 w-3/4 skeleton-shimmer bg-zinc-700/80 rounded-none" />
+                <div className="h-3 sm:h-3.5 w-1/2 skeleton-shimmer bg-zinc-800/80 rounded-none" />
               </div>
 
               {/* Bottom Action Button & Price */}
               <div className="pt-2 flex items-center justify-between gap-2 border-t border-white/20">
-                <div className="h-7.5 w-26 bg-zinc-800/90 border border-zinc-700/80 rounded-none flex items-center justify-center">
+                <div className="h-7 sm:h-7.5 w-24 sm:w-26 bg-zinc-800/90 border border-zinc-700/80 rounded-none flex items-center justify-center">
                   <div className="h-2.5 w-14 bg-zinc-700/80 rounded-none" />
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <div className="h-3 w-10 skeleton-shimmer bg-zinc-700/60 rounded-none" />
-                  <div className="h-4.5 w-16 skeleton-shimmer bg-amber-500/40 border border-amber-500/30 rounded-none" />
+                  <div className="h-4 sm:h-4.5 w-14 sm:w-16 skeleton-shimmer bg-amber-500/40 border border-amber-500/30 rounded-none" />
                 </div>
               </div>
             </div>
@@ -112,39 +112,39 @@ export const SkeletonProductCard: React.FC<{ className?: string }> = ({ classNam
       {/* Product Media with Zero CLS container */}
       <div className="relative w-full aspect-4/3 sm:aspect-16/11 bg-zinc-900 overflow-hidden skeleton-shimmer">
         {/* Top-left tag badge placeholder */}
-        <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
-          <div className="h-4.5 w-16 bg-black/80 border border-zinc-700/70 rounded-none" />
+        <div className="absolute top-2 left-2 sm:top-2.5 sm:left-2.5 z-10 pointer-events-none">
+          <div className="h-4 sm:h-4.5 w-12 sm:w-16 bg-black/80 border border-zinc-700/70 rounded-none" />
         </div>
 
         {/* Top-right action icons placeholder */}
-        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
-          <div className="w-6.5 h-6.5 bg-black/70 border border-zinc-700/60 rounded-none" />
-          <div className="w-6.5 h-6.5 bg-black/70 border border-zinc-700/60 rounded-none" />
+        <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 flex items-center gap-1 z-10">
+          <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 bg-black/70 border border-zinc-700/60 rounded-none" />
+          <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 bg-black/70 border border-zinc-700/60 rounded-none" />
         </div>
 
         {/* Prep Time */}
-        <div className="absolute bottom-2 right-2 z-10">
-          <div className="h-4.5 w-11 bg-black/85 border border-zinc-700/60 rounded-none" />
+        <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 z-10">
+          <div className="h-4 sm:h-4.5 w-9 sm:w-11 bg-black/85 border border-zinc-700/60 rounded-none" />
         </div>
       </div>
 
       {/* Card Content */}
-      <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
+      <div className="p-2.5 sm:p-3.5 flex-1 flex flex-col justify-between">
         <div>
           <div className="flex items-start justify-between gap-2">
-            <div className="h-4 sm:h-4.5 w-4/5 skeleton-shimmer bg-zinc-800/90 rounded-none" />
+            <div className="h-3.5 sm:h-4.5 w-4/5 skeleton-shimmer bg-zinc-800/90 rounded-none" />
           </div>
-          <div className="h-3 w-1/2 skeleton-shimmer bg-zinc-800/50 rounded-none mt-1.5" />
+          <div className="h-2.5 sm:h-3 w-1/2 skeleton-shimmer bg-zinc-800/50 rounded-none mt-1 sm:mt-1.5" />
         </div>
 
         {/* Pricing & CTA */}
-        <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-zinc-800">
-          <div className="space-y-1">
-            <div className="h-2.5 w-10 skeleton-shimmer bg-zinc-800/60 rounded-none" />
-            <div className="h-4.5 w-16 skeleton-shimmer bg-zinc-800/90 rounded-none" />
+        <div className="flex items-center justify-between pt-2 sm:pt-2.5 mt-2 sm:mt-2.5 border-t border-zinc-800 gap-1">
+          <div className="space-y-0.5 sm:space-y-1">
+            <div className="h-2 sm:h-2.5 w-8 sm:w-10 skeleton-shimmer bg-zinc-800/60 rounded-none" />
+            <div className="h-3.5 sm:h-4.5 w-12 sm:w-16 skeleton-shimmer bg-zinc-800/90 rounded-none" />
           </div>
 
-          <div className="h-8.5 w-20 sm:w-22 skeleton-shimmer bg-zinc-800/90 border border-zinc-700 rounded-none" />
+          <div className="h-7.5 sm:h-8.5 w-16 sm:w-20 skeleton-shimmer bg-zinc-800/90 border border-zinc-700 rounded-none" />
         </div>
       </div>
     </div>
@@ -161,7 +161,7 @@ export const SkeletonProductGrid: React.FC<{ count?: number; className?: string 
   return (
     <div
       className={cn(
-        "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5",
+        "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-5",
         className
       )}
     >

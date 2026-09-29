@@ -28,7 +28,7 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
 
     // Calculate approximate active slide index
     const slideWidth = el.querySelector<HTMLElement>("[data-slide]")?.offsetWidth || el.clientWidth / 2.5;
-    const currentSlide = Math.round(el.scrollLeft / (slideWidth + 16));
+    const currentSlide = Math.round(el.scrollLeft / (slideWidth + 14));
     setActiveIndex(Math.min(Math.max(currentSlide, 0), BANNER_SLIDES.length - 1));
   }, [BANNER_SLIDES.length]);
 
@@ -47,11 +47,11 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
       const el = scrollContainerRef.current;
       if (!el) return;
       const slideWidth = el.querySelector<HTMLElement>("[data-slide]")?.offsetWidth || 340;
-      const nextLeft = el.scrollLeft + slideWidth + 16;
+      const nextLeft = el.scrollLeft + slideWidth + 14;
       if (nextLeft >= el.scrollWidth - el.clientWidth) {
         el.scrollTo({ left: 0, behavior: "smooth" });
       } else {
-        el.scrollBy({ left: slideWidth + 16, behavior: "smooth" });
+        el.scrollBy({ left: slideWidth + 14, behavior: "smooth" });
       }
     }, 6000);
 
@@ -94,7 +94,7 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
         {/* Slider Viewport Track */}
         <div
           ref={scrollContainerRef}
-          className="flex items-stretch gap-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pt-0 pb-1"
+          className="flex items-stretch gap-3.5 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pt-0 pb-1"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {BANNER_SLIDES.map((slide, index) => {
@@ -104,7 +104,7 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
                 data-slide
                 onClick={() => handleSlideClick(slide)}
                 className="relative shrink-0 snap-start select-none cursor-pointer overflow-hidden border border-zinc-300 dark:border-zinc-800 shadow-sm transition-all duration-200 hover:border-amber-500
-                  w-[86%] sm:w-[65%] md:w-[calc(40%-13px)] min-h-[190px] sm:min-h-[205px] md:min-h-[215px]"
+                  w-[82%] sm:w-[65%] md:w-[calc(40%-13px)] min-h-[185px] sm:min-h-[205px] md:min-h-[215px]"
               >
                 {/* Background Image with Lower Gradient for Maximum Food Visibility */}
                 <div className="absolute inset-0 z-0">
@@ -121,7 +121,7 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
                 </div>
 
                 {/* Card Content Overlay */}
-                <div className="relative z-10 p-3.5 sm:p-4 flex flex-col justify-between h-full text-white">
+                <div className="relative z-10 p-3 sm:p-4 flex flex-col justify-between h-full text-white">
                   {/* Top Right: Detail / Eye Icon to inspect package items & quantities */}
                   <div className="flex items-center justify-end">
                     <button
@@ -140,14 +140,14 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
 
                   {/* Main Clean Package Name (No extra clutter) */}
                   <div className="my-auto py-1">
-                    <h3 className="text-xl sm:text-2xl md:text-2xl font-black tracking-tight leading-tight uppercase drop-shadow-md text-white line-clamp-1">
+                    <h3 className="text-lg sm:text-2xl md:text-2xl font-black tracking-tight leading-tight uppercase drop-shadow-md text-white line-clamp-1">
                       {slide.title}
                     </h3>
                   </div>
 
                   {/* Bottom Action Button & Price */}
                   <div className="pt-2 flex items-center justify-between gap-2 border-t border-white/20">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wider transition-colors shadow-sm">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white hover:bg-amber-400 text-black font-black text-[11px] sm:text-xs uppercase tracking-wider transition-colors shadow-sm">
                       <SlidersHorizontal className="w-3 h-3 text-amber-600" />
                       <span>{slide.buttonLabel}</span>
                     </div>

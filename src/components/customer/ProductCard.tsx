@@ -70,8 +70,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           if (!displayTag) return null;
 
           return (
-            <div className="absolute top-2.5 left-2.5 pointer-events-none z-10">
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-black/90 text-white border border-white/20 backdrop-blur-xs flex items-center gap-1 shadow-xs">
+            <div className="absolute top-2 left-2 sm:top-2.5 sm:left-2.5 pointer-events-none z-10">
+              <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 bg-black/90 text-white border border-white/20 backdrop-blur-xs flex items-center gap-1 shadow-xs">
                 {displayTag}
               </span>
             </div>
@@ -79,23 +79,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         })()}
 
         {/* Prep Time */}
-        <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-none bg-black/85 text-zinc-200 text-[10px] font-mono font-bold flex items-center gap-1">
+        <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 px-1.5 py-0.5 sm:px-2 rounded-none bg-black/85 text-zinc-200 text-[9px] sm:text-[10px] font-mono font-bold flex items-center gap-1">
           <Clock className="h-3 w-3 text-amber-400" />
           <span>{product.prepTimeMinutes}m</span>
         </div>
 
         {/* Action icons: Eye (Details) & Favorite Heart */}
-        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
+        <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 flex items-center gap-1 sm:gap-1.5 z-10">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setIsDetailOpen(true);
             }}
-            className="p-1.5 bg-black/60 hover:bg-black/90 text-white hover:text-amber-400 backdrop-blur-xs transition-colors cursor-pointer"
+            className="p-1 sm:p-1.5 bg-black/60 hover:bg-black/90 text-white hover:text-amber-400 backdrop-blur-xs transition-colors cursor-pointer"
             title="Inspect dish ingredients, prep time & calories"
           >
-            <Eye className="h-4 w-4" />
+            <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           </button>
 
           <button
@@ -104,11 +104,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               e.stopPropagation();
               toggleFavorite(product.id);
             }}
-            className="p-1.5 bg-black/60 hover:bg-black/90 backdrop-blur-xs transition-colors cursor-pointer"
+            className="p-1 sm:p-1.5 bg-black/60 hover:bg-black/90 backdrop-blur-xs transition-colors cursor-pointer"
             title={favorited ? "Remove favorite" : "Save to favorites"}
           >
             <Heart
-              className={`h-4 w-4 ${
+              className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${
                 favorited ? "fill-rose-500 text-rose-500" : "text-white hover:text-rose-400"
               }`}
             />
@@ -117,7 +117,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </div>
 
       {/* Card Content */}
-      <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
+      <div className="p-2.5 sm:p-3.5 flex-1 flex flex-col justify-between">
         <div>
           <div className="flex items-start justify-between gap-2">
             <h4 className="font-bold text-xs sm:text-[13px] text-white group-hover:text-amber-500 transition-colors line-clamp-1 leading-snug">
@@ -127,33 +127,33 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {/* Pricing & CTA */}
-        <div className="flex items-center justify-between pt-2.5 mt-2.5 border-t border-zinc-800">
-          <div>
-            <span className="text-[10px] text-zinc-400 uppercase font-semibold tracking-wider block">
-              {product.variants.length > 1 ? "Starts From" : "Price"}
+        <div className="flex items-center justify-between pt-2 sm:pt-2.5 mt-2 sm:mt-2.5 border-t border-zinc-800 gap-1">
+          <div className="min-w-0">
+            <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-semibold tracking-wider block leading-tight truncate">
+              {product.variants.length > 1 ? "From" : "Price"}
             </span>
-            <span className="font-mono font-bold text-sm sm:text-base text-amber-400 tracking-tight">
+            <span className="font-mono font-bold text-xs sm:text-sm md:text-base text-amber-400 tracking-tight whitespace-nowrap">
               {formatNPR(product.basePrice)}
             </span>
           </div>
 
-          <div onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
             {hasMultipleVariantsOrModifiers ? (
               <button
                 disabled={!product.isAvailable}
                 onClick={() => onSelect(product)}
-                className="flex items-center gap-1.5 h-8.5 px-3 text-xs font-bold bg-zinc-800 hover:bg-amber-500 hover:text-black text-zinc-200 rounded-none transition-all disabled:opacity-40 cursor-pointer border border-zinc-700 hover:border-amber-500"
+                className="flex items-center gap-1 h-7.5 sm:h-8.5 px-2 sm:px-3 text-[11px] sm:text-xs font-bold bg-zinc-800 hover:bg-amber-500 hover:text-black text-zinc-200 rounded-none transition-all disabled:opacity-40 cursor-pointer border border-zinc-700 hover:border-amber-500 whitespace-nowrap"
               >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
+                <SlidersHorizontal className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
                 <span>Customize</span>
               </button>
             ) : (
               <button
                 disabled={!product.isAvailable}
                 onClick={() => onQuickAdd(product)}
-                className="flex items-center gap-1.5 h-8.5 px-3.5 text-xs font-black bg-amber-500 hover:bg-amber-400 text-black rounded-none shadow-sm transition-all disabled:opacity-40 cursor-pointer border border-amber-600"
+                className="flex items-center gap-1 h-7.5 sm:h-8.5 px-2.5 sm:px-3.5 text-[11px] sm:text-xs font-black bg-amber-500 hover:bg-amber-400 text-black rounded-none shadow-sm transition-all disabled:opacity-40 cursor-pointer border border-amber-600 whitespace-nowrap"
               >
-                <ShoppingCart className="h-3.5 w-3.5 stroke-[2.5]" />
+                <ShoppingCart className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[2.5] shrink-0" />
                 <span>Add</span>
               </button>
             )}
