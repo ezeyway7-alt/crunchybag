@@ -142,6 +142,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   };
 
   // Signup Step 1: Request OTP for new number
+  // Signup Step 1: Request OTP for new number
   const handleSendSignupOtp = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPhone = phone.trim().replace(/\D/g, "");
@@ -151,25 +152,35 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     }
 
     void perform(async () => {
-      const result = await apiClient.post<any>(
-        customerPath("auth/start/"),
-        { phone: cleanPhone },
-        { skipAuth: true }
-      );
+      try {
+        const result = await apiClient.post<any>(
+          customerPath("auth/start/"),
+          { phone: cleanPhone },
+          { skipAuth: true }
+        );
 
-      if (result.exists) {
-        // User already has an account, switch to login view with clear notice
-        setAuthView("LOGIN");
-        setInfoMessage("This number is already registered. Please sign in with your MPIN or Password.");
-        return;
+        if (result.exists) {
+          // User already has an account, smoothly switch to login view
+          setAuthView("LOGIN");
+          setInfoMessage("This mobile number is already registered! Please sign in with your MPIN or Password below, or use OTP if you forgot it.");
+          return;
+        }
+
+        setChallenge(result.challenge_id);
+        setDemoCode(result.demo_code || "");
+        setOtpDigits(["", "", "", ""]);
+        setAuthView("SIGNUP_OTP");
+        setOtpTimer(45);
+        setTimeout(() => inputRefs.current[0]?.focus(), 120);
+      } catch (err: any) {
+        const msg = extractErrorMessage(err).toLowerCase();
+        if (msg.includes("already registered") || msg.includes("already exists") || msg.includes("registered")) {
+          setAuthView("LOGIN");
+          setInfoMessage("This mobile number is already registered! Please sign in with your MPIN or Password below, or use OTP if you forgot it.");
+          return;
+        }
+        throw err;
       }
-
-      setChallenge(result.challenge_id);
-      setDemoCode(result.demo_code || "");
-      setOtpDigits(["", "", "", ""]);
-      setAuthView("SIGNUP_OTP");
-      setOtpTimer(45);
-      setTimeout(() => inputRefs.current[0]?.focus(), 120);
     });
   };
 
@@ -236,7 +247,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         );
       } catch (err: any) {
         const errMsg = extractErrorMessage(err).toLowerCase();
-        // If registration token expired on the backend, auto-request fresh OTP and keep user's profile inputs intact
+        // 1. If registration token expired on the backend, auto-request fresh OTP and keep user's profile inputs intact
         if (errMsg.includes("expired")) {
           setInfoMessage("Verification session timed out. A fresh OTP has been sent to your phone.");
           try {
@@ -257,8 +268,20 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             return;
           }
         }
-        // If username was already taken or pattern error, auto-retry with unique phone suffix
-        if (errMsg.includes("already exists") || errMsg.includes("pattern")) {
+
+        // 2. If mobile, username, or email is already registered: smoothly redirect to Login with pre-filled phone and helpful options
+        if (
+          errMsg.includes("already registered") ||
+          errMsg.includes("already exists") ||
+          errMsg.includes("registered")
+        ) {
+          setAuthView("LOGIN");
+          setInfoMessage("This mobile, username, or email is already registered. Please sign in below, or tap 'Sign In with OTP' if you forgot your PIN.");
+          return;
+        }
+
+        // 3. If username pattern error or taken, auto-retry with unique phone suffix
+        if (errMsg.includes("pattern") || (errMsg.includes("username") && errMsg.includes("taken"))) {
           const uniqueUsername = `${baseUsername.slice(0, 20)}_${phoneSuffix}`;
           registerResult = await apiClient.post<any>(
             customerPath("auth/register/"),
@@ -295,8 +318,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   };
 
   // OTP Login: Send OTP for registered user
-  const handleSendOtpLogin = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendOtpLogin = (e?: React.FormEvent) => {
+    e?.preventDefault();
     const cleanPhone = phone.trim().replace(/\D/g, "");
     if (!cleanPhone || cleanPhone.length < 10) {
       setError("Please enter your 10-digit mobile number.");
@@ -445,7 +468,11 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   type="button"
                   onClick={() => {
                     setError("");
-                    setAuthView("OTP_LOGIN_PHONE");
+                    if (phone.trim().replace(/\D/g, "").length >= 10) {
+                      handleSendOtpLogin();
+                    } else {
+                      setAuthView("OTP_LOGIN_PHONE");
+                    }
                   }}
                   className="text-[11px] text-amber-500 hover:text-amber-400 font-medium cursor-pointer"
                 >
@@ -483,6 +510,31 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             >
               Sign In
             </Button>
+
+            {/* Quick One-Tap Action: Forgot PIN / Sign In with OTP */}
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+              <span className="flex-shrink mx-2 text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+                or
+              </span>
+              <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                if (phone.trim().replace(/\D/g, "").length >= 10) {
+                  handleSendOtpLogin();
+                } else {
+                  setAuthView("OTP_LOGIN_PHONE");
+                }
+              }}
+              className="w-full h-11 border border-zinc-300 dark:border-zinc-700 hover:border-amber-500 bg-zinc-100/70 dark:bg-zinc-800/40 hover:bg-amber-500/10 text-zinc-800 dark:text-zinc-200 hover:text-amber-500 dark:hover:text-amber-400 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer rounded-none"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+              <span>Forgot PIN? Sign In with One-Time OTP</span>
+            </button>
 
             {/* Footer: Create Account Switch */}
             <div className="pt-2 text-center border-t border-zinc-200 dark:border-zinc-800">
