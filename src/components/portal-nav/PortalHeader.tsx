@@ -46,7 +46,7 @@ export const PortalHeader: React.FC = () => {
     loginAsRole,
   } = useApp();
 
-  const { authUser, isAuthenticated, openLoginModal } = useAuth();
+  const { authUser, isAuthenticated, openLoginModal, logout: authLogout } = useAuth();
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isScanQrOpen, setIsScanQrOpen] = useState(false);
@@ -235,7 +235,7 @@ export const PortalHeader: React.FC = () => {
                   <div className="px-3.5 py-2.5 border-b border-zinc-800/80 bg-[#161619]">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 bg-amber-500 text-black font-black text-xs flex items-center justify-center shrink-0 border border-amber-600">
-                        {customerProfile.name.charAt(0) || "A"}
+                        {customerProfile.name.charAt(0) || "?"}
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-bold truncate text-white">
@@ -296,12 +296,12 @@ export const PortalHeader: React.FC = () => {
                       id="menu-my-profile-btn"
                       onClick={() => {
                         setIsProfileMenuOpen(false);
-                        setIsProfileModalOpen(true);
+                        if(authUser?.role === 'CUSTOMER')setIsProfileModalOpen(true);else window.dispatchEvent(new Event('customer:login'));
                       }}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-amber-500/10 hover:text-amber-400 transition-colors text-left cursor-pointer"
                     >
                       <User className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                      <span>My Profile</span>
+                      <span>{authUser?.role === "CUSTOMER" ? "My Profile" : "Sign In / Sign Up"}</span>
                     </button>
 
                     {/* 2. My Orders */}
@@ -389,7 +389,7 @@ export const PortalHeader: React.FC = () => {
                       id="menu-logout-btn"
                       onClick={() => {
                         setIsProfileMenuOpen(false);
-                        logout();
+                        authLogout();logout();
                       }}
                       className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors text-left cursor-pointer"
                     >

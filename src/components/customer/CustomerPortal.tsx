@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import { ComboPackageModal } from "./ComboPackageModal";
+import { comboDefinitions } from "../../lib/catalogApi";
+import { useAuth } from "../../context/AuthContext";
+import React, { useState, useEffect } from "react";
 import {
   Flame,
   Drumstick,
@@ -84,9 +87,16 @@ export const CustomerPortal: React.FC = () => {
   // Modals
   const [activeProductForConfig, setActiveProductForConfig] = useState<Product | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const { isAuthenticated, authUser } = useAuth();
+  const [resumeCheckout, setResumeCheckout] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [trackedOrderId, setTrackedOrderId] = useState<string | undefined>(undefined);
 
+  const openCheckout = () => {
+    if (!isAuthenticated || authUser?.role !== 'CUSTOMER') {setResumeCheckout(true);setIsAuthOpen(true);}
+    else setIsCheckoutOpen(true);
+  };
+  useEffect(() => { const open = () => setIsAuthOpen(true); window.addEventListener('customer:login',open); return () => window.removeEventListener('customer:login',open); },[]);
   // Receipt & QR Slip Review Modals
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isQrReviewModalOpen, setIsQrReviewModalOpen] = useState(false);
@@ -172,6 +182,7 @@ export const CustomerPortal: React.FC = () => {
     return true;
   });
 
+  useEffect(()=>{const configure=(event:Event)=>setActiveProductForConfig((event as CustomEvent<Product>).detail);window.addEventListener('customer:configure',configure);return()=>window.removeEventListener('customer:configure',configure);},[]);
   const getActiveCategoryTitle = () => {
     if (selectedCategory === "all") return "All Menu Items";
     if (selectedCategory === "special") return "Today's Special";
@@ -180,6 +191,7 @@ export const CustomerPortal: React.FC = () => {
   };
 
   const handleQuickAdd = (product: Product) => {
+    if(product.isComboPackage){setActiveProductForConfig(product);return;}
     addToCart(product, product.variants[0], [], 1);
   };
 
@@ -410,7 +422,7 @@ export const CustomerPortal: React.FC = () => {
       <CustomerFooter />
 
       {/* Product Detail & Quote Configurator Modal */}
-      {activeProductForConfig && (
+      {activeProductForConfig && !activeProductForConfig.isComboPackage && (
         <ProductConfiguratorModal
           product={activeProductForConfig}
           isOpen={!!activeProductForConfig}
@@ -419,8 +431,9 @@ export const CustomerPortal: React.FC = () => {
         />
       )}
 
+      {activeProductForConfig?.isComboPackage && <ComboPackageModal combo={comboDefinitions([activeProductForConfig])[0]} isOpen onClose={()=>setActiveProductForConfig(null)} />}
       {/* Persistent Cart Drawer */}
-      <CartDrawer onOpenCheckout={() => setIsCheckoutOpen(true)} />
+      <CartDrawer onOpenCheckout={openCheckout} />
 
       {/* Takeaway Checkout Modal */}
       <TakeawayCheckoutModal
@@ -444,8 +457,9 @@ export const CustomerPortal: React.FC = () => {
 
       {/* Customer Auth Modal */}
       <CustomerAuthModal
+        onSuccess={() => {setIsAuthOpen(false);if(resumeCheckout){setResumeCheckout(false);setIsCheckoutOpen(true);}}}
         isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
+        onClose={() => {setIsAuthOpen(false);setResumeCheckout(false);}}
       />
 
       {/* Customer Profile Modal with Order History & 1-Click Reorder */}

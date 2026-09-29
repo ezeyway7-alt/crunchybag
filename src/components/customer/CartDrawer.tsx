@@ -1,3 +1,5 @@
+import { ComboPackageModal } from "./ComboPackageModal";
+import { comboDefinitions } from "../../lib/catalogApi";
 import React, { useState, useRef } from "react";
 import {
   ShoppingBag,
@@ -36,6 +38,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
     clearCart,
     products,
     addToCart,
+    addCustomComboToCart,
   } = useApp();
 
   const [inspectingItem, setInspectingItem] = useState<CartLineItem | null>(null);
@@ -43,99 +46,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
     item: CartLineItem;
     product: Product;
   } | null>(null);
-  const [showSaucePrompt, setShowSaucePrompt] = useState(false);
-  const sauceSectionRef = useRef<HTMLDivElement>(null);
-
-  const totalItemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItemCount = cart.items.reduce((sum,item) => sum+item.quantity,0);
   const isEmpty = cart.items.length === 0;
-
-  // Check whether the cart contains at least one sauce, dip, sausage, or paid add-on
-  const hasSauceOrAddon = cart.items.some((item) => {
-    const isSauceOrSide =
-      /sauce|dip|mayo|glaze|sausage|ranch|queso/i.test(item.productName) ||
-      /sauce|dip|mayo|glaze|sausage|ranch|queso/i.test(item.variant.name);
-    const hasPaidMod = item.selectedModifiers.some((m) => m.priceDelta > 0);
-    return isSauceOrSide || hasPaidMod;
-  });
-
-  // Curated quick-add signature sauces and add-ons
-  const signatureSauces = [
-    {
-      id: "prod-sauce-01",
-      name: "Smoked Garlic Aioli",
-      price: 50,
-      image: "https://images.unsplash.com/photo-1541544741938-0af808871cc0?w=200&auto=format&fit=crop&q=80",
-      tag: "House Favorite",
-    },
-    {
-      id: "prod-sauce-02",
-      name: "Ghost Pepper Fire Glaze",
-      price: 40,
-      image: "https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=200&auto=format&fit=crop&q=80",
-      tag: "Spicy",
-    },
-    {
-      id: "prod-sauce-03",
-      name: "Black Truffle Raclette Mayo",
-      price: 75,
-      image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=200&auto=format&fit=crop&q=80",
-      tag: "Truffle",
-    },
-    {
-      id: "prod-sauce-04",
-      name: "Crispy Sausage Bites (4 pcs)",
-      price: 160,
-      image: "https://images.unsplash.com/photo-1585325701165-351af916e581?w=200&auto=format&fit=crop&q=80",
-      tag: "Hot Snack",
-    },
-    {
-      id: "prod-sauce-05",
-      name: "Herbed Buttermilk Ranch",
-      price: 45,
-      image: "https://images.unsplash.com/photo-1472476443507-c7a5948772fc?w=200&auto=format&fit=crop&q=80",
-      tag: "Cool & Tangy",
-    },
-    {
-      id: "prod-sauce-06",
-      name: "Cheesy Jalapeño Queso",
-      price: 60,
-      image: "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=200&auto=format&fit=crop&q=80",
-      tag: "Warm Dip",
-    },
-  ];
-
-  const handleQuickAddSauce = (sauce: typeof signatureSauces[0]) => {
-    setShowSaucePrompt(false);
-    const existingProduct = products.find((p) => p.id === sauce.id) || {
-      id: sauce.id,
-      categoryId: "cat-sides",
-      name: sauce.name,
-      description: "Signature craft pairing",
-      basePrice: sauce.price,
-      images: [sauce.image],
-      dietary: ["Popular"],
-      isDeliveryEligible: true,
-      isAvailable: true,
-      prepTimeMinutes: 2,
-      variants: [{ id: `v-${sauce.id}`, name: "Regular Tub", price: sauce.price, isDefault: true }],
-      modifierGroups: [],
-    };
-
-    const variant = existingProduct.variants[0];
-    addToCart(existingProduct, variant, [], 1);
-  };
-
-  const handleCheckoutClick = () => {
-    if (!hasSauceOrAddon) {
-      setShowSaucePrompt(true);
-      if (sauceSectionRef.current) {
-        sauceSectionRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-      return;
-    }
-    setIsCartDrawerOpen(false);
-    onOpenCheckout();
-  };
+  const handleCheckoutClick = () => {setIsCartDrawerOpen(false);onOpenCheckout();};
 
   const handleReconfigureItem = (item: CartLineItem) => {
     const prod = products.find((p) => p.id === item.productId);
@@ -289,109 +202,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
                 );
               })}
 
-              {/* SAUCE & ADD-ON SUGGESTION SECTION (Effortless 1-tap UX on Mobile & Laptop) */}
-              <div
-                ref={sauceSectionRef}
-                className={`mt-4 p-3 transition-all rounded-none border ${
-                  showSaucePrompt && !hasSauceOrAddon
-                    ? "bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/50"
-                    : hasSauceOrAddon
-                    ? "bg-emerald-500/5 border-emerald-500/30 dark:bg-emerald-950/10"
-                    : "bg-zinc-50 dark:bg-[#18181B] border-zinc-200 dark:border-zinc-800"
-                }`}
-              >
-                {/* Section Header */}
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {hasSauceOrAddon ? (
-                      <span className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        <span>Craft Sauce / Add-on Added</span>
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 truncate">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span>Pair with a Craft Sauce / Add-on</span>
-                      </span>
-                    )}
-                  </div>
-
-                  {!hasSauceOrAddon ? (
-                    <span className="px-1.5 py-0.5 text-[9px] font-black uppercase bg-amber-500 text-black shrink-0 tracking-wider">
-                      Min. 1 Required
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-zinc-400 font-mono">
-                      1-Tap Extras
-                    </span>
-                  )}
-                </div>
-
-                {/* Friendly Inline Notice when prompted */}
-                {showSaucePrompt && !hasSauceOrAddon && (
-                  <div className="mb-2 p-2 bg-amber-500 text-black text-xs font-bold flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>Please tap <b>+ Add</b> on any sauce or bite below to proceed:</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Horizontal Quick-Add Scroll Strip */}
-                <div className="flex gap-2 overflow-x-auto pb-1 pt-0.5 scrollbar-thin scrollbar-thumb-zinc-300 dark:scrollbar-thumb-zinc-700">
-                  {signatureSauces.map((sauce) => {
-                    const inCartCount = cart.items
-                      .filter((i) => i.productId === sauce.id || i.productName === sauce.name)
-                      .reduce((sum, i) => sum + i.quantity, 0);
-
-                    return (
-                      <div
-                        key={sauce.id}
-                        className={`shrink-0 w-36 sm:w-40 p-2 bg-white dark:bg-[#121214] border transition-all flex flex-col justify-between ${
-                          inCartCount > 0
-                            ? "border-emerald-500 ring-1 ring-emerald-500"
-                            : "border-zinc-200 dark:border-zinc-800 hover:border-amber-400"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <img
-                            src={sauce.image}
-                            alt={sauce.name}
-                            className="w-8 h-8 rounded-none object-cover shrink-0 border border-zinc-200 dark:border-zinc-800"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <span className="text-[9px] font-mono text-zinc-400 block leading-none">
-                              {sauce.tag}
-                            </span>
-                            <h6 className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100 truncate leading-tight">
-                              {sauce.name}
-                            </h6>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800/80">
-                          <span className="font-mono text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                            {formatNPR(sauce.price)}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => handleQuickAddSauce(sauce)}
-                            className={`h-6 px-2 text-[10px] font-black uppercase tracking-wider rounded-none flex items-center gap-1 transition-all cursor-pointer ${
-                              inCartCount > 0
-                                ? "bg-emerald-500 hover:bg-emerald-400 text-black border border-emerald-600"
-                                : "bg-amber-500 hover:bg-amber-400 text-black border border-amber-600 shadow-2xs"
-                            }`}
-                          >
-                            <Plus className="w-3 h-3 stroke-[3]" />
-                            <span>{inCartCount > 0 ? `${inCartCount} Added` : "Add"}</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
 
             {/* Cart Footer - Compact Layout for Maximum Product Listing Height */}
@@ -420,7 +230,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
                 </button>
 
                 {/* Dynamic Checkout Button */}
-                {hasSauceOrAddon ? (
                   <button
                     type="button"
                     id="cart-checkout-btn"
@@ -433,22 +242,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
                       <ArrowRight className="h-3.5 w-3.5 stroke-[2.5]" />
                     </div>
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    id="cart-checkout-btn"
-                    onClick={handleCheckoutClick}
-                    className="flex-1 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-amber-400 font-black text-xs h-9 px-2.5 border border-amber-500/80 shadow-xs transition-all cursor-pointer flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-1.5 text-left truncate">
-                      <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
-                      <span className="text-[11px] truncate">Select 1 Sauce to Proceed</span>
-                    </div>
-                    <span className="text-[9px] uppercase font-mono font-black bg-amber-500 text-black px-1.5 py-0.5 shrink-0 ml-1">
-                      Choose
-                    </span>
-                  </button>
-                )}
+
               </div>
             </div>
           </div>
@@ -463,8 +257,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
         onReconfigureItem={handleReconfigureItem}
       />
 
+      {editingItem?.product.isComboPackage && <ComboPackageModal combo={comboDefinitions([editingItem.product])[0]} initialSelections={editingItem.item.comboSelections} isOpen onClose={()=>setEditingItem(null)} onAddToCartCustom={data=>{removeCartItem(editingItem.item.cartItemId);addCustomComboToCart({...data,quantity:editingItem.item.quantity});}} />}
       {/* Reconfigure Modal for editing existing cart items */}
-      {editingItem && (
+      {editingItem && !editingItem.product.isComboPackage && (
         <ProductConfiguratorModal
           product={editingItem.product}
           isOpen={!!editingItem}

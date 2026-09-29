@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import { apiClient, ApiError, extractErrorMessage } from "../../lib/api";
+import { customerPath, cartLines, customerRefresh } from "../../lib/customerApi";
+import { useAuth } from "../../context/AuthContext";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ShoppingBag,
   Clock,
@@ -42,29 +45,21 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   onClose,
   onOrderSuccess,
 }) => {
-  const { cart, currentOutlet, placeTakeawayOrder, customerProfile } = useApp();
+  const { cart, currentOutlet, clearCart, customerProfile } = useApp();
 
   // 1. By default, DELIVERY is selected as requested!
   const [selectedFulfillment, setSelectedFulfillment] = useState<FulfillmentType>("DELIVERY");
 
   // Contact info
-  const [name, setName] = useState(customerProfile.name || "Aayush Shrestha");
-  const [phone, setPhone] = useState(customerProfile.phone || "+977 9841-882299");
+  const [name, setName] = useState(customerProfile.name || "");
+  const [phone, setPhone] = useState(customerProfile.phone || "");
   const [notes, setNotes] = useState("");
 
   // Delivery address & location state
   const [deliveryAddress, setDeliveryAddress] = useState(
-    customerProfile.address || "House #14, Lazimpat, Kathmandu, Nepal"
+    customerProfile.address || ""
   );
-  const [deliveryLocation, setDeliveryLocation] = useState<{
-    lat: number;
-    lng: number;
-    landmark?: string;
-  }>({
-    lat: 27.7125,
-    lng: 85.3175,
-    landmark: "Near Standard Chartered Bank",
-  });
+  const [deliveryLocation, setDeliveryLocation] = useState<{lat:number;lng:number;landmark?:string} | undefined>();
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isPreviewItemsOpen, setIsPreviewItemsOpen] = useState(false);
 
@@ -73,7 +68,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const [tableNumber, setTableNumber] = useState("");
 
   // Payment method (eSewa Integration only)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("ESEWA");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("FONEPAY_QR");
   const [tipAmount, setTipAmount] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +76,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   // Sync payment method when switching fulfillment
   const handleFulfillmentChange = (type: FulfillmentType) => {
     setSelectedFulfillment(type);
-    setPaymentMethod("ESEWA");
+    setPaymentMethod("FONEPAY_QR");
   };
 
   const handleSaveLocation = (
@@ -94,58 +89,56 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     }
   };
 
-  const grandPayableTotal = cart.finalTotal + tipAmount;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setError("Please provide your name for the order.");
-      return;
-    }
-    if (!phone.trim()) {
-      setError("Contact phone number is required for SMS receipt and delivery dispatch.");
-      return;
-    }
-    if (selectedFulfillment === "DELIVERY" && !deliveryAddress.trim()) {
-      setError("Please provide a delivery address or pin your location on the map.");
-      return;
-    }
-
-    // Idempotent lock simulation
-    setIsSubmitting(true);
-    setError(null);
-
-    // Build extra notes for Drive-thru or Dine-in or Tip if present
-    let finalNotes = notes.trim();
-    if (tipAmount > 0) {
-      finalNotes = finalNotes
-        ? `[Rider Tip: NPR ${tipAmount}] ${finalNotes}`
-        : `[Rider Tip: NPR ${tipAmount}]`;
-    }
-    if (selectedFulfillment === "DRIVE_THRU" && vehicleInfo.trim()) {
-      finalNotes = finalNotes
-        ? `[Vehicle: ${vehicleInfo.trim()}] - ${finalNotes}`
-        : `[Vehicle: ${vehicleInfo.trim()}]`;
-    } else if (selectedFulfillment === "DINE_IN" && tableNumber.trim()) {
-      finalNotes = finalNotes
-        ? `[Table: ${tableNumber.trim()}] - ${finalNotes}`
-        : `[Table: ${tableNumber.trim()}]`;
-    }
-
-    setTimeout(() => {
-      const order = placeTakeawayOrder({
-        customerName: name.trim(),
-        customerPhone: phone.trim(),
-        fulfillmentType: selectedFulfillment,
-        paymentMethod,
-        notes: finalNotes || undefined,
-        deliveryAddress: selectedFulfillment === "DELIVERY" ? deliveryAddress : undefined,
-        deliveryLocation: selectedFulfillment === "DELIVERY" ? deliveryLocation : undefined,
-      });
-      setIsSubmitting(false);
-      onClose();
-      onOrderSuccess(order.id);
-    }, 850);
+  const {authUser,isAuthenticated} = useAuth();
+  const [meta,setMeta] = useState<any>(null);
+  const [proof,setProof] = useState<File | null>(null);
+  const [quoted,setQuoted] = useState<{signature:string;data:any}|null>(null);
+  const lock = useRef(false);
+  const payload = {outlet_id:Number(currentOutlet.id),items:cartLines(cart.items),fulfillment_type:selectedFulfillment,
+    customer_name:name.trim() || authUser?.username || '',delivery_address:selectedFulfillment==='DELIVERY'?deliveryAddress:'',
+    table_id:selectedFulfillment==='DINE_IN'?meta?.tables.find((t:any)=>t.table_number===tableNumber)?.id || null:null,
+    notes:[vehicleInfo?`Vehicle: ${vehicleInfo}`:'',notes].filter(Boolean).join(' — '),tip:String(tipAmount)};
+  const signature = JSON.stringify(payload);
+  const quote = quoted?.signature===signature ? quoted.data : null;
+  const grandPayableTotal = Number(quote?.total_payable ?? cart.finalTotal+tipAmount);
+  const pendingKey = `customer-checkout:${authUser?.id}:${currentOutlet.id}`;
+  const finishOrder = (order:any) => {sessionStorage.removeItem(pendingKey);clearCart();customerRefresh();onClose();onOrderSuccess(String(order.id));};
+  useEffect(()=>{
+    if(!isOpen)return;
+    setName(authUser?.username || customerProfile.name);setPhone((authUser as any)?.phone_number || customerProfile.phone);setDeliveryAddress(customerProfile.address);setError(null);
+    const controller=new AbortController();let live=true;
+    apiClient.get<any>(`${customerPath('checkout/meta/')}?outlet_id=${currentOutlet.id}`,{signal:controller.signal})
+      .then(result=>{if(live){setMeta(result);if(!result.fulfillment_modes.includes(selectedFulfillment))setSelectedFulfillment(result.fulfillment_modes[0] || 'TAKEAWAY');}})
+      .catch(e=>{if(live)setError(extractErrorMessage(e));});
+    const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');
+    if(pending)apiClient.get<any>(customerPath('orders/'),{signal:controller.signal}).then(result=>{const order=result.results.find((o:any)=>o.request_key===pending.key);if(live&&order)finishOrder(order);}).catch(()=>{});
+    return()=>{live=false;controller.abort();};
+  },[isOpen,currentOutlet.id,authUser?.id]);
+  useEffect(()=>{
+    if(!isOpen||!isAuthenticated||!cart.items.length)return;
+    const controller=new AbortController();let live=true;
+    const timer=setTimeout(()=>apiClient.post<any>(customerPath('checkout/quote/'),JSON.parse(signature),{signal:controller.signal})
+      .then(data=>{if(live){setQuoted({signature,data});setError(null);}}).catch(e=>{if(live)setError(extractErrorMessage(e));}),250);
+    return()=>{live=false;clearTimeout(timer);controller.abort();};
+  },[isOpen,isAuthenticated,signature]);
+  const handleSubmit = async (e:React.FormEvent) => {
+    e.preventDefault();if(lock.current)return;
+    if(!isAuthenticated||authUser?.role!=='CUSTOMER'){setError('Sign in before placing your order.');return;}
+    if(!quote||!proof||!meta?.qr_url){setError('Scan the payment QR and upload your receipt before placing the order.');return;}
+    if(selectedFulfillment==='DELIVERY'&&!deliveryAddress.trim()){setError('Enter your delivery address.');return;}
+    lock.current=true;setIsSubmitting(true);setError(null);
+    try {
+      const body={...payload,expected_total:quote.total_payable};
+      const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await proof.arrayBuffer()))).map(x=>x.toString(16).padStart(2,'0')).join('');
+      const fingerprint=JSON.stringify(body)+digest;
+      const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');
+      if(pending&&pending.fingerprint!==fingerprint)throw new Error('A previous checkout is awaiting confirmation. Check My Orders before changing and resubmitting it.');
+      const requestKey=pending?.key || crypto.randomUUID();sessionStorage.setItem(pendingKey,JSON.stringify({key:requestKey,fingerprint}));
+      const form=new FormData();form.append('payload',JSON.stringify(body));form.append('receipt',proof);
+      const result=await apiClient.post<any>(customerPath('checkout/'),form,{headers:{'Idempotency-Key':requestKey}});
+      setProof(null);finishOrder(result);
+    }catch(e){if(e instanceof ApiError&&e.status>=400&&e.status<500)sessionStorage.removeItem(pendingKey);setError(extractErrorMessage(e));}
+    finally{lock.current=false;setIsSubmitting(false);}
   };
 
   return (
@@ -168,6 +161,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
         contentClassName="p-0 flex-1 min-h-0 flex flex-col overflow-hidden"
       >
         <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
+          <fieldset disabled={isSubmitting} className="contents">
           {/* Scrollable Form Body - Maximized Height */}
           <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-2 sm:py-2.5 space-y-2.5">
             {/* 1. Fulfillment Type Selection - Ultra Compact Horizontal Strip */}
@@ -186,6 +180,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 <button
                   type="button"
                   id="fulfillment-opt-delivery"
+                  disabled={!meta?.fulfillment_modes.includes("DELIVERY")}
                   onClick={() => handleFulfillmentChange("DELIVERY")}
                   className={`h-8 px-1 sm:px-2 border flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                     selectedFulfillment === "DELIVERY"
@@ -202,6 +197,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 <button
                   type="button"
                   id="fulfillment-opt-takeaway"
+                  disabled={!meta?.fulfillment_modes.includes("TAKEAWAY")}
                   onClick={() => handleFulfillmentChange("TAKEAWAY")}
                   className={`h-8 px-1 sm:px-2 border flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                     selectedFulfillment === "TAKEAWAY"
@@ -341,13 +337,13 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
               <div className="p-2 bg-zinc-50 dark:bg-[#151518] border border-zinc-200 dark:border-zinc-800 space-y-1">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900 dark:text-white">
                   <UtensilsCrossed className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Table Number or Counter</span>
+                  <span>Table Number</span>
                 </div>
                 <input
                   type="text"
                   value={tableNumber}
                   onChange={(e) => setTableNumber(e.target.value)}
-                  placeholder="Table number (e.g. Table 4) or write 'Counter'"
+                  placeholder="Enter the table label shown at the outlet"
                   className="w-full px-2 py-1 text-xs bg-white dark:bg-[#1E1E22] border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-amber-500"
                 />
               </div>
@@ -371,7 +367,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 <Input
                   label="Phone Number"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  readOnly
                   placeholder="+977 98XXXXXXXX"
                   leftIcon={<Phone className="h-3.5 w-3.5" />}
                   className="rounded-none text-xs h-7.5"
@@ -388,44 +384,15 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
               />
             </div>
 
-            {/* Payment Method - Dedicated eSewa Integration UI */}
+            {/* Payment evidence uses the organization's uploaded merchant QR. */}
             <div className="space-y-1.5 pt-1 border-t border-zinc-200 dark:border-zinc-800">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Payment Method
-                </label>
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#60BB46] font-mono">
-                  <ShieldCheck className="h-3 w-3" />
-                  Official eSewa Gateway
-                </span>
-              </div>
-
-              {/* eSewa Integration Box */}
-              <div
-                id="esewa-payment-integration"
-                className="p-2 sm:p-2.5 bg-[#60BB46]/10 dark:bg-[#60BB46]/15 border-2 border-[#60BB46] flex items-center justify-between gap-2.5 shadow-2xs"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {/* Authentic eSewa Logo / Brand Icon */}
-                  <div className="w-8 h-8 rounded-none bg-[#60BB46] text-white font-black text-xs flex items-center justify-center tracking-tight shrink-0 shadow-xs border border-white/25">
-                    eSewa
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-black text-xs text-zinc-950 dark:text-white">
-                        eSewa Mobile Wallet
-                      </span>
-                      <CheckCircle2 className="h-3.5 w-3.5 text-[#60BB46] shrink-0" />
-                    </div>
-                    <p className="text-[10px] text-zinc-600 dark:text-zinc-400 truncate">
-                      Instant online checkout via eSewa account ({phone.trim() || "Linked Mobile"})
-                    </p>
-                  </div>
-                </div>
-
-                <div className="px-2 py-0.5 bg-[#60BB46] text-white text-[10px] font-mono font-black tracking-wider uppercase flex items-center gap-1 shrink-0 shadow-2xs">
-                  <Check className="h-3 w-3 stroke-[3]" />
-                  <span>SELECTED</span>
+              <label className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Scan & Pay</label>
+              <div className="p-2 sm:p-2.5 bg-amber-500/10 border border-amber-500/30 flex items-center gap-2.5">
+                {meta?.qr_url ? <a href={meta.qr_url} target="_blank" rel="noreferrer"><img src={meta.qr_url} alt="Merchant payment QR" className="w-32 h-32 object-contain bg-white" /></a> : <p className="text-xs text-amber-500">Payment QR is not configured for this outlet yet.</p>}
+                <div className="space-y-2 min-w-0">
+                  <p className="text-xs font-bold">{meta?.merchant}</p>
+                  <p className="text-[10px] text-zinc-400">Pay {formatNPR(grandPayableTotal)}, then upload the payment receipt. The outlet will verify it.</p>
+                  <input aria-label="Payment receipt" type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files?.[0];if(file&&file.size>5*1024*1024){setError('Receipt must be smaller than 5 MB.');setProof(null);}else setProof(file||null);}} className="w-full text-xs" required />
                 </div>
               </div>
             </div>
@@ -492,7 +459,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
               type="submit"
               size="sm"
               variant="primary"
-              disabled={isSubmitting || cart.items.length === 0}
+              disabled={isSubmitting || !quote || !proof || !meta?.qr_url || !meta?.accepting_orders || cart.items.length === 0}
               className="w-full text-xs sm:text-sm font-black rounded-none h-8 sm:h-8.5 bg-[#60BB46] hover:bg-[#52a43b] text-white border border-[#44912e] shadow-xs cursor-pointer flex items-center justify-between px-3 transition-colors"
               leftIcon={
                 isSubmitting ? (
@@ -503,7 +470,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
               }
             >
               <span className="flex items-center gap-1.5">
-                <span>{isSubmitting ? "Connecting to eSewa..." : "Pay with eSewa"}</span>
+                <span>{isSubmitting ? "Submitting order..." : "Submit Receipt & Place Order"}</span>
                 {!isSubmitting && (
                   <span className="text-[10px] font-normal opacity-90 hidden sm:inline">
                     • {selectedFulfillment === "DELIVERY"
@@ -521,6 +488,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
               </span>
             </Button>
           </div>
+          </fieldset>
         </form>
       </Modal>
 

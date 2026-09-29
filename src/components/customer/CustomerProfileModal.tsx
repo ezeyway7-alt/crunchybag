@@ -54,14 +54,15 @@ export const CustomerProfileModal: React.FC = () => {
     }
   }, [isProfileModalOpen, customerProfile]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateCustomerProfile({
+    const saved = await updateCustomerProfile({
       name: name.trim() || customerProfile.name,
       email: email.trim() || customerProfile.email,
       phone: phone.trim() || customerProfile.phone,
       address: address.trim() || customerProfile.address,
     });
+    if (!saved) return;
     setIsSaved(true);
     setTimeout(() => {
       setIsSaved(false);
@@ -170,7 +171,7 @@ export const CustomerProfileModal: React.FC = () => {
                       <input
                         type="text"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        readOnly
                         required
                         className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                         placeholder="+977 98XXXXXXXX"
@@ -188,7 +189,6 @@ export const CustomerProfileModal: React.FC = () => {
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        required
                         className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                         placeholder="your.email@example.com"
                       />

@@ -37,6 +37,8 @@ export const PrintableTokenReceiptModal: React.FC<PrintableTokenReceiptModalProp
 
   if (!isOpen || !order) return null;
 
+  const source = (order as any)._customerOrder;
+  const seller = source?.seller || {};
   const tokenStr = order.kioskToken || order.orderNumber.replace("CR-", "TK-");
 
   const handlePrint = () => {
@@ -106,12 +108,12 @@ export const PrintableTokenReceiptModal: React.FC<PrintableTokenReceiptModalProp
                 CRISPY FRIED CHICKEN & SMASH BURGERS
               </p>
               <p className="text-[10px] text-zinc-500 mt-0.5">
-                Durbar Marg, Kathmandu, Nepal • Tel: +977 1 4220011
+                {seller.address || order.outletName} {seller.phone || ""}
               </p>
               <div className="flex items-center justify-center gap-2 text-[9px] text-zinc-500 mt-1 font-mono">
-                <span>VAT/PAN: 601289123</span>
+                <span>VAT/PAN: {seller.pan || ""}</span>
                 <span>•</span>
-                <span>POS-02</span>
+                <span>{order.outletName}</span>
               </div>
             </div>
           </div>
@@ -209,11 +211,11 @@ export const PrintableTokenReceiptModal: React.FC<PrintableTokenReceiptModalProp
               <span>{formatNPR(order.subtotal)}</span>
             </div>
             <div className="flex justify-between text-[10px] text-zinc-500">
-              <span>VAT (13% Pan Tax Included):</span>
+              <span>VAT (Included):</span>
               <span>{formatNPR(order.vatIncludedAmount)}</span>
             </div>
             <div className="flex justify-between text-sm font-black border-t-2 border-zinc-950 pt-1.5 mt-1 text-zinc-950">
-              <span>TOTAL PAID:</span>
+              <span>ORDER TOTAL:</span>
               <span>{formatNPR(order.totalAmount)}</span>
             </div>
           </div>

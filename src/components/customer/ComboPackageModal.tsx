@@ -62,6 +62,7 @@ export interface ComboPackageModalProps {
       modifiers: string[];
     }[];
   }) => void;
+  initialSelections?: {product_id:string;variant_id:string|null;modifier_option_ids:string[];quantity:number}[];
   addLabel?: string;
   productsOverride?: Product[];
   channelOverride?: string;
@@ -73,6 +74,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
   onClose,
   onAddToCartCustom,
   addLabel,
+  initialSelections,
   productsOverride,
   channelOverride,
 }) => {
@@ -133,7 +135,12 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
       })
       .filter(Boolean) as ComboItemConfig[];
 
-    setItems(initialItems);
+    if(initialSelections){
+      setItems(initialSelections.flatMap((line,index)=>{const product=products.find(p=>p.id===line.product_id);if(!product)return [];
+        const selectedVariant=product.variants.find(v=>v.id===line.variant_id)||product.variants.find(v=>v.isDefault)||product.variants[0];
+        const selectedModifiers=product.modifierGroups.flatMap(g=>g.options.filter(o=>line.modifier_option_ids.includes(o.id)).map(o=>({groupId:g.id,groupName:g.name,optionId:o.id,optionName:o.name,priceDelta:o.priceDelta})));
+        return [{instanceId:`saved-${index}`,product,selectedVariant,selectedModifiers,quantity:line.quantity,isBaseItem:combo.includedProductIds.includes(product.id),baseEstimatedCredit:0,isRemoved:false}];}));
+    }else setItems(initialItems);
   }, [combo?.id, isOpen]);
 
   // Active items (not removed and quantity > 0)
@@ -147,51 +154,21 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
     [items]
   );
 
-  // Calculate live dynamic combo total price
-  const { comboTotalPrice, totalSavings, totalItemCount } = useMemo(() => {
-    if (!combo) return { comboTotalPrice: 0, totalSavings: 0, totalItemCount: 0 };
-
-    let price = combo.basePrice;
-    let count = 0;
-
-    items.forEach((it) => {
-      if (it.isBaseItem) {
-        if (it.isRemoved || it.quantity === 0) {
-          // Deduct credit for removed base item
-          price = Math.max(0, price - it.baseEstimatedCredit);
-        } else {
-          count += it.quantity;
-          const defaultVar = it.product.variants.find((v) => v.isDefault) || it.product.variants[0];
-          const variantDelta = it.selectedVariant.price - defaultVar.price;
-          const modsDelta = it.selectedModifiers.reduce((sum, m) => sum + m.priceDelta, 0);
-
-          // 1st unit covered by combo + upgrades
-          price += variantDelta + modsDelta;
-
-          // Extra units if quantity > 1 (10% combo discount)
-          if (it.quantity > 1) {
-            const extraUnitCost = Math.round((it.selectedVariant.price + modsDelta) * 0.9);
-            price += extraUnitCost * (it.quantity - 1);
-          }
-        }
-      } else {
-        if (!it.isRemoved && it.quantity > 0) {
-          count += it.quantity;
-          const modsDelta = it.selectedModifiers.reduce((sum, m) => sum + m.priceDelta, 0);
-          const unitCost = Math.round((it.selectedVariant.price + modsDelta) * 0.9);
-          price += unitCost * it.quantity;
-        }
-      }
-    });
-
-    const savings = Math.max(0, (combo.originalPrice || combo.basePrice + 350) - price);
-
-    return {
-      comboTotalPrice: Math.max(150, price),
-      totalSavings: savings,
-      totalItemCount: count,
-    };
-  }, [combo, items]);
+  const quoteBody = JSON.stringify({channel:channelOverride || (activePortal==='staff'||activePortal==='admin'?'pos':activePortal==='kiosk'?'kiosk':isTableOrderMode?'qr':'web'),items:[{product_id:combo?.id,quantity:1,combo_selections:activeItems.map(i=>({product_id:i.product.id,variant_id:i.selectedVariant.id||null,quantity:i.quantity,modifier_option_ids:i.selectedModifiers.map(m=>m.optionId)}))}]});
+  const [livePrice,setLivePrice] = useState<{key:string;price:number}|null>(null);
+  const [priceError,setPriceError] = useState('');
+  useEffect(()=>{
+    if(!isOpen||!combo||!activeItems.length)return;
+    const controller=new AbortController();let live=true;
+    const timer=setTimeout(()=>apiClient.post<any>(catalogPath('quote/',currentOutlet.id),JSON.parse(quoteBody),{signal:controller.signal})
+      .then(result=>{if(live){setLivePrice({key:quoteBody,price:Number(result.items[0].unit_price)});setPriceError('');}})
+      .catch(()=>{if(live)setPriceError('Check required choices and availability.');}),250);
+    return()=>{live=false;clearTimeout(timer);controller.abort();};
+  },[isOpen,currentOutlet.id,quoteBody]);
+  const priceReady = livePrice?.key===quoteBody;
+  const comboTotalPrice = priceReady ? livePrice.price : combo?.basePrice || 0;
+  const totalSavings = Math.max(0,(combo?.originalPrice || comboTotalPrice)-comboTotalPrice);
+  const totalItemCount = activeItems.reduce((sum,item)=>sum+item.quantity,0);
 
   if (!combo) return null;
 
@@ -328,7 +305,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
 
   // Add Combo to Cart
   const handleAddToCart = async () => {
-    if (activeItems.length === 0 || isQuoting) return;
+    if (activeItems.length === 0 || isQuoting || !priceReady) return;
     setIsQuoting(true);
     const selections = activeItems.map(it => ({ product_id: it.product.id, variant_id: it.selectedVariant.id || null,
       modifier_option_ids: it.selectedModifiers.map(m => m.optionId), quantity: it.quantity }));

@@ -52,6 +52,12 @@ export function getOrderReverseTimer(order: {
   fulfillmentType?: string;
   elapsedSeconds: number;
 }): OrderReverseTimerInfo {
+  if ('_customerOrder' in order) {
+    const stage = (order as any)._customerOrder.status;
+    const steps = ['PENDING','ACCEPTED','PREPARING','READY','OUT_FOR_DELIVERY','COMPLETED'];
+    const label = ({PENDING:'Payment review',ACCEPTED:'Confirmed',PREPARING:'In kitchen',READY:'Ready',OUT_FOR_DELIVERY:'Out for delivery',COMPLETED:'Completed',CANCELLED:'Cancelled'} as Record<string,string>)[stage] || stage;
+    return {isUndelivered:!['COMPLETED','CANCELLED'].includes(stage),totalTargetSeconds:0,remainingSeconds:0,formattedCountdown:label,displayLabel:label,progressPercent:stage==='CANCELLED'?0:Math.round(Math.max(0,steps.indexOf(stage))*100/(steps.length-1))};
+  }
   const isUndelivered = order.status !== "COMPLETED" && order.status !== "CANCELLED";
 
   if (!isUndelivered) {

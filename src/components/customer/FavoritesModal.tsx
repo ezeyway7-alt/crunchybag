@@ -19,6 +19,9 @@ export const FavoritesModal: React.FC = () => {
   const favoriteProducts = products.filter((p) => favorites.includes(p.id));
 
   const handleQuickAdd = (product: typeof products[0]) => {
+    if(!product.isAvailable)return;
+    if(product.isComboPackage || product.variants.length>1 || product.modifierGroups.length){setIsFavoritesModalOpen(false);window.dispatchEvent(new CustomEvent('customer:configure',{detail:product}));return;}
+
     addToCart(product, product.variants[0], [], 1);
     addToast({
       title: "Added to Cart",

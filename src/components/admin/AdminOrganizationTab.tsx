@@ -17,7 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import { PaymentMethod } from "../../types";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
-import { organizationApi, extractErrorMessage } from "../../lib/api";
+import { organizationApi, apiClient, extractErrorMessage } from "../../lib/api";
 
 const ALL_METHODS: { id: PaymentMethod; label: string }[] = [
   { id: "ESEWA", label: "eSewa" },
@@ -39,6 +39,13 @@ const CURRENCY_OPTIONS = [
 export const AdminOrganizationTab: React.FC = () => {
   const { orgSettings, updateOrgSettings, currentOutlet, addActivityLog, addToast } = useApp();
   const { authOutlet, authUser } = useAuth();
+  const [paymentQr,setPaymentQr] = useState('');
+  const [qrBusy,setQrBusy] = useState(false);
+  useEffect(()=>{apiClient.get<any>('/organization/').then(value=>setPaymentQr(value.payment_qr || '')).catch(()=>{});},[]);
+  const uploadPaymentQr = async (file:File) => {
+    if(file.size>5*1024*1024){addToast({title:'QR image must be smaller than 5 MB',type:'error'});return;}
+    setQrBusy(true);try{const form=new FormData();form.append('payment_qr',file);const value=await apiClient.patch<any>('/organization/',form);setPaymentQr(value.payment_qr || '');addToast({title:'Payment QR saved',type:'success'});}catch(e){addToast({title:'QR upload failed',description:extractErrorMessage(e),type:'error'});}finally{setQrBusy(false);}
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Scoped branch display
@@ -284,6 +291,11 @@ export const AdminOrganizationTab: React.FC = () => {
         onSubmit={handleSaveOrg}
         className="bg-[#121214] border border-zinc-800 rounded-lg p-5 space-y-5 shadow-sm"
       >
+        <div className="space-y-2 border-b border-zinc-800 pb-3">
+          <label className="text-xs font-bold text-zinc-400">Customer Checkout Payment QR</label>
+          {paymentQr && <img src={paymentQr} alt="Saved merchant payment QR" className="w-28 h-28 object-contain bg-white" />}
+          <input aria-label="Upload merchant payment QR" type="file" accept="image/png,image/jpeg,image/webp" disabled={qrBusy} onChange={e=>{if(e.target.files?.[0])void uploadPaymentQr(e.target.files[0]);}} className="block text-xs text-zinc-400" />
+        </div>
         {/* SINGLE BOX HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
           <div className="flex items-center gap-2">

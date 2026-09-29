@@ -1,3 +1,4 @@
+import { useCustomerAccount, customerRefresh } from "../lib/customerApi";
 import { useCatalog } from "./useCatalog";
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import {
@@ -724,8 +725,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
   // Orders & KDS
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
-  const [activeOrder, setActiveOrder] = useState<Order | null>(INITIAL_ORDERS[0] || null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [kdsTickets, setKdsTickets] = useState<KdsTicket[]>([]);
   const [kdsSoundEnabled, setKdsSoundEnabled] = useState(true);
   const [lastKitchenCall, setLastKitchenCall] = useState<{
@@ -754,43 +755,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const effectiveIsLoadingSkeleton = isLoadingSkeleton || catalogLoading;
 
   // Customer Navigation, Favorites & Search
+  const customerAccount = useCustomerAccount();
   const [customerActiveTab, setCustomerActiveTab] = useState<"menu" | "orders">("menu");
-  const [favorites, setFavorites] = useState<string[]>(["prod-crunchy-classic", "prod-bacon-bbq"]);
+  const favorites = customerAccount.favorites;
   const [isFavoritesModalOpen, setIsFavoritesModalOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
 
   // Customer Profile State
-  const [customerProfile, setCustomerProfile] = useState<CustomerProfile>({
-    name: "Aayush Shrestha",
-    email: "aayush@gmail.com",
-    phone: "+977 9841-882299",
-    address: "House #14, Lazimpat, Kathmandu, Nepal",
-    points: 420,
-    tier: "Gold Club",
-    memberSince: "Jan 2025",
-  });
+  const customerProfile = customerAccount.profile;
+  const setCustomerProfile = (_value: any) => {};
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-
-  const updateCustomerProfile = (updated: Partial<CustomerProfile>) => {
-    setCustomerProfile((prev) => ({ ...prev, ...updated }));
-    addToast({
-      title: "Profile Updated",
-      description: "Your account details have been saved successfully.",
-      type: "success",
-    });
-  };
-
-  const toggleFavorite = (productId: string) => {
-    setFavorites((prev) => {
-      const exists = prev.includes(productId);
-      if (exists) {
-        return prev.filter((id) => id !== productId);
-      } else {
-        return [...prev, productId];
-      }
-    });
-  };
+  const updateCustomerProfile = (updated: Partial<CustomerProfile>) => customerAccount.saveProfile(updated);
+  const toggleFavorite = (productId: string) => { void customerAccount.toggleFavorite(productId); };
 
   const isFavorite = (productId: string) => favorites.includes(productId);
 
@@ -821,6 +798,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
   };
+
+  useEffect(() => { if(customerAccount.error) addToast({title:'Customer request failed',description:customerAccount.error,type:'error'}); }, [customerAccount.error]);
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -1461,17 +1440,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const reorderItems = (order: Order) => {
-    order.items.forEach((item) => {
-      const matchProduct = products.find((p) => p.name === item.productName) || products[0];
-      const matchVariant = matchProduct.variants.find((v) => v.name === item.variantName) || matchProduct.variants[0];
-      addToCart(matchProduct, matchVariant, [], item.quantity);
-    });
-    setIsCartDrawerOpen(true);
-    addToast({
-      title: "Items Added from Previous Order",
-      description: `Reordered ${order.items.length} items to cart`,
-      type: "success",
-    });
+    const source = (order as any)._customerOrder;
+    if (!source?.reorder_items) {addToast({title:'Open the menu to choose your items',type:'info'});return;}
+    const restored: CartLineItem[] = [];
+    for(const line of source.reorder_items) {
+      const product=products.find(p=>String(p.id)===String(line.product_id));
+      if(!product?.isAvailable){addToast({title:'Item no longer available',description:product?.name || 'Choose a replacement from the menu.',type:'warning'});continue;}
+      const variant=product.variants.find(v=>String(v.id)===String(line.variant_id)) || (!line.variant_id ? product.variants.find(v=>v.isDefault)||product.variants[0] : null);
+      if(!variant&&!line.combo_selections){addToast({title:'Choose current options for '+product.name,type:'warning'});continue;}
+      const modifiers=product.modifierGroups.flatMap(g=>g.options.filter(o=>line.modifier_option_ids.includes(o.id)).map(o=>({groupId:g.id,groupName:g.name,optionId:o.id,optionName:o.name,priceDelta:o.priceDelta})));
+      const price=line.combo_selections?product.basePrice:(variant!.price+modifiers.reduce((sum,m)=>sum+m.priceDelta,0));
+      restored.push({cartItemId:crypto.randomUUID(),productId:product.id,productName:product.name,image:product.images[0]||'',variant:variant||{id:'',name:'Combo',price},selectedModifiers:modifiers,quantity:line.quantity,unitPrice:price,lineTotal:price*line.quantity,addedAt:Date.now(),quoteExpiresAt:Date.now()+900000,comboSelections:line.combo_selections});
+    }
+    setCartItems(previous=>[...previous,...restored]);setIsCartDrawerOpen(true);
   };
 
   const acknowledgeOrder = (orderId: string) => {
@@ -2664,11 +2645,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCartItemConfig,
         removeCartItem,
         clearCart,
-        orders,
-        activeOrder,
+        orders: activePortal === "customer" ? customerAccount.orders : orders,
+        activeOrder: activePortal === "customer" ? customerAccount.orders[0] || null : activeOrder,
         setActiveOrder,
         placeTakeawayOrder,
-        cancelOrder,
+        cancelOrder: activePortal === "customer" ? customerAccount.cancel : cancelOrder,
         reorderItems,
         acknowledgeOrder,
         markTakeawayComplete,

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import {
   Clock,
@@ -57,11 +57,12 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
+  useEffect(()=>{if(initialOrderId)setSelectedOrderId(initialOrderId);else if(!selectedOrderId&&orders.length)setSelectedOrderId(orders[0].id);},[initialOrderId,orders,selectedOrderId]);
   const selectedOrder = orders.find((o) => o.id === selectedOrderId) || null;
   const selectedOrderTimer = selectedOrder ? getOrderReverseTimer(selectedOrder) : null;
 
   const timelineSteps: { key: OrderStatus; label: string; desc: string }[] = [
-    { key: "AWAITING_PAYMENT", label: "Awaiting Payment", desc: "Verifying eSewa payment" },
+    { key: "AWAITING_PAYMENT", label: "Payment Review", desc: "The outlet is verifying your uploaded receipt" },
     { key: "CONFIRMED", label: "Confirmed", desc: "Order routed to branch" },
     { key: "PROCESSING", label: "In Kitchen", desc: "Chef actively frying & assembling" },
     { key: "READY", label: "Ready for Pickup", desc: "Warm in takeaway rack" },
@@ -397,13 +398,13 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                         {selectedOrder.status === "COMPLETED"
                           ? "Order Delivered"
                           : selectedOrder.fulfillmentType === "DELIVERY"
-                          ? `Delivery in ${selectedOrderTimer?.formattedCountdown} left`
-                          : `Ready in ${selectedOrderTimer?.formattedCountdown} left`}
+                          ? selectedOrderTimer?.displayLabel
+                          : selectedOrderTimer?.displayLabel}
                       </span>
                     </div>
 
                     <span className="text-[10px] font-mono font-bold bg-black/60 px-2 py-0.5 border border-amber-500/40 text-amber-300">
-                      {selectedOrderTimer?.progressPercent}% In Progress
+                      {selectedOrderTimer?.progressPercent}% Order Progress
                     </span>
                   </div>
 
@@ -534,7 +535,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                   <div>
                     <p className="font-bold text-sm">This order has been cancelled.</p>
                     <p className="text-xs text-rose-400 mt-0.5">
-                      Funds have not been debited. You can reorder the items with 1-tap below.
+                      Contact the outlet if you already paid. You can reorder below.
                     </p>
                   </div>
                 </div>
@@ -590,11 +591,11 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                     </span>
                   </div>
                   <div className="flex justify-between text-[11px]">
-                    <span>VAT (13% Included)</span>
+                    <span>VAT (Included)</span>
                     <span className="font-mono">{formatNPR(selectedOrder.vatIncludedAmount)}</span>
                   </div>
                   <div className="flex justify-between text-sm sm:text-base font-black text-zinc-950 dark:text-white pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                    <span>Total Paid</span>
+                    <span>Order Total</span>
                     <span className="font-mono text-amber-500">
                       {formatNPR(selectedOrder.totalAmount)}
                     </span>

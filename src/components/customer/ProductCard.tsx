@@ -29,7 +29,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   }
 
   const hasMultipleVariantsOrModifiers =
-    product.variants.length > 1 || product.modifierGroups.length > 0;
+    product.isComboPackage || product.variants.length > 1 || product.modifierGroups.length > 0;
 
   return (
     <>
@@ -154,6 +154,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <button
                 disabled={!product.isAvailable}
                 onClick={() => onQuickAdd(product)}
+                aria-label={`Add ${product.name}`}
                 className="flex items-center gap-1 h-7.5 sm:h-8.5 px-2.5 sm:px-3.5 text-[11px] sm:text-xs font-black bg-amber-500 hover:bg-amber-400 text-black rounded-none shadow-sm transition-all disabled:opacity-40 cursor-pointer border border-amber-600 whitespace-nowrap"
               >
                 <ShoppingCart className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[2.5] shrink-0" />

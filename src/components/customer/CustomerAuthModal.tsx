@@ -1,3 +1,5 @@
+import { apiClient, extractErrorMessage } from "../../lib/api";
+import { customerPath, saveCustomerSession } from "../../lib/customerApi";
 import React, { useState, useEffect, useRef } from "react";
 import { Phone, KeyRound, Lock, ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Modal } from "../common/Modal";
@@ -9,19 +11,31 @@ import { useApp } from "../../context/AppContext";
 interface CustomerAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   isOpen,
   onClose,
+  onSuccess,
 }) => {
   const { addToast } = useApp();
   const [authMethod, setAuthMethod] = useState<"OTP" | "PIN" | "PASSWORD">("OTP");
 
+  const [busy,setBusy] = useState(false);
+  const [error,setError] = useState('');
+  const [challenge,setChallenge] = useState('');
+  const [demoCode,setDemoCode] = useState('');
+  const [registrationToken,setRegistrationToken] = useState('');
+  const [username,setUsername] = useState('');
+  const [email,setEmail] = useState('');
+  const locked = useRef(false);
+  const perform = async (work: () => Promise<void>) => { if(locked.current)return;locked.current=true;setBusy(true);setError('');try{await work();}catch(e){setError(extractErrorMessage(e));}finally{locked.current=false;setBusy(false);} };
+  const finish = (result:any) => {saveCustomerSession(result);setPassword('');setNewPin('');setPinDigits(['','','','']);setOtpDigits(['','','','']);onSuccess?.();onClose();};
   // OTP State
-  const [phone, setPhone] = useState("+977 9841-882299");
+  const [phone, setPhone] = useState("");
   const [otpSent, setOtpSent] = useState(false);
-  const [otpDigits, setOtpDigits] = useState(["", "", "", "", "", ""]);
+  const [otpDigits, setOtpDigits] = useState(["", "", "", ""]);
   const [otpTimer, setOtpTimer] = useState(45);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -44,19 +58,15 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     return () => clearInterval(timer);
   }, [otpSent, otpTimer]);
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  useEffect(()=>{if(isOpen){setIsSecuritySetupOpen(false);setOtpSent(false);setAuthMethod('OTP');setError('');setPassword('');setNewPin('');}},[isOpen]);
+  const handleSendOtp = (e: any) => {
     e.preventDefault();
-    if (!phone.trim()) return;
-    setOtpSent(true);
-    setOtpTimer(45);
-    addToast({
-      title: "6-Digit OTP Dispatched",
-      description: `Verification code sent to ${phone}. (Mock: Enter any 6 digits)`,
-      type: "info",
+    void perform(async () => {
+      const result = await apiClient.post<any>(customerPath('auth/start/'), {phone}, {skipAuth:true});
+      if(result.exists){setAuthMethod('PIN');setOtpSent(false);return;}
+      setChallenge(result.challenge_id);setDemoCode(result.demo_code);setOtpDigits(['','','','']);setOtpSent(true);setOtpTimer(45);
+      setTimeout(()=>inputRefs.current[0]?.focus(),100);
     });
-    setTimeout(() => {
-      inputRefs.current[0]?.focus();
-    }, 100);
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -66,7 +76,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setOtpDigits(newOtp);
 
     // Auto focus next input
-    if (value && index < 5) {
+    if (value && index < 3) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -94,60 +104,54 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     }
   };
 
-  const handleVerifyOtp = () => {
-    addToast({
-      title: "Authentication Successful",
-      description: "Welcome back, Aayush! Logged in securely.",
-      type: "success",
-    });
-    setIsSecuritySetupOpen(true);
-  };
-
-  const handleVerifyPin = () => {
-    addToast({
-      title: "PIN Verified",
-      description: "Session restored with quick security PIN.",
-      type: "success",
-    });
-    onClose();
-  };
-
+  const handleVerifyOtp = () => void perform(async () => {
+    const result = await apiClient.post<any>(customerPath('auth/verify/'), {challenge_id:challenge,code:otpDigits.join('')}, {skipAuth:true});
+    setRegistrationToken(result.registration_token);setIsSecuritySetupOpen(true);
+  });
+  const handleVerifyPin = () => void perform(async () => {
+    const result = await apiClient.post<any>(customerPath('auth/login/'), {phone,method:authMethod,credential:authMethod==='PASSWORD'?password:pinDigits.join('')}, {skipAuth:true});
+    finish(result);
+  });
   const handleSaveSecurity = (e: React.FormEvent) => {
-    e.preventDefault();
-    addToast({
-      title: "Security Settings Saved",
-      description: "Your 4-digit quick checkout PIN has been established.",
-      type: "success",
+    e.preventDefault();void perform(async () => {
+      const result = await apiClient.post<any>(customerPath('auth/register/'), {registration_token:registrationToken,username,email,pin:newPin,password}, {skipAuth:true});
+      finish(result);
     });
-    setIsSecuritySetupOpen(false);
-    onClose();
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isSecuritySetupOpen ? "Quick Security Setup" : "Customer Sign In"}
+      title={isSecuritySetupOpen ? "Create Your Account" : "Customer Sign In"}
       description={
         isSecuritySetupOpen
-          ? "Set your 4-digit fast checkout PIN"
+          ? "Choose your username, PIN and password"
           : "Access your past orders, favorite combos, and one-tap reorders"
       }
       maxWidth="md"
     >
+      <fieldset disabled={busy} className="contents">
+      {error && <p role="alert" className="text-xs text-rose-500 mb-3">{error}</p>}
       {isSecuritySetupOpen ? (
         <form onSubmit={handleSaveSecurity} className="space-y-4 py-2">
           <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-3">
             <ShieldCheck className="h-6 w-6 text-amber-500 shrink-0" />
             <p className="text-xs text-zinc-700 dark:text-zinc-300">
-              Set up a 4-digit PIN for lightning-fast 1-tap checkout next time without waiting for SMS OTPs.
+              Use your mobile number with your PIN or password next time.
             </p>
           </div>
 
+          <Input label="Username" value={username} onChange={e=>setUsername(e.target.value)} minLength={3} required autoComplete="username" />
+          <Input label="Email (optional)" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
+          <Input label="Set Password" type="password" value={password} minLength={8} onChange={e=>setPassword(e.target.value)} required autoComplete="new-password" />
           <Input
             label="New 4-Digit Quick PIN"
             type="password"
             maxLength={4}
+            minLength={4}
+            pattern="[0-9]{4}"
+            inputMode="numeric"
             value={newPin}
             onChange={(e) => setNewPin(e.target.value)}
             placeholder="••••"
@@ -165,7 +169,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 onClose();
               }}
             >
-              Skip For Now
+              Cancel
             </Button>
             <Button
               type="submit"
@@ -174,7 +178,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               className="flex-1 font-bold"
               rightIcon={<CheckCircle2 className="h-4 w-4" />}
             >
-              Save Security PIN
+              Create Account & Continue
             </Button>
           </div>
         </form>
@@ -193,7 +197,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
               }`}
             >
-              Phone OTP
+              Mobile Number
             </button>
             <button
               onClick={() => setAuthMethod("PIN")}
@@ -217,7 +221,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             </button>
           </div>
 
-          {/* Phone OTP Flow */}
+          {/* Mobile Number Flow */}
           {authMethod === "OTP" && (
             <div className="space-y-4">
               {!otpSent ? (
@@ -228,17 +232,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+977 98XXXXXXXX"
                     leftIcon={<Phone className="h-4 w-4" />}
-                    hint="A 6-digit SMS verification code will be sent instantly."
+                    hint="Enter your mobile to sign in or create an account."
                     required
                   />
                   <Button type="submit" variant="primary" size="lg" className="w-full font-bold">
-                    Send Verification Code
+                    Continue
                   </Button>
                 </form>
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between text-xs text-zinc-500">
-                    <span>Code sent to {phone}</span>
+                    <span>Signup code for {phone}</span>
                     <button
                       onClick={() => setOtpSent(false)}
                       className="text-amber-500 hover:underline cursor-pointer"
@@ -247,12 +251,13 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     </button>
                   </div>
 
-                  {/* 6 Auto-focus OTP boxes */}
+                  {demoCode && <p className="text-xs text-amber-500">Temporary test code: <strong>{demoCode}</strong> (SMS is not sent yet)</p>}
                   <div className="flex justify-between gap-2">
                     {otpDigits.map((digit, idx) => (
                       <input
                         key={idx}
                         ref={(el) => { inputRefs.current[idx] = el; }}
+                        aria-label={`Signup code digit ${idx+1}`}
                         type="text"
                         inputMode="numeric"
                         maxLength={1}
@@ -294,6 +299,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             </div>
           )}
 
+          {authMethod === "PIN" && <Input label="Mobile Phone Number" value={phone} onChange={e=>setPhone(e.target.value)} autoComplete="tel" required />}
           {/* 4-digit PIN Flow */}
           {authMethod === "PIN" && (
             <div className="space-y-4">
@@ -305,6 +311,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   <input
                     key={idx}
                     ref={(el) => { pinRefs.current[idx] = el; }}
+                    aria-label={`PIN digit ${idx+1}`}
                     type="password"
                     inputMode="numeric"
                     maxLength={1}
@@ -337,8 +344,10 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               className="space-y-3"
             >
               <Input
-                label="Registered Mobile or Email"
-                defaultValue="aayush@gmail.com"
+                label="Mobile Phone Number"
+                value={phone}
+                onChange={e=>setPhone(e.target.value)}
+                autoComplete="tel"
                 required
               />
               <Input
@@ -357,6 +366,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           )}
         </div>
       )}
+      </fieldset>
     </Modal>
   );
 };
