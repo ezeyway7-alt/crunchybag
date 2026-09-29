@@ -71,8 +71,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setNewPin("");
     setNewPassword("");
     setOtpDigits(["", "", "", ""]);
-    onSuccess?.();
-    onClose();
+    if (onSuccess) onSuccess();
+    else onClose();
   };
 
   // Reset state when modal opens
@@ -447,6 +447,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 </div>
                 <input
                   type="tel"
+                  aria-label="Mobile Phone Number"
                   inputMode="numeric"
                   placeholder="98XXXXXXXX"
                   value={phone}
@@ -483,6 +484,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 <Lock className="absolute left-3 w-4 h-4 text-zinc-400 pointer-events-none" />
                 <input
                   type={showCredential ? "text" : "password"}
+                  aria-label="Account Password or PIN"
                   value={credential}
                   onChange={(e) => setCredential(e.target.value)}
                   placeholder="Enter your 4-digit PIN or password"
@@ -571,6 +573,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 </div>
                 <input
                   type="tel"
+                  aria-label="Mobile Phone Number"
                   inputMode="numeric"
                   placeholder="98XXXXXXXX"
                   value={phone}
@@ -692,6 +695,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 <User className="absolute left-3 w-4 h-4 text-zinc-400 pointer-events-none" />
                 <input
                   type="text"
+                  aria-label="Full name"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. Aayush Sharma"
@@ -728,6 +732,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     minLength={4}
                     pattern="[0-9]{4}"
                     inputMode="numeric"
+                    aria-label="New 4-Digit Quick PIN"
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     placeholder="••••"
@@ -745,6 +750,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   <Lock className="absolute left-3 w-4 h-4 text-zinc-400 pointer-events-none" />
                   <input
                     type={showNewPassword ? "text" : "password"}
+                    aria-label="Set Password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Min. 6 chars"
@@ -791,6 +797,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 </div>
                 <input
                   type="tel"
+                  aria-label="Mobile Phone Number"
                   inputMode="numeric"
                   placeholder="98XXXXXXXX"
                   value={phone}

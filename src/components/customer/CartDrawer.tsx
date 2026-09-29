@@ -29,7 +29,7 @@ interface CartDrawerProps {
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
   const {
-    cart,
+    cart, cartSyncError, retryCartSync,
     isCartDrawerOpen,
     setIsCartDrawerOpen,
     updateCartItemQty,
@@ -76,6 +76,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
           </div>
         }
       >
+        {cartSyncError && <div role="alert" className="p-3 text-xs text-amber-400">{cartSyncError} <button onClick={()=>void retryCartSync()} className="underline">Retry</button></div>}
         {isEmpty ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-4">
             <div className="flex items-center justify-center">

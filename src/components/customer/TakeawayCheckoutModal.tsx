@@ -1,3 +1,4 @@
+import {useCustomerAddresses, addressPoint} from '../../lib/customerAddresses';
 import { apiClient, ApiError, extractErrorMessage } from "../../lib/api";
 import { customerPath, cartLines, customerRefresh } from "../../lib/customerApi";
 import { useAuth } from "../../context/AuthContext";
@@ -45,7 +46,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   onClose,
   onOrderSuccess,
 }) => {
-  const { cart, currentOutlet, clearCart, customerProfile } = useApp();
+  const { cart, currentOutlet, consumePurchasedCart, customerProfile, cartSyncing, cartSyncError } = useApp();
 
   // 1. By default, DELIVERY is selected as requested!
   const [selectedFulfillment, setSelectedFulfillment] = useState<FulfillmentType>("DELIVERY");
@@ -69,7 +70,12 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
 
   // Payment method (eSewa Integration only)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("FONEPAY_QR");
-  const [tipAmount, setTipAmount] = useState<number>(0);
+  const savedAddresses = useCustomerAddresses();
+  const [selectedAddressId, setSelectedAddressId] = useState('');
+  const [saveAddress, setSaveAddress] = useState(false);
+  const [addressLabel, setAddressLabel] = useState('Home');
+  const [proofError, setProofError] = useState('');
+  const [touched, setTouched] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,28 +90,31 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     location?: { lat: number; lng: number; landmark?: string }
   ) => {
     setDeliveryAddress(newAddress);
-    if (location) {
-      setDeliveryLocation(location);
-    }
+    setDeliveryLocation(location);setSelectedAddressId('');
   };
 
   const {authUser,isAuthenticated} = useAuth();
   const [meta,setMeta] = useState<any>(null);
   const [proof,setProof] = useState<File | null>(null);
   const [quoted,setQuoted] = useState<{signature:string;data:any}|null>(null);
+  const [quoteVersion,setQuoteVersion] = useState(0);
+  const [quoteError,setQuoteError] = useState('');
   const lock = useRef(false);
+  const addressInitialized = useRef(false);
   const payload = {outlet_id:Number(currentOutlet.id),items:cartLines(cart.items),fulfillment_type:selectedFulfillment,
+    cart_line_ids:cart.items.map(item=>item.cartItemId),
     customer_name:name.trim() || authUser?.username || '',delivery_address:selectedFulfillment==='DELIVERY'?deliveryAddress:'',
     table_id:selectedFulfillment==='DINE_IN'?meta?.tables.find((t:any)=>t.table_number===tableNumber)?.id || null:null,
-    notes:[vehicleInfo?`Vehicle: ${vehicleInfo}`:'',notes].filter(Boolean).join(' — '),tip:String(tipAmount)};
+    notes:[vehicleInfo?`Vehicle: ${vehicleInfo}`:'',notes].filter(Boolean).join(' — '),delivery_location:selectedFulfillment==='DELIVERY' ? deliveryLocation || {} : {}};
   const signature = JSON.stringify(payload);
   const quote = quoted?.signature===signature ? quoted.data : null;
-  const grandPayableTotal = Number(quote?.total_payable ?? cart.finalTotal+tipAmount);
+  const grandPayableTotal = Number(quote?.total_payable ?? cart.finalTotal);
   const pendingKey = `customer-checkout:${authUser?.id}:${currentOutlet.id}`;
-  const finishOrder = (order:any) => {sessionStorage.removeItem(pendingKey);clearCart();customerRefresh();onClose();onOrderSuccess(String(order.id));};
+  const finishOrder = (order:any) => {const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');consumePurchasedCart(pending?.cartLineIds || []);sessionStorage.removeItem(pendingKey);customerRefresh();onClose();onOrderSuccess(String(order.id));};
   useEffect(()=>{
     if(!isOpen)return;
-    setName(authUser?.username || customerProfile.name);setPhone((authUser as any)?.phone_number || customerProfile.phone);setDeliveryAddress(customerProfile.address);setError(null);
+    addressInitialized.current=false;setDeliveryAddress('');setDeliveryLocation(undefined);setSelectedAddressId('');setSaveAddress(false);
+    setName(authUser?.username || customerProfile.name);setPhone((authUser as any)?.phone_number || customerProfile.phone);setError(null);setProofError('');setTouched(false);setProof(null);setMeta(null);
     const controller=new AbortController();let live=true;
     apiClient.get<any>(`${customerPath('checkout/meta/')}?outlet_id=${currentOutlet.id}`,{signal:controller.signal})
       .then(result=>{if(live){setMeta(result);if(!result.fulfillment_modes.includes(selectedFulfillment))setSelectedFulfillment(result.fulfillment_modes[0] || 'TAKEAWAY');}})
@@ -118,26 +127,50 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     if(!isOpen||!isAuthenticated||!cart.items.length)return;
     const controller=new AbortController();let live=true;
     const timer=setTimeout(()=>apiClient.post<any>(customerPath('checkout/quote/'),JSON.parse(signature),{signal:controller.signal})
-      .then(data=>{if(live){setQuoted({signature,data});setError(null);}}).catch(e=>{if(live)setError(extractErrorMessage(e));}),250);
+      .then(data=>{if(live){setQuoted({signature,data});setQuoteError('');}}).catch(e=>{if(live)setQuoteError(extractErrorMessage(e));}),250);
     return()=>{live=false;clearTimeout(timer);controller.abort();};
-  },[isOpen,isAuthenticated,signature]);
+  },[isOpen,isAuthenticated,signature,quoteVersion]);
+  useEffect(()=>{
+    if (!isOpen || addressInitialized.current || savedAddresses.loading) return;
+    addressInitialized.current=true;
+    const row = savedAddresses.addresses.find(row=>row.is_default) || savedAddresses.addresses[0];
+    if (row) {setSelectedAddressId(String(row.id));setDeliveryAddress(row.address);setDeliveryLocation(addressPoint(row));}
+    else if(customerProfile.address) setDeliveryAddress(customerProfile.address);
+  },[isOpen,savedAddresses.addresses,savedAddresses.loading,customerProfile.address,authUser?.id]);
+  const addressError = selectedFulfillment==='DELIVERY' && !deliveryAddress.trim() ? 'Choose your delivery address.' : '';
+  const nameError = !name.trim() ? 'Enter your name.' : name.trim().length > 120 ? 'Use no more than 120 characters.' : '';
+  const tableError = selectedFulfillment==='DINE_IN' && !payload.table_id ? 'Choose a table.' : '';
+  const handleProof = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget, file = input.files?.[0];
+    setProof(null);setProofError('');
+    if (!file) return;
+    if (!['image/png','image/jpeg','image/webp'].includes(file.type)) {setProofError('Choose a PNG, JPEG, or WebP image.');input.value='';return;}
+    if(file.size > 5*1024*1024) {setProofError('Receipt must be smaller than 5 MB.');input.value='';return;}
+    if(!file.size) {setProofError('This file is empty. Choose another receipt.');input.value='';return;}
+    setProof(file);
+  };
   const handleSubmit = async (e:React.FormEvent) => {
-    e.preventDefault();if(lock.current)return;
+    e.preventDefault();setTouched(true);if(lock.current)return;
+    if(nameError || addressError || tableError || cartSyncing || cartSyncError)return;
     if(!isAuthenticated||authUser?.role!=='CUSTOMER'){setError('Sign in before placing your order.');return;}
     if(!quote||!proof||!meta?.qr_url){setError('Scan the payment QR and upload your receipt before placing the order.');return;}
     if(selectedFulfillment==='DELIVERY'&&!deliveryAddress.trim()){setError('Enter your delivery address.');return;}
     lock.current=true;setIsSubmitting(true);setError(null);
     try {
+      if(saveAddress && selectedFulfillment==='DELIVERY' && !selectedAddressId) {
+        const row = await savedAddresses.save({label:addressLabel.trim() || 'Home',address:deliveryAddress,landmark:deliveryLocation?.landmark || '',latitude:deliveryLocation ? deliveryLocation.lat.toFixed(7):null,longitude:deliveryLocation ? deliveryLocation.lng.toFixed(7):null});
+        setSelectedAddressId(String(row.id));setSaveAddress(false);
+      }
       const body={...payload,expected_total:quote.total_payable};
       const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await proof.arrayBuffer()))).map(x=>x.toString(16).padStart(2,'0')).join('');
       const fingerprint=JSON.stringify(body)+digest;
       const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');
       if(pending&&pending.fingerprint!==fingerprint)throw new Error('A previous checkout is awaiting confirmation. Check My Orders before changing and resubmitting it.');
-      const requestKey=pending?.key || crypto.randomUUID();sessionStorage.setItem(pendingKey,JSON.stringify({key:requestKey,fingerprint}));
+      const requestKey=pending?.key || crypto.randomUUID();sessionStorage.setItem(pendingKey,JSON.stringify({key:requestKey,fingerprint,cartLineIds:payload.cart_line_ids}));
       const form=new FormData();form.append('payload',JSON.stringify(body));form.append('receipt',proof);
       const result=await apiClient.post<any>(customerPath('checkout/'),form,{headers:{'Idempotency-Key':requestKey}});
       setProof(null);finishOrder(result);
-    }catch(e){if(e instanceof ApiError&&e.status>=400&&e.status<500)sessionStorage.removeItem(pendingKey);setError(extractErrorMessage(e));}
+    }catch(e){if(e instanceof ApiError&&e.status>=400&&e.status<500)sessionStorage.removeItem(pendingKey);if(e instanceof ApiError&&e.status===409){setQuoted(null);setQuoteVersion(v=>v+1);}setError(extractErrorMessage(e));}
     finally{lock.current=false;setIsSubmitting(false);}
   };
 
@@ -261,10 +294,16 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                     className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-amber-500 hover:bg-amber-400 text-black border border-black cursor-pointer shadow-xs transition-colors"
                   >
                     <Plus className="h-3 w-3 stroke-[2.5]" />
-                    <span>Change Pin</span>
+                    <span>{deliveryAddress ? "Edit address" : "Add address"}</span>
                   </button>
                 </div>
 
+                {savedAddresses.addresses.length > 0 && <select aria-label="Saved delivery address" value={selectedAddressId} onChange={e=>{
+                  setSelectedAddressId(e.target.value);const row=savedAddresses.addresses.find(row=>String(row.id)===e.target.value);
+                  if(row){setDeliveryAddress(row.address);setDeliveryLocation(addressPoint(row));setSaveAddress(false);}else{setDeliveryAddress('');setDeliveryLocation(undefined);}
+                }} className="w-full bg-zinc-900 border border-zinc-700 p-2 text-xs"><option value="">New address</option>{savedAddresses.addresses.map(row=><option key={row.id} value={row.id}>{row.label}: {row.address}</option>)}</select>}
+                {touched && addressError && <p className="text-xs text-rose-400">{addressError}</p>}
+                {savedAddresses.error && <p role="alert" className="text-xs text-rose-400">{savedAddresses.error}</p>}
                 {/* Address Card Display */}
                 <div
                   onClick={() => setIsLocationModalOpen(true)}
@@ -272,7 +311,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 >
                   <div className="space-y-0.5 min-w-0 flex-1">
                     <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                      {deliveryAddress}
+                      {deliveryAddress || "Choose a delivery address"}
                     </p>
                     {deliveryLocation?.landmark && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400 truncate">
@@ -285,6 +324,8 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   </span>
                 </div>
 
+                {!selectedAddressId && deliveryAddress && <div className="space-y-2"><label className="flex gap-2 items-center text-xs"><input type="checkbox" checked={saveAddress} onChange={e=>setSaveAddress(e.target.checked)} />Save this address</label>
+                  {saveAddress && <Input label="Address label" value={addressLabel} onChange={e=>setAddressLabel(e.target.value)} maxLength={60} required />}</div>}
                 {/* Ride Sharing Delivery Fee Note */}
                 <div className="p-1.5 bg-amber-500/10 border border-amber-500/20 flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
                   <Bike className="h-3 w-3 text-amber-500 shrink-0" />
@@ -327,6 +368,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   type="text"
                   value={vehicleInfo}
                   onChange={(e) => setVehicleInfo(e.target.value)}
+                  maxLength={150}
                   placeholder="Vehicle model & plate (e.g., White Swift Ba 2 Cha 4921)"
                   className="w-full px-2 py-1 text-xs bg-white dark:bg-[#1E1E22] border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-amber-500"
                 />
@@ -339,13 +381,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   <UtensilsCrossed className="h-3.5 w-3.5 text-amber-500" />
                   <span>Table Number</span>
                 </div>
-                <input
-                  type="text"
-                  value={tableNumber}
-                  onChange={(e) => setTableNumber(e.target.value)}
-                  placeholder="Enter the table label shown at the outlet"
-                  className="w-full px-2 py-1 text-xs bg-white dark:bg-[#1E1E22] border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-amber-500"
-                />
+                <select aria-label="Table number" value={tableNumber} onChange={e=>setTableNumber(e.target.value)} className="w-full p-2 bg-zinc-900 border border-zinc-700 text-xs"><option value="">Choose a table</option>{meta?.tables.map((table:any)=><option key={table.id} value={table.table_number}>{table.table_number}</option>)}</select>
               </div>
             )}
 
@@ -357,6 +393,9 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <Input
                   label="Full Name"
+                  maxLength={120}
+                  error={touched ? nameError : undefined}
+                  onBlur={()=>setTouched(true)}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your Name"
@@ -377,6 +416,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
 
               <Input
                 label="Kitchen / Delivery Note (Optional)"
+                maxLength={1800}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Special notes"
@@ -392,38 +432,16 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 <div className="space-y-2 min-w-0">
                   <p className="text-xs font-bold">{meta?.merchant}</p>
                   <p className="text-[10px] text-zinc-400">Pay {formatNPR(grandPayableTotal)}, then upload the payment receipt. The outlet will verify it.</p>
-                  <input aria-label="Payment receipt" type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files?.[0];if(file&&file.size>5*1024*1024){setError('Receipt must be smaller than 5 MB.');setProof(null);}else setProof(file||null);}} className="w-full text-xs" required />
+                  <input aria-label="Payment receipt" aria-invalid={!!proofError} aria-describedby={proofError ? 'receipt-error' : undefined} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleProof} className="w-full text-xs" required />
+                  {proofError && <p id="receipt-error" role="alert" className="text-xs text-rose-400">{proofError}</p>}
+                  {proof && <p className="text-xs text-emerald-400">Receipt ready</p>}
                 </div>
               </div>
             </div>
 
-            {/* Bezel-less Rider Tip Buttons (Clean flat chips) */}
-            <div className="flex items-center justify-between gap-2 py-1 bg-zinc-50 dark:bg-zinc-900/60 px-2.5">
-              <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400">
-                <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500/20" />
-                <span className="text-[11px] font-bold">Rider Tip</span>
-              </div>
-              <div className="flex items-center gap-1">
-                {[0, 20, 50, 100].map((amount) => (
-                  <button
-                    key={amount}
-                    type="button"
-                    onClick={() => setTipAmount(amount === tipAmount ? 0 : amount)}
-                    className={`text-[11px] font-mono font-bold px-2 py-1 border-0 transition-all cursor-pointer ${
-                      tipAmount === amount
-                        ? "bg-amber-500 text-black shadow-xs font-black"
-                        : "bg-zinc-200/80 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
-                    }`}
-                  >
-                    {amount === 0 ? "None" : `+${formatNPR(amount)}`}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {error && (
+            {(error || quoteError) && (
               <div className="p-2 bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-bold">
-                {error}
+                {error || quoteError}
               </div>
             )}
           </div>
@@ -443,7 +461,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   <span>Items ({cart.items.reduce((s, it) => s + it.quantity, 0)})</span>
                 </button>
                 <span className="text-[10px] text-zinc-400 font-mono hidden sm:inline">
-                  (VAT incl.{tipAmount > 0 ? ` • Tip ${formatNPR(tipAmount)}` : ""})
+                  (VAT incl.)
                 </span>
               </div>
               <div className="flex items-baseline gap-1.5">
@@ -459,7 +477,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
               type="submit"
               size="sm"
               variant="primary"
-              disabled={isSubmitting || !quote || !proof || !meta?.qr_url || !meta?.accepting_orders || cart.items.length === 0}
+              disabled={isSubmitting || cartSyncing || !!cartSyncError || !!nameError || !!addressError || !!tableError || !quote || !proof || !meta?.qr_url || !meta?.accepting_orders || cart.items.length === 0}
               className="w-full text-xs sm:text-sm font-black rounded-none h-8 sm:h-8.5 bg-[#60BB46] hover:bg-[#52a43b] text-white border border-[#44912e] shadow-xs cursor-pointer flex items-center justify-between px-3 transition-colors"
               leftIcon={
                 isSubmitting ? (
@@ -497,6 +515,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
         isOpen={isLocationModalOpen}
         onClose={() => setIsLocationModalOpen(false)}
         currentAddress={deliveryAddress}
+        currentLocation={deliveryLocation}
         onSaveAddress={handleSaveLocation}
       />
 

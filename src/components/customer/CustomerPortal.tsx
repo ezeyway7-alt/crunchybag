@@ -23,12 +23,13 @@ import { ProductConfiguratorModal } from "./ProductConfiguratorModal";
 import { CartDrawer } from "./CartDrawer";
 import { TakeawayCheckoutModal } from "./TakeawayCheckoutModal";
 import { CustomerAuthModal } from "./CustomerAuthModal";
-import { CustomerProfileModal } from "./CustomerProfileModal";
+import { CustomerProfilePage } from "./CustomerProfilePage";
 import { InstantSearchModal } from "./InstantSearchModal";
 import { LiveOrderTracker } from "./LiveOrderTracker";
 import { FavoritesModal } from "./FavoritesModal";
 import { HeroBannerSlider } from "./HeroBannerSlider";
 import { Button } from "../common/Button";
+import { Modal } from "../common/Modal";
 import { CustomerFooter } from "./CustomerFooter";
 import { PrintableTokenReceiptModal } from "./PrintableTokenReceiptModal";
 import { QrOrderTrackAndReviewModal } from "./QrOrderTrackAndReviewModal";
@@ -55,6 +56,7 @@ const DIETARY_FILTERS: { id: DietaryFilterType; label: string }[] = [
 
 export const CustomerPortal: React.FC = () => {
   const {
+    cartSyncing, cartSyncError, retryCartSync,
     products,
     categories,
     orders,
@@ -88,14 +90,20 @@ export const CustomerPortal: React.FC = () => {
   const [activeProductForConfig, setActiveProductForConfig] = useState<Product | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { isAuthenticated, authUser } = useAuth();
-  const [resumeCheckout, setResumeCheckout] = useState(false);
+  const [resumeCheckout, setResumeCheckout] = useState(() => sessionStorage.getItem('customer:return-to-checkout') === 'yes');
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [trackedOrderId, setTrackedOrderId] = useState<string | undefined>(undefined);
 
   const openCheckout = () => {
-    if (!isAuthenticated || authUser?.role !== 'CUSTOMER') {setResumeCheckout(true);setIsAuthOpen(true);}
-    else setIsCheckoutOpen(true);
+    if (!isAuthenticated || authUser?.role !== 'CUSTOMER') {sessionStorage.setItem('customer:return-to-checkout','yes');setResumeCheckout(true);setIsAuthOpen(true);}
+    else {sessionStorage.setItem('customer:return-to-checkout','yes');setResumeCheckout(true);}
   };
+  useEffect(() => {
+    if (resumeCheckout && authUser?.role === 'CUSTOMER' && !cartSyncing && !cartSyncError) {
+      sessionStorage.removeItem('customer:return-to-checkout');
+      setResumeCheckout(false); setIsAuthOpen(false); setIsCheckoutOpen(true);
+    }
+  }, [resumeCheckout, authUser?.id, authUser?.role, cartSyncing, cartSyncError]);
   useEffect(() => { const open = () => setIsAuthOpen(true); window.addEventListener('customer:login',open); return () => window.removeEventListener('customer:login',open); },[]);
   // Receipt & QR Slip Review Modals
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
@@ -411,7 +419,7 @@ export const CustomerPortal: React.FC = () => {
             </div>
           )}
         </main>
-      ) : (
+      ) : customerActiveTab === "profile" ? <CustomerProfilePage /> : (
         <LiveOrderTracker
           initialOrderId={trackedOrderId}
           onExploreMenu={() => setCustomerActiveTab("menu")}
@@ -457,13 +465,15 @@ export const CustomerPortal: React.FC = () => {
 
       {/* Customer Auth Modal */}
       <CustomerAuthModal
-        onSuccess={() => {setIsAuthOpen(false);if(resumeCheckout){setResumeCheckout(false);setIsCheckoutOpen(true);}}}
+        onSuccess={() => setIsAuthOpen(false)}
         isOpen={isAuthOpen}
-        onClose={() => {setIsAuthOpen(false);setResumeCheckout(false);}}
+        onClose={() => {setIsAuthOpen(false);setResumeCheckout(false);sessionStorage.removeItem('customer:return-to-checkout');}}
       />
 
       {/* Customer Profile Modal with Order History & 1-Click Reorder */}
-      <CustomerProfileModal />
+      <Modal isOpen={resumeCheckout && authUser?.role === 'CUSTOMER' && !isAuthOpen} onClose={()=>{setResumeCheckout(false);sessionStorage.removeItem('customer:return-to-checkout');}} title="Preparing checkout" maxWidth="sm">
+        {cartSyncError ? <div role="alert" className="space-y-3 text-sm"><p>Your items are saved on this device. We couldn’t finish restoring your cart.</p><Button onClick={()=>void retryCartSync()}>Try again</Button></div> : <p role="status" className="text-sm text-zinc-400">Restoring your cart…</p>}
+      </Modal>
 
       {/* Printable Digital Receipt & Token Slip Modal */}
       <PrintableTokenReceiptModal

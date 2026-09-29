@@ -296,7 +296,7 @@ export const PortalHeader: React.FC = () => {
                       id="menu-my-profile-btn"
                       onClick={() => {
                         setIsProfileMenuOpen(false);
-                        if(authUser?.role === 'CUSTOMER')setIsProfileModalOpen(true);else window.dispatchEvent(new Event('customer:login'));
+                        setCustomerActiveTab('profile');
                       }}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-amber-500/10 hover:text-amber-400 transition-colors text-left cursor-pointer"
                     >

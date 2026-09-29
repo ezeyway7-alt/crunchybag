@@ -1,3 +1,4 @@
+import { usePersistentCart } from './usePersistentCart';
 import { useCustomerAccount, customerRefresh } from "../lib/customerApi";
 import { useCatalog } from "./useCatalog";
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
@@ -349,8 +350,12 @@ interface AppContextType {
   setIsLoadingSkeleton: (loading: boolean) => void;
 
   // Customer Navigation & Favorites & Search
-  customerActiveTab: "menu" | "orders";
-  setCustomerActiveTab: (tab: "menu" | "orders") => void;
+  customerActiveTab: "menu" | "orders" | "profile";
+  cartSyncing: boolean;
+  cartSyncError: string;
+  consumePurchasedCart: (ids: string[]) => void;
+  retryCartSync: () => Promise<void>;
+  setCustomerActiveTab: (tab: "menu" | "orders" | "profile") => void;
   favorites: string[];
   toggleFavorite: (productId: string) => void;
   isFavorite: (productId: string) => boolean;
@@ -363,7 +368,7 @@ interface AppContextType {
 
   // Customer Profile & Modals
   customerProfile: CustomerProfile;
-  updateCustomerProfile: (profile: Partial<CustomerProfile>) => void;
+  updateCustomerProfile: (profile: Partial<CustomerProfile>) => Promise<boolean>;
   isProfileModalOpen: boolean;
   setIsProfileModalOpen: (open: boolean) => void;
 
@@ -721,7 +726,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [draftChangesCount, setDraftChangesCount] = useState(0);
 
   // Cart
-  const [cartItems, setCartItems] = useState<CartLineItem[]>([]);
+  const persistentCart = usePersistentCart(currentOutlet.id);
+  const {items: cartItems, setItems: setCartItems} = persistentCart;
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
   // Orders & KDS
@@ -756,7 +762,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Customer Navigation, Favorites & Search
   const customerAccount = useCustomerAccount();
-  const [customerActiveTab, setCustomerActiveTab] = useState<"menu" | "orders">("menu");
+  const pageFromPath = () => window.location.pathname === '/profile' ? 'profile' : window.location.pathname === '/orders' ? 'orders' : 'menu';
+  const [customerActiveTab, setCustomerPage] = useState<'menu' | 'orders' | 'profile'>(pageFromPath);
+  const setCustomerActiveTab = (tab: 'menu' | 'orders' | 'profile') => {
+    window.history.pushState(null, '', `/${tab}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    setCustomerPage(tab);
+  };
+  useEffect(() => {
+    const changed = () => setCustomerPage(pageFromPath());
+    window.addEventListener('popstate', changed);
+    return () => window.removeEventListener('popstate', changed);
+  }, []);
   const favorites = customerAccount.favorites;
   const [isFavoritesModalOpen, setIsFavoritesModalOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -765,7 +782,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Customer Profile State
   const customerProfile = customerAccount.profile;
   const setCustomerProfile = (_value: any) => {};
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const isProfileModalOpen = false;
+  const setIsProfileModalOpen = (open: boolean) => { if (open) setCustomerActiveTab('profile'); };
   const updateCustomerProfile = (updated: Partial<CustomerProfile>) => customerAccount.saveProfile(updated);
   const toggleFavorite = (productId: string) => { void customerAccount.toggleFavorite(productId); };
 
@@ -2685,6 +2703,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsStale,
         isLoadingSkeleton: effectiveIsLoadingSkeleton,
         setIsLoadingSkeleton,
+        cartSyncing: persistentCart.syncing, cartSyncError: persistentCart.error, retryCartSync: persistentCart.retry,
+        consumePurchasedCart: persistentCart.consumePurchased,
         customerActiveTab,
         setCustomerActiveTab,
         favorites,

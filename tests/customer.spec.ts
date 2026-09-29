@@ -6,7 +6,7 @@ async function setup(page:Page, signedIn=false) {
   const outlet={id:1,name:'Web Outlet',branch_code:'WEB',enable_delivery:true,enable_takeaway:true,accepting_orders:true};
   const product={id:'burger',category:'food',name:'Web Burger',description:'Burger',base_price:'200.00',variants:[],modifier_groups:[],images:[`data:image/png;base64,${png}`],dietary_tags:[],is_available:true,is_web_visible:true,is_delivery_eligible:true,requires_kitchen:true};
   const combo={...product,id:'combo',name:'Web Combo',base_price:'350.00',is_combo_package:true,combo_discount_type:'fixed_price',combo_discount_value:'350.00',combo_items:[{product_id:'burger',product_name:'Web Burger',quantity:2,unit_price:'200.00'}]};
-  const state:any={user,outlet,orders:[],favorites:[],calls:[],writes:[],sockets:[],created:0,failCreate:false};
+  const state:any={user,outlet,orders:[],favorites:[],calls:[],writes:[],sockets:[],created:0,failCreate:false,cart:{items:[],version:0},merges:new Set(),addresses:[]};
   if(signedIn)await page.addInitScript(({user,outlet})=>{localStorage.setItem('crunchy_access_token','test-access');localStorage.setItem('crunchy_refresh_token','test-refresh');localStorage.setItem('crunchy_auth_user',JSON.stringify(user));localStorage.setItem('crunchy_auth_outlet',JSON.stringify(outlet));},{user,outlet});
   await page.addInitScript(()=>{document.cookie='csrftoken=abcdefghijklmnopqrstuvwx12345678; path=/';});
   await page.routeWebSocket('**/ws/**',socket=>{if(socket.url().includes('/customer/orders/')){state.sockets.push(socket);socket.onMessage(()=>socket.send(JSON.stringify({type:'heartbeat',revision:String(state.orders.map(o=>o.version))})));}});
@@ -26,6 +26,29 @@ async function setup(page:Page, signedIn=false) {
       if(body.code!=='4821'){await route.fulfill({status:400,json:{detail:'Invalid code'}});return;}
       result={registration_token:'signed-registration'};
     }else if(path==='customer/auth/register/'||path==='customer/auth/login/')result={access:'test-access',refresh:'test-refresh',user,outlet};
+    else if(path==='customer/cart/') {
+      if(req.method()==='PUT') {
+        if(state.forceCartConflict){state.forceCartConflict=false;state.cart.items.push({...body.items[0],cartItemId:'another-device'});state.cart.version++;}
+        if(body.version!==state.cart.version){await route.fulfill({status:409,json:{detail:'Cart changed'}});return;}
+        if(state.blockCartPut){await new Promise<void>(resolve=>{state.releaseCartPut=resolve;});state.blockCartPut=false;}
+        state.cart={items:body.items,version:state.cart.version+1};
+      }
+      if(req.method()==='POST'&&!state.merges.has(body.merge_id)) {
+        state.merges.add(body.merge_id);const ids=new Set(state.cart.items.map(i=>i.cartItemId));
+        state.cart={items:[...state.cart.items,...body.items.filter(i=>!ids.has(i.cartItemId))],version:state.cart.version+1};
+      }
+      result=state.cart;
+    }
+    else if(path==='customer/addresses/') {
+      if(req.method()==='POST') {result={id:state.addresses.length+1,is_default:!state.addresses.length,latitude:null,longitude:null,landmark:'',...body};state.addresses.push(result);}
+      else result=state.addresses;
+    }
+    else if(path.startsWith('customer/addresses/')) {
+      const id=Number(path.split('/')[2]);
+      if(req.method()==='DELETE'){state.addresses=state.addresses.filter(row=>row.id!==id);await route.fulfill({status:204});return;}
+      if(body.is_default)state.addresses.forEach(row=>row.is_default=false);
+      result=state.addresses.find(row=>row.id===id);Object.assign(result,body);
+    }
     else if(path==='customer/profile/')result={name:user.username,phone:user.phone_number,email:'',address:'',member_since:'2026-09-01',favorites:state.favorites};
     else if(path.startsWith('customer/favorites/')){const id=path.split('/')[2];state.favorites=body.selected?[...state.favorites,id]:state.favorites.filter(v=>v!==id);result={favorites:state.favorites};}
     else if(path==='customer/orders/')result={results:state.orders};
@@ -33,11 +56,12 @@ async function setup(page:Page, signedIn=false) {
     else if(path==='customer/checkout/meta/')result={qr_url:`data:image/png;base64,${png}`,merchant:'Registered Merchant',accepting_orders:true,fulfillment_modes:['TAKEAWAY','DELIVERY'],tables:[]};
     else if(path==='customer/checkout/quote/'){
       const subtotal=body.items.reduce((n,i)=>n+(i.product_id==='combo'?350:200)*i.quantity,0);
-      result={subtotal:String(subtotal),total_payable:(subtotal+Number(body.tip)).toFixed(2),vat_included_amount:'0.00',items:body.items};
+      result={subtotal:String(subtotal),total_payable:(subtotal+Number(body.tip || 0)).toFixed(2),vat_included_amount:'0.00',items:body.items};
     }else if(path==='customer/checkout/'){
       if(state.failCreate){state.failCreate=false;await route.fulfill({status:409,json:{detail:'Price changed; please review.'}});return;}
       const raw=req.postData()!; const payload=JSON.parse(raw.match(/name="payload"\r?\n\r?\n([^\r\n]+)/)![1]);
       state.created++;state.lastPayload=payload;
+      state.cart={items:state.cart.items.filter(row=>!payload.cart_line_ids?.includes(row.cartItemId)),version:state.cart.version+1};
       result={id:7,outlet_id:1,outlet_name:'Web Outlet',order_number:'WEB-REAL-7',request_key:req.headers()['idempotency-key'],version:1,status:'PENDING',fulfillment_type:payload.fulfillment_type,order_source:'WEBSITE',customer_name:payload.customer_name,customer_phone:user.phone_number,notes:'',delivery_address:payload.delivery_address,created_at:new Date().toISOString(),subtotal:payload.expected_total,total_payable:payload.expected_total,paid_amount:'0.00',due_amount:payload.expected_total,credit_amount:'0.00',refunded_amount:'0.00',discount_amount:'0.00',vat_included_amount:'0.00',payment_method:'FONEPAY',settlement:'UNPAID',payment_review:'PENDING',receipts:[{id:1,kind:'TOKEN',number:'TOKEN-7'}],payments:[],reorder_items:payload.items,items:payload.items.map((i,n)=>({id:n+1,product_id:i.product_id,product_name:i.product_id==='combo'?'Web Combo':'Web Burger',variant_name:'',quantity:i.quantity,unit_price:i.product_id==='combo'?'350':'200',line_total:payload.expected_total,round_number:1,requires_kitchen:true,is_voided:false,modifiers:[],combo_components:[]}))};
       state.orders=[result];
     }
@@ -49,13 +73,110 @@ async function setup(page:Page, signedIn=false) {
 async function openCheckout(page:Page){await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();await page.getByRole('button',{name:'Shopping Cart',exact:true}).click();await expect(page.getByText('Select 1 Sauce to Proceed')).toHaveCount(0);await page.locator('#cart-checkout-btn').click();}
 async function receipt(page:Page){await page.locator('#fulfillment-opt-takeaway').click();await page.getByLabel('Payment receipt').setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});}
 
+test('cart rebases a stale version without losing another device or in-flight edits',async({page})=>{
+  const state=await setup(page,true);
+  await expect.poll(()=>state.calls.includes('GET customer/cart/')).toBe(true);
+  state.forceCartConflict=true;state.blockCartPut=true;
+  await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();
+  await expect.poll(()=>typeof state.releaseCartPut).toBe('function');
+  await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();
+  state.releaseCartPut();
+  await expect.poll(()=>state.cart.items.length).toBe(3);
+  expect(state.cart.items.some(row=>row.cartItemId==='another-device')).toBe(true);
+  await page.reload();
+  await page.getByRole('button',{name:'Shopping Cart',exact:true}).click();
+  await expect(page.getByText('3 items',{exact:true}).first()).toBeVisible();
+});
+
+test('denied location access never saves a sample address or default map point',async({page})=>{
+  await page.addInitScript(()=>Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition:(_success:any,failure:any,options:any)=>{
+    (window as any).requestedGeoOptions=options;failure({code:1});
+  }}}));
+  await setup(page,true);await page.goto('/profile');
+  await page.getByRole('button',{name:'Add address',exact:true}).click();
+  await page.getByRole('button',{name:'Choose on map',exact:true}).click();
+  await page.getByRole('button',{name:'Current location',exact:true}).click();
+  await expect(page.getByText('Allow location access or choose a point on the map.',{exact:true})).toBeVisible();
+  await expect(page.getByLabel('House / Street / Tole Address')).toHaveValue('');
+  await expect(page.getByRole('button',{name:'Save location',exact:true})).toBeDisabled();
+  expect(await page.evaluate(()=>(window as any).requestedGeoOptions)).toMatchObject({maximumAge:0,enableHighAccuracy:true});
+});
+
+test('guest refresh, account cart merge, checkout validation and signed-in persistence',async({page})=>{
+  const state=await setup(page);
+  await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();
+  const guest=await page.evaluate(()=>JSON.parse(localStorage.getItem('crunchy-cart-v1:guest:1')!));
+  expect(guest.items).toHaveLength(1);
+  state.cart={items:[{...guest.items[0],cartItemId:'existing-account-line'}],version:1};
+  await page.reload();
+  await page.getByRole('button',{name:'Shopping Cart',exact:true}).click();
+  await expect(page.locator('#cart-checkout-btn')).toBeVisible();
+  await page.locator('#cart-checkout-btn').click();
+  
+  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9800000000');
+  await page.getByLabel('Account Password or PIN').fill('Crisp!River49Ocean');
+  await page.getByRole('button',{name:'Sign In',exact:true}).click();
+  await expect(page.getByAltText('Merchant payment QR')).toBeVisible();
+  expect(state.cart.items).toHaveLength(2);
+  expect(await page.evaluate(()=>localStorage.getItem('crunchy-cart-v1:guest:1'))).toBeNull();
+  await expect(page.getByText('Rider Tip',{exact:true})).toHaveCount(0);
+  await expect(page.getByText('Receipt must be smaller than 5 MB.',{exact:true})).toHaveCount(0);
+  await page.getByLabel('Payment receipt').setInputFiles({name:'large.png',mimeType:'image/png',buffer:Buffer.alloc(5*1024*1024+1)});
+  await expect(page.getByText('Receipt must be smaller than 5 MB.',{exact:true})).toBeVisible();
+  await receipt(page);
+  await expect(page.getByText('Receipt must be smaller than 5 MB.',{exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/Submit Receipt & Place Order/})).toBeEnabled();
+  await page.reload();
+  await expect(page.getByRole('button',{name:'Add Web Burger',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Shopping Cart',exact:true}).click();
+  await page.locator('#cart-checkout-btn').click();
+  await expect(page.getByAltText('Merchant payment QR')).toBeVisible();
+  expect(state.cart.items).toHaveLength(2);
+  expect(state.merges.size).toBe(1);
+});
+
+test('profile page saves multiple addresses with live GPS and checkout reuses the default',async({page,context})=>{
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({latitude:27.681234,longitude:85.321987,accuracy:12});
+  const state=await setup(page,true);
+  await page.goto('/profile');
+  await expect(page.getByRole('heading',{name:'My profile',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Add address',exact:true}).click();
+  await page.getByRole('button',{name:'Choose on map',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Save location',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Current location',exact:true}).click();
+  await expect(page.getByRole('status').filter({hasText:'27.681234, 85.321987'})).toBeVisible();
+  await expect(page.getByLabel('House / Street / Tole Address')).toHaveValue('');
+  await page.getByLabel('House / Street / Tole Address').fill('House 9, My street');
+  await page.getByLabel('Nearest Landmark',{exact:true}).fill('Blue gate');
+  await page.getByRole('button',{name:'Save location',exact:true}).click();
+  await page.getByRole('button',{name:'Save address',exact:true}).click();
+  await expect.poll(()=>state.addresses.length).toBe(1);
+  expect(state.addresses[0]).toMatchObject({latitude:'27.6812340',longitude:'85.3219870',landmark:'Blue gate'});
+  await page.getByRole('button',{name:'Add address',exact:true}).click();
+  await page.getByLabel('Address label',{exact:true}).fill('Work');
+  await page.getByLabel('Address',{exact:true}).fill('Office street');
+  await page.getByRole('button',{name:'Save address',exact:true}).click();
+  await expect.poll(()=>state.addresses.length).toBe(2);
+  await page.reload();
+  await expect(page.getByText('Office street',{exact:true})).toBeVisible();
+  await page.goto('/menu');await openCheckout(page);
+  await expect(page.getByLabel('Saved delivery address')).toHaveValue('1');
+  await expect(page.getByText('House 9, My street',{exact:true})).toBeVisible();
+  await page.getByLabel('Payment receipt').setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+  await page.getByRole('button',{name:/Submit Receipt & Place Order/}).click();
+  await expect.poll(()=>state.created).toBe(1);
+  expect(state.lastPayload.delivery_location).toEqual({lat:27.681234,lng:85.321987,landmark:'Blue gate'});
+});
+
 test('guest signup resumes cart checkout and real tracking without required add-ons',async({page})=>{
   const state=await setup(page);await openCheckout(page);
-  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9841234567');await page.getByRole('button',{name:'Continue',exact:true}).click();
-  for(const [index,digit] of [...'4821'].entries())await page.getByLabel(`Signup code digit ${index+1}`).fill(digit);
+  await page.getByRole('button',{name:'Sign Up (Get OTP)',exact:true}).click();
+  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9841234567');await page.getByRole('button',{name:'Get OTP Verification Code',exact:true}).click();
+  for(const [index,digit] of [...'4821'].entries())await page.getByLabel(`Code digit ${index+1}`).fill(digit);
   await page.getByRole('button',{name:'Verify & Continue'}).click();
-  await page.getByLabel('Username',{exact:true}).fill('web_customer');await page.getByLabel('Set Password').fill('Crisp!River49Ocean');await page.getByLabel('New 4-Digit Quick PIN').fill('1234');
-  await page.getByRole('button',{name:'Create Account & Continue'}).click();
+  await page.getByLabel('Full name',{exact:true}).fill('web_customer');await page.getByLabel('Set Password').fill('Crisp!River49Ocean');await page.getByLabel('New 4-Digit Quick PIN').fill('1234');
+  await page.getByRole('button',{name:'Complete & Continue to Checkout'}).click();
   await expect(page.getByAltText('Merchant payment QR')).toBeVisible();
   const submit=page.getByRole('button',{name:/Submit Receipt & Place Order/});await expect(submit).toBeDisabled();
   await receipt(page);await expect(submit).toBeEnabled();await submit.click();
@@ -65,20 +186,19 @@ test('guest signup resumes cart checkout and real tracking without required add-
   state.orders[0].status='PREPARING';state.orders[0].version++;
   state.sockets.at(-1).send(JSON.stringify({type:'orders_changed'}));
   await expect(page.getByText('In kitchen',{exact:true}).first()).toBeVisible();
-  await page.reload();await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();await page.getByRole('button',{name:'Shopping Cart',exact:true}).click();await page.locator('#cart-checkout-btn').click();
+  await page.goto('/menu');await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();await page.getByRole('button',{name:'Shopping Cart',exact:true}).click();await page.locator('#cart-checkout-btn').click();
   await expect(page.getByAltText('Merchant payment QR')).toBeVisible();await expect(page.getByText('Customer Sign In',{exact:true})).toHaveCount(0);
 });
 
 test('returning customer can use mobile and PIN or password; favourites persist',async({page})=>{
-  const state=await setup(page);await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up'}).click();
-  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9800000000');await page.getByRole('button',{name:'Continue',exact:true}).click();
-  for(const [index,digit] of [...'1234'].entries())await page.getByLabel(`PIN digit ${index+1}`).fill(digit);
-  await page.getByRole('button',{name:'Unlock Account'}).click();
-  await page.getByTitle('Save to favorites').first().click();await expect.poll(()=>state.favorites.length).toBe(1);
+  const state=await setup(page);await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();await page.getByRole('button',{name:'Sign in / Sign up',exact:true}).click();
+  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9800000000');await page.getByLabel('Account Password or PIN').fill('1234');
+  await page.getByRole('button',{name:'Sign In',exact:true}).click();
+  await page.goto('/menu');await page.getByTitle('Save to favorites').first().click();await expect.poll(()=>state.favorites.length).toBe(1);
   await page.reload();await expect(page.getByTitle('Remove favorite').first()).toBeVisible();
   await page.getByRole('button',{name:'User Account Profile'}).click();await page.locator('#menu-logout-btn').click();
-  await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up'}).click();
-  await page.getByRole('button',{name:'Password',exact:true}).click();await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9800000000');await page.getByLabel('Account Password').fill('Crisp!River49Ocean');await page.getByRole('button',{name:'Log In',exact:true}).click();
+  await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();await page.getByRole('button',{name:'Sign in / Sign up',exact:true}).click();
+  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9800000000');await page.getByLabel('Account Password or PIN').fill('Crisp!River49Ocean');await page.getByRole('button',{name:'Sign In',exact:true}).click();
   expect(state.writes.filter(w=>w.path==='customer/auth/login/').map(w=>w.body.method)).toEqual(['PIN','PASSWORD']);
 });
 
