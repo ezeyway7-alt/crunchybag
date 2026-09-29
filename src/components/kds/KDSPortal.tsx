@@ -21,8 +21,6 @@ import {
   SlidersHorizontal,
   X,
   Printer,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
@@ -1027,56 +1025,10 @@ export const KDSPortal: React.FC = () => {
       ------------------------------------------------------------- */}
       <header className="sticky top-0 z-30 bg-[#101013] border-b border-zinc-800 px-2.5 sm:px-3.5 py-1.5 sm:py-2 shadow-md shrink-0">
         <div className="w-full flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-          {/* Section 1: Brand & Live Active Badge + WS Connection Status */}
+          {/* Section 1: Clean Kitchen Icon */}
           <div className="flex items-center gap-2 shrink-0">
-            <div className="w-7 h-7 bg-amber-500 text-black rounded flex items-center justify-center font-black text-xs shrink-0 shadow-sm">
+            <div className="w-7 h-7 bg-amber-500 text-black rounded flex items-center justify-center shrink-0 shadow-sm" title="Kitchen Display">
               <ChefHat className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 leading-none">
-                <h1 className="text-xs sm:text-sm font-black tracking-wider text-white uppercase">
-                  KDS
-                </h1>
-                {/* Live Active Pill */}
-                <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      isWsConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-                    }`}
-                  />
-                  {kdsTickets.length} ACTIVE
-                </span>
-
-                {/* WebSocket Real-time Indicator */}
-                <span
-                  title={
-                    isWsConnected
-                      ? `Live WebSocket Connected (ws://crunchybag.com/ws/outlets/${effectiveOutletId}/kitchen/)`
-                      : "WebSocket Connecting / Auto-reconnecting..."
-                  }
-                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 hidden sm:inline-flex ${
-                    isWsConnected
-                      ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/30"
-                      : "text-amber-400 bg-amber-500/10 border border-amber-500/30"
-                  }`}
-                >
-                  {isWsConnected ? (
-                    <>
-                      <Wifi className="w-2.5 h-2.5" />
-                      <span>LIVE STREAM</span>
-                    </>
-                  ) : (
-                    <>
-                      <WifiOff className="w-2.5 h-2.5" />
-                      <span>CONNECTING</span>
-                    </>
-                  )}
-                </span>
-              </div>
-              <p className="text-[10px] text-zinc-400 leading-none mt-0.5 hidden sm:block">
-                {currentOutlet.name} • Synced{" "}
-                {lastSyncTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </p>
             </div>
           </div>
 
@@ -1331,43 +1283,27 @@ export const KDSPortal: React.FC = () => {
             </div>
           </div>
         ) : filteredTickets.length === 0 ? (
-          <div className="py-16 text-center space-y-3 bg-[#121215] border border-zinc-800 rounded-lg p-6 my-4 max-w-xl mx-auto shadow-md">
-            <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-6 h-6" />
+          <div className="py-24 text-center space-y-3 max-w-sm mx-auto">
+            <div className="w-11 h-11 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center mx-auto text-zinc-500">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
             </div>
-            <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center justify-center gap-2">
-              <span>Kitchen All Clear</span>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                0 ACTIVE TICKETS
-              </span>
+            <h3 className="text-sm font-medium text-zinc-300">
+              No orders in queue
             </h3>
-            <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-              {searchQuery || fulfillmentFilter !== "ALL" || activeStage !== "ALL"
-                ? "No active orders match the current filters. Try resetting the stage or search query."
-                : "All orders have been prepared and dispatched. The kitchen station is actively listening for incoming tickets via live WebSocket stream with instant audible chimes."}
-            </p>
-            <div className="pt-2 flex items-center justify-center gap-3 text-[11px] text-zinc-500 font-mono">
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                {isWsConnected ? "Stream Connected" : "Connecting Stream..."}
-              </span>
-              <span>•</span>
-              <span>Outlet #{effectiveOutletId}</span>
-              <span>•</span>
-              <span>Synced {lastSyncTime.toLocaleTimeString()}</span>
-            </div>
             {(searchQuery || fulfillmentFilter !== "ALL" || activeStage !== "ALL") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveStage("ALL");
-                  setFulfillmentFilter("ALL");
-                  setSearchQuery("");
-                }}
-                className="mt-3 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black uppercase tracking-wider rounded cursor-pointer transition-colors"
-              >
-                Reset Filters
-              </button>
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveStage("ALL");
+                    setFulfillmentFilter("ALL");
+                    setSearchQuery("");
+                  }}
+                  className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs rounded transition-colors cursor-pointer"
+                >
+                  Reset filters
+                </button>
+              </div>
             )}
           </div>
         ) : viewMode === "kanban" ? (
