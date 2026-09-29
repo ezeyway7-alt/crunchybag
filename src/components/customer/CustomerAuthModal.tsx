@@ -236,6 +236,27 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         );
       } catch (err: any) {
         const errMsg = extractErrorMessage(err).toLowerCase();
+        // If registration token expired on the backend, auto-request fresh OTP and keep user's profile inputs intact
+        if (errMsg.includes("expired")) {
+          setInfoMessage("Verification session timed out. A fresh OTP has been sent to your phone.");
+          try {
+            const resend = await apiClient.post<any>(
+              customerPath("auth/start/"),
+              { phone: phone.trim().replace(/\D/g, "") },
+              { skipAuth: true }
+            );
+            setChallenge(resend.challenge_id);
+            setDemoCode(resend.demo_code || "");
+            setOtpDigits(["", "", "", ""]);
+            setOtpTimer(45);
+            setAuthView("SIGNUP_OTP");
+            return;
+          } catch {
+            setError("Signup verification expired. Please verify your mobile number again.");
+            setAuthView("SIGNUP_PHONE");
+            return;
+          }
+        }
         // If username was already taken or pattern error, auto-retry with unique phone suffix
         if (errMsg.includes("already exists") || errMsg.includes("pattern")) {
           const uniqueUsername = `${baseUsername.slice(0, 20)}_${phoneSuffix}`;

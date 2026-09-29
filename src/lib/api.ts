@@ -161,6 +161,9 @@ export function extractErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     // If backend returned a structured JSON payload
     if (error.data && typeof error.data === "object") {
+      if (Array.isArray(error.data) && error.data.length > 0) {
+        return typeof error.data[0] === "string" ? error.data[0] : extractErrorMessage(new ApiError(error.message, error.status, error.data[0]));
+      }
       if (error.data.detail) return String(error.data.detail);
       if (error.data.error) return String(error.data.error);
       if (error.data.message) return String(error.data.message);
@@ -171,6 +174,10 @@ export function extractErrorMessage(error: unknown): string {
       const entries = Object.entries(error.data);
       if (entries.length > 0) {
         const [field, val] = entries[0];
+        // If field is numeric index like "0", return the value directly without "0:"
+        if (/^\d+$/.test(field)) {
+          return Array.isArray(val) ? String(val[0]) : String(val);
+        }
         const formattedField = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ");
         if (Array.isArray(val) && val.length > 0) {
           return `${formattedField}: ${val[0]}`;
