@@ -76,7 +76,7 @@ export const CustomerProfileModal: React.FC = () => {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         maxWidth="lg"
-        className="border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden rounded-none"
+        className="border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden rounded-2xl"
         title={
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-amber-500" />
@@ -112,7 +112,7 @@ export const CustomerProfileModal: React.FC = () => {
             >
               <Package className="w-3.5 h-3.5" />
               <span>Past Order History</span>
-              <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold">
+              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-bold rounded-full">
                 {orders.length}
               </span>
             </button>
@@ -121,9 +121,9 @@ export const CustomerProfileModal: React.FC = () => {
           {activeTab === "profile" ? (
             <>
               {/* Compact Account Card */}
-              <div className="p-3 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800 rounded-none flex items-center justify-between gap-3">
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800 rounded-2xl flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-none bg-amber-500 text-black font-black text-xs flex items-center justify-center shrink-0 shadow-sm">
+                  <div className="w-9 h-9 rounded-full bg-amber-500 text-black font-black text-xs flex items-center justify-center shrink-0 shadow-sm">
                     {name.charAt(0) || "A"}
                   </div>
                   <div className="min-w-0">
@@ -136,16 +136,16 @@ export const CustomerProfileModal: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-none border border-amber-500/20 shrink-0">
+                <div className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20 shrink-0">
                   <Sparkles className="w-3 h-3 text-amber-500" />
                   <span>{customerProfile.points} Pts</span>
                 </div>
               </div>
 
               {/* Edit Profile Form */}
-              <form onSubmit={handleSave} className="space-y-3">
+              <form onSubmit={handleSave} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                     Full Name
                   </label>
                   <div className="relative flex items-center">
@@ -155,7 +155,7 @@ export const CustomerProfileModal: React.FC = () => {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
-                      className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                      className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                       placeholder="Your Name"
                     />
                   </div>
@@ -163,7 +163,7 @@ export const CustomerProfileModal: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                       Phone Number
                     </label>
                     <div className="relative flex items-center">
@@ -173,14 +173,14 @@ export const CustomerProfileModal: React.FC = () => {
                         value={phone}
                         readOnly
                         required
-                        className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                        className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-xl text-zinc-500 dark:text-zinc-400 cursor-not-allowed font-medium"
                         placeholder="+977 98XXXXXXXX"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                       Email Address
                     </label>
                     <div className="relative flex items-center">
@@ -189,7 +189,7 @@ export const CustomerProfileModal: React.FC = () => {
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                        className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                         placeholder="your.email@example.com"
                       />
                     </div>
@@ -197,7 +197,7 @@ export const CustomerProfileModal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                     Delivery Address
                   </label>
                   <div className="relative flex items-center">
@@ -207,7 +207,7 @@ export const CustomerProfileModal: React.FC = () => {
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       required
-                      className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                      className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                       placeholder="Street name, building, apartment or area"
                     />
                   </div>
@@ -218,7 +218,7 @@ export const CustomerProfileModal: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveTab("orders")}
-                    className="h-10 px-3 rounded-none border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="h-10 px-3.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Package className="w-3.5 h-3.5 text-amber-500" />
                     <span>View Order History ({orders.length})</span>
@@ -228,14 +228,14 @@ export const CustomerProfileModal: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setIsProfileModalOpen(false)}
-                      className="flex-1 sm:flex-initial h-10 px-3 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 font-medium transition-colors cursor-pointer"
+                      className="flex-1 sm:flex-initial h-10 px-3.5 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 font-medium transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       id="save-profile-btn"
-                      className="flex-1 sm:flex-initial h-10 px-4 rounded-none bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-98 cursor-pointer border border-amber-600"
+                      className="flex-1 sm:flex-initial h-10 px-5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-98 cursor-pointer"
                     >
                       {isSaved ? (
                         <>
@@ -263,7 +263,7 @@ export const CustomerProfileModal: React.FC = () => {
               </div>
 
               {orders.length === 0 ? (
-                <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                <div className="p-8 text-center bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-2">
                   <ShoppingBag className="w-8 h-8 text-zinc-400 mx-auto" />
                   <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">No past orders yet</p>
                   <p className="text-[11px] text-zinc-500">
@@ -278,7 +278,7 @@ export const CustomerProfileModal: React.FC = () => {
                     return (
                       <div
                         key={order.id}
-                        className="p-3.5 bg-white dark:bg-[#12141A] border border-zinc-200 dark:border-zinc-800 hover:border-amber-500/50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                        className="p-3.5 bg-white dark:bg-[#12141A] border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-amber-500/50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                       >
                         {/* Left: Order Info & Items */}
                         <div className="space-y-1 min-w-0">
@@ -289,11 +289,11 @@ export const CustomerProfileModal: React.FC = () => {
                             <span className="text-[11px] font-mono text-zinc-500">
                               #{order.orderNumber}
                             </span>
-                            <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                            <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 rounded-md">
                               {order.fulfillmentType.replace("_", " ")}
                             </span>
                             <span
-                              className={`px-2 py-0.5 text-[10px] font-bold uppercase ${
+                              className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md ${
                                 order.status === "COMPLETED"
                                   ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                                   : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
@@ -329,7 +329,7 @@ export const CustomerProfileModal: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setSelectedReceiptOrder(order)}
-                            className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-bold transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
+                            className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-bold transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700 rounded-xl"
                             title="View & Print Token Receipt Slip"
                           >
                             <Receipt className="w-3.5 h-3.5" />
@@ -339,7 +339,7 @@ export const CustomerProfileModal: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setSelectedReviewOrder(order)}
-                            className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-amber-500 text-xs font-bold transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
+                            className="p-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-amber-500 text-xs font-bold transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700 rounded-xl"
                             title="Track live or leave review"
                           >
                             <Star className="w-3.5 h-3.5" />
@@ -352,7 +352,7 @@ export const CustomerProfileModal: React.FC = () => {
                               reorderItems(order);
                               setIsProfileModalOpen(false);
                             }}
-                            className="h-8 px-3 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black flex items-center gap-1.5 transition-all shadow-xs cursor-pointer border border-amber-600"
+                            className="h-8 px-3.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black flex items-center gap-1.5 transition-all shadow-sm cursor-pointer rounded-xl"
                           >
                             <RotateCcw className="w-3 h-3 stroke-[2.5]" />
                             <span>1-Click Reorder</span>

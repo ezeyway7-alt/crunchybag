@@ -1,10 +1,9 @@
 import { apiClient, extractErrorMessage } from "../../lib/api";
 import { customerPath, saveCustomerSession } from "../../lib/customerApi";
 import React, { useState, useEffect, useRef } from "react";
-import { Phone, KeyRound, Lock, ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Phone, Lock, Eye, EyeOff, CheckCircle2, User, KeyRound, ArrowLeft, ShieldCheck, ArrowRight } from "lucide-react";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
-import { Input } from "../common/Input";
 import { formatTimer } from "../../lib/utils";
 import { useApp } from "../../context/AppContext";
 
@@ -14,358 +13,765 @@ interface CustomerAuthModalProps {
   onSuccess?: () => void;
 }
 
+type AuthView = "LOGIN" | "SIGNUP_PHONE" | "SIGNUP_OTP" | "SIGNUP_PROFILE" | "OTP_LOGIN_PHONE" | "OTP_LOGIN_OTP";
+
 export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
 }) => {
   const { addToast } = useApp();
-  const [authMethod, setAuthMethod] = useState<"OTP" | "PIN" | "PASSWORD">("OTP");
 
-  const [busy,setBusy] = useState(false);
-  const [error,setError] = useState('');
-  const [challenge,setChallenge] = useState('');
-  const [demoCode,setDemoCode] = useState('');
-  const [registrationToken,setRegistrationToken] = useState('');
-  const [username,setUsername] = useState('');
-  const [email,setEmail] = useState('');
-  const locked = useRef(false);
-  const perform = async (work: () => Promise<void>) => { if(locked.current)return;locked.current=true;setBusy(true);setError('');try{await work();}catch(e){setError(extractErrorMessage(e));}finally{locked.current=false;setBusy(false);} };
-  const finish = (result:any) => {saveCustomerSession(result);setPassword('');setNewPin('');setPinDigits(['','','','']);setOtpDigits(['','','','']);onSuccess?.();onClose();};
-  // OTP State
+  const [authView, setAuthView] = useState<AuthView>("LOGIN");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [infoMessage, setInfoMessage] = useState("");
+
+  // Input states
   const [phone, setPhone] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
+  const [credential, setCredential] = useState("");
+  const [showCredential, setShowCredential] = useState(false);
+
+  // OTP state
+  const [challenge, setChallenge] = useState("");
+  const [demoCode, setDemoCode] = useState("");
   const [otpDigits, setOtpDigits] = useState(["", "", "", ""]);
   const [otpTimer, setOtpTimer] = useState(45);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // PIN State
-  const [pinDigits, setPinDigits] = useState(["", "", "", ""]);
-  const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Password State
-  const [password, setPassword] = useState("");
-
-  // Post-auth security setup state
-  const [isSecuritySetupOpen, setIsSecuritySetupOpen] = useState(false);
+  // Registration profile setup state
+  const [registrationToken, setRegistrationToken] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [newPin, setNewPin] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
+  const locked = useRef(false);
+
+  const perform = async (work: () => Promise<void>) => {
+    if (locked.current) return;
+    locked.current = true;
+    setBusy(true);
+    setError("");
+    setInfoMessage("");
+    try {
+      await work();
+    } catch (e) {
+      setError(extractErrorMessage(e));
+    } finally {
+      locked.current = false;
+      setBusy(false);
+    }
+  };
+
+  const finish = (result: any) => {
+    saveCustomerSession(result);
+    setCredential("");
+    setNewPin("");
+    setNewPassword("");
+    setOtpDigits(["", "", "", ""]);
+    onSuccess?.();
+    onClose();
+  };
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setAuthView("LOGIN");
+      setError("");
+      setInfoMessage("");
+      setCredential("");
+      setShowCredential(false);
+      setNewPin("");
+      setNewPassword("");
+    }
+  }, [isOpen]);
+
+  // Countdown timer for OTP
   useEffect(() => {
     let timer: any;
-    if (otpSent && otpTimer > 0) {
+    if ((authView === "SIGNUP_OTP" || authView === "OTP_LOGIN_OTP") && otpTimer > 0) {
       timer = setInterval(() => setOtpTimer((prev) => prev - 1), 1000);
     }
     return () => clearInterval(timer);
-  }, [otpSent, otpTimer]);
+  }, [authView, otpTimer]);
 
-  useEffect(()=>{if(isOpen){setIsSecuritySetupOpen(false);setOtpSent(false);setAuthMethod('OTP');setError('');setPassword('');setNewPin('');}},[isOpen]);
-  const handleSendOtp = (e: any) => {
+  // Unified eSewa-style Login: Mobile Number + MPIN/Password in same field
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanPhone = phone.trim().replace(/\D/g, "");
+    const cleanCred = credential.trim();
+
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setError("Please enter your 10-digit mobile number.");
+      return;
+    }
+    if (!cleanCred) {
+      setError("Please enter your 4-digit MPIN or password.");
+      return;
+    }
+
     void perform(async () => {
-      const result = await apiClient.post<any>(customerPath('auth/start/'), {phone}, {skipAuth:true});
-      if(result.exists){setAuthMethod('PIN');setOtpSent(false);return;}
-      setChallenge(result.challenge_id);setDemoCode(result.demo_code);setOtpDigits(['','','','']);setOtpSent(true);setOtpTimer(45);
-      setTimeout(()=>inputRefs.current[0]?.focus(),100);
+      // Determine if numeric 4-digit PIN or text password
+      const is4Digit = /^\d{4}$/.test(cleanCred);
+      const primaryMethod = is4Digit ? "PIN" : "PASSWORD";
+      const fallbackMethod = is4Digit ? "PASSWORD" : "PIN";
+
+      try {
+        const result = await apiClient.post<any>(
+          customerPath("auth/login/"),
+          { phone: cleanPhone, method: primaryMethod, credential: cleanCred },
+          { skipAuth: true }
+        );
+        finish(result);
+      } catch (err: any) {
+        // Automatically attempt the fallback credential method before showing an error
+        try {
+          const result = await apiClient.post<any>(
+            customerPath("auth/login/"),
+            { phone: cleanPhone, method: fallbackMethod, credential: cleanCred },
+            { skipAuth: true }
+          );
+          finish(result);
+        } catch {
+          throw err;
+        }
+      }
     });
   };
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    const newOtp = [...otpDigits];
-    newOtp[index] = value.slice(-1);
-    setOtpDigits(newOtp);
+  // Signup Step 1: Request OTP for new number
+  const handleSendSignupOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPhone = phone.trim().replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setError("Please enter a valid 10-digit mobile number.");
+      return;
+    }
 
-    // Auto focus next input
+    void perform(async () => {
+      const result = await apiClient.post<any>(
+        customerPath("auth/start/"),
+        { phone: cleanPhone },
+        { skipAuth: true }
+      );
+
+      if (result.exists) {
+        // User already has an account, switch to login view with clear notice
+        setAuthView("LOGIN");
+        setInfoMessage("This number is already registered. Please sign in with your MPIN or Password.");
+        return;
+      }
+
+      setChallenge(result.challenge_id);
+      setDemoCode(result.demo_code || "");
+      setOtpDigits(["", "", "", ""]);
+      setAuthView("SIGNUP_OTP");
+      setOtpTimer(45);
+      setTimeout(() => inputRefs.current[0]?.focus(), 120);
+    });
+  };
+
+  // Signup Step 2: Verify received OTP
+  const handleVerifySignupOtp = () => {
+    const code = otpDigits.join("");
+    if (code.length < 4) {
+      setError("Please enter all 4 digits of the OTP code.");
+      return;
+    }
+
+    void perform(async () => {
+      const result = await apiClient.post<any>(
+        customerPath("auth/verify/"),
+        { challenge_id: challenge, code },
+        { skipAuth: true }
+      );
+      setRegistrationToken(result.registration_token);
+      setAuthView("SIGNUP_PROFILE");
+    });
+  };
+
+  // Signup Step 3: Complete profile and set MPIN + Password
+  const handleCompleteRegistration = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
+    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      setError("Please enter a 4-digit numeric quick MPIN.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    void perform(async () => {
+      const result = await apiClient.post<any>(
+        customerPath("auth/register/"),
+        {
+          registration_token: registrationToken,
+          username: username.trim(),
+          email: email.trim(),
+          pin: newPin,
+          password: newPassword,
+        },
+        { skipAuth: true }
+      );
+      finish(result);
+    });
+  };
+
+  // OTP Login: Send OTP for registered user
+  const handleSendOtpLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPhone = phone.trim().replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setError("Please enter your 10-digit mobile number.");
+      return;
+    }
+
+    void perform(async () => {
+      const result = await apiClient.post<any>(
+        customerPath("auth/start/"),
+        { phone: cleanPhone },
+        { skipAuth: true }
+      );
+
+      setChallenge(result.challenge_id);
+      setDemoCode(result.demo_code || "");
+      setOtpDigits(["", "", "", ""]);
+      setAuthView("OTP_LOGIN_OTP");
+      setOtpTimer(45);
+      setTimeout(() => inputRefs.current[0]?.focus(), 120);
+    });
+  };
+
+  // OTP Login: Verify code
+  const handleVerifyOtpLogin = () => {
+    const code = otpDigits.join("");
+    if (code.length < 4) {
+      setError("Please enter all 4 digits of the OTP code.");
+      return;
+    }
+
+    void perform(async () => {
+      try {
+        const result = await apiClient.post<any>(
+          customerPath("auth/login/"),
+          { phone: phone.trim().replace(/\D/g, ""), method: "OTP", credential: code, challenge_id: challenge },
+          { skipAuth: true }
+        );
+        finish(result);
+      } catch {
+        const verifyResult = await apiClient.post<any>(
+          customerPath("auth/verify/"),
+          { challenge_id: challenge, code },
+          { skipAuth: true }
+        );
+        if (verifyResult.registration_token) {
+          setRegistrationToken(verifyResult.registration_token);
+          setAuthView("SIGNUP_PROFILE");
+        } else {
+          finish(verifyResult);
+        }
+      }
+    });
+  };
+
+  const handleDigitChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const nextDigits = [...otpDigits];
+    nextDigits[index] = value.slice(-1);
+    setOtpDigits(nextDigits);
+
     if (value && index < 3) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
-  const handlePinChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    const newPinArr = [...pinDigits];
-    newPinArr[index] = value.slice(-1);
-    setPinDigits(newPinArr);
-
-    if (value && index < 3) {
-      pinRefs.current[index + 1]?.focus();
+  // Get clean dynamic modal title with no subtitle clutter
+  const getModalTitle = () => {
+    switch (authView) {
+      case "LOGIN":
+        return "Customer Sign In";
+      case "SIGNUP_PHONE":
+        return "Create Your Account";
+      case "SIGNUP_OTP":
+        return "Verify Mobile Number";
+      case "SIGNUP_PROFILE":
+        return "Complete Your Profile";
+      case "OTP_LOGIN_PHONE":
+      case "OTP_LOGIN_OTP":
+        return "Sign In with OTP";
+      default:
+        return "Customer Sign In";
     }
-  };
-
-  const handlePinKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !pinDigits[index] && index > 0) {
-      pinRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handleVerifyOtp = () => void perform(async () => {
-    const result = await apiClient.post<any>(customerPath('auth/verify/'), {challenge_id:challenge,code:otpDigits.join('')}, {skipAuth:true});
-    setRegistrationToken(result.registration_token);setIsSecuritySetupOpen(true);
-  });
-  const handleVerifyPin = () => void perform(async () => {
-    const result = await apiClient.post<any>(customerPath('auth/login/'), {phone,method:authMethod,credential:authMethod==='PASSWORD'?password:pinDigits.join('')}, {skipAuth:true});
-    finish(result);
-  });
-  const handleSaveSecurity = (e: React.FormEvent) => {
-    e.preventDefault();void perform(async () => {
-      const result = await apiClient.post<any>(customerPath('auth/register/'), {registration_token:registrationToken,username,email,pin:newPin,password}, {skipAuth:true});
-      finish(result);
-    });
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isSecuritySetupOpen ? "Create Your Account" : "Customer Sign In"}
-      description={
-        isSecuritySetupOpen
-          ? "Choose your username, PIN and password"
-          : "Access your past orders, favorite combos, and one-tap reorders"
-      }
+      title={getModalTitle()}
       maxWidth="md"
     >
       <fieldset disabled={busy} className="contents">
-      {error && <p role="alert" className="text-xs text-rose-500 mb-3">{error}</p>}
-      {isSecuritySetupOpen ? (
-        <form onSubmit={handleSaveSecurity} className="space-y-4 py-2">
-          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-3">
-            <ShieldCheck className="h-6 w-6 text-amber-500 shrink-0" />
-            <p className="text-xs text-zinc-700 dark:text-zinc-300">
-              Use your mobile number with your PIN or password next time.
-            </p>
+        {error && (
+          <div role="alert" className="p-3 mb-3 text-xs bg-rose-500/10 border border-rose-500/30 text-rose-500 rounded-xl font-medium">
+            {error}
           </div>
+        )}
 
-          <Input label="Username" value={username} onChange={e=>setUsername(e.target.value)} minLength={3} required autoComplete="username" />
-          <Input label="Email (optional)" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
-          <Input label="Set Password" type="password" value={password} minLength={8} onChange={e=>setPassword(e.target.value)} required autoComplete="new-password" />
-          <Input
-            label="New 4-Digit Quick PIN"
-            type="password"
-            maxLength={4}
-            minLength={4}
-            pattern="[0-9]{4}"
-            inputMode="numeric"
-            value={newPin}
-            onChange={(e) => setNewPin(e.target.value)}
-            placeholder="••••"
-            required
-          />
+        {infoMessage && (
+          <div className="p-3 mb-3 text-xs bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-xl font-medium">
+            {infoMessage}
+          </div>
+        )}
 
-          <div className="flex gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="md"
-              className="flex-1"
-              onClick={() => {
-                setIsSecuritySetupOpen(false);
-                onClose();
-              }}
-            >
-              Cancel
-            </Button>
+        {/* -------------------------------------------------------------
+            VIEW 1: UNIFIED LOGIN (eSewa Style: Phone + MPIN/Password)
+        ------------------------------------------------------------- */}
+        {authView === "LOGIN" && (
+          <form onSubmit={handleLogin} className="space-y-4 py-1">
+            {/* Mobile Phone Input */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Mobile Number
+              </label>
+              <div className="flex rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/80 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
+                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-700/80 shrink-0">
+                  +977
+                </div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="98XXXXXXXX"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  autoComplete="tel"
+                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* MPIN / Password Field (In the same input, eSewa style) */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  4-Digit MPIN or Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    setAuthView("OTP_LOGIN_PHONE");
+                  }}
+                  className="text-[11px] text-amber-500 hover:text-amber-400 font-medium cursor-pointer"
+                >
+                  Forgot PIN?
+                </button>
+              </div>
+              <div className="relative flex items-center">
+                <Lock className="absolute left-3 w-4 h-4 text-zinc-400 pointer-events-none" />
+                <input
+                  type={showCredential ? "text" : "password"}
+                  value={credential}
+                  onChange={(e) => setCredential(e.target.value)}
+                  placeholder="Enter your 4-digit PIN or password"
+                  autoComplete="current-password"
+                  className="w-full pl-9 pr-10 h-11 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCredential(!showCredential)}
+                  className="absolute right-3 p-1 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showCredential ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Sign In Button */}
             <Button
               type="submit"
               variant="primary"
-              size="md"
-              className="flex-1 font-bold"
-              rightIcon={<CheckCircle2 className="h-4 w-4" />}
+              size="lg"
+              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer mt-1"
             >
-              Create Account & Continue
+              Sign In
+            </Button>
+
+            {/* Footer: Create Account Switch */}
+            <div className="pt-2 text-center border-t border-zinc-200 dark:border-zinc-800">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Don&apos;t have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    setInfoMessage("");
+                    setAuthView("SIGNUP_PHONE");
+                  }}
+                  className="text-amber-500 hover:text-amber-400 font-bold hover:underline cursor-pointer"
+                >
+                  Sign Up (Get OTP)
+                </button>
+              </p>
+            </div>
+          </form>
+        )}
+
+        {/* -------------------------------------------------------------
+            VIEW 2: SIGNUP - STEP 1 (Enter Mobile Number)
+        ------------------------------------------------------------- */}
+        {authView === "SIGNUP_PHONE" && (
+          <form onSubmit={handleSendSignupOtp} className="space-y-4 py-1">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Mobile Number
+              </label>
+              <div className="flex rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/80 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
+                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-700/80 shrink-0">
+                  +977
+                </div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="98XXXXXXXX"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  autoComplete="tel"
+                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium"
+                  required
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer"
+            >
+              Get OTP Verification Code
+            </Button>
+
+            <div className="pt-2 text-center border-t border-zinc-200 dark:border-zinc-800">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    setAuthView("LOGIN");
+                  }}
+                  className="text-amber-500 hover:text-amber-400 font-bold hover:underline cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </p>
+            </div>
+          </form>
+        )}
+
+        {/* -------------------------------------------------------------
+            VIEW 3: SIGNUP - STEP 2 (Verify 4-Digit OTP)
+        ------------------------------------------------------------- */}
+        {authView === "SIGNUP_OTP" && (
+          <div className="space-y-4 py-1">
+            <div className="flex items-center justify-between text-xs text-zinc-500">
+              <span>Code sent to +977 {phone}</span>
+              <button
+                type="button"
+                onClick={() => setAuthView("SIGNUP_PHONE")}
+                className="text-amber-500 hover:underline cursor-pointer font-medium"
+              >
+                Change Number
+              </button>
+            </div>
+
+            {demoCode && (
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
+                Test OTP Code: <strong className="font-mono text-sm tracking-wider">{demoCode}</strong>
+              </div>
+            )}
+
+            <div className="flex justify-center gap-2.5 my-2">
+              {otpDigits.map((digit, idx) => (
+                <input
+                  key={idx}
+                  ref={(el) => { inputRefs.current[idx] = el; }}
+                  aria-label={`Code digit ${idx + 1}`}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleDigitChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleDigitKeyDown(idx, e)}
+                  className="w-12 h-14 text-center font-mono font-bold text-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500 outline-none text-zinc-900 dark:text-white"
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-zinc-400">
+                Resend in:{" "}
+                <span className="font-mono text-zinc-900 dark:text-zinc-200 font-bold">
+                  {formatTimer(otpTimer)}
+                </span>
+              </span>
+              <button
+                type="button"
+                disabled={otpTimer > 0}
+                onClick={handleSendSignupOtp}
+                className="font-semibold text-amber-500 hover:underline disabled:opacity-40 cursor-pointer"
+              >
+                Resend OTP
+              </button>
+            </div>
+
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer"
+              disabled={otpDigits.some((d) => !d)}
+              onClick={handleVerifySignupOtp}
+            >
+              Verify & Continue
             </Button>
           </div>
-        </form>
-      ) : (
-        <div className="space-y-5">
-          {/* Method Tabs */}
-          <div className="grid grid-cols-3 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs font-semibold">
-            <button
-              onClick={() => {
-                setAuthMethod("OTP");
-                setOtpSent(false);
-              }}
-              className={`py-2 rounded-lg transition-colors cursor-pointer ${
-                authMethod === "OTP"
-                  ? "bg-white dark:bg-[#1A1A1E] text-zinc-950 dark:text-white shadow-sm font-bold"
-                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
-            >
-              Mobile Number
-            </button>
-            <button
-              onClick={() => setAuthMethod("PIN")}
-              className={`py-2 rounded-lg transition-colors cursor-pointer ${
-                authMethod === "PIN"
-                  ? "bg-white dark:bg-[#1A1A1E] text-zinc-950 dark:text-white shadow-sm font-bold"
-                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
-            >
-              4-Digit PIN
-            </button>
-            <button
-              onClick={() => setAuthMethod("PASSWORD")}
-              className={`py-2 rounded-lg transition-colors cursor-pointer ${
-                authMethod === "PASSWORD"
-                  ? "bg-white dark:bg-[#1A1A1E] text-zinc-950 dark:text-white shadow-sm font-bold"
-                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-              }`}
-            >
-              Password
-            </button>
-          </div>
+        )}
 
-          {/* Mobile Number Flow */}
-          {authMethod === "OTP" && (
-            <div className="space-y-4">
-              {!otpSent ? (
-                <form onSubmit={handleSendOtp} className="space-y-3">
-                  <Input
-                    label="Mobile Phone Number"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+977 98XXXXXXXX"
-                    leftIcon={<Phone className="h-4 w-4" />}
-                    hint="Enter your mobile to sign in or create an account."
+        {/* -------------------------------------------------------------
+            VIEW 4: SIGNUP - STEP 3 (Complete Profile & Set PIN + Password)
+        ------------------------------------------------------------- */}
+        {authView === "SIGNUP_PROFILE" && (
+          <form onSubmit={handleCompleteRegistration} className="space-y-3.5 py-1">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Full Name
+              </label>
+              <div className="relative flex items-center">
+                <User className="absolute left-3 w-4 h-4 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="e.g. Aayush Sharma"
+                  className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                  required
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Email Address <span className="text-zinc-400 font-normal">(Optional)</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your.email@example.com"
+                className="w-full px-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Set 4-Digit MPIN
+                </label>
+                <div className="relative flex items-center">
+                  <KeyRound className="absolute left-3 w-4 h-4 text-zinc-400 pointer-events-none" />
+                  <input
+                    type="password"
+                    maxLength={4}
+                    minLength={4}
+                    pattern="[0-9]{4}"
+                    inputMode="numeric"
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="••••"
+                    className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm font-mono tracking-widest bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                     required
                   />
-                  <Button type="submit" variant="primary" size="lg" className="w-full font-bold">
-                    Continue
-                  </Button>
-                </form>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between text-xs text-zinc-500">
-                    <span>Signup code for {phone}</span>
-                    <button
-                      onClick={() => setOtpSent(false)}
-                      className="text-amber-500 hover:underline cursor-pointer"
-                    >
-                      Change Phone
-                    </button>
-                  </div>
-
-                  {demoCode && <p className="text-xs text-amber-500">Temporary test code: <strong>{demoCode}</strong> (SMS is not sent yet)</p>}
-                  <div className="flex justify-between gap-2">
-                    {otpDigits.map((digit, idx) => (
-                      <input
-                        key={idx}
-                        ref={(el) => { inputRefs.current[idx] = el; }}
-                        aria-label={`Signup code digit ${idx+1}`}
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={1}
-                        value={digit}
-                        onChange={(e) => handleOtpChange(idx, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                        className="w-11 h-12 text-center font-mono font-bold text-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500 outline-none text-zinc-900 dark:text-white"
-                      />
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-400">
-                      Resend in:{" "}
-                      <span className="font-mono text-zinc-900 dark:text-zinc-200">
-                        {formatTimer(otpTimer)}
-                      </span>
-                    </span>
-                    <button
-                      disabled={otpTimer > 0}
-                      onClick={handleSendOtp}
-                      className="font-semibold text-amber-500 hover:underline disabled:opacity-40 cursor-pointer"
-                    >
-                      Resend OTP
-                    </button>
-                  </div>
-
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="w-full font-bold"
-                    disabled={otpDigits.some((d) => !d)}
-                    onClick={handleVerifyOtp}
-                  >
-                    Verify & Continue
-                  </Button>
                 </div>
-              )}
-            </div>
-          )}
-
-          {authMethod === "PIN" && <Input label="Mobile Phone Number" value={phone} onChange={e=>setPhone(e.target.value)} autoComplete="tel" required />}
-          {/* 4-digit PIN Flow */}
-          {authMethod === "PIN" && (
-            <div className="space-y-4">
-              <p className="text-xs text-zinc-500 text-center">
-                Enter your 4-digit Crunchy Security PIN
-              </p>
-              <div className="flex justify-center gap-3">
-                {pinDigits.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    ref={(el) => { pinRefs.current[idx] = el; }}
-                    aria-label={`PIN digit ${idx+1}`}
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handlePinChange(idx, e.target.value)}
-                    onKeyDown={(e) => handlePinKeyDown(idx, e)}
-                    className="w-12 h-14 text-center font-mono font-extrabold text-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-2xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500 outline-none text-zinc-900 dark:text-white"
-                  />
-                ))}
               </div>
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full font-bold mt-2"
-                disabled={pinDigits.some((d) => !d)}
-                onClick={handleVerifyPin}
-              >
-                Unlock Account
-              </Button>
-            </div>
-          )}
 
-          {/* Password Flow */}
-          {authMethod === "PASSWORD" && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleVerifyPin();
-              }}
-              className="space-y-3"
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Set Password
+                </label>
+                <div className="relative flex items-center">
+                  <Lock className="absolute left-3 w-4 h-4 text-zinc-400 pointer-events-none" />
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Min. 6 chars"
+                    minLength={6}
+                    className="w-full pl-9 pr-10 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 p-1 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer mt-2"
+              rightIcon={<CheckCircle2 className="h-4 w-4" />}
             >
-              <Input
-                label="Mobile Phone Number"
-                value={phone}
-                onChange={e=>setPhone(e.target.value)}
-                autoComplete="tel"
-                required
-              />
-              <Input
-                label="Account Password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                leftIcon={<Lock className="h-4 w-4" />}
-                required
-              />
-              <Button type="submit" variant="primary" size="lg" className="w-full font-bold">
-                Log In
-              </Button>
-            </form>
-          )}
-        </div>
-      )}
+              Complete & Continue to Checkout
+            </Button>
+          </form>
+        )}
+
+        {/* -------------------------------------------------------------
+            VIEW 5: OTP LOGIN (For users who forgot PIN/password)
+        ------------------------------------------------------------- */}
+        {authView === "OTP_LOGIN_PHONE" && (
+          <form onSubmit={handleSendOtpLogin} className="space-y-4 py-1">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Registered Mobile Number
+              </label>
+              <div className="flex rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/80 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
+                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-700/80 shrink-0">
+                  +977
+                </div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="98XXXXXXXX"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  autoComplete="tel"
+                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium"
+                  required
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer"
+            >
+              Send Login OTP
+            </Button>
+
+            <div className="pt-2 text-center border-t border-zinc-200 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setAuthView("LOGIN");
+                }}
+                className="text-xs text-amber-500 hover:text-amber-400 font-medium hover:underline cursor-pointer"
+              >
+                Back to MPIN / Password Sign In
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* -------------------------------------------------------------
+            VIEW 6: OTP LOGIN - CODE VERIFY
+        ------------------------------------------------------------- */}
+        {authView === "OTP_LOGIN_OTP" && (
+          <div className="space-y-4 py-1">
+            <div className="flex items-center justify-between text-xs text-zinc-500">
+              <span>Code sent to +977 {phone}</span>
+              <button
+                type="button"
+                onClick={() => setAuthView("OTP_LOGIN_PHONE")}
+                className="text-amber-500 hover:underline cursor-pointer font-medium"
+              >
+                Change Number
+              </button>
+            </div>
+
+            {demoCode && (
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
+                Test OTP Code: <strong className="font-mono text-sm tracking-wider">{demoCode}</strong>
+              </div>
+            )}
+
+            <div className="flex justify-center gap-2.5 my-2">
+              {otpDigits.map((digit, idx) => (
+                <input
+                  key={idx}
+                  ref={(el) => { inputRefs.current[idx] = el; }}
+                  aria-label={`Login code digit ${idx + 1}`}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleDigitChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleDigitKeyDown(idx, e)}
+                  className="w-12 h-14 text-center font-mono font-bold text-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500 outline-none text-zinc-900 dark:text-white"
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-zinc-400">
+                Resend in:{" "}
+                <span className="font-mono text-zinc-900 dark:text-zinc-200 font-bold">
+                  {formatTimer(otpTimer)}
+                </span>
+              </span>
+              <button
+                type="button"
+                disabled={otpTimer > 0}
+                onClick={handleSendOtpLogin}
+                className="font-semibold text-amber-500 hover:underline disabled:opacity-40 cursor-pointer"
+              >
+                Resend OTP
+              </button>
+            </div>
+
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer"
+              disabled={otpDigits.some((d) => !d)}
+              onClick={handleVerifyOtpLogin}
+            >
+              Sign In with OTP
+            </Button>
+          </div>
+        )}
       </fieldset>
     </Modal>
   );
