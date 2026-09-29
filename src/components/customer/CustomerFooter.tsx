@@ -277,22 +277,16 @@ export const CustomerFooter: React.FC = () => {
                   </button>
                 </li>
                 <li>
-                  <a
-                    href="/blog"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (typeof window !== "undefined") {
-                        window.history.pushState(null, "", "/blog");
-                        window.dispatchEvent(new PopStateEvent("popstate"));
-                      }
-                    }}
+                  <button
+                    type="button"
+                    onClick={() => setIsBlogsModalOpen(true)}
                     className="hover:text-amber-500 transition-colors cursor-pointer text-left font-medium flex items-center gap-1"
                   >
                     <span>Culinary Blog</span>
                     <span className="text-[9px] px-1 bg-amber-500/20 text-amber-600 dark:text-amber-400 font-mono font-bold">
                       NEW
                     </span>
-                  </a>
+                  </button>
                 </li>
                 <li>
                   <button
@@ -489,19 +483,13 @@ export const CustomerFooter: React.FC = () => {
                 About Us
               </button>
               <span>•</span>
-              <a
-                href="/blog"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (typeof window !== "undefined") {
-                    window.history.pushState(null, "", "/blog");
-                    window.dispatchEvent(new PopStateEvent("popstate"));
-                  }
-                }}
+              <button
+                type="button"
+                onClick={() => setIsBlogsModalOpen(true)}
                 className="hover:text-amber-500 transition-colors cursor-pointer"
               >
-                Blogs & Guides
-              </a>
+                Blogs
+              </button>
               <span>•</span>
               <button
                 type="button"

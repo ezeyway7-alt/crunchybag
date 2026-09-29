@@ -13,9 +13,6 @@ import { TableQrPortal } from "./components/customer/TableQrPortal";
 import { TvOrderDisplayPortal } from "./components/tv/TvOrderDisplayPortal";
 import { UnifiedLoginModal } from "./components/auth/UnifiedLoginModal";
 import { ToastContainer } from "./components/common/ToastContainer";
-import { BlogIndexPage } from "./components/blog/BlogIndexPage";
-import { BlogPostPage } from "./components/blog/BlogPostPage";
-import { CustomerFooter } from "./components/customer/CustomerFooter";
 
 const AppContent: React.FC = () => {
   const {
@@ -104,10 +101,6 @@ const AppContent: React.FC = () => {
   const isKdsRoute = currentPath === "/kds" || currentPath.startsWith("/kds") || activePortal === "kitchen";
   const isWaiterRoute = currentPath === "/waiter" || currentPath.startsWith("/waiter");
   const isRiderRoute = currentPath === "/rider" || currentPath.startsWith("/rider");
-
-  const isBlogIndexRoute = currentPath === "/blog" || currentPath === "/blogs";
-  const isBlogPostRoute = currentPath.startsWith("/blog/") || currentPath.startsWith("/blogs/");
-  const blogSlug = isBlogPostRoute ? currentPath.replace(/^\/blogs?\//, "") : "";
 
   const isProtectedRoleRoute =
     isAdminRoute ||
@@ -272,76 +265,6 @@ const AppContent: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#0A0A0C] text-white antialiased select-none">
         <KioskPortal />
-        <ToastContainer toasts={toasts} onClose={removeToast} />
-      </div>
-    );
-  }
-
-  // 12.5. Culinary Blog Post Page (/blog/:slug)
-  if (isBlogPostRoute) {
-    return (
-      <div className="min-h-screen bg-[#09090b] text-zinc-100 antialiased selection:bg-amber-500 selection:text-black">
-        <PortalHeader />
-        <BlogPostPage
-          slug={blogSlug}
-          onNavigateToBlogIndex={() => {
-            if (typeof window !== "undefined") {
-              window.history.pushState(null, "", "/blog");
-              window.dispatchEvent(new PopStateEvent("popstate"));
-              setCurrentPath("/blog");
-            }
-          }}
-          onNavigateToPost={(newSlug) => {
-            if (typeof window !== "undefined") {
-              window.history.pushState(null, "", `/blog/${newSlug}`);
-              window.dispatchEvent(new PopStateEvent("popstate"));
-              setCurrentPath(`/blog/${newSlug}`);
-            }
-          }}
-          onNavigateToMenu={() => {
-            if (typeof window !== "undefined") {
-              window.history.pushState(null, "", "/menu");
-              window.dispatchEvent(new PopStateEvent("popstate"));
-              setCurrentPath("/menu");
-            }
-          }}
-        />
-        <CustomerFooter />
-        <UnifiedLoginModal
-          isOpen={isLoginModalOpen}
-          onClose={closeLoginModal}
-        />
-        <ToastContainer toasts={toasts} onClose={removeToast} />
-      </div>
-    );
-  }
-
-  // 12.6. Culinary Blog Index Page (/blog)
-  if (isBlogIndexRoute) {
-    return (
-      <div className="min-h-screen bg-[#09090b] text-zinc-100 antialiased selection:bg-amber-500 selection:text-black">
-        <PortalHeader />
-        <BlogIndexPage
-          onNavigateToPost={(slug) => {
-            if (typeof window !== "undefined") {
-              window.history.pushState(null, "", `/blog/${slug}`);
-              window.dispatchEvent(new PopStateEvent("popstate"));
-              setCurrentPath(`/blog/${slug}`);
-            }
-          }}
-          onNavigateToMenu={() => {
-            if (typeof window !== "undefined") {
-              window.history.pushState(null, "", "/menu");
-              window.dispatchEvent(new PopStateEvent("popstate"));
-              setCurrentPath("/menu");
-            }
-          }}
-        />
-        <CustomerFooter />
-        <UnifiedLoginModal
-          isOpen={isLoginModalOpen}
-          onClose={closeLoginModal}
-        />
         <ToastContainer toasts={toasts} onClose={removeToast} />
       </div>
     );
