@@ -18,6 +18,7 @@ import {
   Tv,
   QrCode,
   Store,
+  BookOpen,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
@@ -176,8 +177,25 @@ export const PortalHeader: React.FC = () => {
             </button>
           </div>
 
-          {/* Right Tools: Love Icon, Cart Icon, Yellow Track Button */}
+          {/* Right Tools: Blog, Love Icon, Cart Icon, Yellow Track Button */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* Food Blog Link */}
+            <a
+              href="/blog"
+              onClick={(e) => {
+                e.preventDefault();
+                if (typeof window !== "undefined") {
+                  window.history.pushState(null, "", "/blog");
+                  window.dispatchEvent(new PopStateEvent("popstate"));
+                }
+              }}
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-xs font-semibold text-zinc-300 hover:text-amber-400 transition-colors cursor-pointer"
+              title="Culinary Blog & Kathmandu Food Guides"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+              <span className="hidden md:inline">Blog</span>
+            </a>
+
             {/* Love / Favorites Icon */}
             <button
               id="header-love-btn"
@@ -325,6 +343,28 @@ export const PortalHeader: React.FC = () => {
                         <span className="text-[10px] text-zinc-400">View</span>
                       )}
                     </button>
+
+                    {/* Food Blog & Guides */}
+                    <a
+                      href="/blog"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsProfileMenuOpen(false);
+                        if (typeof window !== "undefined") {
+                          window.history.pushState(null, "", "/blog");
+                          window.dispatchEvent(new PopStateEvent("popstate"));
+                        }
+                      }}
+                      className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-amber-500/10 hover:text-amber-400 transition-colors text-left cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <BookOpen className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span>Food Blog & Guides</span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-500/20 text-amber-400">
+                        NEW
+                      </span>
+                    </a>
 
                     {/* 3. Scan QR Slip & Rate/Review */}
                     <button

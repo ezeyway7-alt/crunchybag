@@ -17,6 +17,8 @@ import { formatNPR } from "../../lib/utils";
 
 interface Props {
   posMeta?: any;
+  orders: Order[];
+  outlet: string;
   onSelectTableForNewOrder: (tableId: string) => void;
   onSelectOngoingOrder: (order: Order) => void;
   onOpenBillingForOrder?: (order: Order) => void;
@@ -24,45 +26,19 @@ interface Props {
 
 export const StaffTableGrid: React.FC<Props> = ({
   posMeta,
+  orders,
+  outlet,
   onSelectTableForNewOrder,
   onSelectOngoingOrder,
   onOpenBillingForOrder,
 }) => {
-  const { orders, updateOrderStatus, addToast } = useApp();
-
-  // 16 Standard Tables in the restaurant (T-01 to T-16), or backend tables from posMeta
-  const allTables = React.useMemo(() => {
-    if (posMeta?.tables && posMeta.tables.length > 0) {
-      return posMeta.tables.map((t: any) => {
-        const num = t.table_number || t.id;
-        return String(num).startsWith("T-") ? String(num) : `T-${String(num).padStart(2, "0")}`;
-      });
-    }
-    return Array.from({ length: 16 }, (_, i) => `T-${String(i + 1).padStart(2, "0")}`);
-  }, [posMeta]);
-
-  // Find active orders for each table
+  const allTables: string[] = (posMeta?.tables || []).map(t => t.table_number);
   const tableOrderMap: Record<string, Order> = {};
-  orders.forEach((o) => {
-    if (
-      o.status !== "CANCELLED" &&
-      o.status !== "COMPLETED" &&
-      !o.isBilled &&
-      o.fulfillmentType === "DINE_IN" &&
-      o.tableNumber
-    ) {
-      // Normalize table format (e.g. "Table 04", "T-04", "T-4")
-      const raw = o.tableNumber.trim().toUpperCase();
-      let norm = raw;
-      const numMatch = raw.match(/\d+/);
-      if (numMatch) {
-        norm = `T-${String(parseInt(numMatch[0], 10)).padStart(2, "0")}`;
-      }
-      tableOrderMap[norm] = o;
-    }
+  (posMeta?.tables || []).forEach(table => {
+    const order = orders.find(o => (o as any)._posOrder?.id === table.active_order_id);
+    if (order) tableOrderMap[table.table_number] = order;
   });
-
-  const occupiedCount = Object.keys(tableOrderMap).length;
+  const occupiedCount = (posMeta?.tables || []).filter(t => t.active_order_id).length;
   const vacantCount = allTables.length - occupiedCount;
   const totalOnTables = Object.values(tableOrderMap).reduce((sum, o) => sum + o.totalAmount, 0);
 
@@ -95,17 +71,19 @@ export const StaffTableGrid: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Grid of 16 Tables */}
+      {!allTables.length && <p className="text-xs text-zinc-400">No tables configured.</p>}
+      {/* Configured tables, with the original card layout */}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
         {allTables.map((tableId) => {
           const activeOrder = tableOrderMap[tableId];
-          const isOccupied = !!activeOrder;
+          const table = posMeta?.tables.find(t => t.table_number === tableId);
+          const isOccupied = !!table?.active_order_id;
           const isBillRequested = isOccupied && activeOrder?.notes?.toLowerCase().includes("bill");
 
           if (!isOccupied) {
             return (
               <button
-                key={tableId}
+                key={tableId} title={posMeta?.tables.find(t => t.table_number === tableId)?.section}
                 type="button"
                 onClick={() => onSelectTableForNewOrder(tableId)}
                 className="group border border-emerald-500/30 hover:border-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10 p-2.5 flex flex-col items-center justify-between text-center min-h-[95px] transition-all cursor-pointer rounded-xs"
@@ -121,7 +99,7 @@ export const StaffTableGrid: React.FC<Props> = ({
                   <span className="text-[10px] uppercase font-bold text-emerald-600/80 dark:text-emerald-400/80 block">
                     Available
                   </span>
-                  <span className="text-[9px] text-zinc-400">4 Seats</span>
+                  <span className="text-[9px] text-zinc-400">{table?.capacity} Seats</span>
                 </div>
 
                 <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 opacity-80 group-hover:opacity-100 flex items-center gap-0.5">
@@ -133,11 +111,12 @@ export const StaffTableGrid: React.FC<Props> = ({
           }
 
           // Occupied Table Card
+          if (!activeOrder) return <div key={tableId} title={posMeta?.tables.find(t => t.table_number === tableId)?.section} className="border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs">{tableId} — Occupied</div>;
           const itemCount = activeOrder.items.reduce((sum, i) => sum + i.quantity, 0);
 
           return (
             <div
-              key={tableId}
+              key={tableId} title={posMeta?.tables.find(t => t.table_number === tableId)?.section}
               className={`border p-2.5 flex flex-col justify-between min-h-[95px] transition-all rounded-xs ${
                 isBillRequested
                   ? "border-purple-500 bg-purple-500/15 animate-pulse"

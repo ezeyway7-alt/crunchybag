@@ -12,9 +12,12 @@ import {
   QrCode,
   Star,
   ShieldCheck,
+  BookOpen,
+  ArrowRight,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Product, Order } from "../../types";
+import { BLOG_ARTICLES } from "../../data/blogs";
 import { ProductCard } from "./ProductCard";
 import { ProductConfiguratorModal } from "./ProductConfiguratorModal";
 import { CartDrawer } from "./CartDrawer";
@@ -384,6 +387,80 @@ export const CustomerPortal: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* SEO & Internal Links: From Our Culinary Journal */}
+          <section className="mt-16 pt-12 border-t border-zinc-800/80">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-8">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-amber-400 mb-1.5">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Kathmandu Food Chronicles</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white">
+                  From Our Culinary Blog & Food Guides
+                </h3>
+              </div>
+              <a
+                href="/blog"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (typeof window !== "undefined") {
+                    window.history.pushState(null, "", "/blog");
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                  }
+                }}
+                className="text-xs font-bold text-amber-400 hover:text-amber-300 inline-flex items-center gap-1 cursor-pointer"
+              >
+                <span>Browse All Guides</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {BLOG_ARTICLES.slice(0, 3).map((article) => (
+                <a
+                  key={article.id}
+                  href={`/blog/${article.slug}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (typeof window !== "undefined") {
+                      window.history.pushState(null, "", `/blog/${article.slug}`);
+                      window.dispatchEvent(new PopStateEvent("popstate"));
+                    }
+                  }}
+                  className="bg-[#111114] border border-zinc-800/80 hover:border-amber-500/50 p-4 transition-all group flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="aspect-[16/9] overflow-hidden mb-3.5 bg-zinc-900">
+                      <img
+                        src={article.featuredImage}
+                        alt={article.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-400 mb-2">
+                      <span className="text-amber-400 font-semibold">{article.category}</span>
+                      <span>•</span>
+                      <span>{article.readTime}</span>
+                    </div>
+                    <h4 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-2 mb-2 leading-snug">
+                      {article.title}
+                    </h4>
+                    <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
+                      {article.excerpt}
+                    </p>
+                  </div>
+                  <div className="pt-3 mt-4 border-t border-zinc-800/60 flex items-center justify-between text-xs">
+                    <span className="text-zinc-500 text-[11px] font-mono">Read Guide</span>
+                    <span className="text-amber-400 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                      Explore &rarr;
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
         </main>
       ) : (
         <LiveOrderTracker

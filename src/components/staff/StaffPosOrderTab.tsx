@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Plus,
   Minus,
@@ -48,15 +48,20 @@ import {
 import {
   usePosSession,
   usePosCommand,
-  usePosOrders,
   posOrderToOrder,
   printPosReceipt,
-  PosLine,
+  PosLine, backendOrder, todayNepal, toPosMethod, posPath, posError,
 } from "../../lib/posApi";
+import { usePosMenu, usePosQuote, usePosOrderFeed, usePosReceipt } from "../../lib/posWorkspace";
+import { posStatistics } from "../../lib/posLegacy";
+import { PosTableManager } from "./PosTableManager";
 import { formatNPR, formatTimer } from "../../lib/utils";
 import { Badge } from "../common/Badge";
 import { Drawer } from "../common/Drawer";
 import { Modal } from "../common/Modal";
+import { comboDefinitions } from "../../lib/catalogApi";
+import { ComboPackageModal } from "../customer/ComboPackageModal";
+import { ProductConfiguratorModal } from "../customer/ProductConfiguratorModal";
 import { StaffTableGrid } from "./StaffTableGrid";
 
 interface SelectedCartItem {
@@ -64,6 +69,7 @@ interface SelectedCartItem {
   variant: ProductVariant;
   quantity: number;
   modifiers: string[];
+  comboSelections?: PosLine["combo_selections"];
   price: number;
 }
 
@@ -73,59 +79,25 @@ interface Props {
 
 export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => {
   const {
-    products,
-    categories,
-    orders,
     currentOutlet,
-    createStaffOrder,
-    updateOrderStatus,
-    lookupLoyaltyByPhone,
-    evaluateLoyaltyDiscountForCustomer,
-    recordAppliedLoyaltyDiscount,
     addToast,
-    addItemsToRunningOrder,
-    removeItemFromRunningOrder,
-    markOrderBilled,
-    triggerKitchenCall,
-    simulateIncomingOrder,
   } = useApp();
 
   // Backend POS session — WebSocket live, fetches meta (tables, perms, payment methods)
   const posSession = usePosSession();
   const posCommand = usePosCommand(posSession);
-  // Fetch backend open tabs; only runs when authenticated & outlet set
-  const backendOngoingQuery = usePosOrders(posSession, { open_tabs: true, page_size: 100 });
-  const backendOrders: Order[] = useMemo(() => {
-    if (!backendOngoingQuery.data?.results?.length) return [];
-    return backendOngoingQuery.data.results.map((po) => posOrderToOrder(po, currentOutlet.name));
-  }, [backendOngoingQuery.data, currentOutlet.name]);
-
+  const menu = usePosMenu(posSession);
+  const { products, categories } = menu;
+  const [configuredCombo, setConfiguredCombo] = useState<Product | null>(null);
+  const [configuredProduct, setConfiguredProduct] = useState<Product | null>(null);
+  const [manageTables, setManageTables] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
   // -------------------------------------------------------------
   // POS MODE & ONGOING ORDER TAB STATE
   // -------------------------------------------------------------
   const [posMode, setPosMode] = useState<"NEW_ORDER" | "ADD_TO_ONGOING" | "FLOOR_TABLES">("NEW_ORDER");
   const [selectedOngoingOrderId, setSelectedOngoingOrderId] = useState<string>("");
-
-  // Merge backend orders (primary) + local orders (fallback when offline/unauthenticated)
-  const mergedOrders = useMemo(() => {
-    if (backendOrders.length > 0) return backendOrders;
-    return orders;
-  }, [backendOrders, orders]);
-
-  // Filter open running orders for ongoing addition
-  const ongoingOrders = useMemo(() => {
-    return mergedOrders.filter(
-      (o) => o.status !== "CANCELLED" && (o.isBilled === false || o.status !== "COMPLETED")
-    );
-  }, [mergedOrders]);
-
-  const targetOngoingOrder = useMemo(() => {
-    if (selectedOngoingOrderId) {
-      const found = mergedOrders.find((o) => o.id === selectedOngoingOrderId || o.orderNumber === selectedOngoingOrderId);
-      if (found) return found;
-    }
-    return ongoingOrders[0] || null;
-  }, [mergedOrders, selectedOngoingOrderId, ongoingOrders]);
 
   // -------------------------------------------------------------
   // CREATE ORDER STATE
@@ -133,7 +105,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("TAKEAWAY");
-  const [tableNumber, setTableNumber] = useState("T-01");
+  const [tableNumber, setTableNumber] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH_ON_PICKUP");
   const [paymentStatus, setPaymentStatus] = useState<"PAID" | "UNPAID">("PAID");
   const [isSplitMode, setIsSplitMode] = useState(false);
@@ -164,13 +136,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   // -------------------------------------------------------------
   // ORDERS DATATABLE & FILTER STATE
   // -------------------------------------------------------------
-  const getTodayStr = () => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
+  const getTodayStr = todayNepal;
 
   const [startDate, setStartDate] = useState<string>(() => getTodayStr());
   const [endDate, setEndDate] = useState<string>(() => getTodayStr());
@@ -181,18 +147,33 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const backendOngoingQuery = usePosOrderFeed(posSession, { open_tabs: true });
+  const registerQuery = usePosOrderFeed(posSession, { ...(startDate ? { start_date: startDate } : {}), ...(endDate ? { end_date: endDate } : {}) });
+  const orders: Order[] = useMemo(() => registerQuery.results.map(po => posOrderToOrder(po, currentOutlet.name)), [registerQuery.results, currentOutlet.name]);
+  const ongoingOrders: Order[] = useMemo(() => backendOngoingQuery.results.map(po => posOrderToOrder(po, currentOutlet.name)), [backendOngoingQuery.results, currentOutlet.name]);
+  const targetOngoingOrder = (selectedOngoingOrderId ? ongoingOrders.find(o => o.id === selectedOngoingOrderId) : ongoingOrders[0]) || null;
+  const mergedOrders = orders;
+  const findOrder = (id: string) => [...orders, ...ongoingOrders].find(o => o.id === id);
+  const receipt = usePosReceipt(posSession, backendOrder(printSlipOrder), 'TOKEN');
+  const receiptPreview = receipt?.snapshot ? posOrderToOrder(receipt.snapshot, currentOutlet.name) : printSlipOrder;
+  useEffect(() => {
+    setSelectedOrderForDrawer(previous => previous ? findOrder(previous.id) || previous : null);
+  }, [orders, ongoingOrders]);
+  useEffect(() => {
+    const message = posSession.error || posCommand.error || menu.error || registerQuery.error || backendOngoingQuery.error;
+    if (message) addToast({ title: 'POS request failed', description: message, type: 'error' });
+  }, [posSession.error, posCommand.error, menu.error, registerQuery.error, backendOngoingQuery.error]);
+  useEffect(() => {
+    setSelectedItems([]); setSelectedOngoingOrderId(''); setSelectedOrderForDrawer(null); setPrintSlipOrder(null); setTableNumber('');
+  }, [posSession.outlet]);
+
   // Loyalty Phone Auto-Check
-  const loyaltyInfo = useMemo(() => {
-    if (customerPhone.trim().length >= 7) {
-      return lookupLoyaltyByPhone(customerPhone.trim());
-    }
-    return null;
-  }, [customerPhone, lookupLoyaltyByPhone]);
+  const loyaltyInfo: any = null;
 
   // Filtered Products for POS Quick-Add
   const availableProducts = useMemo(() => {
     return products.filter((p) => {
-      if (p.is86ed) return false;
+      if (!p.isAvailable || !Number.isFinite(p.basePrice)) return false;
       if (p.showOnPos === false) return false;
       if (selectedCategory !== "ALL" && p.categoryId !== selectedCategory) return false;
       if (menuSearch.trim()) {
@@ -203,27 +184,24 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     });
   }, [products, selectedCategory, menuSearch]);
 
-  // Order Subtotal
-  const orderSubtotal = useMemo(() => {
-    return selectedItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  }, [selectedItems]);
-
-  const [appliedLoyaltyOfferName, setAppliedLoyaltyOfferName] = useState<string>("");
-
-  // Evaluate visit-count and bill range loyalty offer
-  const loyaltyOffer = useMemo(() => {
-    if (customerPhone.trim().length >= 7 && orderSubtotal > 0) {
-      return evaluateLoyaltyDiscountForCustomer(customerPhone.trim(), orderSubtotal);
-    }
-    return null;
-  }, [customerPhone, orderSubtotal, evaluateLoyaltyDiscountForCustomer]);
-
-  const orderTotal = Math.max(0, orderSubtotal - orderDiscountAmount);
+  const [appliedLoyaltyOfferName, setAppliedLoyaltyOfferName] = useState("");
+  const loyaltyOffer: any = null;
+  const lines: PosLine[] = selectedItems.map(item => ({ product_id: String(item.product.id), variant_id: item.variant.id || null, quantity: item.quantity, modifier_option_ids: item.modifiers, ...(item.comboSelections ? { combo_selections: item.comboSelections } : {}) }));
+  const quote = usePosQuote(posSession, 'quote/', selectedItems.length && (posMode !== 'ADD_TO_ONGOING' || targetOngoingOrder) ? {
+    items: lines,
+    ...(posMode === 'ADD_TO_ONGOING' ? { order_id: backendOrder(targetOngoingOrder)?.id } : { discount_amount: String(orderDiscountAmount), payment_method: isSplitMode ? 'SPLIT' : toPosMethod(paymentMethod) }),
+  } : null);
+  const orderSubtotal = quote.quote?.items?.reduce((sum, line) => sum + Number(line.line_total), 0) ?? selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const orderTotal = Number(quote.quote?.total_payable || 0);
+  const cannotSave = !posSession.enabled || !posSession.meta?.accepting_orders || !posSession.meta?.permissions.orders || posCommand.busy || posCommand.hasPending || !quote.quote;
+  useEffect(() => { if (quote.error) addToast({ title: 'Check order choices', description: quote.error, type: 'error' }); }, [quote.error]);
 
   // Add Item to POS Cart
   const handleAddItem = (prod: Product) => {
-    const defaultVariant: ProductVariant = prod.variants[0] || {
-      id: "std",
+    if (prod.isComboPackage) { setConfiguredCombo(prod); return; }
+    if (prod.variants.length > 1 || prod.modifierGroups.length) { setConfiguredProduct(prod); return; }
+    const defaultVariant: ProductVariant = prod.variants.find(v => v.isDefault) || prod.variants[0] || {
+      id: "",
       name: "Standard",
       price: prod.basePrice,
       isDefault: true,
@@ -235,7 +213,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
       );
       if (existingIdx >= 0) {
         const updated = [...prev];
-        updated[existingIdx].quantity += 1;
+        updated[existingIdx] = { ...updated[existingIdx], quantity: updated[existingIdx].quantity + 1 };
         return updated;
       } else {
         return [
@@ -244,7 +222,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
             product: prod,
             variant: defaultVariant,
             quantity: 1,
-            modifiers: [],
+            modifiers: prod.modifierGroups.flatMap(g => g.options.filter(o => o.isDefault).map(o => o.id)),
             price: defaultVariant.price,
           },
         ];
@@ -259,7 +237,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
       if (newQty <= 0) {
         return updated.filter((_, idx) => idx !== index);
       }
-      updated[index].quantity = newQty;
+      updated[index] = { ...updated[index], quantity: newQty };
       return updated;
     });
   };
@@ -269,215 +247,46 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   };
 
   const handlePlaceOrder = async () => {
-    if (selectedItems.length === 0) {
-      addToast({
-        title: "Cart is Empty",
-        description: "Please add at least one item to create an order.",
-        type: "warning",
-      });
-      return;
+    if (cannotSave || !selectedItems.length) return;
+    if (hasCreditMethod && (!customerName.trim() || customerPhone.trim().length < 7)) {
+      addToast({ title: 'Customer required', description: 'Enter customer name and phone for Khata.', type: 'warning' }); return;
     }
-
-    // Enforce compulsory phone number for Credit (Khata) orders
-    if (hasCreditMethod) {
-      const cleanPhone = customerPhone.trim().replace(/\D/g, "");
-      if (!cleanPhone || cleanPhone.length < 10) {
-        addToast({
-          title: "Customer Mobile Number Compulsory",
-          description:
-            "Credit Sale (Khata / उधारो) requires a valid 10-digit customer mobile number to maintain their credit balance.",
-          type: "error",
-        });
-        const el = document.getElementById("pos-customer-phone");
-        if (el) el.focus();
-        return;
-      }
+    if (isSplitMode && Math.abs(posSplits.reduce((sum,s) => sum+s.amount,0)-orderTotal) > 0.01) {
+      addToast({ title: 'Split tenders unbalanced', description: 'Allocated amounts must equal the quoted total.', type: 'warning' }); return;
     }
-
-    // If split mode, ensure allocated sum matches order total
-    if (isSplitMode) {
-      const totalAllocated = posSplits.reduce((acc, s) => acc + s.amount, 0);
-      if (Math.abs(totalAllocated - orderTotal) > 0.01) {
-        addToast({
-          title: "Split Tenders Unbalanced",
-          description: `Total allocated (NPR ${totalAllocated}) must equal Total Payable (NPR ${orderTotal}).`,
-          type: "warning",
-        });
-        return;
-      }
-    }
-
-    const effectiveName = customerName.trim() || (fulfillmentType === "DINE_IN" ? `Table ${tableNumber} Guest` : "Counter Walk-in");
-    const effectivePaymentMethod = isSplitMode ? posSplits[0]?.method || paymentMethod : paymentMethod;
-    const effectivePaymentStatus: "PAID" | "UNPAID" = hasCreditMethod
-      ? isSplitMode && posSplits.some((s) => s.method !== "CREDIT" && s.amount > 0)
-        ? "PAID"
-        : "UNPAID"
-      : paymentStatus;
-
-    // --- BACKEND ORDER PLACEMENT (when authenticated) ---
-    if (posSession.enabled) {
-      // Map cart items to POS line format
-      const lines: PosLine[] = selectedItems.map((item) => ({
-        product_id: String(item.product.id),
-        variant_id: item.variant?.id && item.variant.id !== "" ? item.variant.id : null,
-        quantity: item.quantity,
-        modifier_option_ids: [],
-      }));
-
-      // Map payment method to backend format
-      const backendPaymentMethod = effectivePaymentMethod === "CASH_ON_PICKUP" ? "CASH" : effectivePaymentMethod;
-
-      // Build tenders for payment
-      const tenders = isSplitMode
-        ? posSplits
-            .filter((s) => s.amount > 0)
-            .map((s) => ({
-              method: s.method === "CASH_ON_PICKUP" ? "CASH" : s.method,
-              amount: String(s.amount),
-              reference: "",
-            }))
-        : effectivePaymentStatus === "PAID"
-        ? [{ method: backendPaymentMethod, amount: String(orderTotal), reference: "" }]
-        : [];
-
-      // Find table backend ID from session meta
-      const tableId = fulfillmentType === "DINE_IN" && posSession.meta?.tables
-        ? posSession.meta.tables.find((t) => t.table_number === tableNumber)?.id ?? null
-        : null;
-
-      const payload = {
-        fulfillment_type: fulfillmentType === "ONLINE_DELIVERY" ? "DELIVERY" : fulfillmentType,
-        customer_name: effectiveName,
-        customer_phone: customerPhone.trim() || "",
-        table_id: tableId,
-        notes: orderNotes.trim() || "",
-        discount_amount: orderDiscountAmount > 0 ? String(orderDiscountAmount) : "0",
-        lines,
-        tenders,
-      };
-
-      const result = await posCommand.run("", payload);
-      if (result) {
-        addToast({
-          title: "Order Placed",
-          description: `Order #${result.order_number} created successfully.`,
-          type: "success",
-        });
-      } else if (posCommand.error) {
-        addToast({ title: "Order Failed", description: posCommand.error, type: "error" });
-        return;
-      }
-    } else {
-      // --- LOCAL FALLBACK (offline / unauthenticated) ---
-      createStaffOrder({
-        customerName: effectiveName,
-        customerPhone: customerPhone.trim() || undefined,
-        fulfillmentType,
-        tableNumber: fulfillmentType === "DINE_IN" ? tableNumber : undefined,
-        items: selectedItems,
-        paymentMethod: effectivePaymentMethod,
-        paymentStatus: effectivePaymentStatus,
-        notes: orderNotes.trim() || undefined,
-        discountAmount: orderDiscountAmount,
-        isSplitPayment: isSplitMode,
-        splitPayments: isSplitMode ? posSplits : undefined,
-      });
-    }
-
-    if (orderDiscountAmount > 0 && appliedLoyaltyOfferName && customerPhone.trim()) {
-      recordAppliedLoyaltyDiscount({
-        orderNumber: `CR-${Math.floor(1000 + Math.random() * 9000)}`,
-        customerName: effectiveName,
-        customerPhone: customerPhone.trim(),
-        visitNumber: loyaltyInfo ? loyaltyInfo.visitCount + 1 : 1,
-        subtotal: orderSubtotal,
-        ruleName: appliedLoyaltyOfferName,
-        discountType: "PERCENT",
-        discountValue: orderDiscountAmount,
-        discountAmount: orderDiscountAmount,
-        finalAmount: Math.max(0, orderSubtotal - orderDiscountAmount),
-        outletName: currentOutlet.name,
-      });
-    }
-
-    // Reset Form
-    setSelectedItems([]);
-    setCustomerName("");
-    setCustomerPhone("");
-    setOrderNotes("");
-    setOrderDiscountAmount(0);
-    setAppliedLoyaltyOfferName("");
-    setIsSplitMode(false);
-    setPosSplits([
-      { method: "CASH_ON_PICKUP", amount: 0 },
-      { method: "CREDIT", amount: 0 },
-    ]);
-    setCurrentPage(1);
+    const table = posSession.meta?.tables.find(t => t.table_number === tableNumber);
+    if (fulfillmentType === 'DINE_IN' && (!table || table.active_order_id)) { addToast({ title: 'Select an available table', type: 'warning' }); return; }
+    const tenders = isSplitMode ? posSplits.filter(s => s.amount > 0).map(s => ({ method: toPosMethod(s.method), amount: String(s.amount), reference: '' }))
+      : (paymentStatus === 'PAID' || paymentMethod === 'CREDIT') && orderTotal > 0 ? [{ method: toPosMethod(paymentMethod), amount: String(orderTotal), reference: '' }] : [];
+    const result = await posCommand.run('', { items: lines, expected_total: quote.quote!.total_payable, fulfillment_type: fulfillmentType,
+      table_id: fulfillmentType === 'DINE_IN' ? table?.id : null, customer_name: customerName.trim() || 'Walk-in Guest', customer_phone: customerPhone.trim(),
+      notes: orderNotes, delivery_address: deliveryAddress, discount_amount: String(orderDiscountAmount), discount_reason: discountReason || appliedLoyaltyOfferName,
+      payment_method: isSplitMode ? 'SPLIT' : toPosMethod(paymentMethod), tenders });
+    if (!result) return;
+    setSelectedItems([]); setCustomerName(''); setCustomerPhone(''); setOrderNotes(''); setOrderDiscountAmount(0); setDiscountReason('');
+    setDeliveryAddress(''); setTableNumber(''); setIsSplitMode(false); setPosSplits([{ method: 'CASH_ON_PICKUP', amount: 0 }, { method: 'CREDIT', amount: 0 }]);
+    setPrintSlipOrder(posOrderToOrder(result, currentOutlet.name));
+    addToast({ title: 'Order placed', description: result.order_number, type: 'success' });
   };
-
-  // Add Items to Running/Ongoing Order Handler
   const handleAddItemsToOngoingOrder = async () => {
-    if (!targetOngoingOrder) {
-      addToast({
-        title: "No Target Tab Selected",
-        description: "Please select an ongoing order tab to add items to.",
-        type: "warning",
-      });
-      return;
-    }
-    if (selectedItems.length === 0) {
-      addToast({
-        title: "No Items Selected",
-        description: "Please tap items from the menu to add to this running order.",
-        type: "warning",
-      });
-      return;
-    }
-
-    const kitchenCount = selectedItems.filter((i) => i.product.requiresKitchen !== false).length;
-    const directCount = selectedItems.filter((i) => i.product.requiresKitchen === false).length;
-
-    // Use backend append when order came from backend (_posOrder attached)
-    const backendOrderId = (targetOngoingOrder as any)._posOrder?.id;
-    if (posSession.enabled && backendOrderId) {
-      const lines: PosLine[] = selectedItems.map((item) => ({
-        product_id: String(item.product.id),
-        variant_id: item.variant?.id && item.variant.id !== "" ? item.variant.id : null,
-        quantity: item.quantity,
-        modifier_option_ids: [],
-      }));
-      const result = await posCommand.run(`${backendOrderId}/append/`, { lines });
-      if (result) {
-        addToast({
-          title: "Tab Updated",
-          description: `Order #${result.order_number}: ${kitchenCount > 0 ? `${kitchenCount} sent to kitchen. ` : ""}${directCount > 0 ? `${directCount} direct items ready.` : ""}`,
-          type: "success",
-        });
-      } else if (posCommand.error) {
-        addToast({ title: "Append Failed", description: posCommand.error, type: "error" });
-        return;
-      }
-    } else {
-      addItemsToRunningOrder(targetOngoingOrder.id, selectedItems);
-      addToast({
-        title: "Tab Updated Successfully",
-        description: `Updated #${targetOngoingOrder.orderNumber}: ${kitchenCount > 0 ? `${kitchenCount} sent to kitchen cook line. ` : ""}${directCount > 0 ? `${directCount} direct counter items ready.` : ""}`,
-        type: "success",
-      });
-    }
-
-    setSelectedItems([]);
+    const order = backendOrder(targetOngoingOrder);
+    if (cannotSave || !order || !selectedItems.length) return;
+    const result = await posCommand.run(`${order.id}/append/`, { items: lines, version: quote.quote!.order_version, expected_total: quote.quote!.total_payable });
+    if (result) { setSelectedItems([]); addToast({ title: 'Round added', description: result.order_number, type: 'success' }); }
+  };
+  const handleRemoveItemFromRunningOrder = async (orderId: string, itemId: string) => {
+    const order = backendOrder(findOrder(orderId)); if (!order) return;
+    const reason = window.prompt('Reason for removing this item'); if (!reason?.trim()) return;
+    await posCommand.run(`${order.id}/void/`, { version: order.version, item_id: Number(itemId.replace('pos-item-','')), reason });
+  };
+  const markOrderBilled = (id: string, _method?: string) => {
+    const order = findOrder(id); if (order && onOpenBillingForOrder) onOpenBillingForOrder(order);
+  };
+  const triggerKitchenCall = async (info: { orderNumber: string; [key: string]: unknown }) => {
+    const order = backendOrder([...orders,...ongoingOrders].find(o => o.orderNumber === info.orderNumber));
+    if (order) await posCommand.run(`${order.id}/call/`, { version: order.version });
   };
 
-  // Remove Item from Running Order Handler
-  const handleRemoveItemFromRunningOrder = (orderId: string, itemId: string) => {
-    const success = removeItemFromRunningOrder(orderId, itemId);
-    if (success && selectedOrderForDrawer && selectedOrderForDrawer.id === orderId) {
-      const updated = orders.find((o) => o.id === orderId);
-      if (updated) setSelectedOrderForDrawer(updated);
-    }
-  };
 
   // Initiate Adding Items from Table Row
   const handleStartAddingItemsToOrder = (order: Order) => {
@@ -499,11 +308,11 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     return mergedOrders.filter((o) => {
       // Date Range Filter (Default: today)
       if (startDate) {
-        const orderDate = (o.createdAt || "").slice(0, 10);
+        const orderDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kathmandu", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(o.createdAt));
         if (orderDate && orderDate < startDate) return false;
       }
       if (endDate) {
-        const orderDate = (o.createdAt || "").slice(0, 10);
+        const orderDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kathmandu", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(o.createdAt));
         if (orderDate && orderDate > endDate) return false;
       }
 
@@ -550,100 +359,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   }, [mergedOrders, startDate, endDate, orderTypeFilter, settlementFilter, statusFilter, tableSearchQuery]);
 
   // Statistics reflecting the active filtered dataset
-  const datatableStats = useMemo(() => {
-    let grossSubtotal = 0;
-    let totalDiscounts = 0;
-    let netFinal = 0;
-    let totalPaid = 0;
-    let totalUnpaid = 0;
-
-    let cashTotal = 0;
-    let cashCount = 0;
-    let qrFonepayTotal = 0;
-    let qrFonepayCount = 0;
-    let esewaTotal = 0;
-    let esewaCount = 0;
-    let cardTotal = 0;
-    let cardCount = 0;
-    let creditTotal = 0;
-    let creditCount = 0;
-    let refundVoidTotal = 0;
-    let refundVoidCount = 0;
-
-    filteredOrders.forEach((o) => {
-      const isCancelledOrVoid =
-        o.status === "CANCELLED" || o.refundStatus === "REFUNDED" || o.refundStatus === "VOIDED";
-
-      const sub = o.subtotal || o.totalAmount || 0;
-      const disc = o.discountAmount || 0;
-      const net = o.totalAmount;
-
-      if (isCancelledOrVoid) {
-        refundVoidCount += 1;
-        refundVoidTotal += o.refundAmount || o.totalAmount || 0;
-      } else {
-        grossSubtotal += sub;
-        totalDiscounts += disc;
-        netFinal += net;
-
-        const isCredit =
-          o.paymentMethod === "CREDIT" ||
-          (o.splitPayments && o.splitPayments.some((s) => s.method === "CREDIT" && s.amount > 0));
-
-        if (isCredit) {
-          const creditPart =
-            o.splitPayments?.find((s) => s.method === "CREDIT")?.amount ?? net;
-          creditTotal += creditPart;
-          creditCount += 1;
-        }
-
-        const isPaid = o.paymentStatus === "PAID" || o.isBilled;
-        if (isPaid) {
-          totalPaid += net;
-        } else {
-          totalUnpaid += net;
-        }
-
-        if (o.paymentMethod === "CASH_ON_PICKUP" || o.paymentMethod === "CASH_ON_DELIVERY") {
-          cashTotal += net;
-          cashCount += 1;
-        } else if (o.paymentMethod === "FONEPAY_QR") {
-          qrFonepayTotal += net;
-          qrFonepayCount += 1;
-        } else if (o.paymentMethod === "ESEWA") {
-          esewaTotal += net;
-          esewaCount += 1;
-        } else if (o.paymentMethod === "CARD") {
-          cardTotal += net;
-          cardCount += 1;
-        } else if (o.paymentMethod !== "CREDIT") {
-          cashTotal += net;
-          cashCount += 1;
-        }
-      }
-    });
-
-    return {
-      orderCount: filteredOrders.length,
-      grossSubtotal,
-      totalDiscounts,
-      netFinal,
-      totalPaid,
-      totalUnpaid,
-      cashTotal,
-      cashCount,
-      qrFonepayTotal,
-      qrFonepayCount,
-      esewaTotal,
-      esewaCount,
-      cardTotal,
-      cardCount,
-      creditTotal,
-      creditCount,
-      refundVoidTotal,
-      refundVoidCount,
-    };
-  }, [filteredOrders]);
+  const datatableStats = useMemo(() => posStatistics(filteredOrders), [filteredOrders]);
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
   const paginatedOrders = useMemo(() => {
@@ -657,54 +373,23 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     }
   };
 
-  // Fast Bump Status
-  const handleQuickBumpStatus = (order: Order) => {
-    let nextSt: OrderStatus = "CONFIRMED";
-    let backendSt = "ACCEPTED";
-    if (order.status === "CONFIRMED") {
-      nextSt = "PROCESSING";
-      backendSt = "PREPARING";
-    } else if (order.status === "PROCESSING") {
-      nextSt = "READY";
-      backendSt = "READY";
-    } else if (order.status === "READY") {
-      nextSt = "COMPLETED";
-      backendSt = "COMPLETED";
-    }
-
-    if (posSession.enabled) {
-      const backendId = (order as any)._posOrder?.id || Number(order.id.replace(/\D/g, "")) || order.id;
-      const backendVersion = (order as any)._posOrder?.version || 1;
-      void posCommand.run(`${backendId}/transition/`, {
-        version: backendVersion,
-        status: backendSt,
-      });
-    }
-
-    updateOrderStatus(order.id, nextSt);
-    if (nextSt === "PROCESSING") {
-      addToast({
-        title: "Order Sent to Kitchen",
-        description: `Order #${order.orderNumber} is now being prepared.`,
-        type: "info",
-      });
-    } else if (nextSt === "READY") {
-      addToast({
-        title: "Order Marked Ready",
-        description: `Token ${order.kioskToken || order.orderNumber} is ready at pickup counter!`,
-        type: "success",
-      });
-    } else if (nextSt === "COMPLETED") {
-      addToast({
-        title: "Order Completed & Dispatched",
-        description: `Order #${order.orderNumber} handed over to customer.`,
-        type: "success",
-      });
-    }
+  const handleQuickBumpStatus = async (row: Order) => {
+    const order = backendOrder(row); if (!order) return;
+    const next = { PENDING: 'ACCEPTED', ACCEPTED: 'PREPARING', PREPARING: 'READY', READY: order.fulfillment_type === 'DELIVERY' ? 'OUT_FOR_DELIVERY' : 'COMPLETED', OUT_FOR_DELIVERY: 'COMPLETED' }[order.status];
+    if (next) await posCommand.run(`${order.id}/transition/`, { version: order.version, status: next });
   };
 
   return (
     <div className="space-y-6">
+      {posCommand.hasPending && <button type="button" className="px-2.5 py-1 text-xs font-bold bg-amber-500 text-black border border-amber-500" disabled={posCommand.busy} onClick={async () => { const result = await posCommand.recover(); if (result?.order_number) { setSelectedItems([]); setPrintSlipOrder(posOrderToOrder(result,currentOutlet.name)); } }}>Recover pending order action</button>}
+      {configuredCombo && <ComboPackageModal combo={comboDefinitions([configuredCombo])[0]} productsOverride={products} channelOverride="pos" isOpen onClose={() => setConfiguredCombo(null)} addLabel="Add to order" onAddToCartCustom={data => {
+        setSelectedItems(previous => [...previous, { product: configuredCombo, variant: { id: '', name: 'Combo', price: data.unitPrice }, modifiers: [], comboSelections: data.comboSelections, quantity: data.quantity, price: data.unitPrice }]);
+      }} />}
+      {configuredProduct && <ProductConfiguratorModal product={configuredProduct} isOpen onClose={() => setConfiguredProduct(null)} onAddToCart={(product, variant, modifiers, quantity) => {
+        setSelectedItems(previous => [...previous, { product, variant, modifiers: modifiers.map(m => m.optionId), quantity, price: variant.price + modifiers.reduce((sum,m) => sum + m.priceDelta,0) }]);
+        setConfiguredProduct(null);
+      }} />}
+      {manageTables && <PosTableManager session={posSession} onClose={() => setManageTables(false)} />}
       {/* -------------------------------------------------------------
           TOP SECTION: POS CREATE ORDER WORKSPACE
       ------------------------------------------------------------- */}
@@ -756,23 +441,17 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
               }`}
             >
               <UtensilsCrossed className="w-3 h-3" />
-              <span>Floor Tables (16)</span>
+              <span>Floor Tables ({posSession.meta?.tables.length || 0})</span>
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                const isTable = Math.random() > 0.4;
-                const simulated = simulateIncomingOrder(isTable ? "TABLE_QR" : "WEBSITE");
-                if (simulated.fulfillmentType === "DINE_IN") {
-                  setPosMode("FLOOR_TABLES");
-                }
-              }}
+              onClick={() => setManageTables(true)}
               className="px-2.5 py-1 text-xs font-black bg-amber-500 hover:bg-amber-400 text-black border border-amber-400 transition-all cursor-pointer shadow-xs flex items-center gap-1"
-              title="Click to simulate an incoming Table QR or Web Takeaway order"
+              title="Manage floors and tables"
             >
               <Zap className="w-3.5 h-3.5 fill-black" />
-              <span>⚡ Test Incoming Order</span>
+              <span>Manage Floors & Tables</span>
             </button>
           </div>
 
@@ -801,6 +480,8 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
         {posMode === "FLOOR_TABLES" ? (
           <StaffTableGrid
             posMeta={posSession.meta}
+            orders={ongoingOrders}
+            outlet={posSession.outlet}
             onSelectTableForNewOrder={(tableId) => {
               setFulfillmentType("DINE_IN");
               setTableNumber(tableId);
@@ -920,14 +601,14 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                           </span>
                         ) : (
                           <span className="text-[9px] text-zinc-500 dark:text-zinc-400 truncate">
-                            {prod.variants.length > 1 ? `${prod.variants.length} options` : prod.categoryName}
+                            {prod.variants.length > 1 ? `${prod.variants.length} options` : categories.find(c => c.id === prod.categoryId)?.name}
                           </span>
                         )}
                       </div>
 
                       <div className="mt-1 flex items-center justify-between">
                         <span className="font-mono text-xs font-bold text-amber-600 dark:text-amber-400">
-                          {formatNPR(prod.basePriceNpr)}
+                          {formatNPR(prod.basePrice)}
                         </span>
                         {inCart ? (
                           <span className="bg-amber-500 text-black font-mono font-black text-[10px] px-1 py-0.2">
@@ -1001,7 +682,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                     <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1 border-t border-zinc-100 dark:border-zinc-800">
                       <span>Existing: <strong>{targetOngoingOrder.items.length} items</strong></span>
                       <span>Total: <strong className="font-mono font-bold text-zinc-900 dark:text-white">{formatNPR(targetOngoingOrder.totalAmount)}</strong></span>
-                      <span className="text-amber-500 font-bold">Round {(targetOngoingOrder.roundCount || 1) + 1} Batch</span>
+                      <span className="text-amber-500 font-bold">Round {(targetOngoingOrder.roundsCount || 1) + 1} Batch</span>
                     </div>
                   </div>
                 )}
@@ -1094,7 +775,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                       Updated Tab Total:
                     </span>
                     <span className="font-mono text-lg font-black text-amber-600 dark:text-amber-400">
-                      {formatNPR(targetOngoingOrder.totalAmount + orderSubtotal)}
+                      {formatNPR(orderTotal)}
                     </span>
                   </div>
                 )}
@@ -1114,7 +795,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                   <button
                     type="button"
                     onClick={handleAddItemsToOngoingOrder}
-                    disabled={selectedItems.length === 0 || !targetOngoingOrder}
+                    disabled={cannotSave || selectedItems.length === 0 || !targetOngoingOrder}
                     className="h-11 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
@@ -1219,13 +900,8 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                           onChange={(e) => setTableNumber(e.target.value)}
                           className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-amber-500 font-mono font-bold"
                         >
-                          {Array.from({ length: 16 }, (_, i) => `T-${String(i + 1).padStart(2, "0")}`).map(
-                            (t) => (
-                              <option key={t} value={t}>
-                                {t} (Dining Table)
-                              </option>
-                            )
-                          )}
+                          <option value="">Select a table</option>
+                          {posSession.meta?.tables.filter(t => !t.active_order_id).map(t => <option key={t.id} value={t.table_number}>{t.section} / {t.table_number}</option>)}
                         </select>
                       </div>
                     )}
@@ -1240,6 +916,8 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                   )}
                 </div>
 
+                {fulfillmentType === 'DELIVERY' && <input aria-label="Delivery address" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder="Delivery address" className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-amber-500" />}
+                {orderDiscountAmount > 0 && <input aria-label="Discount reason" value={discountReason} onChange={e => setDiscountReason(e.target.value)} placeholder="Discount reason" className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-amber-500" />}
                 {/* Loyalty Recognized Banner */}
                 {loyaltyInfo && (
                   <div className="p-2 bg-amber-500/10 border border-amber-500/30 text-xs space-y-1.5 text-zinc-200">
@@ -1406,11 +1084,11 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                               : "border-zinc-800 focus:border-amber-500"
                           }`}
                         >
-                          <option value="CASH_ON_PICKUP">💵 Cash Tender</option>
-                          <option value="FONEPAY_QR">📱 FonePay QR</option>
-                          <option value="ESEWA">🟢 eSewa Digital</option>
-                          <option value="CARD">💳 POS Card Machine</option>
-                          <option value="CREDIT">📒 Credit Sale (Khata / उधारो)</option>
+                          <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CASH_ON_PICKUP"))} value="CASH_ON_PICKUP">💵 Cash Tender</option>
+                          <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("FONEPAY_QR"))} value="FONEPAY_QR">📱 FonePay QR</option>
+                          <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("ESEWA"))} value="ESEWA">🟢 eSewa Digital</option>
+                          <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CARD"))} value="CARD">💳 POS Card Machine</option>
+                          <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CREDIT"))} value="CREDIT">📒 Credit Sale (Khata / उधारो)</option>
                         </select>
                       </div>
 
@@ -1482,11 +1160,11 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                               }}
                               className="w-1/2 h-7 px-1.5 text-xs bg-zinc-950 border border-zinc-700 text-zinc-200 font-bold focus:outline-none"
                             >
-                              <option value="CASH_ON_PICKUP">💵 Cash</option>
-                              <option value="FONEPAY_QR">📱 FonePay QR</option>
-                              <option value="ESEWA">🟢 eSewa</option>
-                              <option value="CARD">💳 POS Card</option>
-                              <option value="CREDIT">📒 Credit (Khata)</option>
+                              <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CASH_ON_PICKUP"))} value="CASH_ON_PICKUP">💵 Cash</option>
+                              <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("FONEPAY_QR"))} value="FONEPAY_QR">📱 FonePay QR</option>
+                              <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("ESEWA"))} value="ESEWA">🟢 eSewa</option>
+                              <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CARD"))} value="CARD">💳 POS Card</option>
+                              <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CREDIT"))} value="CREDIT">📒 Credit (Khata)</option>
                             </select>
 
                             <div className="flex-1 relative">
@@ -1603,7 +1281,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                 <button
                   type="button"
                   onClick={handlePlaceOrder}
-                  disabled={selectedItems.length === 0}
+                  disabled={cannotSave || selectedItems.length === 0}
                   className="w-full h-11 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:cursor-not-allowed"
                 >
                   <Flame className="w-4 h-4" />
@@ -1690,7 +1368,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
               <option value="ALL">All Bills</option>
               <option value="PAID">✅ Paid / Settled</option>
               <option value="UNPAID">⏳ Unsettled / Open</option>
-              <option value="CREDIT">📒 Credit Sale (Khata)</option>
+              <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CREDIT"))} value="CREDIT">📒 Credit Sale (Khata)</option>
             </select>
           </div>
 
@@ -2145,33 +1823,15 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                           {/* Direct Status Changer Dropdown */}
                           <select
                             value={order.status}
-                            onChange={(e) => {
-                              const newSt = e.target.value as OrderStatus;
-                              if (posSession.enabled) {
-                                const backendId =
-                                  (order as any)._posOrder?.id ||
-                                  Number(order.id.replace(/\D/g, "")) ||
-                                  order.id;
-                                const backendVersion = (order as any)._posOrder?.version || 1;
-                                const statusMap: Record<string, string> = {
-                                  CONFIRMED: "ACCEPTED",
-                                  PROCESSING: "PREPARING",
-                                  READY: "READY",
-                                  COMPLETED: "COMPLETED",
-                                  CANCELLED: "CANCELLED",
-                                };
-                                void posCommand.run(`${backendId}/transition/`, {
-                                  version: backendVersion,
-                                  status: statusMap[newSt] || newSt,
-                                });
-                              }
-                              updateOrderStatus(order.id, newSt);
-                              addToast({
-                                title: "Status Updated",
-                                description: `Order #${order.orderNumber} changed to ${e.target.value}`,
-                                type: "info",
-                              });
+                            onChange={async (e) => {
+                              const source = backendOrder(order); if (!source) return;
+                              const status = ({ CONFIRMED: 'ACCEPTED', PROCESSING: 'PREPARING' } as Record<string,string>)[e.target.value] || e.target.value;
+                              const reason = status === 'CANCELLED' ? window.prompt('Reason for cancellation') : '';
+                              if (status === 'CANCELLED' && !reason?.trim()) return;
+                              const result = await posCommand.run(`${source.id}/transition/`, { version: source.version, status, reason });
+                              if (result) addToast({ title: 'Status updated', description: result.order_number, type: 'success' });
                             }}
+                            disabled={posCommand.busy || posCommand.hasPending}
                             className="h-7 px-1.5 text-[11px] font-bold bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
                           >
                             <option value="CONFIRMED">Confirmed</option>
@@ -2190,11 +1850,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                                   onOpenBillingForOrder(order);
                                 } else {
                                   markOrderBilled(order.id, order.paymentMethod);
-                                  addToast({
-                                    title: "Order Billed & Settled",
-                                    description: `Order #${order.orderNumber} marked as settled (${formatNPR(order.totalAmount)})`,
-                                    type: "success",
-                                  });
+
                                 }
                               }}
                               className={`px-2.5 py-1 text-xs font-bold border flex items-center gap-1 cursor-pointer transition-colors ${
@@ -2377,25 +2033,8 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                         {selectedOrderForDrawer.status !== "COMPLETED" && selectedOrderForDrawer.status !== "CANCELLED" && (
                           <button
                             type="button"
-                            onClick={() => {
-                              const res = removeItemFromRunningOrder(selectedOrderForDrawer.id, it.productId);
-                              if (res.success) {
-                                addToast({
-                                  title: "Item Removed",
-                                  description: res.message,
-                                  type: "success",
-                                });
-                                // Keep drawer in sync
-                                const updated = orders.find((o) => o.id === selectedOrderForDrawer.id);
-                                if (updated) setSelectedOrderForDrawer(updated);
-                              } else {
-                                addToast({
-                                  title: "Removal Blocked",
-                                  description: res.message,
-                                  type: "error",
-                                });
-                              }
-                            }}
+                            onClick={() => void handleRemoveItemFromRunningOrder(selectedOrderForDrawer.id, it.id)}
+                            disabled={posCommand.busy || posCommand.hasPending}
                             className={`p-1 transition-colors cursor-pointer ${
                               isDirect
                                 ? "text-zinc-400 hover:text-rose-500"
@@ -2536,27 +2175,27 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
         >
           <div className="p-4 bg-white text-black font-mono text-xs space-y-3 border border-zinc-300 max-w-sm mx-auto shadow-lg">
             <div className="text-center space-y-0.5 border-b border-dashed border-zinc-400 pb-3">
-              <h3 className="font-black text-base uppercase tracking-widest">CRUNCHY FOODS</h3>
+              <h3 className="font-black text-base uppercase tracking-widest">{receipt?.snapshot.seller.name || ""}</h3>
               <p className="text-[10px] text-zinc-600">{currentOutlet.name}</p>
-              <p className="text-[10px] text-zinc-600">Kathmandu, Nepal • PAN: 609823145</p>
+              <p className="text-[10px] text-zinc-600">{receipt?.snapshot.seller.address} {receipt?.snapshot.seller.pan ? `• PAN: ${receipt.snapshot.seller.pan}` : ""}</p>
               <div className="mt-2 py-1 bg-black text-white font-black text-xl tracking-widest">
-                {printSlipOrder.kioskToken || printSlipOrder.orderNumber}
+                {receipt?.number || receiptPreview!.kioskToken || receiptPreview!.orderNumber}
               </div>
             </div>
 
             <div className="flex justify-between text-[11px] border-b border-zinc-300 pb-2">
-              <span>Order: #{printSlipOrder.orderNumber}</span>
-              <span>{printSlipOrder.createdAt.split("T")[0]}</span>
+              <span>Order: #{receiptPreview!.orderNumber}</span>
+              <span>{receiptPreview!.createdAt.split("T")[0]}</span>
             </div>
 
             <div className="text-[11px] space-y-0.5">
-              <p>Customer: {printSlipOrder.customerName}</p>
-              <p>Type: {printSlipOrder.fulfillmentType} {printSlipOrder.tableNumber ? `(${printSlipOrder.tableNumber})` : ""}</p>
-              {printSlipOrder.customerPhone && <p>Phone: {printSlipOrder.customerPhone}</p>}
+              <p>Customer: {receiptPreview!.customerName}</p>
+              <p>Type: {receiptPreview!.fulfillmentType} {receiptPreview!.tableNumber ? `(${receiptPreview!.tableNumber})` : ""}</p>
+              {receiptPreview!.customerPhone && <p>Phone: {receiptPreview!.customerPhone}</p>}
             </div>
 
             <div className="border-t border-b border-dashed border-zinc-400 py-2 space-y-1">
-              {printSlipOrder.items.map((it, idx) => (
+              {receiptPreview!.items.map((it, idx) => (
                 <div key={idx} className="flex justify-between text-[11px]">
                   <span>{it.quantity}x {it.productName}</span>
                   <span>{formatNPR(it.lineTotal)}</span>
@@ -2567,17 +2206,17 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
             <div className="space-y-1 pt-1 text-[11px]">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
-                <span>{formatNPR(printSlipOrder.subtotal)}</span>
+                <span>{formatNPR(receiptPreview!.subtotal)}</span>
               </div>
-              {printSlipOrder.discountAmount ? (
+              {receiptPreview!.discountAmount ? (
                 <div className="flex justify-between text-zinc-600">
                   <span>Discount:</span>
-                  <span>-{formatNPR(printSlipOrder.discountAmount)}</span>
+                  <span>-{formatNPR(receiptPreview!.discountAmount)}</span>
                 </div>
               ) : null}
               <div className="flex justify-between font-black text-sm pt-1 border-t border-black">
                 <span>TOTAL:</span>
-                <span>{formatNPR(printSlipOrder.totalAmount)}</span>
+                <span>{formatNPR(receiptPreview!.totalAmount)}</span>
               </div>
             </div>
 
@@ -2590,25 +2229,11 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
               <button
                 type="button"
                 onClick={async () => {
-                  const backendReceipt =
-                    (printSlipOrder as any)._posOrder?.receipts?.find((r: any) => r.kind === "TOKEN") ||
-                    (printSlipOrder as any)._posOrder?.receipts?.[0];
-                  if (posSession.enabled && backendReceipt?.id) {
-                    try {
-                      await printPosReceipt(posSession.outlet, backendReceipt.id);
-                    } catch {
-                      window.print?.();
-                    }
-                  } else {
-                    window.print?.();
-                  }
-                  addToast({
-                    title: "Slip Sent to Thermal Printer",
-                    description: `Token ${printSlipOrder.kioskToken || printSlipOrder.orderNumber} queued.`,
-                    type: "success",
-                  });
-                  setPrintSlipOrder(null);
+                  if (!receipt) return;
+                  try { await printPosReceipt(posSession.outlet, [...backendOrder(printSlipOrder)!.receipts].reverse().find(r => r.kind === 'TOKEN')!.id); }
+                  catch(e) { addToast({ title: 'Print failed', description: posError(e), type: 'error' }); }
                 }}
+                disabled={!receipt}
                 className="w-full py-2 bg-black text-white font-bold text-xs uppercase tracking-wider cursor-pointer"
               >
                 Print Slip

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Flame,
   Clock,
@@ -20,8 +20,9 @@ import {
   Bell,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
-import { KdsColumn, FulfillmentType } from "../../types";
-import { usePosSession, usePosCommand } from "../../lib/posApi";
+import { KdsColumn, KdsTicket, FulfillmentType } from "../../types";
+import { usePosSession, usePosCommand, posOrderToOrder } from "../../lib/posApi";
+import { usePosOrderFeed } from "../../lib/posWorkspace";
 import { formatTimer } from "../../lib/utils";
 import { SkeletonTicketGrid } from "../common/Skeleton";
 
@@ -70,19 +71,35 @@ const playKitchenChime = (type: "advance" | "complete" | "toggle") => {
 
 export const KDSPortal: React.FC = () => {
   const {
-    kdsTickets,
-    bumpKdsTicket,
     kdsSoundEnabled,
     setKdsSoundEnabled,
     currentOutlet,
-    orders,
     addToast,
     isLoadingSkeleton,
-    triggerKitchenCall,
   } = useApp();
 
   const posSession = usePosSession();
   const posCommand = usePosCommand(posSession);
+  const feed = usePosOrderFeed(posSession, { kitchen: true });
+  const orders = useMemo(() => feed.results.map(o => posOrderToOrder(o,currentOutlet.name)), [feed.results,currentOutlet.name]);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()),1000); return () => clearInterval(timer); }, []);
+  const kdsTickets: (KdsTicket & { orderNotes: string })[] = feed.results.map(source => {
+    const order = posOrderToOrder(source,currentOutlet.name);
+    return { id: String(source.id), orderNumber: order.orderNumber, station: '', fulfillmentType: order.fulfillmentType,
+      column: source.status === 'READY' ? 'READY' : source.status === 'PREPARING' ? 'PREPARING' : 'QUEUED',
+      items: source.items.filter(i => !i.is_voided && i.requires_kitchen).flatMap(item => item.combo_components?.length
+        ? item.combo_components.filter(c => c.requires_kitchen).map((component,index) => ({ id: `${item.id}-${index}`, productName: component.product_name, variantName: component.variant_name, quantity: component.quantity * item.quantity, modifiers: component.modifiers.map(m => m.name) }))
+        : [{ id: String(item.id), productName: item.product_name, variantName: item.variant_name, quantity: item.quantity, modifiers: [...item.modifiers.map(m => m.name), ...(item.item_notes ? [item.item_notes] : [])] }]),
+      elapsedSeconds: Math.max(0,Math.floor((now-Date.parse(source.created_at))/1000)), customerName: order.customerName, tableNumber: order.tableNumber,
+      kioskToken: order.kioskToken, roundNumber: order.roundsCount, isAddOnRound: (order.roundsCount || 1) > 1, orderNotes: source.notes };
+  });
+  useEffect(() => { const error = feed.error || posSession.error || posCommand.error; if (error) addToast({ title: 'Kitchen request failed', description: error, type: 'error' }); }, [feed.error,posSession.error,posCommand.error]);
+  const triggerKitchenCall = async (info: { orderNumber: string; [key: string]: unknown }) => {
+    const order = feed.results.find(o => o.order_number === info.orderNumber);
+    if (order) await posCommand.run(`${order.id}/call/`, { version: order.version });
+  };
+
 
   // Queue stage filter for mobile (All, Incoming, In Prep, Ready)
   const [activeStage, setActiveStage] = useState<KdsColumn | "ALL">("ALL");
@@ -124,38 +141,11 @@ export const KDSPortal: React.FC = () => {
     });
   };
 
-  const handleBump = (ticketId: string, currentColumn: KdsColumn) => {
-    if (kdsSoundEnabled) {
-      if (currentColumn === "READY") {
-        playKitchenChime("complete");
-      } else {
-        playKitchenChime("advance");
-      }
-    }
-    const ticket = kdsTickets.find((t) => t.id === ticketId);
-    if (posSession.enabled && ticket) {
-      const relatedOrder = orders.find((o) => o.orderNumber === ticket.orderNumber);
-      const backendId =
-        (relatedOrder as any)?._posOrder?.id ||
-        Number(relatedOrder?.id.replace(/\D/g, "")) ||
-        relatedOrder?.id;
-      const backendVersion = (relatedOrder as any)?._posOrder?.version || 1;
-      let nextStatus = "PREPARING";
-      if (currentColumn === "QUEUED") {
-        nextStatus = "PREPARING";
-      } else if (currentColumn === "PREPARING") {
-        nextStatus = "READY";
-      } else if (currentColumn === "READY") {
-        nextStatus = ticket.fulfillmentType === "DELIVERY" ? "OUT_FOR_DELIVERY" : "COMPLETED";
-      }
-      if (backendId) {
-        void posCommand.run(`${backendId}/transition/`, {
-          version: backendVersion,
-          status: nextStatus,
-        });
-      }
-    }
-    bumpKdsTicket(ticketId);
+  const handleBump = async (ticketId: string, currentColumn: KdsColumn) => {
+    const order = feed.results.find(o => String(o.id) === ticketId); if (!order) return;
+    const status = currentColumn === 'QUEUED' ? (order.status === 'PENDING' ? 'ACCEPTED' : 'PREPARING') : currentColumn === 'PREPARING' ? 'READY' : order.fulfillment_type === 'DELIVERY' ? 'OUT_FOR_DELIVERY' : 'COMPLETED';
+    const result = await posCommand.run(`${order.id}/transition/`, { version: order.version, status });
+    if (result && kdsSoundEnabled) playKitchenChime(currentColumn === 'READY' ? 'complete' : 'advance');
   };
 
   // Filter tickets based on stage, fulfillment, and search
@@ -231,6 +221,7 @@ export const KDSPortal: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#09090B] text-zinc-100 flex flex-col font-sans pb-16">
+      {posCommand.hasPending && <button className="px-2.5 py-1 text-xs font-bold bg-amber-500 text-black" disabled={posCommand.busy} onClick={() => posCommand.recover()}>Recover pending kitchen action</button>}
       {/* -------------------------------------------------------------
           TOP BAR: Mobile-Optimized, Clutter-Free
       ------------------------------------------------------------- */}

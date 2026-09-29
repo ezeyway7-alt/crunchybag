@@ -24,7 +24,9 @@ import {
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Order, PaymentMethod, SplitPaymentEntry } from "../../types";
-import { usePosSession, usePosCommand, usePosOrders, posOrderToOrder, printPosReceipt } from "../../lib/posApi";
+import { usePosSession, usePosCommand, posOrderToOrder, printPosReceipt, backendOrder, todayNepal, toPosMethod, fromPosMethod, posError } from "../../lib/posApi";
+import { usePosOrderFeed, usePosQuote, usePosReceipt } from "../../lib/posWorkspace";
+import { posStatistics } from "../../lib/posLegacy";
 import { formatNPR, formatTimer } from "../../lib/utils";
 import { Modal } from "../common/Modal";
 
@@ -34,27 +36,20 @@ interface Props {
 
 export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   const {
-    orders,
     currentOutlet,
-    settleSplitPaymentOrder,
-    lookupLoyaltyByPhone,
-    orgSettings,
     addToast,
   } = useApp();
 
   // Backend POS session for real-time order data and settlement
   const posSession = usePosSession();
   const posCommand = usePosCommand(posSession);
-  // Fetch all backend orders (today, all statuses for billing view)
-  const backendOrdersQuery = usePosOrders(posSession, { page_size: 100 });
-  const backendOrders = useMemo<Order[]>(() => {
-    if (!backendOrdersQuery.data?.results?.length) return [];
-    return backendOrdersQuery.data.results.map((po) => posOrderToOrder(po, currentOutlet.name));
-  }, [backendOrdersQuery.data, currentOutlet.name]);
-  // Prefer backend orders; fall back to local when offline
-  const allOrders = useMemo(() =>
-    backendOrders.length > 0 ? backendOrders : orders,
-  [backendOrders, orders]);
+  const backendOrdersQuery = usePosOrderFeed(posSession);
+  const allOrders = useMemo(() => backendOrdersQuery.results.map(po => posOrderToOrder(po,currentOutlet.name)), [backendOrdersQuery.results,currentOutlet.name]);
+  const orders = allOrders;
+  useEffect(() => {
+    const error = posSession.error || posCommand.error || backendOrdersQuery.error;
+    if (error) addToast({ title: 'Billing request failed', description: error, type: 'error' });
+  }, [posSession.error,posCommand.error,backendOrdersQuery.error]);
 
   // Selected Order for Billing Workbench
   const [selectedOrderId, setSelectedOrderId] = useState<string>(
@@ -83,13 +78,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
 
   // Datatable Search, Filter, Date Range & Pagination
-  const getTodayStr = () => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
+  const getTodayStr = todayNepal;
 
   const [startDate, setStartDate] = useState<string>(() => getTodayStr());
   const [endDate, setEndDate] = useState<string>(() => getTodayStr());
@@ -124,32 +113,15 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
     return firstUnsettled || allOrders[0] || null;
   }, [allOrders, selectedOrderId]);
 
-  // Synchronize initial splits and customer info when target order changes
+  // Only a real order/version change resets settlement fields; context rerenders do not.
   useEffect(() => {
-    if (activeOrder) {
-      const remainingTotal = Math.max(
-        0,
-        activeOrder.totalAmount - (activeOrder.discountAmount || 0)
-      );
-      setDiscountAmount(activeOrder.discountAmount || 0);
-      setDiscountReason(activeOrder.discountReason || "");
-      setCustomerName(activeOrder.customerName || "");
-      setCustomerPhone(activeOrder.customerPhone || "");
-
-      if (activeOrder.splitPayments && activeOrder.splitPayments.length > 0) {
-        setSplits(activeOrder.splitPayments);
-      } else {
-        setSplits([
-          {
-            method:
-              (activeOrder.paymentMethod as PaymentMethod) || "CASH_ON_PICKUP",
-            amount: remainingTotal,
-          },
-        ]);
-      }
-      setCashTendered("");
-    }
-  }, [activeOrder?.id]);
+    const order = backendOrder(activeOrder); if (!order) return;
+    setDiscountAmount(Number(order.discount_amount)); setDiscountReason(order.discount_reason || '');
+    setCustomerName(order.customer_name); setCustomerPhone(order.customer_phone);
+    setSplits([{ method: fromPosMethod(posSession.meta?.payment_methods.find(m => m !== 'CREDIT') || 'CASH'), amount: Number(order.due_amount) }]);
+    setCashTendered('');
+  }, [activeOrder?.id, backendOrder(activeOrder)?.version]);
+  useEffect(() => { setSelectedOrderId(initialSelectedOrder?.outletId === posSession.outlet ? initialSelectedOrder.id : ''); setInvoiceOrder(null); }, [posSession.outlet]);
 
   // Unsettled / Open Orders list for fast picking
   const openOrders = useMemo(() => {
@@ -164,17 +136,22 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
 
   // Customer Loyalty Check
   const effectivePhone = customerPhone || activeOrder?.customerPhone;
-  const customerLoyalty = useMemo(() => {
-    if (effectivePhone && effectivePhone.length >= 7) {
-      return lookupLoyaltyByPhone(effectivePhone);
-    }
-    return null;
-  }, [effectivePhone, lookupLoyaltyByPhone]);
-
-  // Calculations
-  const billSubtotal = activeOrder ? activeOrder.subtotal : 0;
+  const customerLoyalty: any = null;
+  const billSubtotal = activeOrder?.subtotal || 0;
   const effectiveDiscount = Number(discountAmount) || 0;
-  const netPayable = Math.max(0, billSubtotal - effectiveDiscount);
+  const backend = backendOrder(activeOrder);
+  const quote = usePosQuote(posSession, `${backend?.id}/billing-quote/`, backend && backend.status !== 'CANCELLED' && posSession.meta?.permissions.billing ? { version: backend.version, discount_amount: String(effectiveDiscount) } : null);
+  const netPayable = Number(quote.quote?.due_amount ?? backend?.due_amount ?? 0);
+  const receipt = usePosReceipt(posSession, backendOrder(invoiceOrder), 'BILL');
+  const receiptPreview = receipt?.snapshot ? posOrderToOrder(receipt.snapshot, currentOutlet.name) : invoiceOrder;
+  useEffect(() => { if (quote.error) addToast({ title: 'Check bill', description: quote.error, type: 'error' }); }, [quote.error]);
+  const cannotSettle = !backend || !quote.quote || !posSession.meta?.permissions.billing || posCommand.busy || posCommand.hasPending || Number(backend.due_amount) <= 0;
+  const previewInvoice = async (order: Order) => {
+    const source = backendOrder(order); if (!source) return;
+    if (source.receipts.some(r => r.kind === 'BILL')) { setInvoiceOrder(order); return; }
+    const result = await posCommand.run(`${source.id}/bill/`, { version: source.version });
+    if (result) setInvoiceOrder(posOrderToOrder(result,currentOutlet.name));
+  };
   const totalSplitsAllocated = Number(
     splits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0).toFixed(2)
   );
@@ -204,7 +181,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   const cashSplit = splits.find(
     (s) => s.method === "CASH_ON_PICKUP" || s.method === "CASH_ON_DELIVERY"
   );
-  const cashDue = cashSplit ? cashSplit.amount : netPayable;
+  const cashDue = splits.filter(s => ['CASH_ON_PICKUP','CASH_ON_DELIVERY'].includes(s.method)).reduce((sum,s) => sum + Number(s.amount),0);
   const changeDue =
     typeof cashTendered === "number" ? Math.max(0, cashTendered - cashDue) : 0;
 
@@ -307,68 +284,20 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
     handleUpdateSplit(index, "amount", autoBalance);
   };
 
-  // Submit Settlement (strictly validates compulsory phone for Credit Sale)
-  const handleSettleOrder = () => {
-    if (!activeOrder) return;
-
-    if (Math.abs(remainingToAllocate) > 0.05) {
-      addToast({
-        title: "Split Amount Mismatch",
-        description: `Split total (NPR ${totalSplitsAllocated}) must equal Net Payable (NPR ${netPayable}). Difference is NPR ${remainingToAllocate}.`,
-        type: "warning",
-      });
-      return;
+  const handleSettleOrder = async () => {
+    if (cannotSettle || !backend) return;
+    const tenders = splits.filter(s => s.amount > 0).map(s => ({ method: toPosMethod(s.method), amount: String(s.amount), reference: s.reference || '' }));
+    if (!tenders.length || splits.some(s => !Number.isFinite(s.amount) || s.amount < 0) || totalSplitsAllocated > netPayable + 0.001) {
+      addToast({ title: 'Check payment amounts', description: 'Enter positive payments no greater than the remaining balance.', type: 'warning' }); return;
     }
-
-    // Compulsory customer phone validation for Credit Sale
-    if (hasCreditSplit) {
-      const cleanPhone = (customerPhone || "").trim();
-      if (!cleanPhone || cleanPhone.length < 7) {
-        addToast({
-          title: "Customer Phone Number Compulsory",
-          description: "Customer mobile number is strictly compulsory for Credit Sale / Khata records. Please enter at least 7 digits in the customer mobile field.",
-          type: "warning",
-        });
-        return;
-      }
+    if (hasCreditSplit && (!customerName.trim() || customerName.trim() === 'Walk-in Guest' || customerPhone.trim().length < 7)) {
+      addToast({ title: 'Customer required for Khata', description: 'Enter the customer name and phone.', type: 'warning' }); return;
     }
-
-    if (posSession.enabled) {
-      const backendId =
-        (activeOrder as any)._posOrder?.id ||
-        Number(activeOrder.id.replace(/\D/g, "")) ||
-        activeOrder.id;
-      const backendVersion = (activeOrder as any)._posOrder?.version || 1;
-      const tenderRows = splits.map((s) => ({
-        method: s.method === "CASH_ON_PICKUP" ? "CASH" : s.method,
-        amount: String(s.amount),
-        reference: "",
-      }));
-      void posCommand.run(`${backendId}/settle/`, {
-        version: backendVersion,
-        tenders: tenderRows,
-        customer_name: customerName.trim() || activeOrder.customerName,
-        customer_phone: customerPhone.trim() || activeOrder.customerPhone,
-        discount_amount: String(effectiveDiscount || 0),
-        discount_reason: discountReason || "",
-      });
-      void posCommand.run(`${backendId}/bill/`, { version: backendVersion });
-    }
-
-    const settled = settleSplitPaymentOrder(
-      activeOrder.id,
-      splits,
-      effectiveDiscount,
-      discountReason,
-      {
-        customerName: customerName.trim() || activeOrder.customerName,
-        customerPhone: customerPhone.trim() || activeOrder.customerPhone,
-      }
-    );
-
-    if (settled) {
-      setInvoiceOrder(settled);
-    }
+    if (cashTendered !== '' && cashTendered < cashDue) { addToast({ title: 'Insufficient cash received', type: 'warning' }); return; }
+    const result = await posCommand.run(`${backend.id}/settle/`, { version: backend.version, tenders,
+      discount_amount: String(effectiveDiscount), discount_reason: discountReason,
+      customer_name: customerName.trim(), customer_phone: customerPhone.trim() });
+    if (result) { setInvoiceOrder(posOrderToOrder(result,currentOutlet.name)); addToast({ title: 'Payment recorded', description: `Remaining due: ${formatNPR(Number(result.due_amount))}`, type: 'success' }); }
   };
 
   // -------------------------------------------------------------
@@ -380,11 +309,11 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
 
       // Date Range Filter (Default: today)
       if (startDate) {
-        const orderDate = (o.createdAt || "").slice(0, 10);
+        const orderDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kathmandu", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(o.createdAt));
         if (orderDate && orderDate < startDate) return false;
       }
       if (endDate) {
-        const orderDate = (o.createdAt || "").slice(0, 10);
+        const orderDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kathmandu", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(o.createdAt));
         if (orderDate && orderDate > endDate) return false;
       }
 
@@ -470,102 +399,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   // -------------------------------------------------------------
   // DATATABLE AGGREGATED STATISTICS
   // -------------------------------------------------------------
-  const datatableStats = useMemo(() => {
-    let grossSubtotal = 0;
-    let totalDiscounts = 0;
-    let netFinal = 0;
-    let totalPaid = 0;
-    let totalUnpaid = 0;
-
-    let cashTotal = 0;
-    let qrFonepayTotal = 0;
-    let esewaTotal = 0;
-    let cardTotal = 0;
-    let creditTotal = 0;
-    let creditCount = 0;
-    let refundVoidTotal = 0;
-
-    filteredBills.forEach((o) => {
-      const isCancelledOrVoid =
-        o.status === "CANCELLED" || o.refundStatus === "REFUNDED" || o.refundStatus === "VOIDED";
-
-      const sub = o.subtotal || o.totalAmount || 0;
-      const disc = o.discountAmount || 0;
-      const net = o.totalAmount;
-
-      if (isCancelledOrVoid) {
-        refundVoidTotal += o.refundAmount || o.totalAmount || 0;
-      } else {
-        grossSubtotal += sub;
-        totalDiscounts += disc;
-        netFinal += net;
-
-        const isCredit =
-          o.paymentMethod === "CREDIT" ||
-          Boolean(
-            o.splitPayments &&
-              o.splitPayments.some((s) => s.method === "CREDIT" && s.amount > 0)
-          );
-
-        if (isCredit) {
-          const creditPart =
-            o.splitPayments?.find((s) => s.method === "CREDIT")?.amount ??
-            (o.paymentMethod === "CREDIT" ? net : 0);
-          creditTotal += creditPart;
-          creditCount += 1;
-        }
-
-        const isPaid = o.paymentStatus === "PAID" || o.isBilled;
-        if (isPaid) {
-          totalPaid += net;
-        } else {
-          totalUnpaid += net;
-        }
-
-        if (o.splitPayments && o.splitPayments.length > 0) {
-          o.splitPayments.forEach((sp) => {
-            if (sp.method === "CASH_ON_PICKUP" || sp.method === "CASH_ON_DELIVERY") {
-              cashTotal += sp.amount;
-            } else if (sp.method === "FONEPAY_QR") {
-              qrFonepayTotal += sp.amount;
-            } else if (sp.method === "ESEWA") {
-              esewaTotal += sp.amount;
-            } else if (sp.method === "CARD") {
-              cardTotal += sp.amount;
-            }
-          });
-        } else {
-          if (o.paymentMethod === "CASH_ON_PICKUP" || o.paymentMethod === "CASH_ON_DELIVERY") {
-            cashTotal += net;
-          } else if (o.paymentMethod === "FONEPAY_QR") {
-            qrFonepayTotal += net;
-          } else if (o.paymentMethod === "ESEWA") {
-            esewaTotal += net;
-          } else if (o.paymentMethod === "CARD") {
-            cardTotal += net;
-          } else if (o.paymentMethod !== "CREDIT") {
-            cashTotal += net;
-          }
-        }
-      }
-    });
-
-    return {
-      orderCount: filteredBills.length,
-      grossSubtotal,
-      totalDiscounts,
-      netFinal,
-      totalPaid,
-      totalUnpaid,
-      cashTotal,
-      qrFonepayTotal,
-      esewaTotal,
-      cardTotal,
-      creditTotal,
-      creditCount,
-      refundVoidTotal,
-    };
-  }, [filteredBills]);
+  const datatableStats = useMemo(() => posStatistics(filteredBills), [filteredBills]);
 
   const totalPages = Math.max(1, Math.ceil(filteredBills.length / pageSize));
   const paginatedBills = useMemo(() => {
@@ -575,6 +409,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
 
   return (
     <div className="space-y-2.5 text-xs">
+      {posCommand.hasPending && <button type="button" className="px-2.5 py-1 text-xs font-bold bg-amber-500 text-black border border-amber-500" disabled={posCommand.busy} onClick={async () => { const result = await posCommand.recover(); if (result?.order_number) setInvoiceOrder(posOrderToOrder(result,currentOutlet.name)); }}>Recover pending payment action</button>}
       {/* -------------------------------------------------------------
           ACTIVE SETTLEMENT WORKBENCH (CLEAN, FOCUSED)
       ------------------------------------------------------------- */}
@@ -823,9 +658,9 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
                   </div>
                 )}
                 <div className="flex justify-between text-zinc-500 text-[10px]">
-                  <span>13% VAT (Included):</span>
+                  <span>VAT (Included):</span>
                   <span className="font-mono">
-                    {formatNPR(Math.round(netPayable * 0.13))}
+                    {formatNPR(Number(quote.quote?.vat_included_amount ?? backend?.vat_included_amount ?? 0))}
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-1 border-t border-zinc-800 text-xs font-black">
@@ -883,6 +718,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
                         {/* Method Selector (Flexible, cleanly aligned) */}
                         <div className="flex-1 min-w-[125px]">
                           <select
+                            aria-label="Payment method"
                             value={s.method}
                             onChange={(e) =>
                               handleUpdateSplit(
@@ -897,11 +733,11 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
                                 : "bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-amber-500"
                             }`}
                           >
-                            <option value="CASH_ON_PICKUP">Cash</option>
-                            <option value="FONEPAY_QR">FonePay QR</option>
-                            <option value="ESEWA">eSewa</option>
-                            <option value="CARD">POS Card</option>
-                            <option value="CREDIT">Credit (Khata)</option>
+                            <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CASH_ON_PICKUP"))} value="CASH_ON_PICKUP">Cash</option>
+                            <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("FONEPAY_QR"))} value="FONEPAY_QR">FonePay QR</option>
+                            <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("ESEWA"))} value="ESEWA">eSewa</option>
+                            <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CARD"))} value="CARD">POS Card</option>
+                            <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CREDIT"))} value="CREDIT">Credit (Khata)</option>
                           </select>
                         </div>
 
@@ -911,6 +747,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
                             type="number"
                             min={0}
                             step="any"
+                            aria-label="Amount applied"
                             value={s.amount}
                             onChange={(e) =>
                               handleUpdateSplit(
@@ -977,6 +814,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
                     </span>
                     <input
                       type="number"
+                      aria-label="Cash received"
                       value={cashTendered}
                       onChange={(e) =>
                         setCashTendered(
@@ -1001,6 +839,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
                 <button
                   type="button"
                   onClick={handleSettleOrder}
+                  disabled={cannotSettle}
                   className={`w-full h-9 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-colors ${
                     hasCreditSplit && !isCustomerPhoneValidForCredit
                       ? "bg-rose-600 hover:bg-rose-500 text-white"
@@ -1108,7 +947,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
               <option value="ALL">All Bills</option>
               <option value="PAID">Paid / Settled</option>
               <option value="UNPAID">Unsettled / Open</option>
-              <option value="CREDIT">Credit Sale (Khata)</option>
+              <option disabled={!posSession.meta?.payment_methods.includes(toPosMethod("CREDIT"))} value="CREDIT">Credit Sale (Khata)</option>
             </select>
           </div>
 
@@ -1512,7 +1351,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
 
                           <button
                             type="button"
-                            onClick={() => setInvoiceOrder(ord)}
+                            onClick={() => void previewInvoice(ord)}
                             className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-300 dark:border-zinc-700 cursor-pointer"
                             title="Print Tax Invoice"
                           >
@@ -1606,37 +1445,37 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
           <div className="p-4 bg-white text-black font-mono text-xs space-y-3 border border-zinc-400 max-w-sm mx-auto shadow-xl">
             <div className="text-center space-y-0.5 border-b border-black pb-2">
               <h3 className="font-black text-sm uppercase">
-                {orgSettings.legalEntity}
+                {receipt?.snapshot.seller.name || ""}
               </h3>
               <p className="text-[10px]">
-                {orgSettings.brandName} • {currentOutlet.name}
+                {receipt?.snapshot.seller.outlet || ""} • {currentOutlet.name}
               </p>
-              <p className="text-[10px]">PAN/VAT: {orgSettings.panNumber}</p>
-              <p className="text-[10px]">{currentOutlet.address}</p>
+              <p className="text-[10px]">PAN/VAT: {receipt?.snapshot.seller.pan || ""}</p>
+              <p className="text-[10px]">{receipt?.snapshot.seller.address || ""}</p>
               <div className="mt-1 font-bold text-xs uppercase bg-black text-white py-0.5">
                 TAX INVOICE
               </div>
             </div>
 
             <div className="flex justify-between text-[11px]">
-              <span>Inv: #{invoiceOrder.orderNumber}</span>
-              <span>{invoiceOrder.createdAt.split("T")[0]}</span>
+              <span>Inv: #{receipt?.number || receiptPreview!.orderNumber}</span>
+              <span>{receiptPreview!.createdAt.split("T")[0]}</span>
             </div>
             <div className="text-[11px]">
-              <p>Buyer: {invoiceOrder.customerName}</p>
-              {invoiceOrder.customerPhone && (
-                <p>Contact: {invoiceOrder.customerPhone}</p>
+              <p>Buyer: {receiptPreview!.customerName}</p>
+              {receiptPreview!.customerPhone && (
+                <p>Contact: {receiptPreview!.customerPhone}</p>
               )}
               <p>
-                Type: {invoiceOrder.fulfillmentType}{" "}
-                {invoiceOrder.tableNumber
-                  ? `(${invoiceOrder.tableNumber})`
+                Type: {receiptPreview!.fulfillmentType}{" "}
+                {receiptPreview!.tableNumber
+                  ? `(${receiptPreview!.tableNumber})`
                   : ""}
               </p>
             </div>
 
             <div className="border-t border-b border-dashed border-black py-2 space-y-1 text-[11px]">
-              {invoiceOrder.items.map((it, idx) => (
+              {receiptPreview!.items.map((it, idx) => (
                 <div key={idx} className="flex justify-between">
                   <span>
                     {it.quantity}x {it.productName}
@@ -1649,40 +1488,39 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
             <div className="space-y-1 text-[11px]">
               <div className="flex justify-between">
                 <span>Gross Subtotal:</span>
-                <span>{formatNPR(invoiceOrder.subtotal)}</span>
+                <span>{formatNPR(receiptPreview!.subtotal)}</span>
               </div>
-              {invoiceOrder.discountAmount ? (
+              {receiptPreview!.discountAmount ? (
                 <div className="flex justify-between text-zinc-700">
                   <span>
-                    Discount ({invoiceOrder.discountReason || "Promo"}):
+                    Discount ({receiptPreview!.discountReason || "Promo"}):
                   </span>
-                  <span>-{formatNPR(invoiceOrder.discountAmount)}</span>
+                  <span>-{formatNPR(receiptPreview!.discountAmount)}</span>
                 </div>
               ) : null}
               <div className="flex justify-between text-[10px] text-zinc-600">
-                <span>13% VAT (Included):</span>
+                <span>VAT (Included):</span>
                 <span>
                   {formatNPR(
-                    invoiceOrder.vatIncludedAmount ||
-                      Math.round(invoiceOrder.totalAmount * 0.13)
+                    receiptPreview!.vatIncludedAmount
                   )}
                 </span>
               </div>
               {(() => {
                 const creditAmt =
-                  invoiceOrder.splitPayments
+                  receiptPreview!.splitPayments
                     ?.filter((sp) => sp.method === "CREDIT")
                     .reduce((sum, sp) => sum + sp.amount, 0) ||
-                  (invoiceOrder.paymentMethod === "CREDIT"
-                    ? invoiceOrder.totalAmount
+                  (receiptPreview!.paymentMethod === "CREDIT"
+                    ? receiptPreview!.totalAmount
                     : 0);
-                const paidAmt = Math.max(0, invoiceOrder.totalAmount - creditAmt);
+                const paidAmt = Number(backendOrder(invoiceOrder)?.paid_amount || 0);
 
                 return (
                   <>
                     <div className="flex justify-between font-black text-sm pt-1 border-t border-black">
                       <span>NET BILL TOTAL:</span>
-                      <span>{formatNPR(invoiceOrder.totalAmount)}</span>
+                      <span>{formatNPR(receiptPreview!.totalAmount)}</span>
                     </div>
 
                     {creditAmt > 0 && (
@@ -1707,18 +1545,18 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
             <div className="text-[10px] text-zinc-600 pt-1 border-t border-dashed border-zinc-400">
               <p>
                 Payment:{" "}
-                {invoiceOrder.splitPayments &&
-                invoiceOrder.splitPayments.length > 1
-                  ? invoiceOrder.splitPayments
+                {receiptPreview!.splitPayments &&
+                receiptPreview!.splitPayments.length > 1
+                  ? receiptPreview!.splitPayments
                       .map((sp) => `${sp.method === "CREDIT" ? "Credit (Khata)" : sp.method ? sp.method.replace(/_/g, " ") : "Direct"} (${formatNPR(sp.amount)})`)
                       .join(", ")
-                  : invoiceOrder.paymentMethod === "CREDIT"
+                  : receiptPreview!.paymentMethod === "CREDIT"
                   ? "Credit Sale (Khata)"
-                  : invoiceOrder.paymentMethod ? invoiceOrder.paymentMethod.replace(/_/g, " ") : "Direct"}
+                  : receiptPreview!.paymentMethod ? receiptPreview!.paymentMethod.replace(/_/g, " ") : "Direct"}
               </p>
-              <p>Token: {invoiceOrder.kioskToken || invoiceOrder.orderNumber}</p>
-              {invoiceOrder.customerPhone && (
-                <p>Khata Customer Mobile: {invoiceOrder.customerPhone}</p>
+              <p>Token: {receiptPreview!.kioskToken || receiptPreview!.orderNumber}</p>
+              {receiptPreview!.customerPhone && (
+                <p>Khata Customer Mobile: {receiptPreview!.customerPhone}</p>
               )}
             </div>
 
@@ -1731,21 +1569,12 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
               <button
                 type="button"
                 onClick={async () => {
-                  const backendReceipt =
-                    (invoiceOrder as any)._posOrder?.receipts?.find(
-                      (r: any) => r.kind === "BILL"
-                    ) || (invoiceOrder as any)._posOrder?.receipts?.[0];
-                  if (posSession.enabled && backendReceipt?.id) {
-                    try {
-                      await printPosReceipt(posSession.outlet, backendReceipt.id);
-                    } catch {
-                      window.print?.();
-                    }
-                  } else {
-                    window.print?.();
-                  }
-                  setInvoiceOrder(null);
+                  const saved = [...(backendOrder(invoiceOrder)?.receipts || [])].reverse().find(r => r.kind === 'BILL');
+                  if (!saved || !receipt) return;
+                  try { await printPosReceipt(posSession.outlet, saved.id); }
+                  catch(e) { addToast({ title: 'Print failed', description: posError(e), type: 'error' }); }
                 }}
+                disabled={!receipt}
                 className="w-full py-2 bg-black text-white font-bold text-xs uppercase tracking-wider cursor-pointer"
               >
                 Print Invoice

@@ -63,6 +63,8 @@ export interface ComboPackageModalProps {
     }[];
   }) => void;
   addLabel?: string;
+  productsOverride?: Product[];
+  channelOverride?: string;
 }
 
 export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
@@ -71,8 +73,11 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
   onClose,
   onAddToCartCustom,
   addLabel,
+  productsOverride,
+  channelOverride,
 }) => {
-  const { products, addCustomComboToCart, currentOutlet, activePortal, isTableOrderMode, addToast } = useApp();
+  const { products: contextProducts, addCustomComboToCart, currentOutlet, activePortal, isTableOrderMode, addToast } = useApp();
+  const products = productsOverride || contextProducts;
   const [isQuoting, setIsQuoting] = useState(false);
 
   // Selected items in the combo
@@ -331,7 +336,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
     try {
       const channel = activePortal === "kiosk" ? "kiosk" : activePortal === "staff" || activePortal === "admin" ? "pos" : isTableOrderMode ? "qr" : "web";
       const quoted = await apiClient.post<any>(catalogPath('quote/', currentOutlet.id), {
-        channel, items: [{ product_id: combo.id, quantity: 1, combo_selections: selections }],
+        channel: channelOverride || channel, items: [{ product_id: combo.id, quantity: 1, combo_selections: selections }],
       });
       confirmedPrice = Number(quoted.items[0].unit_price);
     } catch {

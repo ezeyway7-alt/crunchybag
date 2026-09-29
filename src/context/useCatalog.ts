@@ -74,7 +74,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   // Real-time WebSocket connection scoped strictly to outlet ID
   useEffect(() => {
     setCategories([]); setProducts([]); setTimePricingSchedules([]);
-    let closed = false, attempts = 0;
+    let closed = false, attempts = 0, connectedAt = 0;
     let socket: WebSocket | undefined;
     let retry: ReturnType<typeof setTimeout>;
     const connect = () => {
@@ -82,13 +82,13 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
       socket = new WebSocket(menuSocket(effectiveOutletId));
       socket.onopen = () => {
         const wasReconnect = attempts > 0;
-        attempts = 0;
+        connectedAt = Date.now();
         if (wasReconnect) void reloadRef.current();
       };
       socket.onmessage = event => {
         try { if (JSON.parse(event.data).event === 'MENU_UPDATED') void reloadRef.current(); } catch { /* Ignore non-domain frames. */ }
       };
-      socket.onclose = () => { if (!closed) retry = setTimeout(connect, Math.min(30000, 1000 * 2 ** attempts++) + Math.random() * 500); };
+      socket.onclose = () => { if (Date.now() - connectedAt >= 30000) attempts = 0; if (!closed) retry = setTimeout(connect, Math.min(30000, 1000 * 2 ** attempts++) + Math.random() * 500); };
       socket.onerror = () => socket?.close();
     };
     connect();
