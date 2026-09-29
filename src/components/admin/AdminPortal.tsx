@@ -584,7 +584,7 @@ export const AdminPortal: React.FC = () => {
       {/* -------------------------------------------------------------
           MAIN CONTENT WORKSPACE (Clean, high-density, no big boxes)
       ------------------------------------------------------------- */}
-      <main className="flex-1 min-w-0 p-3 sm:p-5 space-y-4">
+      <main className={`flex-1 min-w-0 ${activeTab === "kitchen" ? "p-1.5 sm:p-2" : "p-3 sm:p-5 space-y-4"}`}>
         {isAdminTabLoading || isLoadingSkeleton ? (
           <div>
             {activeTab === "overview" && (

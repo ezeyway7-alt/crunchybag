@@ -725,9 +725,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
 
   // Orders & KDS
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
-  const [kdsTickets, setKdsTickets] = useState<KdsTicket[]>([]);
+  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [activeOrder, setActiveOrder] = useState<Order | null>(INITIAL_ORDERS[0] || null);
+  const [kdsTickets, setKdsTickets] = useState<KdsTicket[]>(INITIAL_KDS_TICKETS);
   const [kdsSoundEnabled, setKdsSoundEnabled] = useState(true);
   const [lastKitchenCall, setLastKitchenCall] = useState<{
     orderNumber: string;

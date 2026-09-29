@@ -64,7 +64,7 @@ async function setup(page: Page) {
   function saveReceipt(order: any, kind: string) {
     const id = Object.keys(state.receipts).length + 1;
     const row = { id, number: `${kind}-SAVED-${id}`, kind };
-    state.receipts[id] = { ...row, snapshot: { ...JSON.parse(JSON.stringify(order)), seller: {name:'Registered seller', outlet:'Test outlet', pan:'123456789', address:'Actual outlet address'} } };
+    state.receipts[id] = { ...row, snapshot: { ...JSON.parse(JSON.stringify(order)), seller: { name: 'Registered seller', outlet: 'Test outlet', pan: '123456789', address: 'Actual outlet address' } } };
     order.receipts.push(row);
   }
   await page.routeWebSocket("**/ws/**", (ws) => {
@@ -247,7 +247,7 @@ async function setup(page: Page) {
           ...quote(Number(result.subtotal), Number(body.discount_amount)),
           due_amount: money(
             (Number(result.subtotal) - Number(body.discount_amount)) * 1.1 -
-              Number(result.paid_amount),
+            Number(result.paid_amount),
           ),
         };
       else if (path.endsWith('/transition/')) { result.status = body.status; result.version++; }
@@ -268,12 +268,12 @@ async function setup(page: Page) {
           result,
           quote(
             Number(result.subtotal) +
-              body.items.reduce((n, i) => n + i.quantity * 200, 0),
+            body.items.reduce((n, i) => n + i.quantity * 200, 0),
           ),
         );
         result.version++;
         result.due_amount = result.total_payable;
-        saveReceipt(result,"TOKEN");
+        saveReceipt(result, "TOKEN");
       } else if (path.endsWith("/settle/")) {
         if (body.version !== result.version) {
           await route.fulfill({
@@ -299,11 +299,11 @@ async function setup(page: Page) {
             status: "SUCCESS",
           })),
         );
-        saveReceipt(result,"BILL");
+        saveReceipt(result, "BILL");
       }
     } else if (path === "orders/pos/")
       result = {
-        results: url.searchParams.get("kitchen") ? state.orders.filter(o => ["PENDING","ACCEPTED","PREPARING","READY"].includes(o.status)) : state.orders,
+        results: url.searchParams.get("kitchen") ? state.orders.filter(o => ["PENDING", "ACCEPTED", "PREPARING", "READY"].includes(o.status)) : state.orders,
         count: state.orders.length,
         page: 1,
         page_size: 25,
@@ -333,83 +333,108 @@ async function setup(page: Page) {
   return state;
 }
 
-const addBurger = (page: Page) => page.getByRole('button', {name: /Test Burger/}).click();
-const fireOrder = (page: Page) => page.getByRole('button', {name: /FIRE ORDER TO KITCHEN/});
+const addBurger = (page: Page) => page.getByRole('button', { name: /Test Burger/ }).click();
+const fireOrder = (page: Page) => page.getByRole('button', { name: /FIRE ORDER TO KITCHEN/ });
 
-test('restored POS is empty without backend data and stays idle without REST polling', async ({page}) => {
+test('an unchanged cart does not repeat quotes, metadata, or socket tickets while idle', async ({ page }) => {
+  const state = await setup(page);
+  await addBurger(page);
+  await expect(fireOrder(page)).toBeEnabled();
+  await page.waitForTimeout(600);
+  await page.clock.install();
+  const before = [...state.calls];
+  const socketCount = state.sockets.length;
+  await page.clock.runFor(95000);
+  expect(state.calls).toEqual(before);
+  expect(state.sockets).toHaveLength(socketCount);
+  await expect(fireOrder(page)).toBeEnabled();
+  // The server renews authenticated POS sockets after five minutes.
+  state.sockets.at(-1).close({ code: 4001 });
+  await page.clock.runFor(3000);
+  await expect.poll(() => state.sockets.length).toBe(socketCount + 1);
+  await page.clock.runFor(1200);
+  await expect(fireOrder(page)).toBeEnabled();
+  await expect.poll(() => state.calls.filter(c => c === 'POST orders/pos/quote/').length)
+    .toBe(before.filter(c => c === 'POST orders/pos/quote/').length + 1);
+  const afterReconnect = [...state.calls];
+  await page.clock.runFor(95000);
+  expect(state.calls).toEqual(afterReconnect);
+});
+
+test('restored POS is empty without backend data and stays idle without REST polling', async ({ page }) => {
   const state = await setup(page);
   await expect(page.getByText('NPR NaN')).toHaveCount(0);
-  await page.getByRole('button', {name: /Add to Ongoing Tab/}).click();
+  await page.getByRole('button', { name: /Add to Ongoing Tab/ }).click();
   await expect(page.getByText(/No active open orders currently/)).toBeVisible();
-  await page.getByRole('button', {name: /Floor Tables/}).click();
+  await page.getByRole('button', { name: /Floor Tables/ }).click();
   await expect(page.getByText('No tables configured.')).toBeVisible();
-  await expect(page.getByText('T-01', {exact: true})).toHaveCount(0);
+  await expect(page.getByText('T-01', { exact: true })).toHaveCount(0);
   await page.waitForTimeout(600);
   await page.clock.install();
   const before = state.calls.length;
   await page.clock.runFor(95000);
   expect(state.calls.length).toBe(before);
   state.revision = 'changed';
-  state.sockets.at(-1).send(JSON.stringify({event_type: 'ORDER_CREATE', event_id: state.revision}));
+  state.sockets.at(-1).send(JSON.stringify({ event_type: 'ORDER_CREATE', event_id: state.revision }));
   await page.clock.runFor(1200);
   await expect.poll(() => state.calls.length).toBe(before + 3);
-  state.sockets.at(-1).send(JSON.stringify({event_type: 'ORDER_CREATE', event_id: state.revision}));
+  state.sockets.at(-1).send(JSON.stringify({ event_type: 'ORDER_CREATE', event_id: state.revision }));
   await page.clock.runFor(1000);
   expect(state.calls.length).toBe(before + 3);
 });
 
-test('original table cards create real orders, append rounds, and settle only the remaining balance', async ({page}) => {
+test('original table cards create real orders, append rounds, and settle only the remaining balance', async ({ page }) => {
   const state = await setup(page);
-  await page.getByRole('button', {name: /Manage Floors & Tables/}).click();
+  await page.getByRole('button', { name: /Manage Floors & Tables/ }).click();
   await page.getByLabel('Floor or group name').fill('First floor');
-  await page.getByRole('button', {name: 'Add group', exact: true}).click();
+  await page.getByRole('button', { name: 'Add group', exact: true }).click();
   await page.getByLabel('Table group').selectOption('1');
   await page.getByLabel('Table label').fill('Window A');
-  await page.getByLabel('Seats', {exact: true}).fill('6');
-  await page.getByRole('button', {name: 'Add table', exact: true}).click();
+  await page.getByLabel('Seats', { exact: true }).fill('6');
+  await page.getByRole('button', { name: 'Add table', exact: true }).click();
   await expect.poll(() => state.tables.length).toBe(1);
-  await page.getByRole('button', {name: 'Close dialog'}).click();
-  await page.getByRole('button', {name: /Floor Tables/}).click();
-  await page.getByRole('button', {name: /Window A Available 6 Seats/}).click();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
+  await page.getByRole('button', { name: /Floor Tables/ }).click();
+  await page.getByRole('button', { name: /Window A Available 6 Seats/ }).click();
   await addBurger(page);
   await expect(fireOrder(page)).toBeEnabled();
   await fireOrder(page).click();
-  await expect(page.getByRole('button', {name: 'Close dialog'})).toBeVisible();
-  expect(state.writes.find(w => w.path === 'orders/pos/').body).toMatchObject({table_id: 1, fulfillment_type: 'DINE_IN', expected_total: '220.00', items: [{product_id: 'burger', quantity: 1}]});
-  await page.getByRole('button', {name: 'Close dialog'}).click();
-  await page.getByRole('button', {name: /Add to Ongoing Tab/}).click();
+  await expect(page.getByRole('button', { name: 'Close dialog' })).toBeVisible();
+  expect(state.writes.find(w => w.path === 'orders/pos/').body).toMatchObject({ table_id: 1, fulfillment_type: 'DINE_IN', expected_total: '220.00', items: [{ product_id: 'burger', quantity: 1 }] });
+  await page.getByRole('button', { name: 'Close dialog' }).click();
+  await page.getByRole('button', { name: /Add to Ongoing Tab/ }).click();
   await addBurger(page);
-  await page.getByRole('button', {name: 'Add Round to Tab'}).click();
+  await page.getByRole('button', { name: 'Add Round to Tab' }).click();
   await expect.poll(() => state.orders[0].version).toBe(2);
-  expect(state.writes.find(w => w.path.endsWith('/append/')).body).toMatchObject({version: 1, expected_total: '440.00', items: [{product_id: 'burger'}]});
-  await page.getByRole('button', {name: /Floor Tables/}).click();
-  await page.getByRole('button', {name: 'Bill', exact: true}).first().click();
+  expect(state.writes.find(w => w.path.endsWith('/append/')).body).toMatchObject({ version: 1, expected_total: '440.00', items: [{ product_id: 'burger' }] });
+  await page.getByRole('button', { name: /Floor Tables/ }).click();
+  await page.getByRole('button', { name: 'Bill', exact: true }).first().click();
   await expect(page.getByLabel('Amount applied')).toHaveValue('440');
   await page.getByLabel('Amount applied').fill('100');
-  await page.getByRole('button', {name: 'Confirm Settlement & Print Tax Invoice', exact: true}).click();
+  await page.getByRole('button', { name: 'Confirm Settlement & Print Tax Invoice', exact: true }).click();
   await expect.poll(() => state.orders[0].paid_amount).toBe('100.00');
-  await expect(page.getByText('Registered seller', {exact:true})).toBeVisible();
+  await expect(page.getByText('Registered seller', { exact: true })).toBeVisible();
   await expect(page.getByText('PAN/VAT: 123456789')).toBeVisible();
-  await page.getByRole('button', {name: 'Close dialog'}).click();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
   await expect(page.getByLabel('Amount applied')).toHaveValue('340');
   await page.getByLabel('Amount applied').fill('140');
-  await page.getByRole('button', {name: 'Add', exact: true}).click();
-  await page.getByLabel('Payment method', {exact: true}).nth(1).selectOption('CARD');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByLabel('Payment method', { exact: true }).nth(1).selectOption('CARD');
   await expect(page.getByLabel('Amount applied').nth(1)).toHaveValue('200');
-  await page.getByRole('button', {name: 'Confirm Settlement & Print Tax Invoice', exact: true}).click();
+  await page.getByRole('button', { name: 'Confirm Settlement & Print Tax Invoice', exact: true }).click();
   await expect.poll(() => state.orders[0].paid_amount).toBe('440.00');
   const payments = state.writes.filter(w => w.path.endsWith('/settle/'));
   expect(payments).toHaveLength(2);
-  expect(payments[1].body.tenders).toEqual([{method:'CASH',amount:'140',reference:''},{method:'CARD',amount:'200',reference:''}]);
-  await page.getByRole('button', {name: 'Close dialog'}).click();
-  await expect(page.getByRole('button', {name: 'Confirm Settlement & Print Tax Invoice', exact: true})).toBeDisabled();
-  await page.screenshot({path:test.info().outputPath('original-billing.png'),fullPage:true});
+  expect(payments[1].body.tenders).toEqual([{ method: 'CASH', amount: '140', reference: '' }, { method: 'CARD', amount: '200', reference: '' }]);
+  await page.getByRole('button', { name: 'Close dialog' }).click();
+  await expect(page.getByRole('button', { name: 'Confirm Settlement & Print Tax Invoice', exact: true })).toBeDisabled();
+  await page.screenshot({ path: test.info().outputPath('original-billing.png'), fullPage: true });
 });
 
-test('rejected create preserves the original ticket for review', async ({page}) => {
+test('rejected create preserves the original ticket for review', async ({ page }) => {
   const state = await setup(page); state.failCreate = true;
   await addBurger(page); await fireOrder(page).click();
-  await expect(page.getByText('Menu prices changed. Review a fresh quote.', {exact:true})).toBeVisible();
+  await expect(page.getByText('Menu prices changed. Review a fresh quote.', { exact: true })).toBeVisible();
   expect(state.orders).toHaveLength(0);
   await expect(fireOrder(page)).toBeEnabled();
   await fireOrder(page).click();
@@ -417,31 +442,31 @@ test('rejected create preserves the original ticket for review', async ({page}) 
   expect(state.writes.filter(w => w.path === 'orders/pos/')[1].body.items).toHaveLength(1);
 });
 
-test('lost response recovers the same request without a duplicate order', async ({page}) => {
+test('lost response recovers the same request without a duplicate order', async ({ page }) => {
   const state = await setup(page); state.loseCreateResponse = true;
   await addBurger(page); await fireOrder(page).click();
-  await page.getByRole('button', {name:'Recover pending order action'}).click();
-  await expect(page.getByRole('button', {name:'Close dialog'})).toBeVisible();
+  await page.getByRole('button', { name: 'Recover pending order action' }).click();
+  await expect(page.getByRole('button', { name: 'Close dialog' })).toBeVisible();
   const writes = state.writes.filter(w => w.path === 'orders/pos/');
   expect(writes).toHaveLength(2); expect(writes[0].key).toBe(writes[1].key);
   expect(writes[0].body).toEqual(writes[1].body); expect(state.orders).toHaveLength(1);
-  await page.getByRole('button', {name:'Close dialog'}).click();
+  await page.getByRole('button', { name: 'Close dialog' }).click();
   await expect(fireOrder(page)).toBeDisabled();
 });
 
 
-test('restored kitchen cards use actual orders and backend transitions', async ({page}) => {
+test('restored kitchen cards use actual orders and backend transitions', async ({ page }) => {
   const state = await setup(page);
   await addBurger(page); await fireOrder(page).click();
   await expect.poll(() => state.orders.length).toBe(1);
   await page.goto('/admin?tab=kitchen');
-  await expect(page.getByText('Test Burger',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:/START COOKING/}).click();
+  await expect(page.getByText('Test Burger', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /START COOKING/ }).click();
   await expect.poll(() => state.orders[0].status).toBe('PREPARING');
-  await page.getByRole('button',{name:'MARK READY FOR PICKUP'}).click();
+  await page.getByRole('button', { name: 'MARK READY FOR PICKUP' }).click();
   await expect.poll(() => state.orders[0].status).toBe('READY');
-  await page.getByRole('button',{name:'DISPATCH & HAND OVER'}).click();
-  await expect(page.getByText('Test Burger',{exact:true})).toHaveCount(0);
+  await page.getByRole('button', { name: 'DISPATCH & HAND OVER' }).click();
+  await expect(page.getByText('Test Burger', { exact: true })).toHaveCount(0);
   expect(state.orders[0].status).toBe('COMPLETED');
-  expect(state.writes.filter(w => w.path.endsWith('/transition/')).map(w => w.body.version)).toEqual([1,2,3]);
+  expect(state.writes.filter(w => w.path.endsWith('/transition/')).map(w => w.body.version)).toEqual([1, 2, 3]);
 });

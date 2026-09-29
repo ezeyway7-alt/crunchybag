@@ -76,6 +76,23 @@ const AppContent: React.FC = () => {
     currentPath === "/admin/login" ||
     currentPath.startsWith("/admin/login");
 
+  const tabQueryParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+  const hasAdminTabParam =
+    Boolean(tabQueryParam &&
+    [
+      "overview",
+      "pos_orders",
+      "billing",
+      "kitchen",
+      "inventory",
+      "daybook",
+      "menu",
+      "loyalty",
+      "employees",
+      "organization",
+      "logs",
+    ].includes(tabQueryParam));
+
   // All administrative manager and superadmin routes lead directly to the full Admin Dashboard (AdminPortal)
   const isAdminRoute =
     (currentPath === "/admin" ||
@@ -94,7 +111,8 @@ const AppContent: React.FC = () => {
       currentPath.startsWith("/outlet") ||
       currentPath === "/dashboard" ||
       currentPath.startsWith("/dashboard") ||
-      activePortal === "admin") &&
+      activePortal === "admin" ||
+      hasAdminTabParam) &&
     !isLoginRoute;
 
   const isPosRoute = currentPath === "/pos" || currentPath.startsWith("/pos") || activePortal === "staff";

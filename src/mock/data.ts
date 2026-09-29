@@ -899,6 +899,51 @@ export const INITIAL_KDS_TICKETS: KdsTicket[] = [
       },
     ],
   },
+  {
+    id: "kds-204",
+    orderNumber: "CR-8924",
+    station: "Grill Station 2",
+    fulfillmentType: "DELIVERY",
+    column: "QUEUED",
+    elapsedSeconds: 180,
+    customerName: "Bikash Rana",
+    items: [
+      {
+        id: "ki-6",
+        productName: "Crunchy Double Patty Burger",
+        variantName: "Monster Size",
+        quantity: 1,
+        modifiers: ["+ Extra Cheddar", "Spicy Chipotle"],
+      },
+      {
+        id: "ki-7",
+        productName: "Peri Peri Fries",
+        variantName: "Large",
+        quantity: 2,
+        modifiers: ["Extra Mayo"],
+      },
+    ],
+  },
+  {
+    id: "kds-205",
+    orderNumber: "CR-8925",
+    station: "Fryer Line 1",
+    fulfillmentType: "DINE_IN",
+    tableNumber: "Table 02",
+    kioskToken: "TK-4825",
+    column: "PREPARING",
+    elapsedSeconds: 960,
+    customerName: "Sita Sharma",
+    items: [
+      {
+        id: "ki-8",
+        productName: "Crispy Fried Chicken Wings",
+        variantName: "6 Pcs Spicy",
+        quantity: 2,
+        modifiers: ["Garlic Dip"],
+      },
+    ],
+  },
 ];
 
 export const MOCK_STAFF: Staff[] = [
