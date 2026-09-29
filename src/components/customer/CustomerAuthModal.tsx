@@ -209,18 +209,67 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     }
 
     void perform(async () => {
-      const result = await apiClient.post<any>(
-        customerPath("auth/register/"),
-        {
-          registration_token: registrationToken,
-          username: username.trim(),
+      // Clean and generate valid Django username (only letters, numbers, underscores, no spaces)
+      const cleanSlug = username
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_")
+        .replace(/[^\w.@+-]/g, "")
+        .replace(/^_+|_+$/g, "");
+
+      const phoneSuffix = phone.trim().replace(/\D/g, "").slice(-4) || String(Math.floor(1000 + Math.random() * 9000));
+      const baseUsername = cleanSlug.length >= 3 ? cleanSlug : `customer_${phoneSuffix}`;
+
+      let registerResult: any;
+      try {
+        registerResult = await apiClient.post<any>(
+          customerPath("auth/register/"),
+          {
+            registration_token: registrationToken,
+            username: baseUsername,
+            name: username.trim(),
+            email: email.trim(),
+            pin: newPin,
+            password: newPassword,
+          },
+          { skipAuth: true }
+        );
+      } catch (err: any) {
+        const errMsg = extractErrorMessage(err).toLowerCase();
+        // If username was already taken or pattern error, auto-retry with unique phone suffix
+        if (errMsg.includes("already exists") || errMsg.includes("pattern")) {
+          const uniqueUsername = `${baseUsername.slice(0, 20)}_${phoneSuffix}`;
+          registerResult = await apiClient.post<any>(
+            customerPath("auth/register/"),
+            {
+              registration_token: registrationToken,
+              username: uniqueUsername,
+              name: username.trim(),
+              email: email.trim(),
+              pin: newPin,
+              password: newPassword,
+            },
+            { skipAuth: true }
+          );
+        } else {
+          throw err;
+        }
+      }
+
+      // 1. Save customer session
+      saveCustomerSession(registerResult);
+
+      // 2. Sync full name to customer profile
+      try {
+        await apiClient.patch(customerPath("profile/"), {
+          name: username.trim(),
           email: email.trim(),
-          pin: newPin,
-          password: newPassword,
-        },
-        { skipAuth: true }
-      );
-      finish(result);
+        });
+      } catch {
+        // Non-blocking profile name sync
+      }
+
+      finish(registerResult);
     });
   };
 

@@ -76,7 +76,7 @@ export const CustomerProfileModal: React.FC = () => {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         maxWidth="lg"
-        className="border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden rounded-2xl"
+        className="border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden rounded-none"
         title={
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-amber-500" />
