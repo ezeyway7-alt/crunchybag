@@ -323,16 +323,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       onClose={onClose}
       title={getModalTitle()}
       maxWidth="md"
+      className="rounded-none"
     >
       <fieldset disabled={busy} className="contents">
         {error && (
-          <div role="alert" className="p-3 mb-3 text-xs bg-rose-500/10 border border-rose-500/30 text-rose-500 rounded-xl font-medium">
+          <div role="alert" className="p-3 mb-3 text-xs bg-rose-500/10 border border-rose-500/30 text-rose-500 rounded-none font-medium">
             {error}
           </div>
         )}
 
         {infoMessage && (
-          <div className="p-3 mb-3 text-xs bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-xl font-medium">
+          <div className="p-3 mb-3 text-xs bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-none font-medium">
             {infoMessage}
           </div>
         )}
@@ -347,8 +348,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Mobile Number
               </label>
-              <div className="flex rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/80 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
-                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-700/80 shrink-0">
+              <div className="flex rounded-none overflow-hidden border border-zinc-200 dark:border-zinc-800 focus-within:border-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
+                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-800 shrink-0 rounded-none">
                   +977
                 </div>
                 <input
@@ -358,7 +359,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   autoComplete="tel"
-                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium"
+                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required
                 />
               </div>
@@ -389,7 +390,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   onChange={(e) => setCredential(e.target.value)}
                   placeholder="Enter your 4-digit PIN or password"
                   autoComplete="current-password"
-                  className="w-full pl-9 pr-10 h-11 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                  className="w-full pl-9 pr-10 h-11 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                   required
                 />
                 <button
@@ -408,7 +409,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer mt-1"
+              className="w-full font-bold h-11 rounded-none shadow-none cursor-pointer mt-1"
             >
               Sign In
             </Button>
@@ -442,8 +443,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Mobile Number
               </label>
-              <div className="flex rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/80 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
-                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-700/80 shrink-0">
+              <div className="flex rounded-none overflow-hidden border border-zinc-200 dark:border-zinc-800 focus-within:border-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
+                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-800 shrink-0 rounded-none">
                   +977
                 </div>
                 <input
@@ -453,7 +454,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   autoComplete="tel"
-                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium"
+                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required
                   autoFocus
                 />
@@ -464,7 +465,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer"
+              className="w-full font-bold h-11 rounded-none shadow-none cursor-pointer"
             >
               Get OTP Verification Code
             </Button>
@@ -504,7 +505,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             </div>
 
             {demoCode && (
-              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-none text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
                 Test OTP Code: <strong className="font-mono text-sm tracking-wider">{demoCode}</strong>
               </div>
             )}
@@ -521,7 +522,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={digit}
                   onChange={(e) => handleDigitChange(idx, e.target.value)}
                   onKeyDown={(e) => handleDigitKeyDown(idx, e)}
-                  className="w-12 h-14 text-center font-mono font-bold text-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500 outline-none text-zinc-900 dark:text-white"
+                  className="w-12 h-14 text-center font-mono font-bold text-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none text-zinc-900 dark:text-white"
                 />
               ))}
             </div>
@@ -547,7 +548,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               type="button"
               variant="primary"
               size="lg"
-              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer"
+              className="w-full font-bold h-11 rounded-none shadow-none cursor-pointer"
               disabled={otpDigits.some((d) => !d)}
               onClick={handleVerifySignupOtp}
             >
@@ -572,7 +573,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. Aayush Sharma"
-                  className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                  className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                   required
                   autoFocus
                 />
@@ -588,7 +589,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your.email@example.com"
-                className="w-full px-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                className="w-full px-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
               />
             </div>
 
@@ -608,7 +609,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     placeholder="••••"
-                    className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm font-mono tracking-widest bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                    className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm font-mono tracking-widest bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                     required
                   />
                 </div>
@@ -626,7 +627,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Min. 6 chars"
                     minLength={6}
-                    className="w-full pl-9 pr-10 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                    className="w-full pl-9 pr-10 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                     required
                   />
                   <button
@@ -645,7 +646,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer mt-2"
+              className="w-full font-bold h-11 rounded-none shadow-none cursor-pointer mt-2"
               rightIcon={<CheckCircle2 className="h-4 w-4" />}
             >
               Complete & Continue to Checkout
@@ -662,8 +663,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Registered Mobile Number
               </label>
-              <div className="flex rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700/80 focus-within:border-amber-500 focus-within:ring-1 focus-within:ring-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
-                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-700/80 shrink-0">
+              <div className="flex rounded-none overflow-hidden border border-zinc-200 dark:border-zinc-800 focus-within:border-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
+                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-800 shrink-0 rounded-none">
                   +977
                 </div>
                 <input
@@ -673,7 +674,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   autoComplete="tel"
-                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium"
+                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required
                   autoFocus
                 />
@@ -684,7 +685,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer"
+              className="w-full font-bold h-11 rounded-none shadow-none cursor-pointer"
             >
               Send Login OTP
             </Button>
@@ -721,7 +722,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             </div>
 
             {demoCode && (
-              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-none text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
                 Test OTP Code: <strong className="font-mono text-sm tracking-wider">{demoCode}</strong>
               </div>
             )}
@@ -738,7 +739,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={digit}
                   onChange={(e) => handleDigitChange(idx, e.target.value)}
                   onKeyDown={(e) => handleDigitKeyDown(idx, e)}
-                  className="w-12 h-14 text-center font-mono font-bold text-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-500 outline-none text-zinc-900 dark:text-white"
+                  className="w-12 h-14 text-center font-mono font-bold text-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none text-zinc-900 dark:text-white"
                 />
               ))}
             </div>
@@ -764,7 +765,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               type="button"
               variant="primary"
               size="lg"
-              className="w-full font-bold h-11 rounded-xl shadow-md cursor-pointer"
+              className="w-full font-bold h-11 rounded-none shadow-none cursor-pointer"
               disabled={otpDigits.some((d) => !d)}
               onClick={handleVerifyOtpLogin}
             >
