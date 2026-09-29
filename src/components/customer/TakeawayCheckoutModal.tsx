@@ -274,7 +274,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                     <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
                       {deliveryAddress}
                     </p>
-                    {deliveryLocation.landmark && (
+                    {deliveryLocation?.landmark && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400 truncate">
                         Landmark: {deliveryLocation.landmark}
                       </p>
