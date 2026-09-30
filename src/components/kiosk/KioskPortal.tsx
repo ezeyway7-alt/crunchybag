@@ -1040,11 +1040,11 @@ export const KioskPortal: React.FC = () => {
           </button>
         </div>
 
-        {/* MIDDLE SECTION: Place to enter user mobile number and then name (optional, compact, tablet friendly) */}
+        {/* MIDDLE SECTION: Place to enter user mobile number and then name (Focused & High Visibility) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Mobile number with tick option */}
-          <div className="flex items-center bg-[#18181E] border border-zinc-800 focus-within:border-zinc-600 px-2 py-1 gap-1.5 shadow-inner">
-            <Phone className="w-3 h-3 text-zinc-500 shrink-0" />
+          <div className="flex items-center bg-black/80 border border-zinc-500 hover:border-amber-400 focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-400/40 px-2 sm:px-2.5 py-1 gap-1.5 shadow-sm transition-all">
+            <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <input
               type="tel"
               value={guestPhone}
@@ -1057,8 +1057,8 @@ export const KioskPortal: React.FC = () => {
                   setPhoneVerified(false);
                 }
               }}
-              placeholder="Mobile (optional)"
-              className="w-24 sm:w-28 bg-transparent text-[11px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+              placeholder="Mobile #"
+              className="w-24 sm:w-28 bg-transparent text-xs font-bold text-white placeholder:text-zinc-400 placeholder:font-medium focus:outline-none"
             />
             {/* Tick option to verify */}
             <button
@@ -1083,14 +1083,14 @@ export const KioskPortal: React.FC = () => {
           </div>
 
           {/* Customer Name */}
-          <div className="flex items-center bg-[#18181E] border border-zinc-800 focus-within:border-zinc-600 px-2 py-1 gap-1.5 shadow-inner">
-            <User className="w-3 h-3 text-zinc-500 shrink-0" />
+          <div className="flex items-center bg-black/80 border border-zinc-500 hover:border-amber-400 focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-400/40 px-2 sm:px-2.5 py-1 gap-1.5 shadow-sm transition-all">
+            <User className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <input
               type="text"
               value={guestName}
               onChange={(e) => setGuestName(e.target.value)}
-              placeholder="Name (optional)"
-              className="w-20 sm:w-26 bg-transparent text-[11px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+              placeholder="Guest Name"
+              className="w-22 sm:w-28 bg-transparent text-xs font-bold text-white placeholder:text-zinc-400 placeholder:font-medium focus:outline-none"
             />
           </div>
         </div>
@@ -1140,7 +1140,7 @@ export const KioskPortal: React.FC = () => {
       </header>
 
       {/* 2. TOP HORIZONTAL CATEGORY ROW (Compact, small clear clickable rectangular buttons) */}
-      <div className="bg-[#111116] border-b border-zinc-800 px-3 sm:px-6 py-2 flex items-center gap-1.5 sm:gap-2 overflow-x-auto shrink-0 scrollbar-none z-10">
+      <div className="bg-[#111116] border-b border-zinc-800 px-2 sm:px-4 py-1 sm:py-1.5 flex items-center gap-1 sm:gap-1.5 overflow-x-auto shrink-0 scrollbar-none z-10">
         {/* 1. All Items Button */}
         <button
           type="button"
@@ -1148,7 +1148,7 @@ export const KioskPortal: React.FC = () => {
             playKioskSound("tap");
             handleCategorySelect("all");
           }}
-          className={`h-8 sm:h-8.5 px-3 sm:px-3.5 flex items-center justify-center gap-1.5 border transition-all cursor-pointer whitespace-nowrap shrink-0 text-xs uppercase font-bold tracking-wide ${
+          className={`h-6.5 sm:h-7 px-2 sm:px-2.5 flex items-center justify-center gap-1 border transition-all cursor-pointer whitespace-nowrap shrink-0 text-[10.5px] uppercase font-bold tracking-tight ${
             selectedCategory === "all"
               ? "bg-amber-500/20 border-amber-500 text-amber-400 font-black shadow-sm"
               : "bg-[#18181E] border-zinc-700/80 hover:border-zinc-500 text-zinc-300 hover:text-white"
@@ -1156,7 +1156,7 @@ export const KioskPortal: React.FC = () => {
         >
           <span>All</span>
           <span
-            className={`text-[10px] font-mono px-1 py-0.2 font-semibold ${
+            className={`text-[9px] font-mono px-1 py-0 font-semibold ${
               selectedCategory === "all" ? "bg-amber-500 text-black font-bold" : "bg-zinc-800 text-zinc-400"
             }`}
           >
@@ -1171,16 +1171,16 @@ export const KioskPortal: React.FC = () => {
             playKioskSound("tap");
             handleCategorySelect("packages");
           }}
-          className={`h-8 sm:h-8.5 px-3 sm:px-3.5 flex items-center justify-center gap-1.5 border transition-all cursor-pointer whitespace-nowrap shrink-0 text-xs uppercase font-bold tracking-wide ${
+          className={`h-6.5 sm:h-7 px-2 sm:px-2.5 flex items-center justify-center gap-1 border transition-all cursor-pointer whitespace-nowrap shrink-0 text-[10.5px] uppercase font-bold tracking-tight ${
             selectedCategory === "packages"
               ? "bg-amber-500/20 border-amber-500 text-amber-400 font-black shadow-sm"
               : "bg-[#18181E] border-zinc-700/80 hover:border-zinc-500 text-zinc-300 hover:text-white"
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <Sparkles className="w-3 h-3 text-amber-400" />
           <span>Packages</span>
           <span
-            className={`text-[10px] font-mono px-1 py-0.2 font-semibold ${
+            className={`text-[9px] font-mono px-1 py-0 font-semibold ${
               selectedCategory === "packages" ? "bg-amber-500 text-black font-bold" : "bg-zinc-800 text-zinc-400"
             }`}
           >
@@ -1202,7 +1202,7 @@ export const KioskPortal: React.FC = () => {
                 playKioskSound("tap");
                 handleCategorySelect(cat.id);
               }}
-              className={`h-8 sm:h-8.5 px-3 sm:px-3.5 flex items-center justify-center gap-1.5 border transition-all cursor-pointer whitespace-nowrap shrink-0 text-xs uppercase font-bold tracking-wide ${
+              className={`h-6.5 sm:h-7 px-2 sm:px-2.5 flex items-center justify-center gap-1 border transition-all cursor-pointer whitespace-nowrap shrink-0 text-[10.5px] uppercase font-bold tracking-tight ${
                 isSelected
                   ? "bg-amber-500/20 border-amber-500 text-amber-400 font-black shadow-sm"
                   : "bg-[#18181E] border-zinc-700/80 hover:border-zinc-500 text-zinc-300 hover:text-white"
@@ -1211,7 +1211,7 @@ export const KioskPortal: React.FC = () => {
               <span>{cat.name}</span>
               {count > 0 && (
                 <span
-                  className={`text-[10px] font-mono px-1 py-0.2 font-semibold ${
+                  className={`text-[9px] font-mono px-1 py-0 font-semibold ${
                     isSelected ? "bg-amber-500 text-black font-bold" : "bg-zinc-800 text-zinc-400"
                   }`}
                 >
@@ -1226,47 +1226,47 @@ export const KioskPortal: React.FC = () => {
       {/* 3. MAIN WORKSPACE: CENTER PRODUCT GRID, RIGHT FLOATING CART */}
       <div className="flex-1 flex overflow-hidden">
         {/* CENTER PRODUCT TOUCH GRID */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-5 bg-[#0B0B0E]">
-          {/* Category Title + Fast Compact Search */}
-          <div className="flex items-center justify-between gap-3 mb-3.5">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-black uppercase tracking-tight text-white flex items-center gap-2">
-                {selectedCategory === "packages" ? (
-                  <>
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>Curated Packages</span>
-                  </>
-                ) : selectedCategory === "all" ? (
-                  "Full Menu"
-                ) : (
-                  categories.find((c) => c.id === selectedCategory)?.name || "Dishes"
-                )}
-              </h2>
-              <span className="text-xs font-mono text-zinc-500 font-normal">
+        <main className="flex-1 overflow-y-auto p-2 sm:p-2.5 bg-[#0B0B0E]">
+          {/* Category Title (Hidden on 'All' to save space) + Fast Compact Search */}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5">
+              {selectedCategory !== "all" && (
+                <h2 className="text-xs sm:text-sm font-black uppercase tracking-tight text-white flex items-center gap-1.5">
+                  {selectedCategory === "packages" ? (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Curated Packages</span>
+                    </>
+                  ) : (
+                    categories.find((c) => c.id === selectedCategory)?.name || "Dishes"
+                  )}
+                </h2>
+              )}
+              <span className="text-[11px] font-mono text-zinc-400 font-medium">
                 ({selectedCategory === "packages"
                   ? filteredCombos.length
                   : selectedCategory === "all"
                   ? currentCategoryProducts.length + filteredCombos.length
-                  : currentCategoryProducts.length})
+                  : currentCategoryProducts.length} items)
               </span>
             </div>
 
-            {/* Quick Touch Search (Compact) */}
-            <div className="relative w-44 sm:w-56">
+            {/* Quick Touch Search (Ultra Compact) */}
+            <div className="relative w-36 sm:w-48">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full bg-zinc-900 border border-zinc-700/80 px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 font-medium"
+                placeholder="Search menu..."
+                className="w-full bg-zinc-900/90 border border-zinc-700/80 px-2 py-1 text-[11px] text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 font-medium"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3" />
                 </button>
               )}
             </div>
@@ -1348,50 +1348,48 @@ export const KioskPortal: React.FC = () => {
             )
           ) : (
             <>
-              {/* Featured Packages Horizontal Slider in "All" view (Dashboard style) */}
+              {/* Featured Packages Horizontal Slider in "All" view (Compact & Congested) */}
               {selectedCategory === "all" && filteredCombos.length > 0 && (
-                <div className="mb-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <h3 className="text-xs font-black uppercase tracking-wider text-amber-400">
-                        Featured Packages & Combos
+                <div className="mb-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      <h3 className="text-[11px] font-black uppercase tracking-wider text-amber-400">
+                        Featured Packages
                       </h3>
-                      <span className="text-[10px] text-zinc-500 font-normal">
-                        ({filteredCombos.length} customizable packs)
+                      <span className="text-[9.5px] text-zinc-500 font-mono">
+                        ({filteredCombos.length})
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       {/* Left & Right Arrow controls for horizontal slider */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            playKioskSound("tap");
-                            if (kioskFeaturedScrollRef.current) {
-                              kioskFeaturedScrollRef.current.scrollBy({ left: -320, behavior: "smooth" });
-                            }
-                          }}
-                          className="p-1.5 bg-[#1a1a20] hover:bg-amber-500 hover:text-black text-zinc-300 border border-zinc-700/80 transition-colors cursor-pointer"
-                          aria-label="Scroll left"
-                        >
-                          <ChevronLeft className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            playKioskSound("tap");
-                            if (kioskFeaturedScrollRef.current) {
-                              kioskFeaturedScrollRef.current.scrollBy({ left: 320, behavior: "smooth" });
-                            }
-                          }}
-                          className="p-1.5 bg-[#1a1a20] hover:bg-amber-500 hover:text-black text-zinc-300 border border-zinc-700/80 transition-colors cursor-pointer"
-                          aria-label="Scroll right"
-                        >
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playKioskSound("tap");
+                          if (kioskFeaturedScrollRef.current) {
+                            kioskFeaturedScrollRef.current.scrollBy({ left: -260, behavior: "smooth" });
+                          }
+                        }}
+                        className="p-1 bg-[#1a1a20] hover:bg-amber-500 hover:text-black text-zinc-300 border border-zinc-700/80 transition-colors cursor-pointer"
+                        aria-label="Scroll left"
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playKioskSound("tap");
+                          if (kioskFeaturedScrollRef.current) {
+                            kioskFeaturedScrollRef.current.scrollBy({ left: 260, behavior: "smooth" });
+                          }
+                        }}
+                        className="p-1 bg-[#1a1a20] hover:bg-amber-500 hover:text-black text-zinc-300 border border-zinc-700/80 transition-colors cursor-pointer"
+                        aria-label="Scroll right"
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
 
                       <button
                         type="button"
@@ -1399,27 +1397,18 @@ export const KioskPortal: React.FC = () => {
                           playKioskSound("tap");
                           setSelectedCategory("packages");
                         }}
-                        className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer ml-1"
+                        className="text-[10.5px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-0.5 cursor-pointer ml-1"
                       >
                         <span>View all</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        <ChevronRight className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Horizontal Slider Viewport Track */}
+                  {/* Horizontal Slider Viewport Track (Congested) */}
                   <div
                     ref={kioskFeaturedScrollRef}
-                    onScroll={(e) => {
-                      const el = e.currentTarget;
-                      if (el.children.length > 0) {
-                        const firstChild = el.children[0] as HTMLElement;
-                        const itemWidth = firstChild.offsetWidth + 16;
-                        const idx = Math.round(el.scrollLeft / itemWidth);
-                        setActiveKioskSlide(Math.min(filteredCombos.length - 1, Math.max(0, idx)));
-                      }
-                    }}
-                    className="flex items-stretch gap-3 sm:gap-4 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pt-0.5 pb-2"
+                    className="flex items-stretch gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory pb-1"
                     style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                   >
                     {filteredCombos.map((combo) => (
@@ -1432,7 +1421,7 @@ export const KioskPortal: React.FC = () => {
                           setIsComboModalOpen(true);
                         }}
                         className="relative shrink-0 snap-start select-none cursor-pointer overflow-hidden border border-zinc-700 hover:border-amber-400 transition-all duration-200 group shadow-md
-                          w-[72%] sm:w-[42%] md:w-[32%] lg:w-[25%] xl:w-[20%] 2xl:w-[17%] min-h-[125px] sm:min-h-[135px]"
+                          w-[54%] sm:w-[35%] md:w-[26%] lg:w-[21%] xl:w-[17%] 2xl:w-[14%] min-h-[88px] sm:min-h-[96px]"
                       >
                         {/* Background Image with Lower Gradient for Maximum Food Visibility */}
                         <div className="absolute inset-0 z-0">
@@ -1450,41 +1439,41 @@ export const KioskPortal: React.FC = () => {
                         </div>
 
                         {/* Card Content Overlay */}
-                        <div className="relative z-10 p-2 sm:p-2.5 flex flex-col justify-between h-full text-white">
+                        <div className="relative z-10 p-1.5 flex flex-col justify-between h-full text-white">
                           {/* Top row: Promo badge if any, and item count badge */}
                           <div className="flex items-center justify-between gap-1">
                             {combo.promoText ? (
-                              <span className="bg-black/80 text-amber-400 text-[7.5px] font-black uppercase tracking-wider px-1.5 py-0.2 border border-amber-500/40">
+                              <span className="bg-black/80 text-amber-400 text-[7px] font-black uppercase tracking-wider px-1 py-0.2 border border-amber-500/40">
                                 {combo.promoText}
                               </span>
                             ) : <span />}
 
-                            <span className="bg-black/70 text-zinc-300 text-[8.5px] font-mono font-bold px-1.5 py-0.2 border border-white/20">
+                            <span className="bg-black/70 text-zinc-300 text-[8px] font-mono font-bold px-1 py-0.2 border border-white/20">
                               {combo.includedProductIds.length} items
                             </span>
                           </div>
 
                           {/* Main Clean Package Title */}
                           <div className="my-auto py-0.5">
-                            <h3 className="text-xs sm:text-sm font-black tracking-tight leading-snug uppercase drop-shadow-md text-white line-clamp-1 group-hover:text-amber-300 transition-colors">
+                            <h3 className="text-[11px] sm:text-xs font-bold tracking-tight leading-tight uppercase drop-shadow-md text-white line-clamp-1 group-hover:text-amber-300 transition-colors">
                               {combo.title}
                             </h3>
                           </div>
 
                           {/* Bottom Action Button & Price */}
-                          <div className="pt-1.5 flex items-center justify-between gap-1.5 border-t border-white/20">
-                            <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500 group-hover:bg-amber-400 text-black font-black text-[10px] uppercase tracking-wider transition-colors shadow-sm">
+                          <div className="pt-1 flex items-center justify-between gap-1 border-t border-white/20">
+                            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500 group-hover:bg-amber-400 text-black font-black text-[9px] uppercase tracking-wider transition-colors shadow-sm">
                               <Sliders className="w-2.5 h-2.5 text-black" />
                               <span>{combo.buttonLabel || "Customize"}</span>
                             </div>
 
                             <div className="text-right">
                               {combo.originalPrice && combo.originalPrice > combo.basePrice && (
-                                <span className="text-[9px] text-zinc-300 line-through mr-1 font-mono">
+                                <span className="text-[8.5px] text-zinc-300 line-through mr-1 font-mono">
                                   {formatNPR(combo.originalPrice)}
                                 </span>
                               )}
-                              <span className="text-xs sm:text-xs font-black text-amber-400 font-mono drop-shadow-xs">
+                              <span className="text-[11px] sm:text-xs font-black text-amber-400 font-mono drop-shadow-xs">
                                 {formatNPR(combo.basePrice)}
                               </span>
                             </div>
@@ -1494,42 +1483,8 @@ export const KioskPortal: React.FC = () => {
                     ))}
                   </div>
 
-                  {/* Dot Indicators */}
-                  {filteredCombos.length > 1 && (
-                    <div className="flex items-center justify-center gap-1.5 pt-1">
-                      {filteredCombos.map((_, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            if (kioskFeaturedScrollRef.current) {
-                              const el = kioskFeaturedScrollRef.current;
-                              if (el.children[idx]) {
-                                const targetEl = el.children[idx] as HTMLElement;
-                                el.scrollTo({
-                                  left: targetEl.offsetLeft - el.offsetLeft,
-                                  behavior: "smooth",
-                                });
-                              }
-                            }
-                            setActiveKioskSlide(idx);
-                          }}
-                          className={`h-1 transition-all cursor-pointer ${
-                            activeKioskSlide === idx
-                              ? "w-5 bg-amber-400"
-                              : "w-1.5 bg-zinc-700 hover:bg-zinc-500"
-                          }`}
-                          aria-label={`Go to combo ${idx + 1}`}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mt-3 pt-2 border-t border-zinc-800/80 flex items-center gap-2">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-zinc-400">
-                      Individual Menu Items ({currentCategoryProducts.length})
-                    </h3>
-                  </div>
+                  {/* Sleek low-profile separator to keep things congested */}
+                  <div className="my-1.5 border-t border-zinc-800/60" />
                 </div>
               )}
 
@@ -1615,10 +1570,10 @@ export const KioskPortal: React.FC = () => {
         {/* RIGHT SIDE: STREAMLINED SLIM TOUCH CART & CHECKOUT PANEL */}
         <aside className="w-64 sm:w-72 md:w-80 bg-[#111114] border-l border-zinc-800 flex flex-col shrink-0">
           {/* Cart Header (Compact) */}
-          <div className="px-3 py-2.5 border-b border-zinc-800 bg-[#151518] flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="w-4 h-4 text-amber-500" />
-              <h3 className="text-xs sm:text-sm font-bold uppercase text-white tracking-wide">
+          <div className="px-2.5 py-1.5 border-b border-zinc-800 bg-[#151518] flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <ShoppingBag className="w-3.5 h-3.5 text-amber-500" />
+              <h3 className="text-[11px] sm:text-xs font-bold uppercase text-zinc-300 tracking-wider">
                 Tray ({kioskCart.reduce((sum, i) => sum + i.quantity, 0)})
               </h3>
             </div>
@@ -1630,7 +1585,7 @@ export const KioskPortal: React.FC = () => {
                   playKioskSound("tap");
                   setKioskCart([]);
                 }}
-                className="text-[11px] text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
+                className="text-[10px] text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
               >
                 Clear
               </button>
@@ -1641,9 +1596,9 @@ export const KioskPortal: React.FC = () => {
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {kioskCart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-4 text-zinc-500">
-                <ShoppingBag className="w-9 h-9 stroke-[1.2] text-zinc-700 mb-1.5" />
-                <p className="text-xs font-semibold text-zinc-400">Tray is Empty</p>
-                <p className="text-[10.5px] text-zinc-500 mt-0.5">
+                <ShoppingBag className="w-8 h-8 stroke-[1.2] text-zinc-700 mb-1.5" />
+                <p className="text-[11px] font-semibold text-zinc-400">Tray is Empty</p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">
                   Touch any item to add
                 </p>
               </div>
