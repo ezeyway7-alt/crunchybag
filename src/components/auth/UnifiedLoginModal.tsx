@@ -128,7 +128,7 @@ export const UnifiedLoginModal: React.FC<UnifiedLoginModalProps> = ({
               placeholder="Email, phone, or username"
               required
               autoFocus
-              className="w-full h-11 pl-10 pr-3.5 bg-[#18181b] border border-zinc-800 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
+              className="w-full h-11 pl-10 pr-3.5 bg-[#18181b] border border-zinc-800 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
               autoComplete="username"
             />
           </div>
@@ -151,7 +151,7 @@ export const UnifiedLoginModal: React.FC<UnifiedLoginModalProps> = ({
               }}
               placeholder="Password"
               required
-              className="w-full h-11 pl-10 pr-10 bg-[#18181b] border border-zinc-800 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
+              className="w-full h-11 pl-10 pr-10 bg-[#18181b] border border-zinc-800 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
               autoComplete="current-password"
             />
             <button

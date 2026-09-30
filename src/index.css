@@ -42,17 +42,13 @@
 }
 
 /* Prevent mobile keyboard auto-zoom & viewport distortion (iOS Safari / Mobile WebKit) */
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 1024px), (pointer: coarse) {
   input,
   select,
   textarea,
-  input[type="text"],
-  input[type="tel"],
-  input[type="number"],
-  input[type="email"],
-  input[type="search"],
-  input[type="password"],
-  input[type="url"] {
+  input:focus,
+  select:focus,
+  textarea:focus {
     font-size: 16px !important;
   }
 }

@@ -1,3 +1,4 @@
+import {OrganizationSmsSettings} from './OrganizationSmsSettings';
 import React, { useState, useEffect, useRef } from "react";
 import {
   Building2,
@@ -630,6 +631,7 @@ export const AdminOrganizationTab: React.FC = () => {
           </div>
         </div>
 
+        <OrganizationSmsSettings/>
         {/* -------------------------------------------------------------
             BOTTOM ACTIONS ROW (Inside the single container)
         ------------------------------------------------------------- */}

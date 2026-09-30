@@ -301,7 +301,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 {savedAddresses.addresses.length > 0 && <select aria-label="Saved delivery address" value={selectedAddressId} onChange={e=>{
                   setSelectedAddressId(e.target.value);const row=savedAddresses.addresses.find(row=>String(row.id)===e.target.value);
                   if(row){setDeliveryAddress(row.address);setDeliveryLocation(addressPoint(row));setSaveAddress(false);}else{setDeliveryAddress('');setDeliveryLocation(undefined);}
-                }} className="w-full bg-zinc-900 border border-zinc-700 p-2 text-xs"><option value="">New address</option>{savedAddresses.addresses.map(row=><option key={row.id} value={row.id}>{row.label}: {row.address}</option>)}</select>}
+                }} className="w-full bg-zinc-900 border border-zinc-700 p-2 text-base sm:text-xs"><option value="">New address</option>{savedAddresses.addresses.map(row=><option key={row.id} value={row.id}>{row.label}: {row.address}</option>)}</select>}
                 {touched && addressError && <p className="text-xs text-rose-400">{addressError}</p>}
                 {savedAddresses.error && <p role="alert" className="text-xs text-rose-400">{savedAddresses.error}</p>}
                 {/* Address Card Display */}
@@ -370,7 +370,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   onChange={(e) => setVehicleInfo(e.target.value)}
                   maxLength={150}
                   placeholder="Vehicle model & plate (e.g., White Swift Ba 2 Cha 4921)"
-                  className="w-full px-2 py-1 text-xs bg-white dark:bg-[#1E1E22] border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-amber-500"
+                  className="w-full px-2 py-1 text-base sm:text-xs bg-white dark:bg-[#1E1E22] border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-amber-500"
                 />
               </div>
             )}
@@ -381,7 +381,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   <UtensilsCrossed className="h-3.5 w-3.5 text-amber-500" />
                   <span>Table Number</span>
                 </div>
-                <select aria-label="Table number" value={tableNumber} onChange={e=>setTableNumber(e.target.value)} className="w-full p-2 bg-zinc-900 border border-zinc-700 text-xs"><option value="">Choose a table</option>{meta?.tables.map((table:any)=><option key={table.id} value={table.table_number}>{table.table_number}</option>)}</select>
+                <select aria-label="Table number" value={tableNumber} onChange={e=>setTableNumber(e.target.value)} className="w-full p-2 bg-zinc-900 border border-zinc-700 text-base sm:text-xs"><option value="">Choose a table</option>{meta?.tables.map((table:any)=><option key={table.id} value={table.table_number}>{table.table_number}</option>)}</select>
               </div>
             )}
 

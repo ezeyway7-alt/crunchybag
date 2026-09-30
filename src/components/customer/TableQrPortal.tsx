@@ -34,6 +34,7 @@ import {
   AlertCircle,
   RefreshCw,
   Star,
+  Loader2,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Product, ProductVariant, SelectedModifier, Order, PaymentMethod } from "../../types";
@@ -245,12 +246,27 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   };
 
   const handleConfirmOrder = async () => {
-    if (!cart.items.length || submitLock.current) return;
+    if (submitLock.current || submitting) return;
+
+    // Proper Validation checks
+    if (!cart.items.length) {
+      setCheckoutError("Your tray is empty. Please add items to place an order.");
+      return;
+    }
+
+    if (diningMode === "DINE_IN" && !tableNumber && !qrContext?.table_number) {
+      setCheckoutError("Please select your table number before submitting.");
+      setIsTableSwitcherOpen(true);
+      return;
+    }
+
     submitLock.current = true;
     setSubmitting(true);
     setCheckoutError('');
 
     try {
+      const payableTotal = serverQuote.quote?.total_payable ?? cart.finalTotal;
+
       if (activeRunningOrder) {
         // MECHANISM TO ADD ITEMS TO RUNNING ORDER:
         let apiResult: any = null;
@@ -258,7 +274,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           try {
             apiResult = await submitSelfService({
               ...checkoutBody,
-              expected_total: serverQuote.quote?.total_payable,
+              expected_total: payableTotal,
               existing_order_number: activeRunningOrder.orderNumber,
               is_addon_round: true,
               round_number: (activeRunningOrder.roundsCount || 1) + 1,
@@ -289,7 +305,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
         if (qrContext) {
           const result = await submitSelfService({
             ...checkoutBody,
-            expected_total: serverQuote.quote?.total_payable,
+            expected_total: payableTotal,
           });
           sessionStorage.setItem(`table-order:${qrToken}`, result.tracking_token);
           setTrackingToken(result.tracking_token);
@@ -313,7 +329,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
         playMobileSound('success');
       }
     } catch (error: any) {
-      setCheckoutError(error.message || 'Unable to confirm order. Retry to recover it.');
+      setCheckoutError(error.message || 'Unable to confirm order. Please try again.');
       serverQuote.refresh();
     } finally {
       submitLock.current = false;
@@ -818,12 +834,12 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   <label className="text-[10px] text-zinc-400 block uppercase font-bold mb-1 truncate">
                     Table / Spot
                   </label>
-                  <div className="bg-zinc-900 border border-zinc-700 px-2 py-1.5 text-xs text-white font-mono font-bold flex items-center justify-between min-w-0">
+                  <div className="bg-zinc-900 border border-zinc-700 px-2.5 py-2 text-xs sm:text-sm text-white font-mono font-bold flex items-center justify-between min-w-0">
                     <span className="truncate pr-1">{diningMode === "DINE_IN" ? (tableNumber || "Select Table") : "Takeaway"}</span>
                     <button
                       type="button"
                       onClick={() => {if(!qrContext)setIsTableSwitcherOpen(true);}}
-                      className="text-[10px] text-amber-400 underline shrink-0"
+                      className="text-[11px] text-amber-400 underline shrink-0 cursor-pointer font-bold"
                     >
                       Change
                     </button>
@@ -839,7 +855,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
                     placeholder="Your name"
-                    className="w-full min-w-0 bg-zinc-900 border border-zinc-700 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                    className="w-full min-w-0 bg-zinc-900 border border-zinc-700 px-2.5 py-2 text-base sm:text-xs text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
@@ -853,7 +869,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="98XXXXXXXX"
-                  className="w-full min-w-0 bg-zinc-900 border border-zinc-700 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                  className="w-full min-w-0 bg-zinc-900 border border-zinc-700 px-2.5 py-2 text-base sm:text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
                 />
               </div>
 
@@ -862,11 +878,11 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                 <label className="text-[10px] text-zinc-400 block uppercase font-bold mb-1">
                   Payment Preference
                 </label>
-                <div className="grid grid-cols-3 gap-1 sm:gap-1.5 text-[9.5px] sm:text-[10.5px]">
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
                   <button
                     type="button"
                     onClick={() => setSelectedPaymentMethod("PAY_AT_COUNTER")}
-                    className={`p-1.5 sm:p-2 border text-center transition-colors break-words leading-tight cursor-pointer ${
+                    className={`p-2 border text-center transition-colors break-words leading-tight cursor-pointer ${
                       selectedPaymentMethod === "PAY_AT_COUNTER"
                         ? "bg-amber-500 text-black border-amber-500 font-black"
                         : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700"
@@ -877,7 +893,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   <button
                     type="button"
                     onClick={() => setSelectedPaymentMethod("FONEPAY_QR")}
-                    className={`p-1.5 sm:p-2 border text-center transition-colors break-words leading-tight cursor-pointer ${
+                    className={`p-2 border text-center transition-colors break-words leading-tight cursor-pointer ${
                       selectedPaymentMethod === "FONEPAY_QR"
                         ? "bg-amber-500 text-black border-amber-500 font-black"
                         : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700"
@@ -888,7 +904,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   <button
                     type="button"
                     onClick={() => setSelectedPaymentMethod("CASH_ON_PICKUP")}
-                    className={`p-1.5 sm:p-2 border text-center transition-colors break-words leading-tight cursor-pointer ${
+                    className={`p-2 border text-center transition-colors break-words leading-tight cursor-pointer ${
                       selectedPaymentMethod === "CASH_ON_PICKUP"
                         ? "bg-amber-500 text-black border-amber-500 font-black"
                         : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700"
@@ -908,26 +924,63 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   type="text"
                   value={tableNotes}
                   onChange={(e) => setTableNotes(e.target.value)}
-                  placeholder="Special notes"
-                  className="w-full min-w-0 bg-zinc-900 border border-zinc-700 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  placeholder="Special notes for the kitchen"
+                  className="w-full min-w-0 bg-zinc-900 border border-zinc-700 px-2.5 py-2 text-base sm:text-xs text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
 
-            {(checkoutError || serverQuote.error) && <p role="alert" className="text-xs text-rose-400 break-words">{checkoutError || serverQuote.error}</p>}
-            {serverQuote.quote && <p className="text-xs text-zinc-300">This round: Rs. {serverQuote.quote.total_payable} • Payment due at counter</p>}
-            {/* Confirm Submit */}
+            {/* Validation Notice or Server Quote Error */}
+            {checkoutError && (
+              <div role="alert" className="p-2.5 bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 font-bold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span className="flex-1 break-words">{checkoutError}</span>
+              </div>
+            )}
+
+            {serverQuote.error && !checkoutError && (
+              <div role="alert" className="p-2.5 bg-rose-500/10 border border-rose-500/30 text-xs text-rose-400 font-medium flex items-center justify-between gap-2">
+                <span className="flex-1 break-words">{serverQuote.error}</span>
+                <button
+                  type="button"
+                  onClick={() => serverQuote.refresh()}
+                  className="px-2 py-0.5 bg-rose-500/20 text-rose-300 font-bold text-[10px] uppercase underline shrink-0 cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {serverQuote.quote && (
+              <p className="text-xs text-zinc-300">
+                This round: Rs. {serverQuote.quote.total_payable} • Payment due at counter
+              </p>
+            )}
+
+            {/* Confirm Submit Button with Active Spinner & Dynamic Text */}
             <div className="pt-2">
               <button
-                onClick={()=>void handleConfirmOrder()} disabled={submitting || cart.items.length === 0 || (qrContext && !serverQuote.quote && !activeRunningOrder)}
-                className="w-full py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-black font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
+                type="button"
+                id="table-qr-checkout-btn"
+                onClick={() => void handleConfirmOrder()}
+                disabled={submitting}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-60 text-black font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
               >
-                <span>
-                  {activeRunningOrder
-                    ? `Send Round ${(activeRunningOrder.roundsCount || 1) + 1} to Kitchen`
-                    : "Send Order to Kitchen"}
-                </span>
-                <ArrowRight className="w-4 h-4 shrink-0" />
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    <span>Sending Order to Kitchen...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      {activeRunningOrder
+                        ? `Send Round ${(activeRunningOrder.roundsCount || 1) + 1} to Kitchen`
+                        : "Send Order to Kitchen"}
+                    </span>
+                    <ArrowRight className="w-4 h-4 shrink-0" />
+                  </>
+                )}
               </button>
             </div>
           </div>

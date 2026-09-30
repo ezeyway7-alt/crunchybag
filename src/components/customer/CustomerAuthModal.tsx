@@ -13,14 +13,14 @@ interface CustomerAuthModalProps {
   onSuccess?: () => void;
 }
 
-type AuthView = "LOGIN" | "SIGNUP_PHONE" | "SIGNUP_OTP" | "SIGNUP_PROFILE" | "OTP_LOGIN_PHONE" | "OTP_LOGIN_OTP";
+type AuthView = "LOGIN" | "SIGNUP_PHONE" | "SIGNUP_OTP" | "SIGNUP_PROFILE" | "OTP_LOGIN_PHONE" | "OTP_LOGIN_OTP" | "RESET_PASSWORD";
 
 export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
 }) => {
-  const { addToast } = useApp();
+  const { addToast, currentOutlet } = useApp();
 
   const [authView, setAuthView] = useState<AuthView>("LOGIN");
   const [busy, setBusy] = useState(false);
@@ -34,7 +34,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
   // OTP state
   const [challenge, setChallenge] = useState("");
-  const [demoCode, setDemoCode] = useState("");
+  const [resetToken,setResetToken] = useState("");
   const [otpDigits, setOtpDigits] = useState(["", "", "", ""]);
   const [otpTimer, setOtpTimer] = useState(45);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -103,7 +103,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     const cleanPhone = phone.trim().replace(/\D/g, "");
     const cleanCred = credential.trim();
 
-    if (!cleanPhone || cleanPhone.length < 10) {
+    if (!/^(?:977)?9[78]\d{8}$/.test(cleanPhone)) {
       setError("Please enter your 10-digit mobile number.");
       return;
     }
@@ -146,7 +146,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   const handleSendSignupOtp = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPhone = phone.trim().replace(/\D/g, "");
-    if (!cleanPhone || cleanPhone.length < 10) {
+    if (!/^(?:977)?9[78]\d{8}$/.test(cleanPhone)) {
       setError("Please enter a valid 10-digit mobile number.");
       return;
     }
@@ -155,7 +155,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       try {
         const result = await apiClient.post<any>(
           customerPath("auth/start/"),
-          { phone: cleanPhone },
+          { phone: cleanPhone, outlet_id: /^\d+$/.test(String(currentOutlet?.id)) ? currentOutlet.id : undefined },
           { skipAuth: true }
         );
 
@@ -167,10 +167,10 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         }
 
         setChallenge(result.challenge_id);
-        setDemoCode(result.demo_code || "");
+
         setOtpDigits(["", "", "", ""]);
         setAuthView("SIGNUP_OTP");
-        setOtpTimer(45);
+        setOtpTimer(60);
         setTimeout(() => inputRefs.current[0]?.focus(), 120);
       } catch (err: any) {
         const msg = extractErrorMessage(err).toLowerCase();
@@ -214,8 +214,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       setError("Please enter a 4-digit numeric quick MPIN.");
       return;
     }
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
 
@@ -253,13 +253,13 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           try {
             const resend = await apiClient.post<any>(
               customerPath("auth/start/"),
-              { phone: phone.trim().replace(/\D/g, "") },
+              { phone: phone.trim().replace(/\D/g, ""), outlet_id: /^\d+$/.test(String(currentOutlet?.id)) ? currentOutlet.id : undefined },
               { skipAuth: true }
             );
             setChallenge(resend.challenge_id);
-            setDemoCode(resend.demo_code || "");
+
             setOtpDigits(["", "", "", ""]);
-            setOtpTimer(45);
+            setOtpTimer(60);
             setAuthView("SIGNUP_OTP");
             return;
           } catch {
@@ -276,7 +276,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           errMsg.includes("registered")
         ) {
           setAuthView("LOGIN");
-          setInfoMessage("This mobile, username, or email is already registered. Please sign in below, or tap 'Sign In with OTP' if you forgot your PIN.");
+          setInfoMessage("This mobile, username, or email is already registered. Please sign in below, or tap 'Verify Recovery Code' if you forgot your PIN.");
           return;
         }
 
@@ -317,62 +317,30 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     });
   };
 
-  // OTP Login: Send OTP for registered user
   const handleSendOtpLogin = (e?: React.FormEvent) => {
     e?.preventDefault();
-    const cleanPhone = phone.trim().replace(/\D/g, "");
-    if (!cleanPhone || cleanPhone.length < 10) {
-      setError("Please enter your 10-digit mobile number.");
-      return;
-    }
-
-    void perform(async () => {
-      const result = await apiClient.post<any>(
-        customerPath("auth/start/"),
-        { phone: cleanPhone },
-        { skipAuth: true }
-      );
-
-      setChallenge(result.challenge_id);
-      setDemoCode(result.demo_code || "");
-      setOtpDigits(["", "", "", ""]);
-      setAuthView("OTP_LOGIN_OTP");
-      setOtpTimer(45);
-      setTimeout(() => inputRefs.current[0]?.focus(), 120);
+    const cleanPhone=phone.trim().replace(/\D/g,'');
+    if(!/^(?:977)?9[78]\d{8}$/.test(cleanPhone)){setError('Enter a valid Nepal mobile number.');return;}
+    void perform(async()=>{
+      const result=await apiClient.post<any>(customerPath('auth/recovery-start/'),{phone:cleanPhone,outlet_id:/^\d+$/.test(String(currentOutlet?.id))?currentOutlet.id:undefined},{skipAuth:true});
+      setChallenge(result.challenge_id);setOtpDigits(['','','','']);setAuthView('OTP_LOGIN_OTP');setOtpTimer(result.resend_after || 60);
+      setInfoMessage('SMS code requested. It may take a moment to arrive.');
     });
   };
-
-  // OTP Login: Verify code
-  const handleVerifyOtpLogin = () => {
-    const code = otpDigits.join("");
-    if (code.length < 4) {
-      setError("Please enter all 4 digits of the OTP code.");
-      return;
-    }
-
-    void perform(async () => {
-      try {
-        const result = await apiClient.post<any>(
-          customerPath("auth/login/"),
-          { phone: phone.trim().replace(/\D/g, ""), method: "OTP", credential: code, challenge_id: challenge },
-          { skipAuth: true }
-        );
-        finish(result);
-      } catch {
-        const verifyResult = await apiClient.post<any>(
-          customerPath("auth/verify/"),
-          { challenge_id: challenge, code },
-          { skipAuth: true }
-        );
-        if (verifyResult.registration_token) {
-          setRegistrationToken(verifyResult.registration_token);
-          setAuthView("SIGNUP_PROFILE");
-        } else {
-          finish(verifyResult);
-        }
-      }
-    });
+  const handleVerifyOtpLogin=()=>{
+    if(otpDigits.some(d=>!d)){setError('Enter the four-digit SMS code.');return;}
+    void perform(async()=>{const result=await apiClient.post<any>(customerPath('auth/recovery-verify/'),{challenge_id:challenge,code:otpDigits.join('')},{skipAuth:true});setResetToken(result.reset_token);setNewPassword('');setNewPin('');setAuthView('RESET_PASSWORD');});
   };
+  const handleResetPassword=(e:React.FormEvent)=>{
+    e.preventDefault();
+    if(newPassword.length<8 || !/^\d{4}$/.test(newPin)){setError('Use a password of at least 8 characters and a four-digit PIN.');return;}
+    void perform(async()=>{const result=await apiClient.post<any>(customerPath('auth/reset/'),{reset_token:resetToken,password:newPassword,pin:newPin},{skipAuth:true});setResetToken('');finish(result);});
+  };
+  const checkSmsStatus=()=>void perform(async()=>{
+    const result=await apiClient.post<any>(customerPath('auth/sms-status/'),{challenge_id:challenge},{skipAuth:true});
+    if(result.status==='FAILED'||result.status==='EXPIRED')throw new Error('SMS could not be sent or the code expired. Request a new code, or contact the outlet.');
+    setInfoMessage(result.status==='SENT'?'Sparrow accepted your SMS. Check your mobile inbox.':'Your SMS is queued. Please wait a moment.');
+  });
 
   const handleDigitChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -404,7 +372,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         return "Complete Your Profile";
       case "OTP_LOGIN_PHONE":
       case "OTP_LOGIN_OTP":
-        return "Sign In with OTP";
+        return "Recover your account";
+      case "RESET_PASSWORD": return "Set new password and PIN";
       default:
         return "Customer Sign In";
     }
@@ -442,7 +411,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 Mobile Number
               </label>
               <div className="flex rounded-none overflow-hidden border border-zinc-200 dark:border-zinc-800 focus-within:border-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
-                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-800 shrink-0 rounded-none">
+                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-base sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-800 shrink-0 rounded-none">
                   +977
                 </div>
                 <input
@@ -453,7 +422,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   autoComplete="tel"
-                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
+                  className="flex-1 px-3 py-2.5 bg-transparent text-base sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required
                 />
               </div>
@@ -489,7 +458,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   onChange={(e) => setCredential(e.target.value)}
                   placeholder="Enter your 4-digit PIN or password"
                   autoComplete="current-password"
-                  className="w-full pl-9 pr-10 h-11 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                  className="w-full pl-9 pr-10 h-11 text-base sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                   required
                 />
                 <button
@@ -513,7 +482,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               Sign In
             </Button>
 
-            {/* Quick One-Tap Action: Forgot PIN / Sign In with OTP */}
+            {/* Quick One-Tap Action: Forgot PIN / Verify Recovery Code */}
             <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
               <span className="flex-shrink mx-2 text-[10px] uppercase font-bold tracking-wider text-zinc-400">
@@ -535,7 +504,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               className="w-full h-11 border border-zinc-300 dark:border-zinc-700 hover:border-amber-500 bg-zinc-100/70 dark:bg-zinc-800/40 hover:bg-amber-500/10 text-zinc-800 dark:text-zinc-200 hover:text-amber-500 dark:hover:text-amber-400 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer rounded-none"
             >
               <KeyRound className="w-3.5 h-3.5 text-amber-500" />
-              <span>Forgot PIN? Sign In with One-Time OTP</span>
+              <span>Forgot password or PIN? Recover with SMS</span>
             </button>
 
             {/* Footer: Create Account Switch */}
@@ -568,7 +537,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 Mobile Number
               </label>
               <div className="flex rounded-none overflow-hidden border border-zinc-200 dark:border-zinc-800 focus-within:border-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
-                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-800 shrink-0 rounded-none">
+                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-base sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-800 shrink-0 rounded-none">
                   +977
                 </div>
                 <input
@@ -579,7 +548,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   autoComplete="tel"
-                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
+                  className="flex-1 px-3 py-2.5 bg-transparent text-base sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required
                   autoFocus
                 />
@@ -619,7 +588,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         {authView === "SIGNUP_OTP" && (
           <div className="space-y-4 py-1">
             <div className="flex items-center justify-between text-xs text-zinc-500">
-              <span>Code sent to +977 {phone}</span>
+              <span>SMS code for {phone}</span>
               <button
                 type="button"
                 onClick={() => setAuthView("SIGNUP_PHONE")}
@@ -628,12 +597,6 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 Change Number
               </button>
             </div>
-
-            {demoCode && (
-              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-none text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
-                Test OTP Code: <strong className="font-mono text-sm tracking-wider">{demoCode}</strong>
-              </div>
-            )}
 
             <div className="flex justify-center gap-2.5 my-2">
               {otpDigits.map((digit, idx) => (
@@ -699,7 +662,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. Aayush Sharma"
-                  className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                  className="w-full pl-9 pr-3 h-10 text-base sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                   required
                   autoFocus
                 />
@@ -715,7 +678,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your.email@example.com"
-                className="w-full px-3 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                className="w-full px-3 h-10 text-base sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
               />
             </div>
 
@@ -736,7 +699,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     placeholder="••••"
-                    className="w-full pl-9 pr-3 h-10 text-xs sm:text-sm font-mono tracking-widest bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                    className="w-full pl-9 pr-3 h-10 text-base sm:text-sm font-mono tracking-widest bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                     required
                   />
                 </div>
@@ -755,7 +718,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Min. 6 chars"
                     minLength={6}
-                    className="w-full pl-9 pr-10 h-10 text-xs sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                    className="w-full pl-9 pr-10 h-10 text-base sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                     required
                   />
                   <button
@@ -792,7 +755,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 Registered Mobile Number
               </label>
               <div className="flex rounded-none overflow-hidden border border-zinc-200 dark:border-zinc-800 focus-within:border-amber-500 bg-zinc-50/70 dark:bg-[#161619] transition-colors">
-                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-800 shrink-0 rounded-none">
+                <div className="px-3 py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-base sm:text-sm font-bold flex items-center border-r border-zinc-200 dark:border-zinc-800 shrink-0 rounded-none">
                   +977
                 </div>
                 <input
@@ -803,7 +766,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                   autoComplete="tel"
-                  className="flex-1 px-3 py-2.5 bg-transparent text-xs sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
+                  className="flex-1 px-3 py-2.5 bg-transparent text-base sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required
                   autoFocus
                 />
@@ -816,7 +779,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               size="lg"
               className="w-full font-bold h-11 rounded-none shadow-none cursor-pointer"
             >
-              Send Login OTP
+              Send Recovery Code
             </Button>
 
             <div className="pt-2 text-center border-t border-zinc-200 dark:border-zinc-800">
@@ -840,7 +803,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         {authView === "OTP_LOGIN_OTP" && (
           <div className="space-y-4 py-1">
             <div className="flex items-center justify-between text-xs text-zinc-500">
-              <span>Code sent to +977 {phone}</span>
+              <span>SMS code for {phone}</span>
               <button
                 type="button"
                 onClick={() => setAuthView("OTP_LOGIN_PHONE")}
@@ -849,12 +812,6 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 Change Number
               </button>
             </div>
-
-            {demoCode && (
-              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-none text-xs text-amber-600 dark:text-amber-400 text-center font-medium">
-                Test OTP Code: <strong className="font-mono text-sm tracking-wider">{demoCode}</strong>
-              </div>
-            )}
 
             <div className="flex justify-center gap-2.5 my-2">
               {otpDigits.map((digit, idx) => (
@@ -898,10 +855,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               disabled={otpDigits.some((d) => !d)}
               onClick={handleVerifyOtpLogin}
             >
-              Sign In with OTP
+              Verify Recovery Code
             </Button>
           </div>
         )}
+        {(authView==='SIGNUP_OTP'||authView==='OTP_LOGIN_OTP')&&<button type="button" onClick={checkSmsStatus} className="mt-3 text-xs text-amber-500 underline">Check SMS delivery</button>}
+        {authView==='RESET_PASSWORD'&&<form onSubmit={handleResetPassword} className="space-y-4 py-2">
+          <p className="text-xs text-zinc-400">Mobile verified. Set your new password and quick PIN.</p>
+          <label className="block text-xs">New password<Input aria-label="New password" type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required/></label>
+          <label className="block text-xs">New 4-digit PIN<Input aria-label="New 4-digit PIN" type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="new-password" value={newPin} onChange={e=>setNewPin(e.target.value.replace(/\D/g,''))} required/></label>
+          <Button type="submit" className="w-full" disabled={busy}>Save and sign in</Button>
+        </form>}
       </fieldset>
     </Modal>
   );

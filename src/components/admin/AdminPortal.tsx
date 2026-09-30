@@ -57,6 +57,9 @@ import { AdminLoyaltyTab } from "./AdminLoyaltyTab";
 import { AdminMenuManagerTab } from "./AdminMenuManagerTab";
 import { AdminOrganizationTab } from "./AdminOrganizationTab";
 import { AdminActivityTab } from "./AdminActivityTab";
+import { AdminUnifiedOrdersTab } from "./AdminUnifiedOrdersTab";
+import { LiveSiteVisitorsBanner } from "./LiveSiteVisitorsBanner";
+import { useLiveSiteVisitors } from "../../lib/useLiveSiteVisitors";
 import {
   SkeletonMetricsRow,
   SkeletonChartCard,
@@ -85,6 +88,7 @@ export const AdminPortal: React.FC = () => {
   } = useApp();
 
   const { authUser, authOutlet, logout: authLogout } = useAuth();
+  const visitorStats = useLiveSiteVisitors();
 
   const displayName =
     authUser?.name ||
@@ -217,14 +221,14 @@ export const AdminPortal: React.FC = () => {
   }[] = [
     {
       id: "overview",
-      label: "Overview & KPIs",
-      icon: TrendingUp,
+      label: "Unified Orders & Live Site",
+      icon: Receipt,
+      badge: activeOrdersCount > 0 ? activeOrdersCount : undefined,
     },
     {
       id: "pos_orders",
-      label: "POS & Orders",
-      icon: Receipt,
-      badge: activeOrdersCount > 0 ? activeOrdersCount : undefined,
+      label: "POS Cashier Register",
+      icon: Utensils,
     },
     {
       id: "billing",
@@ -765,131 +769,27 @@ export const AdminPortal: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* TAB 1: OVERVIEW */}
+            {/* TAB 1: UNIFIED ORDER PAGE & LIVE SITE */}
             {activeTab === "overview" && (
               <div className="space-y-4">
-                {/* Clean Operational KPIs Bar - No bulky boxes or giant fonts */}
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-zinc-400 py-1 font-medium overflow-x-auto no-scrollbar border-b border-zinc-800 pb-3">
-                  <div className="flex items-center gap-2 whitespace-nowrap">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-zinc-500 font-normal">Today's Sales:</span>
-                    <span className="font-mono text-emerald-400 font-bold">{formatNPR(totalRevenue)}</span>
-                  </div>
-                  <div className="flex items-center gap-2 whitespace-nowrap">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    <span className="text-zinc-500 font-normal">Total Orders:</span>
-                    <span className="font-mono text-zinc-100 font-bold">{totalOrders}</span>
-                  </div>
-                  <div className="flex items-center gap-2 whitespace-nowrap">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
-                    <span className="text-zinc-500 font-normal">Active in Kitchen:</span>
-                    <span className="font-mono text-amber-400 font-bold">{activeKitchenOrders}</span>
-                  </div>
-                  <div className="flex items-center gap-2 whitespace-nowrap">
-                    <span className="w-2 h-2 rounded-full bg-sky-500" />
-                    <span className="text-zinc-500 font-normal">Ready for Pickup:</span>
-                    <span className="font-mono text-sky-400 font-bold">{readyOrders}</span>
-                  </div>
-                  <div className="flex items-center gap-2 whitespace-nowrap">
-                    <span className={`w-2 h-2 rounded-full ${lowStockCount > 0 ? "bg-rose-500 animate-pulse" : "bg-zinc-600"}`} />
-                    <span className="text-zinc-500 font-normal">Low Stock Alerts:</span>
-                    <span className={`font-mono font-bold ${lowStockCount > 0 ? "text-rose-400" : "text-zinc-400"}`}>
-                      {lowStockCount}
-                    </span>
-                  </div>
-                </div>
+                {/* 1. Total Users Open Site & Operational KPIs Live Banner */}
+                <LiveSiteVisitorsBanner
+                  visitorStats={visitorStats}
+                  totalRevenue={totalRevenue}
+                  totalOrders={totalOrders}
+                  activeKitchenOrders={activeKitchenOrders}
+                  readyOrders={readyOrders}
+                  lowStockCount={lowStockCount}
+                />
 
-                {/* Quick Activity Preview & Recent Orders */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Activity Logs Card */}
-                  <div className="p-4 bg-[#121214] border border-zinc-800 rounded-sm">
-                    <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
-                      <h3 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
-                        <FileText className="w-3.5 h-3.5 text-amber-500" />
-                        Live Operational Logs
-                      </h3>
-                      <button
-                        onClick={() => setActiveTab("logs")}
-                        className="text-[11px] font-bold text-amber-400 hover:underline cursor-pointer"
-                      >
-                        View All ({activityLogs.length})
-                      </button>
-                    </div>
-                    <div className="divide-y divide-zinc-800/80 mt-1">
-                      {activityLogs.slice(0, 5).map((log) => (
-                        <div key={log.id} className="py-2 flex items-start justify-between gap-3 text-xs">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-zinc-100 truncate">
-                                {log.action}
-                              </span>
-                              <span className="text-[10px] text-zinc-500 whitespace-nowrap">
-                                {log.actorName}
-                              </span>
-                            </div>
-                            <p className="text-zinc-400 text-[11px] mt-0.5 line-clamp-1">{log.details}</p>
-                          </div>
-                          <span className="font-mono text-[10px] text-zinc-500 shrink-0">
-                            {log.timestamp}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Recent Orders Card */}
-                  <div className="p-4 bg-[#121214] border border-zinc-800 rounded-sm">
-                    <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
-                      <h3 className="text-xs font-bold text-zinc-200 uppercase tracking-wider flex items-center gap-2">
-                        <Receipt className="w-3.5 h-3.5 text-amber-500" />
-                        Recent Customer Orders
-                      </h3>
-                      <button
-                        onClick={() => setActiveTab("orders")}
-                        className="text-[11px] font-bold text-amber-400 hover:underline cursor-pointer"
-                      >
-                        View All ({orders.length})
-                      </button>
-                    </div>
-                    <div className="divide-y divide-zinc-800/80 mt-1">
-                      {orders.slice(0, 5).map((order) => (
-                        <div key={order.id} className="py-2 flex items-center justify-between gap-2 text-xs">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-zinc-100">
-                                #{order.orderNumber}
-                              </span>
-                              <span className="text-zinc-400 truncate">
-                                {order.customerName}
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-zinc-500">
-                              {order.items?.length || 0} items •{" "}
-                              {order.paymentMethod === "ESEWA" ? "eSewa" : order.paymentMethod}
-                            </span>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <span className="font-mono font-bold text-zinc-100 block text-xs">
-                              {formatNPR(order.totalAmount)}
-                            </span>
-                            <Badge
-                              variant={
-                                order.status === "READY"
-                                  ? "success"
-                                  : order.status === "PROCESSING"
-                                  ? "brand"
-                                  : "neutral"
-                              }
-                              size="sm"
-                            >
-                              {order.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                {/* 2. The Complete Unified Order Detail Datatable (Using POS Order Datatable API) */}
+                <AdminUnifiedOrdersTab
+                  onOpenBillingForOrder={(ord) => {
+                    setSelectedBillingOrder(ord);
+                    handleTabChange("billing");
+                  }}
+                  onNavigateToTab={(tab) => handleTabChange(tab as TabType)}
+                />
               </div>
             )}
 

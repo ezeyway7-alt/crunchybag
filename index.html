@@ -15,6 +15,10 @@
           window.addEventListener('focusout', function(e) {
             if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
               window.scrollTo({ left: 0, top: window.scrollY });
+              var meta = document.querySelector('meta[name="viewport"]');
+              if (meta) {
+                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+              }
             }
           });
         }
