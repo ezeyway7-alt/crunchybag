@@ -85,7 +85,7 @@ export const DUMMY_USERS: Record<Exclude<UserRole, "CUSTOMER">, AuthUser & { pas
   KITCHEN: {
     id: "usr-kitchen-1",
     name: "Chef Ramesh Thapa",
-    email: "chef@crunchy.com",
+    email: "chef@crunchybag.com",
     role: "KITCHEN",
     title: "Head Cook / Kitchen Display",
     passwordHint: "chef123",
@@ -93,7 +93,7 @@ export const DUMMY_USERS: Record<Exclude<UserRole, "CUSTOMER">, AuthUser & { pas
   STAFF: {
     id: "usr-staff-1",
     name: "Bikash Shrestha",
-    email: "staff@crunchy.com",
+    email: "staff@crunchybag.com",
     role: "STAFF",
     title: "Front Cashier & Orders",
     passwordHint: "staff123",
@@ -101,7 +101,7 @@ export const DUMMY_USERS: Record<Exclude<UserRole, "CUSTOMER">, AuthUser & { pas
   ADMIN: {
     id: "usr-admin-1",
     name: "Rahul Adhikari",
-    email: "admin@crunchy.com",
+    email: "admin@crunchybag.com",
     role: "ADMIN",
     title: "Store General Manager",
     passwordHint: "admin123",
@@ -109,7 +109,7 @@ export const DUMMY_USERS: Record<Exclude<UserRole, "CUSTOMER">, AuthUser & { pas
   KIOSK: {
     id: "usr-kiosk-1",
     name: "Express Touch Kiosk #1",
-    email: "kiosk1@crunchy.com",
+    email: "kiosk1@crunchybag.com",
     role: "KIOSK",
     title: "Self-Order Touchscreen Kiosk",
     passwordHint: "kiosk123",

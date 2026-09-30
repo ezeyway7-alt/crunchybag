@@ -1,3 +1,4 @@
+import {AdminAudienceTab} from './AdminAudienceTab';
 import React, { useState } from "react";
 import {
   TrendingUp,
@@ -88,7 +89,7 @@ export const AdminPortal: React.FC = () => {
   } = useApp();
 
   const { authUser, authOutlet, logout: authLogout } = useAuth();
-  const visitorStats = useLiveSiteVisitors();
+
 
   const displayName =
     authUser?.name ||
@@ -104,6 +105,8 @@ export const AdminPortal: React.FC = () => {
   const displayOutlet = authOutlet?.name || currentOutlet?.name || "Kathmandu Branch";
 
   type TabType =
+    | "analytics"
+    | "customers"
     | "overview"
     | "pos_orders"
     | "billing"
@@ -117,6 +120,7 @@ export const AdminPortal: React.FC = () => {
     | "logs";
 
   const VALID_TABS: TabType[] = [
+    "analytics", "customers",
     "overview",
     "pos_orders",
     "billing",
@@ -283,6 +287,8 @@ export const AdminPortal: React.FC = () => {
       icon: Users,
       badge: safeEmployees.length,
     },
+    { id: "analytics", label: "Website Analytics", icon: TrendingUp },
+    { id: "customers", label: "Customers", icon: Users },
     {
       id: "organization",
       label: "Organization",
@@ -839,6 +845,8 @@ export const AdminPortal: React.FC = () => {
 
         {/* TAB 10: ORGANIZATION */}
         {activeTab === "organization" && <AdminOrganizationTab />}
+        {activeTab === "analytics" && <AdminAudienceTab mode="analytics"/>}
+        {activeTab === "customers" && <AdminAudienceTab mode="customers"/>}
 
         {/* TAB 11: ACTIVITY & AUDIT LOGS */}
         {activeTab === "logs" && <AdminActivityTab />}

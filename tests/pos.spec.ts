@@ -503,3 +503,42 @@ test('staff token and settled bill use the same saved compact receipt and tracki
   await expect.poll(()=>state.orders[0].paid_amount).toBe('220.00');
   await page.screenshot({path:test.info().outputPath('compact-staff-bill.png'),fullPage:true});
 });
+
+
+test('website analytics and customer directory show real scoped data with simple graph and search',async({page})=>{
+  await setup(page);
+  let trafficReads=0;const sockets:any[]=[];
+  await page.routeWebSocket('**/ws/outlets/1/analytics/',ws=>{sockets.push(ws);ws.onMessage(()=>ws.send(JSON.stringify({event_type:'HEARTBEAT',revision:'initial'})));});
+  await page.route('**/api/v1/customer/analytics/**',route=>{trafficReads++;return route.fulfill({json:{visitors:12,sessions:15,page_views:25,daily:[{date:'2026-09-29',visitors:5,page_views:10},{date:'2026-09-30',visitors:7,page_views:15}],channels:[{channel:'WEBSITE',page_views:20},{channel:'TABLE_QR',page_views:5}],pages:[{path:'/menu',page_views:25}]}});});
+  await page.route('**/api/v1/customer/directory/**',route=>{const search=new URL(route.request().url()).searchParams.get('search');return route.fulfill({json:{count:search==='missing'?0:1,page:1,page_size:25,results:search==='missing'?[]:[{id:1,name:'Suraj',phone:'+9779841234567',email:'',registered:true,sources:['WEBSITE','TABLE_QR','KIOSK'],orders:3,order_total:'600.00',last_seen:'2026-09-30T10:00:00Z',last_login:'2026-09-30T09:00:00Z'}]}});});
+  await page.getByRole('button',{name:'Website Analytics',exact:true}).click();
+  await expect(page.getByRole('img',{name:'Daily website visitors'})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Website Analytics'})).toContainText('12');
+  await page.getByLabel('Traffic period').selectOption('7');
+  await expect.poll(()=>trafficReads).toBeGreaterThan(1);
+  const beforeLive=trafficReads;sockets.at(-1).send(JSON.stringify({event_type:'HEARTBEAT',revision:'new-visit'}));
+  await expect.poll(()=>trafficReads).toBeGreaterThan(beforeLive);
+  await page.mouse.move(950,400);await page.waitForTimeout(300);await page.screenshot({path:test.info().outputPath('website-analytics.png'),fullPage:true});
+  await page.getByRole('button',{name:'Customers',exact:true}).click();
+  await expect(page.getByRole('cell',{name:'Suraj',exact:true})).toBeVisible();
+  await expect(page.getByRole('cell',{name:'+9779841234567',exact:true})).toBeVisible();
+  await page.getByLabel('Search customers').fill('missing');
+  await expect(page.getByText('No customers match your search.')).toBeVisible();
+  await page.getByLabel('Search customers').fill('Suraj');
+  await expect(page.getByRole('cell',{name:'Suraj',exact:true})).toBeVisible();
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:test.info().outputPath('customer-directory-mobile.png'),fullPage:true});
+});
+
+test('organization SMS token stays write only and blank keeps existing credential',async({page})=>{
+  await setup(page);const writes:any[]=[];
+  await page.route('**/api/v1/organization/',route=>{if(route.request().method()==='PATCH')writes.push(route.request().postDataJSON());return route.fulfill({json:{id:1,name:'Kitchen',sms_enabled:true,sms_sender:'Approved',sms_token_configured:true,sms_admin_numbers:'9841234567',sms_keyword:'',sms_shortcode:'',sms_public_base_url:'https://crunchybag.com'}});});
+  await page.getByRole('button',{name:'Organization',exact:true}).click();
+  await expect(page.getByLabel('Sparrow SMS API Token')).toHaveValue('');
+  await expect(page.getByLabel('Sender Identity (From)')).toHaveValue('Approved');
+  await page.getByRole('button',{name:'Save SMS Settings'}).click();
+  await expect(page.getByText('SMS settings saved',{exact:true})).toBeVisible();expect(writes.at(-1)).not.toHaveProperty('sms_api_token');
+  await page.getByLabel('Sparrow SMS API Token').fill('new-secret');
+  await page.getByRole('button',{name:'Save SMS Settings'}).click();
+  await expect(page.getByLabel('Sparrow SMS API Token')).toHaveValue('');expect(writes.at(-1).sms_api_token).toBe('new-secret');
+});

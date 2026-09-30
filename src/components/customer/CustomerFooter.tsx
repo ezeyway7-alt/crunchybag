@@ -447,7 +447,7 @@ export const CustomerFooter: React.FC = () => {
                   +977 1-4229988
                 </li>
                 <li className="text-zinc-500">
-                  Email: hello@crunchy.com.np
+                  Email: hello@crunchybag.com
                 </li>
                 <li className="text-[11px] text-zinc-500">
                   Durbar Marg, Kathmandu

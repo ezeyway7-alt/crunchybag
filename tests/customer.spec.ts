@@ -284,3 +284,30 @@ test('web receipt uses the saved outlet compact format and prints only the same 
   await expect(popup.getByRole('link',{name:'Track this order'})).toHaveAttribute('href','http://127.0.0.1:4173/track?token=receipt-signed');
   await expect(popup.getByRole('button')).toHaveCount(0);await popup.close();
 });
+
+
+test('SMS recovery verifies the code before resetting password and PIN without displaying an OTP',async({page})=>{
+  const state=await setup(page);const writes:any[]=[];
+  await page.route('**/api/v1/customer/auth/recovery-start/',route=>{writes.push(route.request().postDataJSON());return route.fulfill({json:{challenge_id:'recovery-1',resend_after:60,delivery_status:'QUEUED'}});});
+  await page.route('**/api/v1/customer/auth/recovery-verify/',route=>{expect(route.request().postDataJSON()).toEqual({challenge_id:'recovery-1',code:'4821'});return route.fulfill({json:{reset_token:'verified-reset'}});});
+  await page.route('**/api/v1/customer/auth/reset/',route=>{writes.push(route.request().postDataJSON());return route.fulfill({json:{access:'test-access',refresh:'test-refresh',user:state.user,outlet:state.outlet}});});
+  await page.goto('/menu');await page.getByRole('button',{name:'User Account Profile'}).click();
+  await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();
+  await page.getByRole('button',{name:'Forgot password or PIN? Recover with SMS'}).click();
+  await page.getByPlaceholder('98XXXXXXXX').last().fill('9841234567');
+  await page.getByRole('button',{name:'Send Recovery Code'}).click();
+  await expect(page.getByText('Test OTP Code:',{exact:false})).toHaveCount(0);
+  for(const [index,digit] of [...'4821'].entries())await page.getByLabel(`Login code digit ${index+1}`).fill(digit);
+  await page.getByRole('button',{name:'Verify Recovery Code',exact:true}).click();
+  await page.getByLabel('New Password',{exact:true}).fill('New-Passphrase-8*Forest');await page.getByLabel('New 4-Digit Quick PIN',{exact:true}).fill('9274');
+  await page.getByRole('button',{name:'Save New Credentials & Sign In'}).click();
+  await expect.poll(()=>writes.length).toBe(2);expect(writes[1]).toMatchObject({reset_token:'verified-reset',password:'New-Passphrase-8*Forest',pin:'9274'});
+});
+
+test('website traffic records page views without query strings or personal data',async({page})=>{
+  const state=await setup(page);await page.goto('/menu?token=private-test');
+  await expect.poll(()=>state.writes.filter(w=>w.path==='customer/traffic/'&&w.body.path==='/menu').length).toBe(1);
+  const visit=state.writes.find(w=>w.path==='customer/traffic/'&&w.body.path==='/menu').body;expect(visit.path).toBe(new URL(page.url()).pathname);expect(JSON.stringify(visit)).not.toContain('private-test');expect(visit).not.toHaveProperty('phone');
+  await page.reload();await expect.poll(()=>state.writes.filter(w=>w.path==='customer/traffic/'&&w.body.path==='/menu').length).toBe(2);
+  const second=state.writes.filter(w=>w.path==='customer/traffic/'&&w.body.path==='/menu')[1].body;expect(second.visitor_id).toBe(visit.visitor_id);expect(second.session_id).toBe(visit.session_id);expect(second.event_id).not.toBe(visit.event_id);
+});

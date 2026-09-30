@@ -764,7 +764,7 @@ export const AdminEmployeesTab: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="sita.sharma@crunchy.com"
+                placeholder="sita.sharma@crunchybag.com"
                 required
                 className="text-xs"
               />

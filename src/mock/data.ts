@@ -950,7 +950,7 @@ export const MOCK_STAFF: Staff[] = [
   {
     id: "st-01",
     name: "Sunil Karki",
-    email: "sunil.karki@crunchy.np",
+    email: "sunil.karki@crunchybag.com",
     role: "Store Manager",
     outletId: "out-01",
     outletName: "Crunchy Flagship - Durbar Marg",
@@ -966,7 +966,7 @@ export const MOCK_STAFF: Staff[] = [
   {
     id: "st-02",
     name: "Manish Shrestha",
-    email: "manish.sh@crunchy.np",
+    email: "manish.sh@crunchybag.com",
     role: "Lead Cashier",
     outletId: "out-01",
     outletName: "Crunchy Flagship - Durbar Marg",
@@ -976,7 +976,7 @@ export const MOCK_STAFF: Staff[] = [
   {
     id: "st-03",
     name: "Sagar Thapa",
-    email: "sagar.kitchen@crunchy.np",
+    email: "sagar.kitchen@crunchybag.com",
     role: "Kitchen Supervisor",
     outletId: "out-01",
     outletName: "Crunchy Flagship - Durbar Marg",
@@ -996,7 +996,7 @@ export const MOCK_ORGANIZATIONS: PlatformOrganization[] = [
     totalOutlets: 3,
     activeDevices: 7,
     monthlyOrders: 14250,
-    contactEmail: "ops@crunchy.np",
+    contactEmail: "ops@crunchybag.com",
     createdAt: "2024-01-15",
   },
   {

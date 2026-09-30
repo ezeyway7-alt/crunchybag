@@ -1,3 +1,4 @@
+import {useWebsiteTraffic} from './lib/useWebsiteTraffic';
 import {ReceiptOrderTrackingPage} from "./components/customer/ReceiptOrderTrackingPage";
 import React from "react";
 import { AppProvider, useApp } from "./context/AppContext";
@@ -18,6 +19,7 @@ import { ToastContainer } from "./components/common/ToastContainer";
 const AppContent: React.FC = () => {
   const {
     activePortal,
+    currentOutlet,
     setActivePortal,
     isTableOrderMode,
     setIsTableOrderMode,
@@ -67,6 +69,8 @@ const AppContent: React.FC = () => {
     document.body.style.colorScheme = "dark";
     document.body.style.backgroundColor = "#09090b";
   }, []);
+
+  useWebsiteTraffic(currentPath,String(currentOutlet?.id || ''),activePortal,!!authUser && authUser.role!=='CUSTOMER');
 
   // Route classifications
   const isLoginRoute =

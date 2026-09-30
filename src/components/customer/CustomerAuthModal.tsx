@@ -1,3 +1,4 @@
+import {Input} from '../common/Input';
 import { apiClient, extractErrorMessage } from "../../lib/api";
 import { customerPath, saveCustomerSession } from "../../lib/customerApi";
 import React, { useState, useEffect, useRef } from "react";
@@ -131,7 +132,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       try {
         const result = await apiClient.post<any>(
           customerPath("auth/login/"),
-          { phone: cleanPhone, method: primaryMethod, credential: cleanCred },
+          { phone: cleanPhone, outlet_id:currentOutlet?.id, method: primaryMethod, credential: cleanCred },
           { skipAuth: true }
         );
         finish(result);
@@ -140,7 +141,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         try {
           const result = await apiClient.post<any>(
             customerPath("auth/login/"),
-            { phone: cleanPhone, method: fallbackMethod, credential: cleanCred },
+            { phone: cleanPhone, outlet_id:currentOutlet?.id, method: fallbackMethod, credential: cleanCred },
             { skipAuth: true }
           );
           finish(result);
@@ -246,7 +247,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         registerResult = await apiClient.post<any>(
           customerPath("auth/register/"),
           {
-            registration_token: registrationToken,
+            outlet_id:currentOutlet?.id, registration_token: registrationToken,
             username: baseUsername,
             name: username.trim(),
             email: email.trim(),
@@ -296,7 +297,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           registerResult = await apiClient.post<any>(
             customerPath("auth/register/"),
             {
-              registration_token: registrationToken,
+              outlet_id:currentOutlet?.id, registration_token: registrationToken,
               username: uniqueUsername,
               name: username.trim(),
               email: email.trim(),
@@ -371,7 +372,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     void perform(async () => {
       const result = await apiClient.post<any>(
         customerPath("auth/reset/"),
-        { reset_token: resetToken, password: newPassword, pin: newPin },
+        { reset_token: resetToken, password: newPassword, pin: newPin, outlet_id:currentOutlet?.id },
         { skipAuth: true }
       );
       setResetToken("");
@@ -763,8 +764,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                     aria-label="Set Password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Min. 6 chars"
-                    minLength={6}
+                    placeholder="Min. 8 chars"
+                    minLength={8}
                     className="w-full pl-9 pr-10 h-10 text-base sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
                     required
                   />

@@ -20,8 +20,8 @@ export const INITIAL_ORG_SETTINGS: OrganizationSettings = {
   legalEntity: "Crunchy Hospitality & Foods Pvt. Ltd.",
   panNumber: "609823145",
   logoUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format&fit=crop&q=80",
-  websiteUrl: "https://crunchy.com.np",
-  contactEmail: "admin@crunchy.com",
+  websiteUrl: "https://crunchybag.com",
+  contactEmail: "admin@crunchybag.com",
   contactPhone: "+977 1-4229988",
   headquartersAddress: "Kings Way, Durbar Marg, Kathmandu, Nepal",
   vatRatePercent: 13,
@@ -156,7 +156,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   {
     id: "emp-01",
     name: "Rahul Adhikari",
-    email: "admin@crunchy.com",
+    email: "admin@crunchybag.com",
     phone: "+977 9851023456",
     role: "SUPER_ADMIN",
     title: "General Manager & Franchise Director",
@@ -180,7 +180,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   {
     id: "emp-02",
     name: "Bikash Shrestha",
-    email: "staff@crunchy.com",
+    email: "staff@crunchybag.com",
     phone: "+977 9841234567",
     role: "CASHIER",
     title: "Head Cashier & Billing Operator",
@@ -193,7 +193,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   {
     id: "emp-03",
     name: "Chef Ramesh Thapa",
-    email: "chef@crunchy.com",
+    email: "chef@crunchybag.com",
     phone: "+977 9813456789",
     role: "KITCHEN_SUPERVISOR",
     title: "Executive Head Chef & Kitchen Lead",
@@ -206,7 +206,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   {
     id: "emp-04",
     name: "Pooja Gurung",
-    email: "inventory@crunchy.com",
+    email: "inventory@crunchybag.com",
     phone: "+977 9801987654",
     role: "INVENTORY_MANAGER",
     title: "Procurement & Storekeeper",
@@ -219,7 +219,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
   {
     id: "emp-05",
     name: "Suman Maharjan",
-    email: "suman@crunchy.com",
+    email: "suman@crunchybag.com",
     phone: "+977 9860112233",
     role: "STORE_MANAGER",
     title: "Jhamsikhel Branch Manager",

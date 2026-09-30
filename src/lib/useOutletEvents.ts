@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {DEFAULT_API_BASE} from './api';
 
 // Public outlet events carry identifiers/status only. Private snapshots still require authorization.
-export function useOutletEvents(outlet: string, enabled: boolean, onRefresh: () => void, onEvent?: (event:any)=>void) {
+export function useOutletEvents(outlet: string, enabled: boolean, onRefresh: () => void, onEvent?: (event:any)=>void, channel:'display'|'analytics'='display') {
   const refreshRef=useRef(onRefresh), eventRef=useRef(onEvent);
   refreshRef.current=onRefresh;eventRef.current=onEvent;
   const [live,setLive]=useState(false);
@@ -16,7 +16,7 @@ export function useOutletEvents(outlet: string, enabled: boolean, onRefresh: () 
       if(stopped)return;
       const url=new URL((import.meta as any).env.VITE_POS_WS_ORIGIN || DEFAULT_API_BASE,window.location.origin);
       url.protocol=['https:','wss:'].includes(url.protocol)?'wss:':'ws:';
-      url.pathname=`/ws/outlets/${encodeURIComponent(outlet)}/display/`;url.search='';
+      url.pathname=`/ws/outlets/${encodeURIComponent(outlet)}/${channel}/`;url.search='';
       const ws=new WebSocket(url);socket=ws;
       ws.onopen=()=>{if(stopped){ws.close();return;}setLive(true);attempts=0;heard=Date.now();refresh();ws.send(JSON.stringify({type:'ping'}));};
       ws.onmessage=message=>{
@@ -40,6 +40,6 @@ export function useOutletEvents(outlet: string, enabled: boolean, onRefresh: () 
     connect();
     const ping=setInterval(()=>{if(socket?.readyState===WebSocket.OPEN){if(Date.now()-heard>65000)socket.close();else socket.send(JSON.stringify({type:'ping'}));}},25000);
     return()=>{stopped=true;clearInterval(ping);clearTimeout(retry);clearTimeout(debounce);socket?.close();};
-  },[outlet,enabled]);
+  },[outlet,enabled,channel]);
   return live;
 }

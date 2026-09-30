@@ -16,7 +16,7 @@ const DEFAULT_METADATA: SEOMetadata = {
   title: 'Crunchy - Crispy Fried Chicken & Burgers in Kathmandu',
   description:
     'Order fresh, crispy fried chicken, smash burgers, and delicious sides online with fast delivery across Kathmandu. Instant eSewa payment supported.',
-  canonical: 'https://crunchy.com.np/',
+  canonical: 'https://crunchybag.com/',
   image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=1200&h=630&q=80',
   noIndex: false,
 };
