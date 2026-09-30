@@ -123,5 +123,6 @@ export function comboDefinitions(products: Product[]) {
     promoText: '', buttonLabel: 'Customize', targetCategory: p.categoryId, bgGradient: 'from-amber-600 via-amber-500 to-yellow-500',
     image: p.images[p.mainImageIndex || 0] || '', basePrice: p.basePrice, originalPrice: p.comboOriginalPrice ?? p.basePrice,
     includedProductIds: (p.comboItems || []).flatMap(item => Array(item.quantity).fill(item.productId)),
+    comboItems: p.comboItems || [],
   }));
 }

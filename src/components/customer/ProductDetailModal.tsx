@@ -159,6 +159,30 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
         </div>
 
+        {/* Combo Included Items Overview */}
+        {product.isComboPackage && product.comboItems && product.comboItems.length > 0 && (
+          <div className="space-y-1.5 p-2.5 bg-amber-500/5 border border-amber-500/20">
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-500 block">
+              Package Includes:
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {product.comboItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-1.5 p-1.5 bg-zinc-100 dark:bg-[#18181B] border border-zinc-200 dark:border-zinc-800 text-xs"
+                >
+                  <span className="px-1.5 py-0.2 bg-amber-500 text-black font-mono font-black text-[10px] shrink-0">
+                    {item.quantity}x
+                  </span>
+                  <span className="font-semibold text-zinc-800 dark:text-zinc-200 text-[11px] truncate">
+                    {item.productName || item.productId}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Portions / Variants list if multiple */}
         {product.variants.length > 1 && (
           <div className="space-y-1 pt-1 border-t border-zinc-100 dark:border-zinc-800">

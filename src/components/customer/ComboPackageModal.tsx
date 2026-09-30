@@ -32,6 +32,7 @@ export interface ComboPackageDefinition {
   basePrice: number;
   originalPrice: number;
   includedProductIds: string[];
+  comboItems?: { productId: string; productName?: string; quantity: number; unitPrice?: number }[];
 }
 
 interface ComboItemConfig {
@@ -97,9 +98,62 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
     setIsAddMoreOpen(false);
     setAddSearchQuery("");
 
-    // Map included product IDs to ComboItemConfigs
-    const initialItems: ComboItemConfig[] = combo.includedProductIds
-      .map((pid, idx) => {
+    let initialItems: ComboItemConfig[] = [];
+
+    // Consolidate bundle pieces: If a combo contains multiple pieces of the same item (e.g. 4x Chicken Burger, 4x Coke),
+    // group them into ONE row with quantity = count so customers can see and adjust with +/- or direct typing.
+    if (combo.comboItems && combo.comboItems.length > 0) {
+      const mergedMap = new Map<string, { productId: string; quantity: number }>();
+      for (const ci of combo.comboItems) {
+        const existing = mergedMap.get(ci.productId);
+        if (existing) {
+          existing.quantity += (ci.quantity || 1);
+        } else {
+          mergedMap.set(ci.productId, { productId: ci.productId, quantity: ci.quantity || 1 });
+        }
+      }
+
+      initialItems = Array.from(mergedMap.values()).map((ci, idx) => {
+        const prod = products.find((p) => p.id === ci.productId);
+        if (!prod) return null;
+
+        const defaultVariant = prod.variants.find((v) => v.isDefault) || prod.variants[0];
+        const defaultMods: SelectedModifier[] = [];
+
+        prod.modifierGroups.forEach((group) => {
+          const defOpt = group.options.find((o) => o.isDefault);
+          if (defOpt) {
+            defaultMods.push({
+              groupId: group.id,
+              groupName: group.name,
+              optionId: defOpt.id,
+              optionName: defOpt.name,
+              priceDelta: defOpt.priceDelta,
+            });
+          }
+        });
+
+        const estimatedCredit = Math.round(prod.basePrice * 0.75);
+
+        return {
+          instanceId: `base-${prod.id}-${idx}`,
+          product: prod,
+          selectedVariant: defaultVariant,
+          selectedModifiers: defaultMods,
+          quantity: ci.quantity,
+          isBaseItem: true,
+          baseEstimatedCredit: estimatedCredit,
+          isRemoved: false,
+        };
+      }).filter(Boolean) as ComboItemConfig[];
+    } else {
+      // Fallback: group includedProductIds by product ID counting occurrences
+      const countMap = new Map<string, number>();
+      for (const pid of combo.includedProductIds) {
+        countMap.set(pid, (countMap.get(pid) || 0) + 1);
+      }
+
+      initialItems = Array.from(countMap.entries()).map(([pid, qty], idx) => {
         const prod = products.find((p) => p.id === pid);
         if (!prod) return null;
 
@@ -119,7 +173,6 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
           }
         });
 
-        // Credit if removed: approximate proportion of basePrice
         const estimatedCredit = Math.round(prod.basePrice * 0.75);
 
         return {
@@ -127,20 +180,59 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
           product: prod,
           selectedVariant: defaultVariant,
           selectedModifiers: defaultMods,
-          quantity: 1,
+          quantity: qty,
           isBaseItem: true,
           baseEstimatedCredit: estimatedCredit,
           isRemoved: false,
         };
-      })
-      .filter(Boolean) as ComboItemConfig[];
+      }).filter(Boolean) as ComboItemConfig[];
+    }
 
-    if(initialSelections){
-      setItems(initialSelections.flatMap((line,index)=>{const product=products.find(p=>p.id===line.product_id);if(!product)return [];
-        const selectedVariant=product.variants.find(v=>v.id===line.variant_id)||product.variants.find(v=>v.isDefault)||product.variants[0];
-        const selectedModifiers=product.modifierGroups.flatMap(g=>g.options.filter(o=>line.modifier_option_ids.includes(o.id)).map(o=>({groupId:g.id,groupName:g.name,optionId:o.id,optionName:o.name,priceDelta:o.priceDelta})));
-        return [{instanceId:`saved-${index}`,product,selectedVariant,selectedModifiers,quantity:line.quantity,isBaseItem:combo.includedProductIds.includes(product.id),baseEstimatedCredit:0,isRemoved:false}];}));
-    }else setItems(initialItems);
+    if (initialSelections) {
+      const mergedSelections = new Map<string, {
+        product_id: string;
+        variant_id: string | null;
+        modifier_option_ids: string[];
+        quantity: number;
+      }>();
+
+      for (const line of initialSelections) {
+        const key = `${line.product_id}:${line.variant_id}:${[...line.modifier_option_ids].sort().join(",")}`;
+        const existing = mergedSelections.get(key);
+        if (existing) {
+          existing.quantity += line.quantity;
+        } else {
+          mergedSelections.set(key, { ...line });
+        }
+      }
+
+      setItems(Array.from(mergedSelections.values()).flatMap((line, index) => {
+        const product = products.find((p) => p.id === line.product_id);
+        if (!product) return [];
+        const selectedVariant = product.variants.find((v) => v.id === line.variant_id) || product.variants.find((v) => v.isDefault) || product.variants[0];
+        const selectedModifiers = product.modifierGroups.flatMap((g) =>
+          g.options.filter((o) => line.modifier_option_ids.includes(o.id)).map((o) => ({
+            groupId: g.id,
+            groupName: g.name,
+            optionId: o.id,
+            optionName: o.name,
+            priceDelta: o.priceDelta,
+          }))
+        );
+        return [{
+          instanceId: `saved-${index}`,
+          product,
+          selectedVariant,
+          selectedModifiers,
+          quantity: line.quantity,
+          isBaseItem: combo.includedProductIds.includes(product.id),
+          baseEstimatedCredit: 0,
+          isRemoved: false,
+        }];
+      }));
+    } else {
+      setItems(initialItems);
+    }
   }, [combo?.id, isOpen]);
 
   // Active items (not removed and quantity > 0)
@@ -246,6 +338,20 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
           return { ...it, quantity: 0, isRemoved: true };
         }
         return { ...it, quantity: newQty, isRemoved: false };
+      })
+    );
+  };
+
+  // Handler: set direct quantity from numeric input
+  const handleQuantitySet = (instanceId: string, value: number) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.instanceId !== instanceId) return it;
+        const validQty = Math.max(0, Math.min(99, Math.floor(value || 0)));
+        if (validQty <= 0) {
+          return { ...it, quantity: 0, isRemoved: true };
+        }
+        return { ...it, quantity: validQty, isRemoved: false };
       })
     );
   };
@@ -590,13 +696,18 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
 
                       {/* Product Name at bottom */}
                       <div className="mt-1.5 w-full text-center">
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1 flex-wrap">
                           <span
                             className="text-[11px] sm:text-xs font-bold text-zinc-950 dark:text-zinc-100 truncate block max-w-full"
                             title={prod.name}
                           >
                             {prod.name}
                           </span>
+                          {item.quantity > 1 && (
+                            <span className="text-[9px] px-1.5 py-0.2 bg-amber-500/20 text-amber-600 dark:text-amber-400 font-mono font-black border border-amber-500/40 shrink-0">
+                              {item.quantity}x
+                            </span>
+                          )}
                           {!item.isBaseItem && (
                             <span className="text-[8px] px-1 py-0.2 bg-amber-500 text-black font-black uppercase shrink-0">
                               Extra
@@ -622,23 +733,32 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Quantity Stepper at the bottom of left column */}
+                      {/* Quantity Stepper with +/- buttons and direct typeable input */}
                       <div className="mt-1.5 flex items-center justify-center border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#1E1E22] h-6 w-full max-w-[85px]">
                         <button
                           type="button"
                           onClick={() => handleQuantityChange(item.instanceId, -1)}
-                          className="w-5 h-full flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
+                          className="w-5 h-full flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
                           title="Decrease quantity"
                         >
                           <Minus className="w-2.5 h-2.5" />
                         </button>
-                        <span className="flex-1 text-center text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100">
-                          {item.quantity}
-                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="99"
+                          value={item.quantity === 0 ? "" : item.quantity}
+                          onChange={(e) => {
+                            const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                            handleQuantitySet(item.instanceId, isNaN(val) ? 0 : val);
+                          }}
+                          className="w-8 h-full text-center text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 bg-transparent border-0 p-0 focus:outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          title="Type quantity or use + / -"
+                        />
                         <button
                           type="button"
                           onClick={() => handleQuantityChange(item.instanceId, 1)}
-                          className="w-5 h-full flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
+                          className="w-5 h-full flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
                           title="Increase quantity"
                         >
                           <Plus className="w-2.5 h-2.5" />
