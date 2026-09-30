@@ -7,7 +7,7 @@ export const ToastContainer: React.FC = () => {
   const { toasts, removeToast } = useApp();
 
   return (
-    <div className="fixed top-4 right-4 sm:top-5 sm:right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 w-[calc(100vw-2rem)] max-w-sm pointer-events-none">
       <AnimatePresence>
         {toasts.map((toast) => {
           const icons = {
