@@ -304,23 +304,25 @@ export const PortalHeader: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Separator */}
-                  <div className="border-t border-zinc-100 dark:border-zinc-800/80 my-0.5" />
-
-                  {/* 4. Logout */}
-                  <div className="p-1">
-                    <button
-                      id="menu-logout-btn"
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        authLogout();logout();
-                      }}
-                      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors text-left cursor-pointer"
-                    >
-                      <LogOut className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      <span>Logout</span>
-                    </button>
-                  </div>
+                  {/* Separator + Logout — only for logged-in customers */}
+                  {authUser?.role === "CUSTOMER" && (
+                    <>
+                      <div className="border-t border-zinc-100 dark:border-zinc-800/80 my-0.5" />
+                      <div className="p-1">
+                        <button
+                          id="menu-logout-btn"
+                          onClick={() => {
+                            setIsProfileMenuOpen(false);
+                            authLogout();logout();
+                          }}
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors text-left cursor-pointer"
+                        >
+                          <LogOut className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          <span>Logout</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
