@@ -1,0 +1,29 @@
+# Crunchy Restaurant - robots.txt
+# https://crunchy.com.np
+
+User-agent: *
+Allow: /
+Allow: /favicon.svg
+Allow: /logo.svg
+
+# Protect private staff & admin operational portals from search engines
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /staff
+Disallow: /staff/*
+Disallow: /kds
+Disallow: /kds/*
+Disallow: /portal-control
+Disallow: /portal-control/*
+Disallow: /api/
+Disallow: /api/*
+
+# Google & Bing bots specific directives
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Sitemap Location
+Sitemap: https://crunchy.com.np/sitemap.xml
