@@ -786,7 +786,6 @@ export const AdminPortal: React.FC = () => {
               <div className="space-y-4">
                 {/* 1. Total Users Open Site & Operational KPIs Live Banner */}
                 <LiveSiteVisitorsBanner
-                  visitorStats={visitorStats}
                   totalRevenue={totalRevenue}
                   totalOrders={totalOrders}
                   activeKitchenOrders={activeKitchenOrders}
