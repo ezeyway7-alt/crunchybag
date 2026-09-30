@@ -2025,7 +2025,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
             </div>
 
             {selectedOrderForDrawer.fulfillmentType === "DELIVERY" && (
-              <DeliveryOrderDetails key={selectedOrderForDrawer.id} order={selectedOrderForDrawer} compact />
+              <DeliveryOrderDetails key={selectedOrderForDrawer.id} order={selectedOrderForDrawer} compact adminOnly />
             )}
 
             {/* Items list with Kitchen vs Direct Counter distinction */}

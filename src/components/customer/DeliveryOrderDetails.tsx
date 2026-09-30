@@ -491,7 +491,8 @@ export const DeliveryDispatchModal: React.FC<{
 export const DeliveryOrderDetails: React.FC<{
   order: Order;
   compact?: boolean;
-}> = ({ order, compact = false }) => {
+  adminOnly?: boolean;
+}> = ({ order, compact = false, adminOnly = false }) => {
   const info = deliveryInfo(order);
   const [notice, setNotice] = useState('');
   const [manual, setManual] = useState(false);
@@ -637,85 +638,87 @@ export const DeliveryOrderDetails: React.FC<{
         </div>
       )}
 
-      {/* Navigation & App Dispatch Bar */}
-      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-        {/* Share & Open App Chooser */}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void share()}
-          aria-label="Share delivery details"
-          className={
-            compact
-              ? 'px-2.5 py-1 text-[11px] bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50'
-              : 'px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50'
-          }
-        >
-          <Share2 className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Share / Dispatch</span>
-        </button>
-
-        {/* Google Maps Directions */}
-        {info.directionsUrl && (
-          <a
-            href={info.directionsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={actionClass}
-            title="Open turn-by-turn navigation in Google Maps"
-          >
-            <Navigation className="w-3 h-3 text-emerald-400" />
-            <span>Maps</span>
-          </a>
-        )}
-
-        {/* Pathao Deep Link */}
-        <button
-          type="button"
-          onClick={() => openPathao(info.point, info.address)}
-          className={actionClass}
-          title="Open in Pathao app with auto destination"
-        >
-          <Bike className="w-3 h-3 text-rose-500" />
-          <span>Pathao</span>
-        </button>
-
-        {/* Yango Deep Link */}
-        <button
-          type="button"
-          onClick={() => openYango(info.point, info.address)}
-          className={actionClass}
-          title="Open in Yango app with auto destination"
-        >
-          <Compass className="w-3 h-3 text-amber-400" />
-          <span>Yango</span>
-        </button>
-
-        {/* Native Device Map (Geo URI) */}
-        {info.geoUri && (
+      {/* Navigation & App Dispatch Bar — admin only */}
+      {adminOnly && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          {/* Share & Open App Chooser */}
           <button
             type="button"
-            onClick={() => openNativeGeo(info.point, info.address)}
-            className={actionClass}
-            title="Open in native mobile map app"
+            disabled={busy}
+            onClick={() => void share()}
+            aria-label="Share delivery details"
+            className={
+              compact
+                ? 'px-2.5 py-1 text-[11px] bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50'
+                : 'px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50'
+            }
           >
-            <Smartphone className="w-3 h-3 text-sky-400" />
-            <span>Device</span>
+            <Share2 className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Share / Dispatch</span>
           </button>
-        )}
 
-        {/* Copy Slip */}
-        <button
-          type="button"
-          onClick={() => void copy()}
-          aria-label="Copy delivery details"
-          className={actionClass}
-          title="Copy delivery details for rider"
-        >
-          <Copy className="w-3 h-3" />
-          <span>Copy</span>
-        </button>
-      </div>
+          {/* Google Maps Directions */}
+          {info.directionsUrl && (
+            <a
+              href={info.directionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={actionClass}
+              title="Open turn-by-turn navigation in Google Maps"
+            >
+              <Navigation className="w-3 h-3 text-emerald-400" />
+              <span>Maps</span>
+            </a>
+          )}
+
+          {/* Pathao Deep Link */}
+          <button
+            type="button"
+            onClick={() => openPathao(info.point, info.address)}
+            className={actionClass}
+            title="Open in Pathao app with auto destination"
+          >
+            <Bike className="w-3 h-3 text-rose-500" />
+            <span>Pathao</span>
+          </button>
+
+          {/* Yango Deep Link */}
+          <button
+            type="button"
+            onClick={() => openYango(info.point, info.address)}
+            className={actionClass}
+            title="Open in Yango app with auto destination"
+          >
+            <Compass className="w-3 h-3 text-amber-400" />
+            <span>Yango</span>
+          </button>
+
+          {/* Native Device Map (Geo URI) */}
+          {info.geoUri && (
+            <button
+              type="button"
+              onClick={() => openNativeGeo(info.point, info.address)}
+              className={actionClass}
+              title="Open in native mobile map app"
+            >
+              <Smartphone className="w-3 h-3 text-sky-400" />
+              <span>Device</span>
+            </button>
+          )}
+
+          {/* Copy Slip */}
+          <button
+            type="button"
+            onClick={() => void copy()}
+            aria-label="Copy delivery details"
+            className={actionClass}
+            title="Copy delivery details for rider"
+          >
+            <Copy className="w-3 h-3" />
+            <span>Copy</span>
+          </button>
+        </div>
+      )}
 
       {notice && (
         <p role="status" className="text-amber-500 dark:text-amber-400 font-bold text-[11px] animate-pulse">
