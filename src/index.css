@@ -15,7 +15,10 @@
     color: #f4f4f5 !important;
     overflow-x: hidden;
     max-width: 100vw;
+    width: 100%;
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
   }
 
   body {
@@ -26,12 +29,31 @@
     min-height: 100vh;
     overflow-x: hidden;
     max-width: 100vw;
+    width: 100%;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: none;
+    overscroll-behavior-x: none;
   }
 
   .font-mono {
     font-family: var(--font-mono);
+  }
+}
+
+/* Prevent mobile keyboard auto-zoom & viewport distortion (iOS Safari / Mobile WebKit) */
+@media screen and (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  input[type="text"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="email"],
+  input[type="search"],
+  input[type="password"],
+  input[type="url"] {
+    font-size: 16px !important;
   }
 }
 

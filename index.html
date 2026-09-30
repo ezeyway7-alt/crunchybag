@@ -2,13 +2,22 @@
 <html lang="en" class="dark" data-theme="dark" style="color-scheme: dark; background-color: #09090b;">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <script>
       (function() {
         document.documentElement.classList.add('dark');
         document.documentElement.setAttribute('data-theme', 'dark');
         document.documentElement.style.colorScheme = 'dark';
         document.documentElement.style.backgroundColor = '#09090b';
+
+        // Prevent mobile keyboard zoom / scroll offset distortion on keyboard close
+        if (typeof window !== 'undefined') {
+          window.addEventListener('focusout', function(e) {
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
+              window.scrollTo({ left: 0, top: window.scrollY });
+            }
+          });
+        }
       })();
     </script>
     <title>Crunchy - Restaurant Platform</title>

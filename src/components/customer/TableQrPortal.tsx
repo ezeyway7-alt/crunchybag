@@ -410,7 +410,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 placeholder="Phone (Optional)"
-                className="w-full min-w-0 bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none font-mono"
+                className="w-full min-w-0 bg-transparent text-base sm:text-xs text-white placeholder:text-zinc-500 focus:outline-none font-mono"
               />
             </div>
 
@@ -421,7 +421,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                 value={guestName}
                 onChange={(e) => setGuestName(e.target.value)}
                 placeholder="Name (Optional)"
-                className="w-full min-w-0 bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none"
+                className="w-full min-w-0 bg-transparent text-base sm:text-xs text-white placeholder:text-zinc-500 focus:outline-none"
               />
             </div>
           </div>
@@ -434,7 +434,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search burgers, tenders, drinks..."
-              className="w-full min-w-0 bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none"
+              className="w-full min-w-0 bg-transparent text-base sm:text-xs text-white placeholder:text-zinc-500 focus:outline-none"
             />
             {searchQuery && (
               <button
