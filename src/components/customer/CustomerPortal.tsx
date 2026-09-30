@@ -11,7 +11,6 @@ import {
   LayoutGrid,
   BadgePercent,
   Filter,
-  Receipt,
   QrCode,
   Star,
   ShieldCheck,
@@ -338,21 +337,8 @@ export const CustomerPortal: React.FC = () => {
                 })}
               </div>
 
-              {/* Direct Quick Shortcuts: Print Receipt & Scan QR Tracker */}
+              {/* Direct Quick Shortcut: Scan QR Tracker & Rate */}
               <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedModalOrder(latestOrder);
-                    setIsReceiptModalOpen(true);
-                  }}
-                  className="h-6.5 px-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-bold flex items-center gap-1 border border-zinc-700 transition-colors cursor-pointer"
-                  title="View digital token receipt slip"
-                >
-                  <Receipt className="w-3 h-3 text-amber-500" />
-                  <span className="hidden sm:inline">Receipt Slip</span>
-                </button>
-
                 <button
                   type="button"
                   onClick={() => {

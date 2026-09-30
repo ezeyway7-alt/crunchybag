@@ -31,6 +31,9 @@ import {
   ArrowLeft,
   LogOut,
   Globe,
+  Tablet,
+  Tv,
+  ExternalLink,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
@@ -309,7 +312,33 @@ export const AdminPortal: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* Open TV Screen Button */}
+          <a
+            id="mobile-nav-open-tv-btn"
+            href="/tv"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open Live TV Order Board"
+            className="px-2 py-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <Tv className="w-3 h-3 text-emerald-400" />
+            <span className="hidden xs:inline">TV</span>
+          </a>
+
+          {/* Touch Screen Kiosk Button */}
+          <a
+            id="mobile-nav-open-kiosk-btn"
+            href="/kiosk"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open Touch Screen Kiosk"
+            className="px-2 py-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <Tablet className="w-3 h-3 text-amber-400" />
+            <span className="hidden xs:inline">Kiosk</span>
+          </a>
+
           <button
             type="button"
             onClick={handleReturnToCustomer}
@@ -317,7 +346,7 @@ export const AdminPortal: React.FC = () => {
             className="px-2 py-1 text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded flex items-center gap-1 cursor-pointer"
           >
             <ArrowLeft className="w-3 h-3" />
-            <span>Storefront</span>
+            <span className="hidden sm:inline">Storefront</span>
           </button>
           <button
             type="button"
@@ -414,6 +443,62 @@ export const AdminPortal: React.FC = () => {
                 </button>
               );
             })}
+
+            {/* Quick Launch Terminals: TV Screen & Touch Kiosk */}
+            <div className="pt-2 mt-2 border-t border-zinc-800/80 space-y-1">
+              {isSidebarHovered && (
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Displays & Terminals
+                </div>
+              )}
+              {/* Open TV Screen */}
+              <a
+                id="sidebar-open-tv-btn"
+                href="/tv"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open Live TV Order Board (Airport FIDS)"
+                className="w-full h-10 px-3 text-xs transition-colors flex items-center rounded-md cursor-pointer text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+              >
+                <div className="w-6 flex items-center justify-center shrink-0">
+                  <Tv className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div
+                  className={`flex-1 flex items-center justify-between ml-2.5 overflow-hidden transition-opacity duration-200 ${
+                    isSidebarHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+                  }`}
+                >
+                  <span className="truncate whitespace-nowrap font-medium">Open TV Screen</span>
+                  <span className="font-mono text-[9px] font-bold uppercase px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded">
+                    TV
+                  </span>
+                </div>
+              </a>
+
+              {/* Touch Screen Kiosk */}
+              <a
+                id="sidebar-open-kiosk-btn"
+                href="/kiosk"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open Touch Screen Self-Order Kiosk"
+                className="w-full h-10 px-3 text-xs transition-colors flex items-center rounded-md cursor-pointer text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+              >
+                <div className="w-6 flex items-center justify-center shrink-0">
+                  <Tablet className="w-4 h-4 text-amber-400" />
+                </div>
+                <div
+                  className={`flex-1 flex items-center justify-between ml-2.5 overflow-hidden transition-opacity duration-200 ${
+                    isSidebarHovered ? "opacity-100" : "opacity-0 pointer-events-none"
+                  }`}
+                >
+                  <span className="truncate whitespace-nowrap font-medium">Touch Screen Kiosk</span>
+                  <span className="font-mono text-[9px] font-bold uppercase px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded">
+                    KIOSK
+                  </span>
+                </div>
+              </a>
+            </div>
           </nav>
 
           {/* Footer - Sign Out */}
@@ -507,6 +592,45 @@ export const AdminPortal: React.FC = () => {
                     </button>
                   );
                 })}
+
+                {/* Quick Launch Terminals: TV Screen & Touch Kiosk in Mobile Drawer */}
+                <div className="pt-2 mt-2 border-t border-zinc-800/80 space-y-1">
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Displays & Terminals
+                  </div>
+                  <a
+                    id="drawer-open-tv-btn"
+                    href="/tv"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                    className="w-full h-10 px-3 text-xs flex items-center justify-between rounded-md cursor-pointer text-emerald-400 hover:bg-emerald-500/10"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Tv className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="font-medium">Open TV Screen</span>
+                    </div>
+                    <span className="font-mono text-[9px] font-bold uppercase px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded">
+                      TV
+                    </span>
+                  </a>
+                  <a
+                    id="drawer-open-kiosk-btn"
+                    href="/kiosk"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                    className="w-full h-10 px-3 text-xs flex items-center justify-between rounded-md cursor-pointer text-amber-400 hover:bg-amber-500/10"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Tablet className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span className="font-medium">Touch Screen Kiosk</span>
+                    </div>
+                    <span className="font-mono text-[9px] font-bold uppercase px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded">
+                      KIOSK
+                    </span>
+                  </a>
+                </div>
               </nav>
             </div>
 
@@ -528,9 +652,66 @@ export const AdminPortal: React.FC = () => {
       )}
 
       {/* -------------------------------------------------------------
-          MAIN CONTENT WORKSPACE (Clean, high-density, no big boxes)
+          MAIN CONTENT WORKSPACE (Clean, high-density, with desktop top nav)
       ------------------------------------------------------------- */}
-      <main className={`flex-1 min-w-0 ${activeTab === "kitchen" ? "p-1.5 sm:p-2" : "p-3 sm:p-5 space-y-4"}`}>
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Desktop Top Navigation Bar of Admin Panel */}
+        <header className="hidden md:flex h-12 bg-[#101012] border-b border-zinc-800 px-4 sm:px-6 items-center justify-between sticky top-0 z-30 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-zinc-100">
+              {navItems.find((n) => n.id === activeTab)?.label || "Admin Panel"}
+            </span>
+            <span className="text-zinc-600 text-xs">•</span>
+            <span className="text-[11px] text-zinc-400 font-mono">
+              {displayOutlet}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Open TV Screen Button */}
+            <a
+              id="admin-nav-open-tv-btn"
+              href="/tv"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-8 px-3 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Open Live TV Order Board (Airport FIDS) in new tab"
+            >
+              <Tv className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Open TV Screen</span>
+              <ExternalLink className="w-3 h-3 text-emerald-500/70" />
+            </a>
+
+            {/* Touch Screen Kiosk Button */}
+            <a
+              id="admin-nav-open-kiosk-btn"
+              href="/kiosk"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-8 px-3 text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Open Touch Screen Self-Order Kiosk in new tab"
+            >
+              <Tablet className="w-3.5 h-3.5 text-amber-400" />
+              <span>Touch Screen Kiosk</span>
+              <ExternalLink className="w-3 h-3 text-amber-500/70" />
+            </a>
+
+            <div className="h-4 w-px bg-zinc-800 mx-1" />
+
+            {/* Storefront button */}
+            <button
+              type="button"
+              onClick={handleReturnToCustomer}
+              className="h-8 px-2.5 text-xs font-medium text-zinc-300 bg-zinc-800/80 hover:bg-zinc-700/80 hover:text-white border border-zinc-700/60 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Back to Customer Storefront"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Storefront</span>
+            </button>
+          </div>
+        </header>
+
+        <main className={`flex-1 min-w-0 ${activeTab === "kitchen" ? "p-1.5 sm:p-2" : "p-3 sm:p-5 space-y-4"}`}>
         {isAdminTabLoading || isLoadingSkeleton ? (
           <div>
             {activeTab === "overview" && (
@@ -753,6 +934,7 @@ export const AdminPortal: React.FC = () => {
           </>
         )}
       </main>
+      </div>
     </div>
   );
 };

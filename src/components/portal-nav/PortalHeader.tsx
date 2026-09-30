@@ -14,11 +14,7 @@ import {
   Sun,
   User,
   Package,
-  Tablet,
-  Tv,
   QrCode,
-  Store,
-  UtensilsCrossed,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
@@ -44,10 +40,9 @@ export const PortalHeader: React.FC = () => {
     setIsSearchModalOpen,
     customerProfile,
     setIsProfileModalOpen,
-    loginAsRole,
   } = useApp();
 
-  const { authUser, isAuthenticated, openLoginModal, logout: authLogout } = useAuth();
+  const { authUser, logout: authLogout } = useAuth();
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isScanQrOpen, setIsScanQrOpen] = useState(false);
@@ -251,70 +246,6 @@ export const PortalHeader: React.FC = () => {
 
                   {/* Sub-menu Options */}
                   <div className="py-1">
-                    {/* Admin Dashboard (if logged in or admin) */}
-                    {(isAuthenticated || authUser || userRole === "ADMIN") && (
-                      <button
-                        id="menu-admin-dashboard-btn"
-                        onClick={() => {
-                          setIsProfileMenuOpen(false);
-                          if (typeof window !== "undefined") {
-                            window.history.pushState(null, "", "/admin");
-                            window.dispatchEvent(new PopStateEvent("popstate"));
-                          }
-                        }}
-                        className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-semibold text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer border-b border-zinc-800/60 pb-2 mb-1"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Store className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                          <span>Admin Dashboard</span>
-                        </div>
-                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-500 text-black">
-                          OPEN
-                        </span>
-                      </button>
-                    )}
-
-                    {/* POS & Floor Tables (if authenticated staff/admin) */}
-                    {(isAuthenticated || authUser || userRole === "ADMIN" || userRole === "STAFF") && (
-                      <button
-                        id="menu-pos-tables-btn"
-                        onClick={() => {
-                          setIsProfileMenuOpen(false);
-                          if (typeof window !== "undefined") {
-                            window.history.pushState(null, "", "/pos");
-                            window.dispatchEvent(new PopStateEvent("popstate"));
-                          }
-                        }}
-                        className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-semibold text-zinc-200 hover:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer border-b border-zinc-800/60 pb-2 mb-1"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <UtensilsCrossed className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                          <span>POS & Floor Tables</span>
-                        </div>
-                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 bg-zinc-800 text-amber-400 border border-amber-500/30">
-                          TABLES
-                        </span>
-                      </button>
-                    )}
-
-                    {/* Admin Login (if guest / not logged in) */}
-                    {!isAuthenticated && !authUser && (
-                      <button
-                        id="menu-admin-login-btn"
-                        onClick={() => {
-                          setIsProfileMenuOpen(false);
-                          openLoginModal();
-                        }}
-                        className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-zinc-300 hover:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer border-b border-zinc-800/60 pb-2 mb-1"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <Store className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                          <span>Admin Portal Login</span>
-                        </div>
-                        <span className="text-[10px] text-zinc-500">&rarr;</span>
-                      </button>
-                    )}
-
                     {/* 1. My Profile */}
                     <button
                       id="menu-my-profile-btn"
@@ -365,41 +296,6 @@ export const PortalHeader: React.FC = () => {
                       </div>
                       <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-500/20 text-amber-500">
                         Scan
-                      </span>
-                    </button>
-
-                    {/* Self-Order Tablet Kiosk */}
-                    <button
-                      id="menu-launch-kiosk-btn"
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        loginAsRole("KIOSK");
-                      }}
-                      className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Tablet className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span>Touch Screen Kiosk</span>
-                      </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-500/20 text-amber-500">
-                        Tablet
-                      </span>
-                    </button>
-
-                    <button
-                      id="menu-launch-tv-btn"
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        setActivePortal("tv");
-                      }}
-                      className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Tv className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                        <span>Live TV Order Board</span>
-                      </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-emerald-500/20 text-emerald-500">
-                        Airport FIDS
                       </span>
                     </button>
                   </div>

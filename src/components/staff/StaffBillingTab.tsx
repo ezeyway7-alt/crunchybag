@@ -1,3 +1,5 @@
+import {useOrderReceipt} from "../../lib/orderReceipt";
+import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
 import React, { useState, useMemo, useEffect } from "react";
 import {
   Receipt,
@@ -142,7 +144,8 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   const backend = backendOrder(activeOrder);
   const quote = usePosQuote(posSession, `${backend?.id}/billing-quote/`, backend && backend.status !== 'CANCELLED' && posSession.meta?.permissions.billing ? { version: backend.version, discount_amount: String(effectiveDiscount) } : null);
   const netPayable = Number(quote.quote?.due_amount ?? backend?.due_amount ?? 0);
-  const receipt = usePosReceipt(posSession, backendOrder(invoiceOrder), 'BILL');
+  const receiptState=useOrderReceipt(invoiceOrder,'', 'BILL');
+  const receipt=receiptState.receipt;
   const receiptPreview = receipt?.snapshot ? posOrderToOrder(receipt.snapshot, currentOutlet.name) : invoiceOrder;
   useEffect(() => { if (quote.error) addToast({ title: 'Check bill', description: quote.error, type: 'error' }); }, [quote.error]);
   const cannotSettle = !backend || !quote.quote || !posSession.meta?.permissions.billing || posCommand.busy || posCommand.hasPending || Number(backend.due_amount) <= 0;
@@ -1442,129 +1445,8 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
           title="Official Tax Invoice / Receipt"
           size="sm"
         >
-          <div className="p-4 bg-white text-black font-mono text-xs space-y-3 border border-zinc-400 max-w-sm mx-auto shadow-xl">
-            <div className="text-center space-y-0.5 border-b border-black pb-2">
-              <h3 className="font-black text-sm uppercase">
-                {receipt?.snapshot.seller.name || ""}
-              </h3>
-              <p className="text-[10px]">
-                {receipt?.snapshot.seller.outlet || ""} • {currentOutlet.name}
-              </p>
-              <p className="text-[10px]">PAN/VAT: {receipt?.snapshot.seller.pan || ""}</p>
-              <p className="text-[10px]">{receipt?.snapshot.seller.address || ""}</p>
-              <div className="mt-1 font-bold text-xs uppercase bg-black text-white py-0.5">
-                TAX INVOICE
-              </div>
-            </div>
-
-            <div className="flex justify-between text-[11px]">
-              <span>Inv: #{receipt?.number || receiptPreview!.orderNumber}</span>
-              <span>{receiptPreview!.createdAt.split("T")[0]}</span>
-            </div>
-            <div className="text-[11px]">
-              <p>Buyer: {receiptPreview!.customerName}</p>
-              {receiptPreview!.customerPhone && (
-                <p>Contact: {receiptPreview!.customerPhone}</p>
-              )}
-              <p>
-                Type: {receiptPreview!.fulfillmentType}{" "}
-                {receiptPreview!.tableNumber
-                  ? `(${receiptPreview!.tableNumber})`
-                  : ""}
-              </p>
-            </div>
-
-            <div className="border-t border-b border-dashed border-black py-2 space-y-1 text-[11px]">
-              {receiptPreview!.items.map((it, idx) => (
-                <div key={idx} className="flex justify-between">
-                  <span>
-                    {it.quantity}x {it.productName}
-                  </span>
-                  <span>{formatNPR(it.lineTotal)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-1 text-[11px]">
-              <div className="flex justify-between">
-                <span>Gross Subtotal:</span>
-                <span>{formatNPR(receiptPreview!.subtotal)}</span>
-              </div>
-              {receiptPreview!.discountAmount ? (
-                <div className="flex justify-between text-zinc-700">
-                  <span>
-                    Discount ({receiptPreview!.discountReason || "Promo"}):
-                  </span>
-                  <span>-{formatNPR(receiptPreview!.discountAmount)}</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between text-[10px] text-zinc-600">
-                <span>VAT (Included):</span>
-                <span>
-                  {formatNPR(
-                    receiptPreview!.vatIncludedAmount
-                  )}
-                </span>
-              </div>
-              {(() => {
-                const creditAmt =
-                  receiptPreview!.splitPayments
-                    ?.filter((sp) => sp.method === "CREDIT")
-                    .reduce((sum, sp) => sum + sp.amount, 0) ||
-                  (receiptPreview!.paymentMethod === "CREDIT"
-                    ? receiptPreview!.totalAmount
-                    : 0);
-                const paidAmt = Number(backendOrder(invoiceOrder)?.paid_amount || 0);
-
-                return (
-                  <>
-                    <div className="flex justify-between font-black text-sm pt-1 border-t border-black">
-                      <span>NET BILL TOTAL:</span>
-                      <span>{formatNPR(receiptPreview!.totalAmount)}</span>
-                    </div>
-
-                    {creditAmt > 0 && (
-                      <div className="pt-1 space-y-0.5 text-[11px] font-bold border-t border-dashed border-zinc-400">
-                        {paidAmt > 0 && (
-                          <div className="flex justify-between text-emerald-700">
-                            <span>Settled Paid:</span>
-                            <span>{formatNPR(paidAmt)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-amber-700">
-                          <span>Booked on Credit (Khata):</span>
-                          <span>{formatNPR(creditAmt)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-
-            <div className="text-[10px] text-zinc-600 pt-1 border-t border-dashed border-zinc-400">
-              <p>
-                Payment:{" "}
-                {receiptPreview!.splitPayments &&
-                receiptPreview!.splitPayments.length > 1
-                  ? receiptPreview!.splitPayments
-                      .map((sp) => `${sp.method === "CREDIT" ? "Credit (Khata)" : sp.method ? sp.method.replace(/_/g, " ") : "Direct"} (${formatNPR(sp.amount)})`)
-                      .join(", ")
-                  : receiptPreview!.paymentMethod === "CREDIT"
-                  ? "Credit Sale (Khata)"
-                  : receiptPreview!.paymentMethod ? receiptPreview!.paymentMethod.replace(/_/g, " ") : "Direct"}
-              </p>
-              <p>Token: {receiptPreview!.kioskToken || receiptPreview!.orderNumber}</p>
-              {receiptPreview!.customerPhone && (
-                <p>Khata Customer Mobile: {receiptPreview!.customerPhone}</p>
-              )}
-            </div>
-
-            <div className="text-center pt-2 text-[10px] text-zinc-600">
-              <p>*** Computer Generated Invoice ***</p>
-              <p>Thank you for dining with us!</p>
-            </div>
-
+          <div className="space-y-2">
+            {receipt ? <CompactOrderReceipt receipt={receipt}/> : receiptState.error ? <p role="alert" className="text-xs text-rose-400">{receiptState.error}<button onClick={receiptState.retry} className="ml-2 underline">Retry</button></p> : <p role="status" className="text-xs text-zinc-400">Loading saved receipt...</p>}
             <div className="pt-2">
               <button
                 type="button"

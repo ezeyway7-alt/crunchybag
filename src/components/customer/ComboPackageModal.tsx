@@ -363,9 +363,9 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        maxWidth="2xl"
+        maxWidth="xl"
         showCloseButton={false}
-        className="border-0 shadow-2xl overflow-hidden bg-white dark:bg-[#121214] rounded-none"
+        className="max-w-xl border-0 shadow-2xl overflow-hidden bg-white dark:bg-[#121214] rounded-none"
         contentClassName="p-0"
       >
         <div className="flex flex-col max-h-[88vh] overflow-hidden">

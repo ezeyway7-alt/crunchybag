@@ -1,3 +1,6 @@
+import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
+import {useOrderReceipt} from "../../lib/orderReceipt";
+import {printReceiptDocument} from "../../lib/receiptPrinting";
 import {apiClient} from "../../lib/api";
 import {cartLines} from "../../lib/customerApi";
 import {posOrderToOrder} from "../../lib/posApi";
@@ -153,6 +156,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   },[qrToken]);
 
   const liveOrder=useSelfServiceOrder(String(qrContext?.branch_id || currentOutlet.id),currentOutlet.name,trackingToken);
+  const tableReceipt=useOrderReceipt(placedOrderResult,placedOrderResult?trackingToken:'');
 
   const checkoutBody={branch_id:Number(qrContext?.branch_id || currentOutlet.id),order_source:'TABLE_QR',
     fulfillment_type:'DINE_IN',qr_token:qrToken,customer_name:guestName.trim(),customer_phone:phoneNumber.trim(),notes:tableNotes,items:cartLines(cart.items)};
@@ -700,7 +704,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       ------------------------------------------------------------- */}
       {placedOrderResult && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain touch-pan-y">
-          <div className="bg-[#121217] border border-amber-500/60 max-w-sm w-full p-4 sm:p-5 text-center space-y-3.5 sm:space-y-4 shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden my-auto">
+          <div className="bg-[#121217] border border-amber-500/60 max-w-sm w-full max-h-[90vh] p-3 text-center space-y-3 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto my-auto">
             <div className="w-12 h-12 bg-amber-500 text-black mx-auto flex items-center justify-center font-black">
               <Check className="w-7 h-7 stroke-[3]" />
             </div>
@@ -717,48 +721,9 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               </p>
             </div>
 
-            {/* Unique Kiosk Print Token Highlight Card */}
-            <div className="bg-black/60 border border-dashed border-amber-500/80 p-3 sm:p-3.5 space-y-1.5 overflow-hidden">
-              <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 block">
-                YOUR UNIQUE KIOSK PRINT TOKEN
-              </span>
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl font-black font-mono tracking-widest text-amber-400">
-                  {placedOrderResult.kioskToken || "TK-4821"}
-                </span>
-                <button
-                  onClick={() => handleCopyToken(placedOrderResult.kioskToken || "TK-4821")}
-                  className="p-1.5 bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors"
-                  title="Copy Token"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Simulated thermal barcode representation */}
-              <div className="flex items-center justify-center gap-0.5 py-1 opacity-70 overflow-hidden max-w-full">
-                <span className="h-6 w-0.5 bg-white inline-block" />
-                <span className="h-6 w-1 bg-white inline-block" />
-                <span className="h-6 w-0.5 bg-white inline-block" />
-                <span className="h-6 w-1.5 bg-white inline-block" />
-                <span className="h-6 w-0.5 bg-white inline-block" />
-                <span className="h-6 w-2 bg-white inline-block" />
-                <span className="h-6 w-0.5 bg-white inline-block" />
-                <span className="h-6 w-1 bg-white inline-block" />
-                <span className="h-6 w-0.5 bg-white inline-block" />
-                <span className="h-6 w-1.5 bg-white inline-block" />
-                <span className="h-6 w-0.5 bg-white inline-block" />
-              </div>
-
-              <div className="bg-amber-500/10 border border-amber-500/30 p-2 text-left text-[10.5px] text-amber-200/90 leading-tight">
-                <div className="flex items-start gap-1.5">
-                  <Printer className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Want a physical token?</strong> Show order <strong>{placedOrderResult.orderNumber}</strong> to staff for a printed slip.
-                  </span>
-                </div>
-              </div>
-            </div>
+            {tableReceipt.receipt ? <CompactOrderReceipt receipt={tableReceipt.receipt}/> : <p role={tableReceipt.error?'alert':'status'} className="text-xs text-zinc-400">{tableReceipt.error || 'Loading saved receipt...'}{tableReceipt.error && <button onClick={tableReceipt.retry} className="ml-2 underline">Retry</button>}</p>}
+            <button type="button" disabled={!tableReceipt.receipt} onClick={()=>void printReceiptDocument(tableReceipt.receipt!).catch(error=>setCheckoutError(error.message))} className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 disabled:opacity-40">Print Slip</button>
+            {checkoutError && <p role="alert" className="text-xs text-rose-400">{checkoutError}</p>}
 
             {/* Actions */}
             <div className="space-y-2 pt-1">

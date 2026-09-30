@@ -1,3 +1,4 @@
+import {receiptFixture} from "./receiptFixture";
 import {test,expect,Page} from '@playwright/test';
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0x8AAAAASUVORK5CYII=';
 async function setup(page:Page, signedIn=false) {
@@ -263,4 +264,23 @@ test('delivery sharing falls back to selectable text when clipboard access is de
   await page.getByRole('button',{name:'Share delivery details',exact:true}).click();
   await expect(page.getByLabel('Delivery details to copy')).toHaveValue(/Coordinates: 27\.7, 85\.3/);
   await expect(page.getByRole('link',{name:'Open in Maps',exact:true})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=27.7%2C85.3');
+});
+
+
+test('web receipt uses the saved outlet compact format and prints only the same slip with its QR',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  const state=await setup(page,true);await openCheckout(page);await receipt(page);
+  await page.getByRole('button',{name:/Submit Receipt & Place Order/}).click();await expect.poll(()=>state.created).toBe(1);
+  await page.route('**/api/v1/orders/customer/7/slip/',route=>route.fulfill({json:receiptFixture(state.orders[0])}));
+  await page.getByRole('button',{name:'Print Token Slip',exact:true}).click();
+  const paper=page.getByRole('article',{name:'Order receipt'});
+  await expect(paper).toHaveAttribute('data-receipt-format','compact-v1');await expect(paper).toContainText('Saved Street, Kathmandu');
+  await expect(paper.getByTestId('receipt-order-number')).toHaveText('WEB-REAL-7');
+  await expect(paper.getByRole('img',{name:'Scan to track this order'})).toBeVisible();
+  const size=await paper.boundingBox();expect(size!.width).toBeLessThanOrEqual(288);
+  await page.screenshot({path:test.info().outputPath('compact-web-receipt.png'),fullPage:true});
+  const popupPromise=page.waitForEvent('popup');await page.locator('#print-receipt-btn').click();const popup=await popupPromise;
+  await expect(popup.getByRole('article',{name:'Order receipt'})).toHaveAttribute('data-receipt-format','compact-v1');
+  await expect(popup.getByRole('link',{name:'Track this order'})).toHaveAttribute('href','http://127.0.0.1:4173/track?token=receipt-signed');
+  await expect(popup.getByRole('button')).toHaveCount(0);await popup.close();
 });

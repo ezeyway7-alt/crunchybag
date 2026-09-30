@@ -1,3 +1,4 @@
+import {printReceiptDocument} from './receiptPrinting';
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   apiClient,
@@ -559,52 +560,7 @@ export async function printPosReceipt(outlet: string, receiptId: number) {
     const r = await apiClient.get<any>(
       posPath(outlet, `receipts/${receiptId}/`),
     );
-    const s = r.snapshot;
-    const lines = [
-      s.seller.name,
-      s.seller.outlet,
-      s.seller.address,
-      s.seller.pan ? `PAN: ${s.seller.pan}` : "",
-      `${r.kind} ${r.number}`,
-      s.order_number,
-      new Date(r.created_at).toLocaleString(),
-      `${s.customer_name} ${s.customer_phone}`,
-      s.table_number ? `Table ${s.table_number}` : s.fulfillment_type,
-      "--------------------------------",
-      ...s.items
-        .filter((i: PosItem) => !i.is_voided)
-        .flatMap((i: PosItem) => [
-          `${i.quantity} × ${i.product_name} ${i.variant_name}  ${npr(i.line_total)}`,
-          ...i.modifiers.map((m) => `  + ${m.name}`),
-          ...i.combo_components.map(
-            (c) => `  ${c.quantity} × ${c.product_name} ${c.variant_name}`,
-          ),
-          i.item_notes ? `  Note: ${i.item_notes}` : "",
-        ]),
-      "--------------------------------",
-      `Subtotal: ${npr(s.subtotal)}`,
-      `Discount: ${npr(s.discount_amount)}`,
-      `Service charge: ${npr(s.service_charge_amount)}`,
-      `Rounding savings: ${npr(s.cash_round_down_savings)}`,
-      `Included VAT: ${npr(s.vat_included_amount)}`,
-      `TOTAL: ${npr(s.total_payable)}`,
-      `Paid: ${npr(s.paid_amount)}`,
-      `Due: ${npr(s.due_amount)}`,
-      `Khata: ${npr(s.credit_amount)}`,
-      `Refunded: ${npr(s.refunded_amount)}`,
-      ...s.payments.map(
-        (p: any) => `${p.status} ${p.method}: ${npr(p.amount)} ${p.reference}`,
-      ),
-      s.notes,
-    ];
-    const pre = popup.document.createElement("pre");
-    pre.style.cssText =
-      "font:12px monospace;white-space:pre-wrap;max-width:76mm;margin:0 auto";
-    pre.textContent = lines.filter(Boolean).join("\n");
-    popup.document.body.replaceChildren(pre);
-    popup.document.title = r.number;
-    popup.focus();
-    popup.print();
+    await printReceiptDocument(r,popup);
   } catch (e) {
     popup.close();
     throw e;

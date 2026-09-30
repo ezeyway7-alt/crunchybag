@@ -1,3 +1,4 @@
+import {receiptFixture} from './receiptFixture';
 import { test, expect, Page } from "@playwright/test";
 
 async function setup(page: Page) {
@@ -64,7 +65,7 @@ async function setup(page: Page) {
   function saveReceipt(order: any, kind: string) {
     const id = Object.keys(state.receipts).length + 1;
     const row = { id, number: `${kind}-SAVED-${id}`, kind };
-    state.receipts[id] = { ...row, snapshot: { ...JSON.parse(JSON.stringify(order)), seller: { name: 'Registered seller', outlet: 'Test outlet', pan: '123456789', address: 'Actual outlet address' } } };
+    state.receipts[id] = { ...receiptFixture(order,kind), ...row, created_at: order.created_at, snapshot: { ...JSON.parse(JSON.stringify(order)), seller: { name: 'Registered seller', outlet: 'Test outlet', pan: '123456789', address: 'Actual outlet address' } } };
     order.receipts.push(row);
   }
   await page.routeWebSocket("**/ws/**", (ws) => {
@@ -482,4 +483,23 @@ test('delivery kitchen handover dispatches instead of completing the order',asyn
   await expect(page.getByText('Test Burger',{exact:true})).toHaveCount(0);
   const command=state.writes.find(w=>w.path.endsWith('/transition/'));
   expect(command.key).toBeTruthy();expect(command.body.status).toBe('OUT_FOR_DELIVERY');
+});
+
+
+test('staff token and settled bill use the same saved compact receipt and tracking QR',async({page})=>{
+  const state=await setup(page);await addBurger(page);await expect(fireOrder(page)).toBeEnabled();await fireOrder(page).click();
+  const paper=page.getByRole('article',{name:'Order receipt'});
+  await expect(paper).toHaveAttribute('data-receipt-format','compact-v1');
+  await expect(paper).toContainText('Actual outlet address');
+  await expect(paper.getByTestId('receipt-order-number')).toHaveText(state.orders[0].order_number);
+  const tracking=await paper.getByRole('link',{name:'Track this order'}).getAttribute('href');
+  await page.getByRole('button',{name:'Close dialog'}).click();
+  await page.getByRole('button',{name:'Bill',exact:true}).first().click();
+  await expect(page.getByLabel('Amount applied')).toHaveValue('220');
+  await page.getByRole('button',{name:'Confirm Settlement & Print Tax Invoice',exact:true}).click();
+  await expect(paper).toHaveAttribute('data-receipt-format','compact-v1');
+  await expect(paper).toContainText('Tax invoice');await expect(paper).toContainText('PAN/VAT: 123456789');
+  await expect(paper.getByRole('link',{name:'Track this order'})).toHaveAttribute('href',tracking!);
+  await expect.poll(()=>state.orders[0].paid_amount).toBe('220.00');
+  await page.screenshot({path:test.info().outputPath('compact-staff-bill.png'),fullPage:true});
 });

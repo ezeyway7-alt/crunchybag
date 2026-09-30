@@ -1,3 +1,7 @@
+import {posOrderToOrder} from "../../lib/posApi";
+import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
+import {useOrderReceipt} from "../../lib/orderReceipt";
+import {printReceiptDocument} from "../../lib/receiptPrinting";
 import {apiClient} from "../../lib/api";
 import {submitSelfService, useSelfServiceOrder, useSelfServiceQuote} from "../../lib/selfService";
 import React, { useState, useEffect, useRef } from "react";
@@ -139,9 +143,11 @@ export const KioskPortal: React.FC = () => {
   const [tables, setTables] = useState<{ id: number; table_number: string; capacity?: number; section?: string }[]>([]);
   const [orderError, setOrderError] = useState("");
   const [trackingToken, setTrackingToken] = useState("");
+  const [receiptOrder,setReceiptOrder]=useState<Order|null>(null);
   const [savedTotal, setSavedTotal] = useState<number | null>(null);
   const submitting = useRef(false);
   const liveOrder = useSelfServiceOrder(String(currentOutlet.id), currentOutlet.name, trackingToken);
+  const kioskReceipt=useOrderReceipt(step==='RECEIPT_TOKEN'?(receiptOrder || liveOrder):null,step==='RECEIPT_TOKEN'?trackingToken:'');
 
   const DEFAULT_TABLES = [
     { id: 1, table_number: "Table 01", capacity: 2, section: "Main Floor" },
@@ -293,7 +299,7 @@ export const KioskPortal: React.FC = () => {
 
   const handleResetToAttract = () => {
     if(submitting.current)return;
-    setTrackingToken('');setSavedTotal(null);setOrderError('');setTableNumber('');
+    setTrackingToken('');setReceiptOrder(null);setSavedTotal(null);setOrderError('');setTableNumber('');
     setStep("ATTRACT");
     setKioskCart([]);
     setSelectedCategory("all");
@@ -371,6 +377,7 @@ export const KioskPortal: React.FC = () => {
   };
 
   const handlePrintLookedUpOrder = (targetOrder: Order) => {
+    setReceiptOrder(targetOrder);setTrackingToken((targetOrder as any)._posOrder?.tracking_token || '');
     playKioskSound("tap");
     const token = targetOrder.kioskToken || `T-${targetOrder.orderNumber.replace(/\D/g, "").slice(-3) || "108"}`;
     setGeneratedToken(token);
@@ -396,9 +403,7 @@ export const KioskPortal: React.FC = () => {
     setIsTokenPrintLookupModalOpen(false);
     setStep("RECEIPT_TOKEN");
 
-    setTimeout(() => {
-      handleTriggerPrint();
-    }, 500);
+
   };
 
   // Calculations for Kiosk Cart
@@ -599,26 +604,19 @@ export const KioskPortal: React.FC = () => {
     try {
       const created=await submitSelfService({...checkoutBody,expected_total:serverQuote.quote?.total_payable});
       setGeneratedToken(created.order_number);setCompletedOrderNumber(created.order_number);
-      setSavedTotal(Number(created.total_payable));setTrackingToken(created.tracking_token);
+      setSavedTotal(Number(created.total_payable));setTrackingToken(created.tracking_token);setReceiptOrder(posOrderToOrder(created,currentOutlet.name));
       setOrderTimeEstimate(`In ${currentOutlet.estimatedPrepTimeMin || 12} mins`);
       playKioskSound('success');setPaymentSuccess(true);setStep('RECEIPT_TOKEN');
     } catch(error:any){setOrderError(error.message || 'Order not confirmed. Retry to recover the same request.');serverQuote.refresh();}
     finally{submitting.current=false;setPaymentProcessing(false);}
   };
 
-  const handleTriggerPrint = () => {
-    if(!completedOrderNumber){setOrderError('Place an order before printing its token.');return;}
-    const popup=window.open('', '_blank', 'width=380,height=600');
-    if(!popup){setOrderError('Allow popups to open the print dialog.');return;}
-    popup.document.title=`Token ${completedOrderNumber}`;
-    const style=popup.document.createElement('style');
-    style.textContent='body{font:13px monospace;padding:12px;color:#000;background:#fff}h1{font-size:20px;overflow-wrap:anywhere}p{white-space:pre-wrap}@page{margin:6mm}';
-    popup.document.head.append(style);
-    const heading=popup.document.createElement('h1');heading.textContent=completedOrderNumber;popup.document.body.append(heading);
-    const details=popup.document.createElement('p');
-    details.textContent=[currentOutlet.name,fulfillment==='DINE_IN'?`Table: ${tableNumber}`:'Takeaway',guestName,
-      ...kioskCart.map(item=>`${item.quantity} x ${item.product.name}`),`Payment due: Rs. ${totalPayable}`].filter(Boolean).join('\n');
-    popup.document.body.append(details);popup.focus();popup.print();setHasPrinted(true);
+  const handleTriggerPrint = async () => {
+    if(!kioskReceipt.receipt)return;
+    setIsPrinting(true);setOrderError('');
+    try{await printReceiptDocument(kioskReceipt.receipt);setHasPrinted(true);}
+    catch(error:any){setOrderError(error.message);}
+    finally{setIsPrinting(false);}
   };
 
   // Filtered Combos from BANNER_SLIDES
@@ -1715,80 +1713,93 @@ export const KioskPortal: React.FC = () => {
           MODAL: CUSTOMIZE ITEM (Variants + Add-ons)
       ------------------------------------------------------------- */}
       {customizingProduct && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8 animate-in fade-in duration-200">
-          <div className="bg-[#141418] border-2 border-zinc-700 w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-[#141418] border border-zinc-700 w-full max-w-md sm:max-w-lg max-h-[82vh] flex flex-col shadow-2xl overflow-hidden rounded-none">
             {/* Modal Header */}
-            <div className="p-4 sm:p-6 bg-[#18181D] border-b border-zinc-800 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] uppercase font-bold text-amber-500 tracking-wider">
-                  Customize Your Selection
-                </span>
-                <h3 className="text-xl sm:text-2xl font-black text-white uppercase">
-                  {customizingProduct.name}
-                </h3>
+            <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 bg-[#18181D] border-b border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                {customizingProduct.images?.[0] && (
+                  <img
+                    src={customizingProduct.images[0]}
+                    alt={customizingProduct.name}
+                    className="w-9 h-9 sm:w-10 sm:h-10 object-cover border border-zinc-700 shrink-0"
+                  />
+                )}
+                <div className="min-w-0">
+                  <span className="text-[9.5px] uppercase font-bold text-amber-500 tracking-wider block">
+                    Customize Selection
+                  </span>
+                  <h3 className="text-sm sm:text-base font-black text-white uppercase truncate">
+                    {customizingProduct.name}
+                  </h3>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setCustomizingProduct(null)}
-                className="p-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white"
+                className="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0 ml-2"
+                title="Close"
               >
-                <X className="w-6 h-6" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+            <div className="p-3 sm:p-4 overflow-y-auto space-y-3 flex-1 overscroll-contain">
               {/* 1. Size / Patty Variant Selection */}
-              <div>
-                <h4 className="text-xs uppercase font-bold text-zinc-400 tracking-wider mb-3">
-                  Step 1: Choose Portion / Variant
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {customizingProduct.variants.map((variant) => {
-                    const isSelected = activeVariant?.id === variant.id;
-                    return (
-                      <div
-                        key={variant.id}
-                        onClick={() => {
-                          playKioskSound("tap");
-                          setActiveVariant(variant);
-                        }}
-                        className={`p-3.5 border-2 cursor-pointer flex items-center justify-between transition-all ${
-                          isSelected
-                            ? "border-amber-500 bg-amber-500/10 text-white font-bold"
-                            : "border-zinc-800 bg-zinc-900/80 text-zinc-300 hover:border-zinc-700"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                              isSelected ? "border-amber-500 bg-amber-500 text-black" : "border-zinc-600"
-                            }`}
-                          >
-                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+              {customizingProduct.variants.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] uppercase font-black text-zinc-400 tracking-wider mb-1.5">
+                    1. Portion / Variant
+                  </h4>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {customizingProduct.variants.map((variant) => {
+                      const isSelected = activeVariant?.id === variant.id;
+                      return (
+                        <div
+                          key={variant.id}
+                          onClick={() => {
+                            playKioskSound("tap");
+                            setActiveVariant(variant);
+                          }}
+                          className={`px-2.5 py-1.5 border cursor-pointer flex items-center justify-between text-xs transition-all ${
+                            isSelected
+                              ? "border-amber-500 bg-amber-500/10 text-white font-bold"
+                              : "border-zinc-800 bg-zinc-900/80 text-zinc-300 hover:border-zinc-700"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <div
+                              className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                                isSelected ? "border-amber-500 bg-amber-500 text-black" : "border-zinc-600"
+                              }`}
+                            >
+                              {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                            </div>
+                            <span className="text-[11.5px] font-bold truncate">{variant.name}</span>
                           </div>
-                          <span className="text-sm font-bold">{variant.name}</span>
+                          <span className="text-[11px] font-mono font-bold text-amber-400 shrink-0 ml-1">
+                            {formatNPR(variant.price)}
+                          </span>
                         </div>
-                        <span className="text-sm font-mono font-bold text-amber-400">
-                          {formatNPR(variant.price)}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 2. Modifiers / Add-ons */}
               {customizingProduct.modifierGroups && customizingProduct.modifierGroups.length > 0 && (
                 <div>
-                  <h4 className="text-xs uppercase font-bold text-zinc-400 tracking-wider mb-3">
-                    Step 2: Add-Ons & Toppings
+                  <h4 className="text-[10px] uppercase font-black text-zinc-400 tracking-wider mb-1.5">
+                    2. Add-Ons & Toppings
                   </h4>
                   {customizingProduct.modifierGroups.map((group) => (
-                    <div key={group.id} className="mb-4">
-                      <span className="text-xs font-bold text-zinc-300 block mb-2">
+                    <div key={group.id} className="mb-2.5">
+                      <span className="text-[10.5px] font-bold text-zinc-300 block mb-1">
                         {group.name} {group.required ? "(Required)" : "(Optional)"}
                       </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="grid grid-cols-2 gap-1.5">
                         {group.options.map((opt) => {
                           const isChecked = activeModifiers.some((m) => m.optionId === opt.id);
                           return (
@@ -1811,23 +1822,23 @@ export const KioskPortal: React.FC = () => {
                                   ]);
                                 }
                               }}
-                              className={`p-3 border cursor-pointer flex items-center justify-between text-xs transition-all ${
+                              className={`px-2 py-1.5 border cursor-pointer flex items-center justify-between text-xs transition-all ${
                                 isChecked
                                   ? "border-amber-500 bg-amber-500/10 text-white font-bold"
                                   : "border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-700"
                               }`}
                             >
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
                                 <div
-                                  className={`w-4 h-4 border flex items-center justify-center ${
+                                  className={`w-3.5 h-3.5 border flex items-center justify-center shrink-0 ${
                                     isChecked ? "border-amber-500 bg-amber-500 text-black" : "border-zinc-600"
                                   }`}
                                 >
-                                  {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                                  {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                                 </div>
-                                <span>{opt.name}</span>
+                                <span className="text-[11px] truncate">{opt.name}</span>
                               </div>
-                              <span className="font-mono text-zinc-400">
+                              <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-1">
                                 {opt.priceDelta > 0 ? `+${formatNPR(opt.priceDelta)}` : "Free"}
                               </span>
                             </div>
@@ -1841,30 +1852,30 @@ export const KioskPortal: React.FC = () => {
 
               {/* 3. Special Request Note */}
               <div>
-                <h4 className="text-xs uppercase font-bold text-zinc-400 tracking-wider mb-2">
-                  Step 3: Chef Instructions (Optional)
+                <h4 className="text-[10px] uppercase font-black text-zinc-400 tracking-wider mb-1">
+                  3. Kitchen Notes (Optional)
                 </h4>
                 <input
                   type="text"
                   value={activeNotes}
                   onChange={(e) => setActiveNotes(e.target.value)}
-                  placeholder="Special notes"
-                  className="w-full bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                  placeholder="e.g. Extra crispy, sauce on the side..."
+                  className="w-full bg-zinc-900 border border-zinc-700 px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               {/* 4. Quantity */}
-              <div className="flex items-center justify-between pt-4 border-t border-zinc-800">
-                <span className="text-xs uppercase font-bold text-zinc-400 tracking-wider">
+              <div className="flex items-center justify-between pt-2 border-t border-zinc-800">
+                <span className="text-[10.5px] uppercase font-black text-zinc-400 tracking-wider">
                   Quantity
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setActiveQty(Math.max(1, activeQty - 1))}
-                    className="w-10 h-10 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center text-lg font-bold border border-zinc-700/80 cursor-pointer"
+                    className="w-7 h-7 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 cursor-pointer"
                   >
-                    <Minus className="w-4 h-4" />
+                    <Minus className="w-3.5 h-3.5" />
                   </button>
                   <input
                     type="number"
@@ -1878,25 +1889,25 @@ export const KioskPortal: React.FC = () => {
                       }
                     }}
                     onFocus={(e) => e.target.select()}
-                    className="w-14 h-10 text-center font-mono font-bold text-lg text-amber-400 bg-zinc-900 border border-zinc-700 focus:border-amber-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none cursor-text"
+                    className="w-10 h-7 text-center font-mono font-bold text-xs sm:text-sm text-amber-400 bg-zinc-900 border border-zinc-700 focus:border-amber-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none cursor-text"
                     title="Click to edit quantity"
                   />
                   <button
                     type="button"
                     onClick={() => setActiveQty(Math.min(99, activeQty + 1))}
-                    className="w-10 h-10 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center text-lg font-bold border border-zinc-700/80 cursor-pointer"
+                    className="w-7 h-7 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold border border-zinc-700 cursor-pointer"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 sm:p-6 bg-[#18181D] border-t border-zinc-800 flex items-center justify-between gap-4">
+            <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 bg-[#18181D] border-t border-zinc-800 flex items-center justify-between gap-3">
               <div>
-                <span className="text-xs text-zinc-400 block">Item Total</span>
-                <span className="text-xl sm:text-2xl font-black text-amber-400 font-mono">
+                <span className="text-[9.5px] uppercase font-bold text-zinc-400 block tracking-wider">Total</span>
+                <span className="text-base sm:text-lg font-black text-amber-400 font-mono leading-none">
                   {formatNPR(
                     ((activeVariant?.price || 0) +
                       activeModifiers.reduce((sum, m) => sum + m.priceDelta, 0)) *
@@ -1908,10 +1919,10 @@ export const KioskPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={handleConfirmCustomization}
-                className="px-8 py-4 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider text-base flex items-center gap-2 shadow-xl"
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider text-xs flex items-center gap-1.5 shadow-md transition-colors cursor-pointer active:scale-98"
               >
                 <span>Add To Tray</span>
-                <Check className="w-5 h-5" />
+                <Check className="w-4 h-4 stroke-[3]" />
               </button>
             </div>
           </div>
@@ -2097,7 +2108,7 @@ export const KioskPortal: React.FC = () => {
               </div>
 
               <p className="text-xs text-zinc-400 max-w-sm mx-auto sm:mx-0 leading-relaxed">
-                Please take your printed slip. Watch the pickup counter or scan the receipt QR code to track live order preparation on your phone.
+                Keep your order number. Scan the receipt QR to follow its live status, or print a copy below.
               </p>
 
               {/* High-Contrast Prominent Call Token Box */}
@@ -2134,168 +2145,9 @@ export const KioskPortal: React.FC = () => {
                   <div className="w-44 h-1 bg-black" />
                 </div>
 
-                {/* The Paper Receipt */}
-                <div
-                  className={`bg-white text-zinc-900 p-3 sm:p-3.5 font-mono text-xs shadow-2xl transition-all duration-700 ${
-                    isPrinting ? "translate-y-2 opacity-90" : "translate-y-0 opacity-100"
-                  }`}
-                  style={{
-                    boxShadow: "0 15px 30px rgba(0,0,0,0.8)",
-                  }}
-                >
-                  {/* Paper header */}
-                  <div className="text-center pb-1.5 border-b border-dashed border-zinc-400">
-                    <p className="font-black text-xs uppercase tracking-wider text-black leading-tight">
-                      CRUNCHY FRIED CHICKEN
-                    </p>
-                    <p className="text-[9px] text-zinc-600 font-semibold">{currentOutlet.name}</p>
-                    <p className="text-[8.5px] text-zinc-500">Self-Order Kiosk Slip</p>
-                  </div>
-
-                  {/* HIGH-VISIBILITY LARGE TOKEN NUMBER BANNER */}
-                  <div className="my-1.5 py-1.5 px-2 bg-zinc-100 border border-dashed border-zinc-900 text-center">
-                    <span className="text-[8px] uppercase font-black tracking-widest text-zinc-600 block">
-                      CALL TOKEN NUMBER
-                    </span>
-                    <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-black block leading-none py-0.5">
-                      {generatedToken}
-                    </span>
-                    <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-wider block">
-                      {fulfillment === "DINE_IN" ? "Dine-In" : "Takeaway"}
-                    </span>
-                  </div>
-
-                  <div className="py-1 border-b border-dashed border-zinc-400 text-[9px] space-y-0.5">
-                    <div className="flex justify-between">
-                      <span>Order Ref:</span>
-                      <span className="font-bold">{completedOrderNumber}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Payment:</span>
-                      <span className="font-bold">{selectedPaymentMethod === "CASH_ON_PICKUP" ? "CASH AT COUNTER" : "ONLINE QR"}</span>
-                    </div>
-                    {guestName.trim() && (
-                      <div className="flex justify-between">
-                        <span>Guest:</span>
-                        <span className="font-bold truncate max-w-[120px]">{guestName.trim()}</span>
-                      </div>
-                    )}
-                    {guestPhone.trim() && (
-                      <div className="flex justify-between">
-                        <span>Mobile:</span>
-                        <span className="font-bold">{guestPhone.trim()}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Items List (compact) */}
-                  <div className="py-1 border-b border-dashed border-zinc-400 space-y-0.5 text-[9px]">
-                    {kioskCart.slice(0, 3).map((item, idx) => (
-                      <div key={idx} className="flex justify-between">
-                        <span className="truncate max-w-[150px]">
-                          {item.quantity}x {item.product.name}
-                        </span>
-                        <span className="font-bold">Rs.{item.lineTotal}</span>
-                      </div>
-                    ))}
-                    {kioskCart.length > 3 && (
-                      <div className="text-[8.5px] text-zinc-500 text-right italic">
-                        +{kioskCart.length - 3} more items
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Total */}
-                  <div className="py-1 text-right flex items-center justify-between">
-                    <span className="text-[8px] text-zinc-500">VAT 13% Incl.</span>
-                    <span className="text-xs font-black text-black">
-                      {selectedPaymentMethod === "CASH_ON_PICKUP" ? "PAY: " : "PAID: "}Rs.{totalPayable}
-                    </span>
-                  </div>
-
-                  {/* SCAN QR TO TRACK ORDER LIVE BY PHONE */}
-                  <div className="pt-1.5 pb-1 border-t border-dashed border-zinc-800 text-center bg-amber-50/60 -mx-3 sm:-mx-3.5 px-3">
-                    <div className="flex items-center justify-center gap-1 mb-0.5">
-                      <Smartphone className="w-3 h-3 text-zinc-800" />
-                      <span className="text-[9px] font-black uppercase tracking-wider text-black">
-                        Scan to Track Order
-                      </span>
-                    </div>
-
-                    {/* Scannable Tracking QR SVG */}
-                    <div className="inline-block p-1 bg-white border border-zinc-300 shadow-sm mx-auto">
-                      <svg
-                        viewBox="0 0 120 120"
-                        className="w-16 h-16 sm:w-18 sm:h-18 text-black mx-auto"
-                        fill="currentColor"
-                      >
-                        {/* Finder Top-Left */}
-                        <rect x="8" y="8" width="32" height="32" rx="2" fill="#000" />
-                        <rect x="13" y="13" width="22" height="22" fill="#FFF" />
-                        <rect x="18" y="18" width="12" height="12" fill="#000" />
-
-                        {/* Finder Top-Right */}
-                        <rect x="80" y="8" width="32" height="32" rx="2" fill="#000" />
-                        <rect x="85" y="13" width="22" height="22" fill="#FFF" />
-                        <rect x="90" y="18" width="12" height="12" fill="#000" />
-
-                        {/* Finder Bottom-Left */}
-                        <rect x="8" y="80" width="32" height="32" rx="2" fill="#000" />
-                        <rect x="13" y="85" width="22" height="22" fill="#FFF" />
-                        <rect x="18" y="90" width="12" height="12" fill="#000" />
-
-                        {/* Timing & Matrix Dots */}
-                        <rect x="46" y="10" width="6" height="6" fill="#000" />
-                        <rect x="58" y="10" width="6" height="6" fill="#000" />
-                        <rect x="70" y="10" width="6" height="6" fill="#000" />
-                        <rect x="46" y="22" width="6" height="6" fill="#000" />
-                        <rect x="70" y="22" width="6" height="6" fill="#000" />
-                        <rect x="46" y="34" width="6" height="6" fill="#000" />
-                        <rect x="58" y="34" width="6" height="6" fill="#000" />
-
-                        {/* Center Timing lines */}
-                        <rect x="10" y="46" width="6" height="6" fill="#000" />
-                        <rect x="22" y="46" width="6" height="6" fill="#000" />
-                        <rect x="34" y="46" width="6" height="6" fill="#000" />
-                        <rect x="46" y="46" width="6" height="6" fill="#000" />
-                        <rect x="58" y="46" width="6" height="6" fill="#000" />
-                        <rect x="70" y="46" width="6" height="6" fill="#000" />
-                        <rect x="82" y="46" width="6" height="6" fill="#000" />
-                        <rect x="94" y="46" width="6" height="6" fill="#000" />
-                        <rect x="106" y="46" width="6" height="6" fill="#000" />
-
-                        {/* Center badge with mobile icon */}
-                        <rect x="42" y="42" width="36" height="36" rx="3" fill="#FFF" stroke="#000" strokeWidth="1.5" />
-                        <rect x="52" y="47" width="16" height="26" rx="2.5" fill="#000" />
-                        <rect x="54" y="50" width="12" height="18" fill="#FFF" />
-                        <circle cx="60" cy="70.5" r="1.2" fill="#FFF" />
-
-                        {/* Bottom data dots */}
-                        <rect x="46" y="82" width="6" height="6" fill="#000" />
-                        <rect x="58" y="82" width="6" height="6" fill="#000" />
-                        <rect x="82" y="82" width="6" height="6" fill="#000" />
-                        <rect x="94" y="82" width="6" height="6" fill="#000" />
-                        <rect x="106" y="82" width="6" height="6" fill="#000" />
-                        <rect x="46" y="94" width="6" height="6" fill="#000" />
-                        <rect x="70" y="94" width="6" height="6" fill="#000" />
-                        <rect x="82" y="94" width="6" height="6" fill="#000" />
-                        <rect x="106" y="94" width="6" height="6" fill="#000" />
-                        <rect x="58" y="106" width="6" height="6" fill="#000" />
-                        <rect x="70" y="106" width="6" height="6" fill="#000" />
-                        <rect x="94" y="106" width="6" height="6" fill="#000" />
-                      </svg>
-                    </div>
-
-                    <p className="text-[8px] font-mono font-bold text-zinc-700 mt-0.5">
-                      crunchy.app/t/{completedOrderNumber}
-                    </p>
-                  </div>
-
-                  <p className="text-[7.5px] text-zinc-500 text-center mt-1 border-t border-dashed border-zinc-300 pt-0.5">
-                    Thank you! Wait for Token {generatedToken}
-                  </p>
-                </div>
+                {kioskReceipt.receipt ? <CompactOrderReceipt receipt={kioskReceipt.receipt}/> : kioskReceipt.error ? <div role="alert" className="p-3 text-xs text-rose-400">{kioskReceipt.error}<button onClick={kioskReceipt.retry} className="ml-2 underline">Retry</button></div> : <p role="status" className="p-3 text-xs text-zinc-400">Loading saved receipt...</p>}
               </div>
+              {orderError && <p role="alert" className="text-xs text-rose-400">{orderError}</p>}
 
               {/* Print Status Feedback & Reprint */}
               <div className="mt-2 text-center">
@@ -2307,11 +2159,11 @@ export const KioskPortal: React.FC = () => {
                 ) : (
                   <button
                     type="button"
-                    onClick={handleTriggerPrint}
+                    onClick={()=>void handleTriggerPrint()} disabled={!kioskReceipt.receipt || isPrinting}
                     className="inline-flex items-center gap-1 px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-[11px] font-bold cursor-pointer"
                   >
                     <Printer className="w-3 h-3 text-amber-400" />
-                    <span>Reprint Token Slip</span>
+                    <span>{hasPrinted?"Reprint Token Slip":"Print Token Slip"}</span>
                   </button>
                 )}
               </div>

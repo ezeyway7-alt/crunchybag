@@ -1,3 +1,4 @@
+import {ReceiptOrderTrackingPage} from "./components/customer/ReceiptOrderTrackingPage";
 import React from "react";
 import { AppProvider, useApp } from "./context/AppContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -134,6 +135,8 @@ const AppContent: React.FC = () => {
   }, [isAdminRoute, activePortal, setActivePortal]);
 
   // 1. Direct Login Page route (/admin-login, /admin/login, or /login)
+  if (currentPath === "/track") return <ReceiptOrderTrackingPage/>;
+
   if (isLoginRoute) {
     if (isAuthenticated) {
       if (typeof window !== "undefined") {

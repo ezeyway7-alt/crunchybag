@@ -1,3 +1,4 @@
+import {receiptFixture} from "./receiptFixture";
 import {test,expect,Page} from '@playwright/test';
 
 async function setup(page:Page){
@@ -25,6 +26,8 @@ async function setup(page:Page){
       state.orders=[data];
       if(state.fail){state.fail=false;await route.abort('failed');return;}
     }else if(path==='orders/self-service/order/')data=state.orders[0];
+    else if(path==='orders/self-service/receipt/')data=receiptFixture(state.orders[0]);
+    else if(path==='orders/tracking/')data={order_number:state.orders[0].order_number,outlet_id:1,outlet_name:'Saved Branch',status:state.orders[0].status,fulfillment_type:state.orders[0].fulfillment_type,history:[]};
     else if(path==='orders/display/1/')data={tickets:state.orders,revision:state.revision};
     await route.fulfill({json:data});
   });
@@ -56,12 +59,15 @@ test('TV receives preparation, ready, call and completion without navigation and
 test('kiosk persists the tray and contact details and retries a lost response with the same key',async({page})=>{
   const state=await setup(page);state.fail=true;
   await page.goto('/kiosk?outlet_id=1');await page.getByText('Takeaway Go',{exact:true}).click();
-  await page.getByPlaceholder('Mobile (optional)').fill('9800000000');await page.getByPlaceholder('Name (optional)').fill('Suraj');
+  await page.getByPlaceholder('Mobile #').fill('9800000000');await page.getByPlaceholder('Guest Name').fill('Suraj');
   await page.getByTitle('Quick Add 1 Item').first().click();
   await page.getByRole('button',{name:'Pay & Order',exact:true}).click();
   const confirm=page.getByRole('button',{name:/Confirm Order/});await expect(confirm).toBeEnabled();await confirm.click();
   await expect(page.getByRole('alert')).toBeVisible();await confirm.click();
   await expect(page.getByText('KIOSK-1-00000005',{exact:true}).first()).toBeVisible();
+  await expect(page.getByRole('article',{name:'Order receipt'})).toContainText('Saved Street, Kathmandu');
+  await expect(page.getByRole('article',{name:'Order receipt'})).toHaveAttribute('data-receipt-format','compact-v1');
+  await expect(page.getByRole('link',{name:'Track this order'})).toHaveAttribute('href',/track\?token=receipt-signed/);
   expect(state.writes).toHaveLength(2);expect(state.writes[0].key).toBe(state.writes[1].key);
   expect(state.writes[0].body).toMatchObject({order_source:'KIOSK',customer_name:'Suraj',customer_phone:'9800000000',items:[{product_id:'burger',quantity:1}],expected_total:'200.00'});
   state.orders[0].status='READY';emit(state);
@@ -77,7 +83,22 @@ test('signed table QR places a real table order and receives its live status',as
   await page.getByRole('button',{name:'Send Order to Kitchen',exact:true}).click();
   expect(state.writes[0].body).toMatchObject({order_source:'TABLE_QR',qr_token:'signed-table',fulfillment_type:'DINE_IN'});
   await expect(page.getByText('A2 Order Confirmed!')).toBeVisible();
+  await expect(page.getByRole('article',{name:'Order receipt'})).toContainText('Saved Kitchen Pvt Ltd');
+  await expect(page.getByRole('article',{name:'Order receipt'})).toHaveAttribute('data-receipt-format','compact-v1');
   state.orders[0].status='READY';emit(state);
   await page.getByRole('button',{name:'Track Live Order & Review (QR Slip)'}).click();
   await expect(page.getByText('Live Burger',{exact:true}).last()).toBeVisible();
+});
+
+
+test('scanned receipt URL opens only its order and follows live status without navigation',async({page})=>{
+  const state=await setup(page);state.orders=[{id:5,order_number:'K-05',status:'PREPARING',fulfillment_type:'TAKEAWAY'}];
+  await page.goto('/track?token=receipt-signed');
+  await expect(page.getByRole('heading',{name:'K-05',exact:true})).toBeVisible();
+  await expect(page.getByRole('status').filter({hasText:'Preparing'})).toBeVisible();
+  let navigations=0;page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++;});
+  state.orders[0].status='READY';emit(state);
+  await expect(page.getByRole('status').filter({hasText:'Ready for pickup'})).toBeVisible();
+  expect(navigations).toBe(0);
+  await page.screenshot({path:test.info().outputPath('receipt-tracking.png'),fullPage:true});
 });

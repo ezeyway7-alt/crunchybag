@@ -1,3 +1,5 @@
+import {useOrderReceipt} from "../../lib/orderReceipt";
+import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
 import { DeliveryOrderDetails, deliveryInfo, DeliveryDispatchModal } from "../customer/DeliveryOrderDetails";
 import React, { useState, useMemo, useEffect } from "react";
 import {
@@ -159,7 +161,8 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const targetOngoingOrder = (selectedOngoingOrderId ? ongoingOrders.find(o => o.id === selectedOngoingOrderId) : ongoingOrders[0]) || null;
   const mergedOrders = orders;
   const findOrder = (id: string) => [...orders, ...ongoingOrders].find(o => o.id === id);
-  const receipt = usePosReceipt(posSession, backendOrder(printSlipOrder), 'TOKEN');
+  const receiptState=useOrderReceipt(printSlipOrder,'', 'TOKEN');
+  const receipt=receiptState.receipt;
   const receiptPreview = receipt?.snapshot ? posOrderToOrder(receipt.snapshot, currentOutlet.name) : printSlipOrder;
   useEffect(() => {
     setSelectedOrderForDrawer(previous => previous ? findOrder(previous.id) || previous : null);
@@ -2210,58 +2213,8 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
           title="Thermal Order Slip Preview"
           size="sm"
         >
-          <div className="p-4 bg-white text-black font-mono text-xs space-y-3 border border-zinc-300 max-w-sm mx-auto shadow-lg">
-            <div className="text-center space-y-0.5 border-b border-dashed border-zinc-400 pb-3">
-              <h3 className="font-black text-base uppercase tracking-widest">{receipt?.snapshot.seller.name || ""}</h3>
-              <p className="text-[10px] text-zinc-600">{currentOutlet.name}</p>
-              <p className="text-[10px] text-zinc-600">{receipt?.snapshot.seller.address} {receipt?.snapshot.seller.pan ? `• PAN: ${receipt.snapshot.seller.pan}` : ""}</p>
-              <div className="mt-2 py-1 bg-black text-white font-black text-xl tracking-widest">
-                {receipt?.number || receiptPreview!.kioskToken || receiptPreview!.orderNumber}
-              </div>
-            </div>
-
-            <div className="flex justify-between text-[11px] border-b border-zinc-300 pb-2">
-              <span>Order: #{receiptPreview!.orderNumber}</span>
-              <span>{receiptPreview!.createdAt.split("T")[0]}</span>
-            </div>
-
-            <div className="text-[11px] space-y-0.5">
-              <p>Customer: {receiptPreview!.customerName}</p>
-              <p>Type: {receiptPreview!.fulfillmentType} {receiptPreview!.tableNumber ? `(${receiptPreview!.tableNumber})` : ""}</p>
-              {receiptPreview!.customerPhone && <p>Phone: {receiptPreview!.customerPhone}</p>}
-            </div>
-
-            <div className="border-t border-b border-dashed border-zinc-400 py-2 space-y-1">
-              {receiptPreview!.items.map((it, idx) => (
-                <div key={idx} className="flex justify-between text-[11px]">
-                  <span>{it.quantity}x {it.productName}</span>
-                  <span>{formatNPR(it.lineTotal)}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-1 pt-1 text-[11px]">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>{formatNPR(receiptPreview!.subtotal)}</span>
-              </div>
-              {receiptPreview!.discountAmount ? (
-                <div className="flex justify-between text-zinc-600">
-                  <span>Discount:</span>
-                  <span>-{formatNPR(receiptPreview!.discountAmount)}</span>
-                </div>
-              ) : null}
-              <div className="flex justify-between font-black text-sm pt-1 border-t border-black">
-                <span>TOTAL:</span>
-                <span>{formatNPR(receiptPreview!.totalAmount)}</span>
-              </div>
-            </div>
-
-            <div className="text-center pt-2 text-[10px] text-zinc-500 border-t border-dashed border-zinc-300">
-              <p>Thank you for choosing Crunchy!</p>
-              <p>Show token slip at pick-up counter.</p>
-            </div>
-
+          <div className="space-y-2">
+            {receipt ? <CompactOrderReceipt receipt={receipt}/> : receiptState.error ? <p role="alert" className="text-xs text-rose-400">{receiptState.error}<button onClick={receiptState.retry} className="ml-2 underline">Retry</button></p> : <p role="status" className="text-xs text-zinc-400">Loading saved receipt...</p>}
             <div className="pt-2">
               <button
                 type="button"

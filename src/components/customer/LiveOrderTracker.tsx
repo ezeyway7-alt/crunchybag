@@ -597,7 +597,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
 
               {/* Action Buttons: Cancel, Print Slip, Review, 1-Tap Reorder */}
               <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1">
-                {selectedOrder.status === "AWAITING_PAYMENT" ? (
+                {selectedOrder.status === "AWAITING_PAYMENT" && (
                   <Button
                     variant="danger"
                     size="sm"
@@ -606,7 +606,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                   >
                     Cancel Order
                   </Button>
-                ) : (
+                )}
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -617,16 +617,15 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                       <span>Print Token Slip</span>
                     </button>
 
-                    <button
+                    {selectedOrder.status !== "AWAITING_PAYMENT" && <button
                       type="button"
                       onClick={() => setIsReviewOpen(true)}
                       className="h-9 px-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-amber-500 text-xs font-bold border border-zinc-300 dark:border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Star className="w-3.5 h-3.5" />
                       <span>Rate Experience</span>
-                    </button>
+                    </button>}
                   </div>
-                )}
 
                 <div className="flex items-center gap-2">
                   <Button
