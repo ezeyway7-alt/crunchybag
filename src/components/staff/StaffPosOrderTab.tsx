@@ -499,6 +499,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
             onOpenBillingForOrder={(order) => {
               if (onOpenBillingForOrder) onOpenBillingForOrder(order);
             }}
+            onOpenManageTables={() => setManageTables(true)}
           />
         ) : (
         /* 2-Column POS Layout: Left = Menu Selection, Right = Order Ticket & Tender */

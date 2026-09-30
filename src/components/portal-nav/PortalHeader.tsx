@@ -18,6 +18,7 @@ import {
   Tv,
   QrCode,
   Store,
+  UtensilsCrossed,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
@@ -269,6 +270,29 @@ export const PortalHeader: React.FC = () => {
                         </div>
                         <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-500 text-black">
                           OPEN
+                        </span>
+                      </button>
+                    )}
+
+                    {/* POS & Floor Tables (if authenticated staff/admin) */}
+                    {(isAuthenticated || authUser || userRole === "ADMIN" || userRole === "STAFF") && (
+                      <button
+                        id="menu-pos-tables-btn"
+                        onClick={() => {
+                          setIsProfileMenuOpen(false);
+                          if (typeof window !== "undefined") {
+                            window.history.pushState(null, "", "/pos");
+                            window.dispatchEvent(new PopStateEvent("popstate"));
+                          }
+                        }}
+                        className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-semibold text-zinc-200 hover:text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer border-b border-zinc-800/60 pb-2 mb-1"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <UtensilsCrossed className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          <span>POS & Floor Tables</span>
+                        </div>
+                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 bg-zinc-800 text-amber-400 border border-amber-500/30">
+                          TABLES
                         </span>
                       </button>
                     )}
