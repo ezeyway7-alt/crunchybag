@@ -87,6 +87,7 @@ async function setup(page: Page) {
       url = new URL(request.url());
     const path = url.pathname.replace("/api/v1/", "");
     state.calls.push(`${request.method()} ${path}`);
+    console.log("POS_CALL:", `${request.method()} ${path}`);
     const body = request.method() === "POST" ? request.postDataJSON() : null;
     if (body && !path.endsWith("quote/") && !path.endsWith("socket-ticket/"))
       state.writes.push({
@@ -469,4 +470,16 @@ test('restored kitchen cards use actual orders and backend transitions', async (
   await expect(page.getByText('Test Burger', { exact: true })).toHaveCount(0);
   expect(state.orders[0].status).toBe('COMPLETED');
   expect(state.writes.filter(w => w.path.endsWith('/transition/')).map(w => w.body.version)).toEqual([1, 2, 3]);
+});
+
+test('delivery kitchen handover dispatches instead of completing the order',async({page})=>{
+  const state=await setup(page);await addBurger(page);await fireOrder(page).click();
+  await expect.poll(()=>state.orders.length).toBe(1);
+  Object.assign(state.orders[0],{fulfillment_type:'DELIVERY',status:'READY'});
+  await page.goto('/admin?tab=kitchen');
+  await page.getByRole('button',{name:'DISPATCH & HAND OVER',exact:true}).click();
+  await expect.poll(()=>state.orders[0].status).toBe('OUT_FOR_DELIVERY');
+  await expect(page.getByText('Test Burger',{exact:true})).toHaveCount(0);
+  const command=state.writes.find(w=>w.path.endsWith('/transition/'));
+  expect(command.key).toBeTruthy();expect(command.body.status).toBe('OUT_FOR_DELIVERY');
 });

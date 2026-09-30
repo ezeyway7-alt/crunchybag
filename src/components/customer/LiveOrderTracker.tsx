@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { DeliveryOrderDetails, deliveryStatus, deliveryStatusLabel } from './DeliveryOrderDetails';
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import {
   Clock,
@@ -57,24 +58,28 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
-  useEffect(()=>{if(initialOrderId)setSelectedOrderId(initialOrderId);else if(!selectedOrderId&&orders.length)setSelectedOrderId(orders[0].id);},[initialOrderId,orders,selectedOrderId]);
+  const appliedInitialOrder = useRef<string | undefined>();
+  useEffect(() => {
+    if (initialOrderId && appliedInitialOrder.current !== initialOrderId && orders.some(order => order.id === initialOrderId)) {
+      appliedInitialOrder.current = initialOrderId;
+      setSelectedOrderId(initialOrderId);
+      return;
+    }
+    setSelectedOrderId(previous => orders.some(order => order.id === previous) ? previous : orders[0]?.id || null);
+  }, [initialOrderId, orders]);
   const selectedOrder = orders.find((o) => o.id === selectedOrderId) || null;
   const selectedOrderTimer = selectedOrder ? getOrderReverseTimer(selectedOrder) : null;
 
-  const timelineSteps: { key: OrderStatus; label: string; desc: string }[] = [
-    { key: "AWAITING_PAYMENT", label: "Payment Review", desc: "The outlet is verifying your uploaded receipt" },
-    { key: "CONFIRMED", label: "Confirmed", desc: "Order routed to branch" },
-    { key: "PROCESSING", label: "In Kitchen", desc: "Chef actively frying & assembling" },
-    { key: "READY", label: "Ready for Pickup", desc: "Warm in takeaway rack" },
-    { key: "COMPLETED", label: "Completed", desc: "Fulfilled and handed over" },
+  const isDelivery = selectedOrder?.fulfillmentType === 'DELIVERY';
+  const timelineSteps = [
+    {key:'PENDING',label:'Payment Review',desc:'The outlet is verifying your receipt'},
+    {key:'ACCEPTED',label:'Confirmed',desc:'Order accepted by the outlet'},
+    {key:'PREPARING',label:'In Kitchen',desc:'Your food is being prepared'},
+    {key:'READY',label:isDelivery ? 'Ready for dispatch' : 'Ready for pickup',desc:isDelivery ? 'Waiting for rider collection' : 'Ready at the counter'},
+    ...(isDelivery ? [{key:'OUT_FOR_DELIVERY',label:'Dispatched',desc:'Your order is on the way'}] : []),
+    {key:'COMPLETED',label:isDelivery ? 'Delivered' : 'Completed',desc:isDelivery ? 'Delivered to your address' : 'Order handed over'},
   ];
-
-  const getStepIndex = (status: OrderStatus) => {
-    if (status === "CANCELLED") return -1;
-    return timelineSteps.findIndex((s) => s.key === status);
-  };
-
-  const currentStepIndex = selectedOrder ? getStepIndex(selectedOrder.status) : 0;
+  const currentStepIndex = selectedOrder ? timelineSteps.findIndex(step => step.key === deliveryStatus(selectedOrder)) : -1;
 
   // Filter orders in sidebar
   const filteredOrders = orders.filter((o) => {
@@ -191,14 +196,9 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                   <button
                     key={order.id}
                     type="button"
-                    onClick={() => {
-                      // Toggle selection or select
-                      if (isSelected) {
-                        setSelectedOrderId(null);
-                      } else {
-                        setSelectedOrderId(order.id);
-                      }
-                    }}
+                    aria-pressed={isSelected}
+                    aria-label={`View order ${order.orderNumber}`}
+                    onClick={() => {setSelectedOrderId(order.id);setIsReceiptOpen(false);setIsReviewOpen(false);}}
                     className={`w-full p-2.5 sm:p-3 text-left transition-colors cursor-pointer border-l-3 ${
                       isSelected
                         ? "border-l-amber-500 bg-amber-500/10 dark:bg-amber-500/15"
@@ -221,7 +221,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                             : "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30"
                         }`}
                       >
-                        {order.status.replace("_", " ")}
+                        {deliveryStatusLabel(order)}
                       </span>
                     </div>
 
@@ -230,9 +230,9 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                       <div className="flex items-center justify-between px-1.5 py-0.5 mb-1 bg-amber-500/15 dark:bg-amber-500/20 border border-amber-500/40 text-[10px] font-mono font-black text-amber-700 dark:text-amber-300">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3 animate-pulse text-amber-500 shrink-0" />
-                          <span>{order.fulfillmentType === "DELIVERY" ? "Delivery in" : "Ready in"}</span>
+                          <span>{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Status"}</span>
                         </span>
-                        <span>{timer.formattedCountdown} left</span>
+                        <span>{timer.formattedCountdown}</span>
                       </div>
                     ) : (
                       <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 mb-1">
@@ -304,7 +304,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                         selectedOrder.status === "CONFIRMED"
                       }
                     >
-                      {selectedOrder.status.replace("_", " ")}
+                      {deliveryStatusLabel(selectedOrder)}
                     </Badge>
 
                     {/* Fulfillment Type Badge */}
@@ -348,42 +348,24 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                     {selectedOrder.status === "COMPLETED"
                       ? "Order Status"
                       : selectedOrder.fulfillmentType === "DELIVERY"
-                      ? "Estimated Delivery"
-                      : "Estimated Readiness"}
+                      ? "Delivery status"
+                      : "Order status"}
                   </span>
                   {selectedOrderTimer?.isUndelivered ? (
                     <div className="flex items-center sm:justify-end gap-1.5 font-mono text-xl sm:text-2xl font-black text-amber-500">
                       <Clock className="h-5 w-5 animate-pulse text-amber-500 shrink-0" />
                       <span>{selectedOrderTimer.formattedCountdown}</span>
-                      <span className="text-xs text-zinc-400 font-sans font-bold">left</span>
+                      
                     </div>
                   ) : (
                     <p className="text-lg sm:text-xl font-black text-emerald-500 font-mono">
-                      {selectedOrder.status === "COMPLETED" ? "Delivered" : selectedOrder.status}
+                      {deliveryStatusLabel(selectedOrder)}
                     </p>
                   )}
                 </div>
               </div>
 
-              {/* Delivery Destination */}
-              {selectedOrder.fulfillmentType === "DELIVERY" && selectedOrder.deliveryAddress && (
-                <div className="p-2.5 sm:p-3 bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-xs">
-                  <Navigation className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-zinc-900 dark:text-white">
-                      Delivery Destination:{" "}
-                    </span>
-                    <span className="text-zinc-700 dark:text-zinc-300">
-                      {selectedOrder.deliveryAddress}
-                    </span>
-                    {selectedOrder.deliveryLocation?.landmark && (
-                      <span className="text-amber-600 dark:text-amber-400 ml-1 font-medium">
-                        ({selectedOrder.deliveryLocation.landmark})
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
+              {selectedOrder.fulfillmentType === 'DELIVERY' && <DeliveryOrderDetails key={selectedOrder.id} order={selectedOrder} />}
 
               {/* ==================================================================== */}
               {/* ANIMATED LIVE ORDER TRACKING STAGE */}
@@ -396,7 +378,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                       <span className="w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
                       <span className="text-xs font-mono font-bold text-amber-400">
                         {selectedOrder.status === "COMPLETED"
-                          ? "Order Delivered"
+                          ? (isDelivery ? "Order Delivered" : "Order Completed")
                           : selectedOrder.fulfillmentType === "DELIVERY"
                           ? selectedOrderTimer?.displayLabel
                           : selectedOrderTimer?.displayLabel}
@@ -427,7 +409,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                       <motion.div
                         className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.8)] relative z-10"
                         animate={{
-                          width: `${selectedOrderTimer?.progressPercent || 20}%`,
+                          width: `${selectedOrderTimer?.progressPercent ?? 0}%`,
                         }}
                         transition={{ duration: 0.5, ease: "easeOut" }}
                       />
@@ -437,7 +419,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                     <motion.div
                       className="absolute -top-3.5 z-20"
                       animate={{
-                        left: `calc(${selectedOrderTimer?.progressPercent || 20}% - 18px)`,
+                        left: `calc(${selectedOrderTimer?.progressPercent ?? 0}% - 18px)`,
                       }}
                       transition={{ duration: 0.5, ease: "easeOut" }}
                     >
@@ -482,7 +464,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
               {/* Horizontal Step Progress Timeline */}
               {selectedOrder.status !== "CANCELLED" ? (
                 <div className="py-2">
-                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2 relative">
+                  <div className={`grid ${isDelivery ? "grid-cols-3 sm:grid-cols-6" : "grid-cols-5"} gap-3 sm:gap-2 relative`}>
                     {timelineSteps.map((step, idx) => {
                       const isPassed = idx <= currentStepIndex;
                       const isCurrent = idx === currentStepIndex;
@@ -490,6 +472,8 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                       return (
                         <div
                           key={step.key}
+                          aria-current={isCurrent ? "step" : undefined}
+                          data-testid={`tracking-step-${step.key}`}
                           className="flex flex-col items-center text-center group"
                         >
                           {/* Step Indicator */}

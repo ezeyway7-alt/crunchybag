@@ -215,3 +215,52 @@ test('rejected checkout keeps the cart and receipt for retry',async({page})=>{
   const state=await setup(page,true);state.failCreate=true;await openCheckout(page);await receipt(page);const submit=page.getByRole('button',{name:/Submit Receipt & Place Order/});await expect(submit).toBeEnabled();await submit.click();
   await expect(page.getByText('Price changed; please review.',{exact:true})).toBeVisible();expect(state.created).toBe(0);await submit.click();await expect.poll(()=>state.created).toBe(1);
 });
+
+test('order selection survives live updates and delivery has dispatch, maps, copy and mobile sharing',async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.addInitScript(()=>{
+    Object.defineProperty(navigator,'share',{configurable:true,value:async(value:any)=>{(window as any).sharedDelivery=value;}});
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async(value:string)=>{(window as any).copiedDelivery=value;}}});
+  });
+  const state=await setup(page,true);await openCheckout(page);await receipt(page);
+  await page.getByRole('button',{name:/Submit Receipt & Place Order/}).click();
+  await expect.poll(()=>state.created).toBe(1);
+  const delivery={...state.orders[0],id:8,order_number:'WEB-DELIVERY-8',status:'OUT_FOR_DELIVERY',fulfillment_type:'DELIVERY',delivery_address:'House 9, Test Street',delivery_location:{lat:27.681234,lng:85.321987,landmark:'Blue gate'},notes:'Call at the gate'};
+  state.orders.push(delivery);
+  state.sockets.at(-1).send(JSON.stringify({type:'orders_changed'}));
+  await page.getByRole('button',{name:'View order WEB-DELIVERY-8',exact:true}).click();
+  await expect(page.getByRole('button',{name:'View order WEB-DELIVERY-8',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByTestId('tracking-step-OUT_FOR_DELIVERY')).toHaveAttribute('aria-current','step');
+  const destination=page.getByRole('region',{name:'Delivery details'});
+  await expect(destination.getByRole('link',{name:'Open in Maps',exact:true})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=27.681234%2C85.321987');
+  await destination.getByRole('button',{name:'Copy delivery details',exact:true}).click();
+  const copied=await page.evaluate(()=>(window as any).copiedDelivery);
+  expect(copied).toContain('House 9, Test Street');expect(copied).toContain('+9779841234567');expect(copied).toContain('Blue gate');expect(copied).toContain('Call at the gate');
+  await destination.getByRole('button',{name:'Share delivery details',exact:true}).click();
+  expect(await page.evaluate(()=>(window as any).sharedDelivery)).toMatchObject({title:'Delivery WEB-DELIVERY-8',url:'https://www.google.com/maps/search/?api=1&query=27.681234%2C85.321987'});
+  delivery.status='COMPLETED';delivery.version++;
+  state.sockets.at(-1).send(JSON.stringify({type:'orders_changed'}));
+  await expect(page.getByTestId('tracking-step-COMPLETED')).toHaveAttribute('aria-current','step');
+  await expect(page.getByTestId('tracking-step-COMPLETED')).toContainText('Delivered');
+  await expect(page.getByRole('button',{name:'View order WEB-DELIVERY-8',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'View order WEB-REAL-7',exact:true}).click();
+  await expect(page.getByRole('button',{name:'View order WEB-REAL-7',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByTestId('tracking-step-OUT_FOR_DELIVERY')).toHaveCount(0);
+  await expect(page.getByTestId('tracking-step-COMPLETED')).toContainText('Completed');
+  await page.getByRole('button',{name:'View order WEB-DELIVERY-8',exact:true}).click();
+  await expect(destination).toContainText('House 9, Test Street');
+});
+
+test('delivery sharing falls back to selectable text when clipboard access is denied',async({page})=>{
+  await page.addInitScript(()=>{
+    Object.defineProperty(navigator,'share',{configurable:true,value:undefined});
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('Denied');}}});
+  });
+  const state=await setup(page,true);await openCheckout(page);await receipt(page);
+  await page.getByRole('button',{name:/Submit Receipt & Place Order/}).click();await expect.poll(()=>state.created).toBe(1);
+  Object.assign(state.orders[0],{fulfillment_type:'DELIVERY',delivery_address:'My street\nhttps://maps.google.com/?q=27.7,85.3',status:'READY'});
+  state.sockets.at(-1).send(JSON.stringify({type:'orders_changed'}));
+  await page.getByRole('button',{name:'Share delivery details',exact:true}).click();
+  await expect(page.getByLabel('Delivery details to copy')).toHaveValue(/Coordinates: 27\.7, 85\.3/);
+  await expect(page.getByRole('link',{name:'Open in Maps',exact:true})).toHaveAttribute('href','https://www.google.com/maps/search/?api=1&query=27.7%2C85.3');
+});

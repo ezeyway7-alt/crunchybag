@@ -494,12 +494,13 @@ export const KDSPortal: React.FC = () => {
    * Automatically broadcasts WebSocket notification to KDS screens and TV displays
    */
   const handleBump = async (ticketId: string, currentColumn: KdsColumn) => {
+    const ticket = serverTickets.find((t) => String(t.id) === ticketId);
     const nextStatus =
       currentColumn === "QUEUED"
         ? "PREPARING"
         : currentColumn === "PREPARING"
         ? "READY"
-        : "COMPLETED";
+        : ticket?.fulfillment_type === "DELIVERY" ? "OUT_FOR_DELIVERY" : "COMPLETED";
 
     // Immediate sound feedback
     if (kdsSoundEnabled) {
@@ -507,7 +508,6 @@ export const KDSPortal: React.FC = () => {
     }
 
     // Resolve accurate outlet_id and version for this ticket
-    const ticket = serverTickets.find((t) => String(t.id) === ticketId);
     const appOrder = appOrders.find(
       (o) => String(o.id) === ticketId || o.orderNumber === ticket?.order_number
     );
@@ -518,7 +518,7 @@ export const KDSPortal: React.FC = () => {
       prev
         .map((t) =>
           String(t.id) === ticketId
-            ? nextStatus === "COMPLETED"
+            ? (nextStatus === "COMPLETED" || nextStatus === "OUT_FOR_DELIVERY")
               ? null
               : { ...t, status: nextStatus, version: currentVersion + 1 }
             : t
@@ -547,9 +547,11 @@ export const KDSPortal: React.FC = () => {
             status: nextStatus,
             to_status: nextStatus,
             reason: `Kitchen transitioned order to ${nextStatus}`,
-          }
+          },
+          {headers: {"Idempotency-Key": `kds-transition:${ticketOutletId}:${ticketId}:${currentVersion}:${nextStatus}`}}
         );
       } catch (posErr) {
+        if ((posErr as any)?.status !== 404) throw posErr;
         // Fallback: Universal KDS transition endpoint (POST /api/v1/orders/<order_id>/transition/?outlet_id=<outlet_id>)
         await apiClient.post(
           `/orders/${ticketId}/transition/?outlet_id=${encodeURIComponent(ticketOutletId)}`,
@@ -564,7 +566,7 @@ export const KDSPortal: React.FC = () => {
       }
 
       // AppContext sync fallback
-      if (appBumpKdsTicket) {
+      if (appBumpKdsTicket && nextStatus !== "OUT_FOR_DELIVERY") {
         appBumpKdsTicket(ticketId);
       }
 
