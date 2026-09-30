@@ -157,12 +157,12 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
       onClose={onClose}
       maxWidth="md"
       showCloseButton={false}
-      className="max-w-[480px] w-full h-[90vh] max-h-[680px] min-h-[440px] border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none"
+      className="max-w-[480px] w-full h-[88vh] sm:h-[90vh] max-h-[680px] min-h-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none overscroll-contain touch-pan-y max-w-full"
       contentClassName="p-0 h-full flex flex-col min-h-0"
     >
-      <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#121214] text-zinc-900 dark:text-zinc-100 overflow-hidden">
+      <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#121214] text-zinc-900 dark:text-zinc-100 overflow-hidden w-full max-w-full">
         {/* Top Image Showcase (Proper Food Dimensions) */}
-        <div className="relative w-full h-44 sm:h-52 bg-zinc-950 shrink-0 overflow-hidden flex flex-col justify-between border-b border-zinc-200 dark:border-zinc-800">
+        <div className="relative w-full h-38 sm:h-48 bg-zinc-950 shrink-0 overflow-hidden flex flex-col justify-between border-b border-zinc-200 dark:border-zinc-800">
           <img
             src={product.images[activeImageIndex] || product.images[0]}
             alt={product.name}
@@ -175,7 +175,7 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
           {/* Floating Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-2.5 right-2.5 z-10 w-7.5 h-7.5 rounded-none bg-black/80 hover:bg-black text-white border border-white/20 flex items-center justify-center cursor-pointer shadow-md active:scale-95"
+            className="absolute top-2.5 right-2.5 z-10 w-7.5 h-7.5 rounded-none bg-black/80 hover:bg-black active:bg-zinc-800 text-white border border-white/20 flex items-center justify-center cursor-pointer shadow-md transition-colors"
             aria-label="Close"
           >
             <X className="w-4 h-4 stroke-[2.5]" />
@@ -221,9 +221,9 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
         </div>
 
         {/* Customization & Action Column */}
-        <div className="flex-1 min-h-0 flex flex-col h-full bg-white dark:bg-[#121214]">
+        <div className="flex-1 min-h-0 flex flex-col h-full bg-white dark:bg-[#121214] overflow-hidden">
           {/* Header with Title, Price, Description */}
-          <div className="px-3 py-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0 bg-zinc-50/80 dark:bg-zinc-900/60">
+          <div className="px-3 py-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0 bg-zinc-50/80 dark:bg-zinc-900/60 w-full overflow-hidden">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-black text-zinc-950 dark:text-white tracking-tight truncate">
@@ -240,7 +240,7 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
           </div>
 
           {/* Scrollable Customization Body */}
-          <div className="flex-1 min-h-0 overflow-y-auto p-2.5 sm:p-3.5 space-y-2.5 text-xs">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2.5 sm:p-3.5 space-y-2.5 text-xs overscroll-contain touch-pan-y">
             {/* Variant Selector (e.g. Regular vs Large) */}
             {product.variants.length > 1 && (
               <div className="space-y-1.5">
@@ -373,13 +373,13 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
           </div>
 
           {/* Sticky Bottom Footer with Quantity & Add to Order */}
-          <div className="shrink-0 bg-white dark:bg-[#121214] border-t border-zinc-200 dark:border-zinc-800 p-2 sm:p-2.5 flex items-center gap-2 z-20 shadow-lg">
+          <div className="shrink-0 bg-white dark:bg-[#121214] border-t border-zinc-200 dark:border-zinc-800 p-2 sm:p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] flex items-center gap-2 z-20 shadow-lg w-full max-w-full overflow-hidden">
             {/* Quantity Controls */}
             <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-none p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-7 h-7 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-none transition-colors cursor-pointer text-zinc-700 dark:text-zinc-200 active:scale-95"
+                className="w-7 h-7 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 active:bg-zinc-300 dark:active:bg-zinc-600 rounded-none transition-colors cursor-pointer text-zinc-700 dark:text-zinc-200"
                 aria-label="Decrease quantity"
               >
                 <Minus className="h-3.5 w-3.5" />
@@ -390,7 +390,7 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
               <button
                 type="button"
                 onClick={() => setQuantity(quantity + 1)}
-                className="w-7 h-7 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-none transition-colors cursor-pointer text-zinc-700 dark:text-zinc-200 active:scale-95"
+                className="w-7 h-7 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 active:bg-zinc-300 dark:active:bg-zinc-600 rounded-none transition-colors cursor-pointer text-zinc-700 dark:text-zinc-200"
                 aria-label="Increase quantity"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -402,7 +402,7 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
               type="button"
               id="modal-add-to-order-btn"
               onClick={handleConfirmAdd}
-              className="flex-1 bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-black font-black text-xs sm:text-sm h-9 sm:h-10 px-3 rounded-none shadow-xs transition-all cursor-pointer flex items-center justify-between border border-amber-600"
+              className="flex-1 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-black font-black text-xs sm:text-sm h-9 sm:h-10 px-3 rounded-none shadow-xs transition-colors cursor-pointer flex items-center justify-between border border-amber-600"
             >
               <span>{editingCartItemId ? "Update Item" : "Add to Order"}</span>
               <span className="font-mono font-black text-xs sm:text-sm">

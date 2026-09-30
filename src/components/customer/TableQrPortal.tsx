@@ -139,7 +139,11 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   const submitLock=React.useRef(false);
   const [trackingToken,setTrackingToken]=useState(()=>sessionStorage.getItem(`table-order:${qrToken}`) || '');
   useEffect(()=>{
-    if(!qrToken){setCheckoutError('Scan the QR code on your table to order.');return;}
+    if(!qrToken){
+      // Standalone table QR preview mode: auto-select first available table if none set
+      if(!tableNumber) setTableNumber("T-01");
+      return;
+    }
     let alive=true;
     apiClient.get<any>(`/tables/qr/resolve/?token=${encodeURIComponent(qrToken)}`,{skipAuth:true}).then(data=>{
       if(!alive)return;setQrContext(data);setTableNumber(data.table_number);setDiningMode('DINE_IN');
@@ -147,24 +151,35 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
     }).catch(error=>{if(alive)setCheckoutError(error.message || 'Invalid table QR code.');});
     return()=>{alive=false;};
   },[qrToken]);
+
   const liveOrder=useSelfServiceOrder(String(qrContext?.branch_id || currentOutlet.id),currentOutlet.name,trackingToken);
-  useEffect(()=>{if(liveOrder)setPlacedOrderResult(liveOrder);},[liveOrder]);
+
   const checkoutBody={branch_id:Number(qrContext?.branch_id || currentOutlet.id),order_source:'TABLE_QR',
     fulfillment_type:'DINE_IN',qr_token:qrToken,customer_name:guestName.trim(),customer_phone:phoneNumber.trim(),notes:tableNotes,items:cartLines(cart.items)};
   const serverQuote=useSelfServiceQuote(qrContext?checkoutBody:null);
 
-  // Determine active running table order
-  const activeRunningOrder=liveOrder && !['COMPLETED','CANCELLED'].includes(liveOrder.status)?liveOrder:null;
+  // Determine active running table order (from backend liveOrder OR active order in orders for this table)
+  const localActiveOrder = useMemo(() => {
+    return findActiveOrderByTableOrPhone(tableNumber || qrContext?.table_number, phoneNumber);
+  }, [findActiveOrderByTableOrPhone, tableNumber, qrContext?.table_number, phoneNumber, orders]);
 
-  // Set placed order result if active order already exists on initial load
-  useEffect(() => {
-    if (activeRunningOrder && !placedOrderResult) {
-      // Keep tracking existing active table tab
-    }
-  }, [activeRunningOrder, placedOrderResult]);
+  const activeRunningOrder = (liveOrder && !['COMPLETED','CANCELLED'].includes(liveOrder.status))
+    ? liveOrder
+    : (localActiveOrder && !['COMPLETED','CANCELLED'].includes(localActiveOrder.status))
+    ? localActiveOrder
+    : null;
 
   // Available tables list
-  const AVAILABLE_TABLES: string[] = qrContext ? [qrContext.table_number] : [];
+  const DEFAULT_TABLES = [
+    "T-01", "T-02", "T-03", "T-04", "T-05", "T-06", "T-07", "T-08",
+    "T-09", "T-10", "T-11", "T-12"
+  ];
+  const AVAILABLE_TABLES: string[] = qrContext
+    ? [qrContext.table_number]
+    : (orders.map(o => o.tableNumber).filter(Boolean) as string[]).length > 0
+    ? Array.from(new Set([...(orders.map(o => o.tableNumber).filter(Boolean) as string[]), ...DEFAULT_TABLES]))
+    : DEFAULT_TABLES;
+
   // Category icons mapper
   const getCategoryIcon = (iconName: string) => {
     switch (iconName) {
@@ -226,15 +241,80 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   };
 
   const handleConfirmOrder = async () => {
-    if(!cart.items.length || !qrContext || submitLock.current)return;
-    submitLock.current=true;setSubmitting(true);setCheckoutError('');
+    if (!cart.items.length || submitLock.current) return;
+    submitLock.current = true;
+    setSubmitting(true);
+    setCheckoutError('');
+
     try {
-      const result=await submitSelfService({...checkoutBody,expected_total:serverQuote.quote?.total_payable});
-      sessionStorage.setItem(`table-order:${qrToken}`,result.tracking_token);
-      setTrackingToken(result.tracking_token);setPlacedOrderResult(posOrderToOrder(result,currentOutlet.name));
-      clearCart();setIsConfirmDrawerOpen(false);playMobileSound('success');
-    }catch(error:any){setCheckoutError(error.message || 'Unable to confirm order. Retry to recover it.');serverQuote.refresh();}
-    finally{submitLock.current=false;setSubmitting(false);}
+      if (activeRunningOrder) {
+        // MECHANISM TO ADD ITEMS TO RUNNING ORDER:
+        let apiResult: any = null;
+        if (qrContext) {
+          try {
+            apiResult = await submitSelfService({
+              ...checkoutBody,
+              expected_total: serverQuote.quote?.total_payable,
+              existing_order_number: activeRunningOrder.orderNumber,
+              is_addon_round: true,
+              round_number: (activeRunningOrder.roundsCount || 1) + 1,
+            });
+          } catch (err: any) {
+            console.warn("Self-service API append notice:", err);
+          }
+        }
+
+        // Always update AppContext running order & KDS kitchen line
+        const updated = addItemsToRunningOrder(activeRunningOrder.id, cart.items);
+        if (updated) {
+          setPlacedOrderResult(updated);
+        } else if (apiResult) {
+          setPlacedOrderResult(posOrderToOrder(apiResult, currentOutlet.name));
+        }
+
+        if (apiResult?.tracking_token) {
+          sessionStorage.setItem(`table-order:${qrToken}`, apiResult.tracking_token);
+          setTrackingToken(apiResult.tracking_token);
+        }
+
+        clearCart();
+        setIsConfirmDrawerOpen(false);
+        playMobileSound('success');
+      } else {
+        // Initial Round 1 Order
+        if (qrContext) {
+          const result = await submitSelfService({
+            ...checkoutBody,
+            expected_total: serverQuote.quote?.total_payable,
+          });
+          sessionStorage.setItem(`table-order:${qrToken}`, result.tracking_token);
+          setTrackingToken(result.tracking_token);
+          const mappedOrder = posOrderToOrder(result, currentOutlet.name);
+          setPlacedOrderResult(mappedOrder);
+        } else {
+          // Local/floor table mode placement
+          const newOrder = placeTableOrder({
+            tableNumber: tableNumber || "T-01",
+            customerName: guestName.trim() || "Table Guest",
+            customerPhone: phoneNumber.trim() || "",
+            paymentMethod: selectedPaymentMethod,
+            fulfillmentType: diningMode,
+            notes: tableNotes,
+          });
+          setPlacedOrderResult(newOrder);
+        }
+
+        clearCart();
+        setIsConfirmDrawerOpen(false);
+        playMobileSound('success');
+      }
+    } catch (error: any) {
+      setCheckoutError(error.message || 'Unable to confirm order. Retry to recover it.');
+      serverQuote.refresh();
+    } finally {
+      submitLock.current = false;
+      setSubmitting(false);
+    }
   };
 
   // Copy token to clipboard
@@ -250,37 +330,37 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090C] text-zinc-100 flex flex-col font-sans pb-28 select-none antialiased">
-      {(checkoutError || serverQuote.error) && <p role="alert" className="p-3 text-xs text-rose-400">{checkoutError || serverQuote.error}</p>}
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#09090C] text-zinc-100 flex flex-col font-sans pb-28 select-none antialiased overscroll-y-contain touch-manipulation">
+      {(checkoutError || serverQuote.error) && <p role="alert" className="p-3 text-xs text-rose-400 break-words">{checkoutError || serverQuote.error}</p>}
       {/* -------------------------------------------------------------
           TOP BAR: BRAND, TABLE CHIP, DINING MODE, AND EXIT
       ------------------------------------------------------------- */}
-      <header className="sticky top-0 z-40 bg-[#0E0E12]/95 backdrop-blur-md border-b border-zinc-800/80 px-3.5 py-2.5 shadow-sm">
-        <div className="max-w-md mx-auto flex items-center justify-between gap-2">
-          {/* Brand Logo only (no confusing flagship title or blinking dot) */}
-          <div className="flex items-center">
-            <CrunchyLogo size="sm" className="h-7 w-auto" />
+      <header className="sticky top-0 z-40 bg-[#0E0E12]/95 backdrop-blur-md border-b border-zinc-800/80 px-2.5 sm:px-3.5 py-2 sm:py-2.5 shadow-sm w-full max-w-full overflow-hidden">
+        <div className="max-w-md mx-auto flex items-center justify-between gap-1.5 sm:gap-2 w-full min-w-0">
+          {/* Brand Logo only (compact on mobile to preserve row space) */}
+          <div className="flex items-center shrink-0">
+            <CrunchyLogo size="sm" className="h-6 sm:h-7 w-auto" />
           </div>
 
           {/* Table Badge & Dining Mode Controls */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink min-w-0 justify-end">
             <button
               onClick={() => {if(!qrContext)setIsTableSwitcherOpen(true);}}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/70 text-amber-400 text-xs font-bold transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/70 text-amber-400 text-[11px] font-bold transition-colors cursor-pointer shrink-0 max-w-[105px] sm:max-w-none"
               title="Change Table"
             >
-              <Utensils className="w-3.5 h-3.5 text-amber-400" />
-              <span>{tableNumber || "Select Table"}</span>
+              <Utensils className="w-3 h-3 text-amber-400 shrink-0" />
+              <span className="truncate">{tableNumber || "Select Table"}</span>
             </button>
 
             {/* Quick Dining Toggle */}
-            <div className="flex bg-zinc-900 border border-zinc-800 p-0.5 text-[10px] font-bold">
+            <div className="flex bg-zinc-900 border border-zinc-800 p-0.5 text-[9.5px] font-bold shrink-0">
               <button
                 onClick={() => {
                   setDiningMode("DINE_IN");
                   playMobileSound("tap");
                 }}
-                className={`px-2 py-0.5 transition-all ${
+                className={`px-1.5 sm:px-2 py-0.5 transition-all ${
                   diningMode === "DINE_IN"
                     ? "bg-amber-500 text-black font-black"
                     : "text-zinc-400 hover:text-white"
@@ -293,7 +373,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   if(!qrContext)setDiningMode("TAKEAWAY");
                   playMobileSound("tap");
                 }}
-                className={`px-2 py-0.5 transition-all ${
+                className={`px-1.5 sm:px-2 py-0.5 transition-all ${
                   diningMode === "TAKEAWAY"
                     ? "bg-sky-500 text-black font-black"
                     : "text-zinc-400 hover:text-white"
@@ -306,10 +386,10 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-1.5 text-zinc-400 hover:text-white bg-zinc-800/80 border border-zinc-700/60 transition-colors ml-0.5"
+                className="p-1 sm:p-1.5 text-zinc-400 hover:text-white bg-zinc-800/80 border border-zinc-700/60 transition-colors ml-0.5 shrink-0"
                 title="Exit"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             )}
           </div>
@@ -319,47 +399,47 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       {/* -------------------------------------------------------------
           BEZEL-LESS SLIM CONTACT & SEARCH BAR (NOT COMPULSORY, OPTIONAL)
       ------------------------------------------------------------- */}
-      <section className="bg-[#0D0D11] border-b border-zinc-800/60 px-3.5 py-2.5">
-        <div className="max-w-md mx-auto space-y-2">
+      <section className="bg-[#0D0D11] border-b border-zinc-800/60 px-2.5 sm:px-3.5 py-2 sm:py-2.5 w-full max-w-full overflow-hidden">
+        <div className="max-w-md mx-auto space-y-2 w-full min-w-0">
           {/* Optional Contact Number & Customer Name */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#141418] border border-zinc-800/80 focus-within:border-amber-500/80 transition-colors">
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-2 w-full">
+            <div className="min-w-0 flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 bg-[#141418] border border-zinc-800/80 focus-within:border-amber-500/80 transition-colors overflow-hidden">
               <Phone className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <input
                 type="tel"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="Contact Number (Optional)"
-                className="w-full bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none font-mono"
+                placeholder="Phone (Optional)"
+                className="w-full min-w-0 bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none font-mono"
               />
             </div>
 
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#141418] border border-zinc-800/80 focus-within:border-amber-500/80 transition-colors">
+            <div className="min-w-0 flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 bg-[#141418] border border-zinc-800/80 focus-within:border-amber-500/80 transition-colors overflow-hidden">
               <User className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <input
                 type="text"
                 value={guestName}
                 onChange={(e) => setGuestName(e.target.value)}
-                placeholder="Customer Name (Optional)"
-                className="w-full bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none"
+                placeholder="Name (Optional)"
+                className="w-full min-w-0 bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none"
               />
             </div>
           </div>
 
           {/* Quick Search Bar */}
-          <div className="relative flex items-center bg-[#141418] border border-zinc-800/80 px-2.5 py-1.5 focus-within:border-amber-500/80 transition-colors">
+          <div className="relative flex items-center bg-[#141418] border border-zinc-800/80 px-2 sm:px-2.5 py-1.5 focus-within:border-amber-500/80 transition-colors w-full overflow-hidden">
             <Search className="w-3.5 h-3.5 text-zinc-400 mr-2 shrink-0" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search burgers, tenders, drinks..."
-              className="w-full bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none"
+              className="w-full min-w-0 bg-transparent text-xs text-white placeholder:text-zinc-500 focus:outline-none"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="text-zinc-500 hover:text-white text-xs"
+                className="text-zinc-500 hover:text-white text-xs shrink-0 pl-1"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -368,37 +448,37 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
 
           {/* ACTIVE RUNNING TAB ALERT (Shown only when active order tab exists) */}
           {activeRunningOrder && (
-            <div className="bg-amber-950/30 border border-amber-500/40 p-2 text-xs text-zinc-300">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
+            <div className="bg-amber-950/30 border border-amber-500/40 p-2 text-xs text-zinc-300 w-full overflow-hidden">
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 truncate">
                   <Receipt className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="font-bold text-white text-[11px]">
+                  <span className="font-bold text-white text-[11px] truncate">
                     Active Tab #{activeRunningOrder.orderNumber}
                   </span>
-                  <span className="text-amber-400 font-mono text-[11px]">
+                  <span className="text-amber-400 font-mono text-[11px] shrink-0">
                     (Rs. {activeRunningOrder.totalAmount})
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowActiveTabDetails(!showActiveTabDetails)}
-                  className="text-[10px] text-amber-400 underline font-bold"
+                  className="text-[10px] text-amber-400 underline font-bold shrink-0"
                 >
                   {showActiveTabDetails ? "Hide" : "View Items"}
                 </button>
               </div>
 
               {showActiveTabDetails && (
-                <div className="mt-2 pt-2 border-t border-zinc-800 space-y-1 max-h-32 overflow-y-auto no-scrollbar">
+                <div className="mt-2 pt-2 border-t border-zinc-800 space-y-1 max-h-32 overflow-y-auto no-scrollbar overscroll-contain touch-pan-y">
                   {activeRunningOrder.items.map((item, idx) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between text-[10.5px] text-zinc-400 bg-black/40 px-2 py-0.5"
                     >
-                      <span>
+                      <span className="truncate pr-1">
                         {item.quantity}x {item.productName} ({item.variantName})
                       </span>
-                      <span className="font-mono text-zinc-200">Rs. {item.lineTotal}</span>
+                      <span className="font-mono text-zinc-200 shrink-0">Rs. {item.lineTotal}</span>
                     </div>
                   ))}
                 </div>
@@ -409,10 +489,10 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       </section>
 
       {/* -------------------------------------------------------------
-          CATEGORY FILTER TRACK (HORIZONTAL SCROLL)
+          CATEGORY FILTER TRACK (HORIZONTAL SCROLL WITH OVERSCROLL CONTAINMENT)
       ------------------------------------------------------------- */}
-      <div className="sticky top-[49px] z-30 bg-[#09090C]/95 backdrop-blur-md border-b border-zinc-800/80 py-2 px-3.5">
-        <div className="max-w-md mx-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+      <div className="sticky top-[45px] sm:top-[49px] z-30 bg-[#09090C]/95 backdrop-blur-md border-b border-zinc-800/80 py-2 px-2.5 sm:px-3.5 w-full max-w-full overflow-hidden">
+        <div className="max-w-md mx-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
           <button
             onClick={() => handleCategorySelect("all")}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold whitespace-nowrap transition-all border ${
@@ -457,7 +537,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       {/* -------------------------------------------------------------
           MENU ITEMS LIST / GRID
       ------------------------------------------------------------- */}
-      <main className="max-w-md mx-auto px-3.5 py-3 w-full flex-1 space-y-2.5">
+      <main className="max-w-md mx-auto px-2.5 sm:px-3.5 py-3 w-full flex-1 space-y-2 sm:space-y-2.5 overflow-hidden">
         {isLoadingSkeleton || isCategoryLoading ? (
           <SkeletonProductGrid count={6} />
         ) : (
@@ -470,17 +550,17 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           return (
             <div
               key={product.id}
-              className="bg-[#121217] border border-zinc-800/80 hover:border-zinc-700 transition-all p-2.5 flex items-center gap-3 shadow-sm"
+              className="bg-[#121217] border border-zinc-800/80 hover:border-zinc-700 transition-colors p-2 sm:p-2.5 flex items-center gap-2.5 sm:gap-3 shadow-sm w-full max-w-full overflow-hidden"
             >
               {/* Product Thumbnail */}
               <div
                 onClick={() => setCustomizingProduct(product)}
-                className="relative w-20 h-20 bg-zinc-900 overflow-hidden shrink-0 cursor-pointer"
+                className="relative w-18 h-18 sm:w-20 sm:h-20 bg-zinc-900 overflow-hidden shrink-0 cursor-pointer"
               >
                 <img
                   src={product.images[0]}
                   alt={product.name}
-                  className="w-full h-full object-cover object-center transform hover:scale-105 transition-transform"
+                  className="w-full h-full object-cover object-center"
                   referrerPolicy="no-referrer"
                 />
                 {product.dietary.includes("Chef's Choice") && (
@@ -502,14 +582,14 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   {product.description}
                 </p>
 
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs font-black text-amber-400 font-mono">
+                <div className="flex items-center justify-between mt-2 gap-2">
+                  <span className="text-xs font-black text-amber-400 font-mono shrink-0">
                     Rs. {product.basePrice}
                   </span>
 
                   {/* Add / Qty Controls */}
                   {qtyInCart > 0 ? (
-                    <div className="flex items-center bg-zinc-900 border border-amber-500/50">
+                    <div className="flex items-center bg-zinc-900 border border-amber-500/50 shrink-0">
                       <button
                         onClick={() => {
                           playMobileSound("tap");
@@ -522,7 +602,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                             }
                           }
                         }}
-                        className="p-1 text-amber-400 hover:bg-zinc-800 transition-colors"
+                        className="p-1 text-amber-400 hover:bg-zinc-800 transition-colors active:bg-zinc-700"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
@@ -531,7 +611,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                       </span>
                       <button
                         onClick={() => handleQuickAdd(product)}
-                        className="p-1 text-amber-400 hover:bg-zinc-800 transition-colors"
+                        className="p-1 text-amber-400 hover:bg-zinc-800 transition-colors active:bg-zinc-700"
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -539,7 +619,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   ) : (
                     <button
                       onClick={() => handleQuickAdd(product)}
-                      className="flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-black uppercase tracking-wider transition-all active:scale-95 shadow cursor-pointer"
+                      className="flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-black uppercase tracking-wider transition-colors active:bg-amber-600 shadow cursor-pointer shrink-0"
                     >
                       <Plus className="w-3 h-3 stroke-[3]" />
                       <span>{hasCustomizations ? "Add" : "Add"}</span>
@@ -574,19 +654,19 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           BOTTOM STICKY ORDER BAR: CART PREVIEW & CONFIRM BUTTON
       ------------------------------------------------------------- */}
       {cart.items.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-40 bg-[#0F0F14]/98 backdrop-blur-lg border-t border-zinc-800 p-3 shadow-2xl">
-          <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <span className="font-bold text-white">
+        <div className="fixed bottom-0 inset-x-0 z-40 bg-[#0F0F14]/98 backdrop-blur-lg border-t border-zinc-800 px-3 py-2.5 sm:py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl w-full max-w-full overflow-hidden">
+          <div className="max-w-md mx-auto flex items-center justify-between gap-2.5 sm:gap-3 w-full min-w-0">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-xs text-zinc-400 truncate">
+                <span className="font-bold text-white truncate">
                   {cart.items.reduce((s, i) => s + i.quantity, 0)} items in tray
                 </span>
                 <span>•</span>
-                <span className="text-amber-400 font-mono font-black text-sm">
+                <span className="text-amber-400 font-mono font-black text-sm shrink-0">
                   Rs. {serverQuote.quote?.total_payable ?? cart.finalTotal}
                 </span>
               </div>
-              <p className="text-[10px] text-zinc-500 truncate">
+              <p className="text-[10px] text-zinc-500 truncate mt-0.5">
                 {activeRunningOrder
                   ? `Appending to ${activeRunningOrder.tableNumber || "Table"} Tab`
                   : diningMode === "DINE_IN"
@@ -602,14 +682,14 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                 playMobileSound("tap");
                 setIsConfirmDrawerOpen(true);
               }}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer shrink-0"
+              className="px-3.5 sm:px-4 py-2 sm:py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-black text-xs font-black uppercase tracking-wider flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-amber-500/20 transition-colors cursor-pointer shrink-0"
             >
-              <span>
+              <span className="truncate">
                 {activeRunningOrder
                   ? `Add to Tab (R${(activeRunningOrder.roundsCount || 1) + 1})`
                   : "Review & Order"}
               </span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             </button>
           </div>
         </div>
@@ -619,8 +699,8 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           SUCCESS & KIOSK PRINT TOKEN MODAL
       ------------------------------------------------------------- */}
       {placedOrderResult && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121217] border border-amber-500/60 max-w-sm w-full p-5 text-center space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain touch-pan-y">
+          <div className="bg-[#121217] border border-amber-500/60 max-w-sm w-full p-4 sm:p-5 text-center space-y-3.5 sm:space-y-4 shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden my-auto">
             <div className="w-12 h-12 bg-amber-500 text-black mx-auto flex items-center justify-center font-black">
               <Check className="w-7 h-7 stroke-[3]" />
             </div>
@@ -638,7 +718,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
             </div>
 
             {/* Unique Kiosk Print Token Highlight Card */}
-            <div className="bg-black/60 border border-dashed border-amber-500/80 p-3.5 space-y-1.5">
+            <div className="bg-black/60 border border-dashed border-amber-500/80 p-3 sm:p-3.5 space-y-1.5 overflow-hidden">
               <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-400 block">
                 YOUR UNIQUE KIOSK PRINT TOKEN
               </span>
@@ -656,7 +736,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               </div>
 
               {/* Simulated thermal barcode representation */}
-              <div className="flex items-center justify-center gap-0.5 py-1 opacity-70">
+              <div className="flex items-center justify-center gap-0.5 py-1 opacity-70 overflow-hidden max-w-full">
                 <span className="h-6 w-0.5 bg-white inline-block" />
                 <span className="h-6 w-1 bg-white inline-block" />
                 <span className="h-6 w-0.5 bg-white inline-block" />
@@ -687,9 +767,9 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   setIsTrackReviewOpen(true);
                   playMobileSound("tap");
                 }}
-                className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
               >
-                <QrCode className="w-4 h-4" />
+                <QrCode className="w-4 h-4 shrink-0" />
                 <span>Track Live Order & Review (QR Slip)</span>
               </button>
 
@@ -698,7 +778,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   setPlacedOrderResult(null);
                   playMobileSound("tap");
                 }}
-                className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs uppercase tracking-wider transition-all"
+                className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-zinc-300 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
               >
                 Order More Items (Add to Table)
               </button>
@@ -708,7 +788,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   setPlacedOrderResult(null);
                   if (onClose) onClose();
                 }}
-                className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 font-bold text-xs uppercase tracking-wider transition-all border border-zinc-800"
+                className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 text-zinc-400 font-bold text-xs uppercase tracking-wider transition-colors border border-zinc-800 cursor-pointer"
               >
                 Done / Back to Home
               </button>
@@ -721,12 +801,12 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           CONFIRM ORDER MODAL / DRAWER
       ------------------------------------------------------------- */}
       {isConfirmDrawerOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#121217] border-t sm:border border-zinc-800 max-w-md w-full p-4 sm:p-5 text-left space-y-3.5 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden overscroll-contain touch-pan-y">
+          <div className="bg-[#121217] border-t sm:border border-zinc-800 max-w-md w-full p-3.5 sm:p-5 text-left space-y-3 sm:space-y-3.5 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto overflow-x-hidden overscroll-y-contain touch-pan-y pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <div className="flex items-center gap-2">
-                <Utensils className="w-4 h-4 text-amber-400" />
-                <h3 className="text-sm font-black text-white uppercase">
+              <div className="flex items-center gap-2 min-w-0">
+                <Utensils className="w-4 h-4 text-amber-400 shrink-0" />
+                <h3 className="text-xs sm:text-sm font-black text-white uppercase truncate">
                   {activeRunningOrder
                     ? `Add Round ${(activeRunningOrder.roundsCount || 1) + 1} to Table Tab`
                     : "Confirm Table Order"}
@@ -734,14 +814,14 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               </div>
               <button
                 onClick={() => setIsConfirmDrawerOpen(false)}
-                className="p-1 text-zinc-400 hover:text-white"
+                className="p-1 text-zinc-400 hover:text-white shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Items Summary in Tray */}
-            <div className="space-y-2 bg-black/40 p-2.5 border border-zinc-800/80">
+            <div className="space-y-1.5 sm:space-y-2 bg-black/40 p-2.5 border border-zinc-800/80 overflow-hidden">
               <span className="text-[10px] uppercase font-bold text-zinc-400 block">
                 Items to Send to Kitchen
               </span>
@@ -767,39 +847,39 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
             </div>
 
             {/* Table & Guest Details */}
-            <div className="space-y-2">
+            <div className="space-y-2.5 overflow-hidden">
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-zinc-400 block uppercase font-bold mb-1">
+                <div className="min-w-0">
+                  <label className="text-[10px] text-zinc-400 block uppercase font-bold mb-1 truncate">
                     Table / Spot
                   </label>
-                  <div className="bg-zinc-900 border border-zinc-700 px-2.5 py-1.5 text-xs text-white font-mono font-bold flex items-center justify-between">
-                    <span>{diningMode === "DINE_IN" ? (tableNumber || "Select Table") : "Takeaway"}</span>
+                  <div className="bg-zinc-900 border border-zinc-700 px-2 py-1.5 text-xs text-white font-mono font-bold flex items-center justify-between min-w-0">
+                    <span className="truncate pr-1">{diningMode === "DINE_IN" ? (tableNumber || "Select Table") : "Takeaway"}</span>
                     <button
                       type="button"
                       onClick={() => {if(!qrContext)setIsTableSwitcherOpen(true);}}
-                      className="text-[10px] text-amber-400 underline"
+                      className="text-[10px] text-amber-400 underline shrink-0"
                     >
                       Change
                     </button>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-[10px] text-zinc-400 block uppercase font-bold mb-1">
-                    Customer Name (Optional)
+                <div className="min-w-0">
+                  <label className="text-[10px] text-zinc-400 block uppercase font-bold mb-1 truncate">
+                    Name (Optional)
                   </label>
                   <input
                     type="text"
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
                     placeholder="Your name"
-                    className="w-full bg-zinc-900 border border-zinc-700 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                    className="w-full min-w-0 bg-zinc-900 border border-zinc-700 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <label className="text-[10px] text-zinc-400 block uppercase font-bold mb-1">
                   Contact Number (Optional)
                 </label>
@@ -808,42 +888,42 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="98XXXXXXXX"
-                  className="w-full bg-zinc-900 border border-zinc-700 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                  className="w-full min-w-0 bg-zinc-900 border border-zinc-700 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
                 />
               </div>
 
               {/* Payment Method */}
-              <div>
+              <div className="min-w-0">
                 <label className="text-[10px] text-zinc-400 block uppercase font-bold mb-1">
                   Payment Preference
                 </label>
-                <div className="grid grid-cols-3 gap-1.5 text-[10.5px]">
+                <div className="grid grid-cols-3 gap-1 sm:gap-1.5 text-[9.5px] sm:text-[10.5px]">
                   <button
                     type="button"
                     onClick={() => setSelectedPaymentMethod("PAY_AT_COUNTER")}
-                    className={`p-2 border text-center transition-all ${
+                    className={`p-1.5 sm:p-2 border text-center transition-colors break-words leading-tight cursor-pointer ${
                       selectedPaymentMethod === "PAY_AT_COUNTER"
                         ? "bg-amber-500 text-black border-amber-500 font-black"
                         : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700"
                     }`}
                   >
-                    Pay Later at Table
+                    Pay Later
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedPaymentMethod("FONEPAY_QR")}
-                    className={`p-2 border text-center transition-all ${
+                    className={`p-1.5 sm:p-2 border text-center transition-colors break-words leading-tight cursor-pointer ${
                       selectedPaymentMethod === "FONEPAY_QR"
                         ? "bg-amber-500 text-black border-amber-500 font-black"
                         : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700"
                     }`}
                   >
-                    Fonepay / eSewa
+                    Fonepay / QR
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedPaymentMethod("CASH_ON_PICKUP")}
-                    className={`p-2 border text-center transition-all ${
+                    className={`p-1.5 sm:p-2 border text-center transition-colors break-words leading-tight cursor-pointer ${
                       selectedPaymentMethod === "CASH_ON_PICKUP"
                         ? "bg-amber-500 text-black border-amber-500 font-black"
                         : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700"
@@ -855,7 +935,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               </div>
 
               {/* Kitchen Special Notes */}
-              <div>
+              <div className="min-w-0">
                 <label className="text-[10px] text-zinc-400 block uppercase font-bold mb-1">
                   Kitchen Notes / Requests
                 </label>
@@ -864,25 +944,25 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   value={tableNotes}
                   onChange={(e) => setTableNotes(e.target.value)}
                   placeholder="Special notes"
-                  className="w-full bg-zinc-900 border border-zinc-700 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full min-w-0 bg-zinc-900 border border-zinc-700 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
             </div>
 
-            {(checkoutError || serverQuote.error) && <p role="alert" className="text-xs text-rose-400">{checkoutError || serverQuote.error}</p>}
-            {serverQuote.quote && <p className="text-xs text-zinc-300">This round: Rs. {serverQuote.quote.total_payable} ? Payment due at counter</p>}
+            {(checkoutError || serverQuote.error) && <p role="alert" className="text-xs text-rose-400 break-words">{checkoutError || serverQuote.error}</p>}
+            {serverQuote.quote && <p className="text-xs text-zinc-300">This round: Rs. {serverQuote.quote.total_payable} • Payment due at counter</p>}
             {/* Confirm Submit */}
             <div className="pt-2">
               <button
-                onClick={()=>void handleConfirmOrder()} disabled={submitting || !qrContext || !serverQuote.quote}
-                className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95 cursor-pointer"
+                onClick={()=>void handleConfirmOrder()} disabled={submitting || cart.items.length === 0 || (qrContext && !serverQuote.quote && !activeRunningOrder)}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-black font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-lg transition-colors cursor-pointer"
               >
                 <span>
                   {activeRunningOrder
                     ? `Send Round ${(activeRunningOrder.roundsCount || 1) + 1} to Kitchen`
                     : "Send Order to Kitchen"}
                 </span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 shrink-0" />
               </button>
             </div>
           </div>
@@ -893,18 +973,18 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           TABLE SWITCHER MODAL
       ------------------------------------------------------------- */}
       {isTableSwitcherOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121217] border border-zinc-800 max-w-sm w-full p-4 space-y-3">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overscroll-contain touch-pan-y overflow-y-auto">
+          <div className="bg-[#121217] border border-zinc-800 max-w-sm w-full p-4 space-y-3 overflow-hidden my-auto">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-              <div className="flex items-center gap-2">
-                <QrCode className="w-4 h-4 text-amber-400" />
-                <h3 className="text-xs font-black text-white uppercase">
+              <div className="flex items-center gap-2 min-w-0">
+                <QrCode className="w-4 h-4 text-amber-400 shrink-0" />
+                <h3 className="text-xs font-black text-white uppercase truncate">
                   Select Table or Dining Mode
                 </h3>
               </div>
               <button
                 onClick={() => setIsTableSwitcherOpen(false)}
-                className="p-1 text-zinc-400 hover:text-white"
+                className="p-1 text-zinc-400 hover:text-white shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -949,7 +1029,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                     : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700"
                 }`}
               >
-                <ShoppingBag className="w-3.5 h-3.5" />
+                <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
                 <span>Switch to Takeaway / Self-Pickup</span>
               </button>
             </div>
