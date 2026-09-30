@@ -22,13 +22,43 @@ export function CustomerProfilePage() {
     setEditing(row);setLabel(row?.label || 'Home');setAddress(row?.address || '');
     setPoint(row ? addressPoint(row) : undefined);setDefault(row?.is_default || false);setMessage('');
   };
-  if (authUser?.role !== 'CUSTOMER') return <main className="max-w-3xl mx-auto p-6 space-y-4">
-    <h1 className="text-xl font-bold">My profile</h1><p className="text-sm text-zinc-400">Sign in to manage your profile and saved addresses.</p>
-    <Button onClick={()=>window.dispatchEvent(new Event('customer:login'))}>Sign in / Sign up</Button>
-  </main>;
-  return <main className="max-w-3xl mx-auto px-4 py-6 space-y-7">
-    <div className="flex items-center justify-between"><h1 className="text-xl font-bold">My profile</h1>
-      <button onClick={()=>setCustomerActiveTab('orders')} className="text-sm text-amber-400">My orders</button></div>
+  useEffect(() => {
+    if (!authUser || authUser.role !== 'CUSTOMER') {
+      window.dispatchEvent(new Event('customer:login'));
+      setCustomerActiveTab('menu');
+    }
+  }, [authUser]);
+
+  if (authUser?.role !== 'CUSTOMER') {
+    return (
+      <main className="max-w-md mx-auto p-6 my-10 bg-[#121214] border border-zinc-800 text-center space-y-4 shadow-xl text-zinc-100">
+        <h1 className="text-lg font-bold text-white uppercase tracking-tight">Customer Profile</h1>
+        <p className="text-xs text-zinc-400">Please sign in to manage your profile, saved delivery addresses, and past orders.</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
+          <Button variant="primary" onClick={() => window.dispatchEvent(new Event('customer:login'))} className="w-full sm:w-auto">
+            Sign In / Sign Up
+          </Button>
+          <Button variant="outline" onClick={() => setCustomerActiveTab('menu')} className="w-full sm:w-auto">
+            Browse Menu
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  return <main className="max-w-3xl mx-auto px-4 py-6 space-y-7 text-zinc-100">
+    <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setCustomerActiveTab('menu')}
+          className="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+        >
+          ← Back to Menu
+        </button>
+        <h1 className="text-xl font-bold text-white">My Profile</h1>
+      </div>
+      <button onClick={()=>setCustomerActiveTab('orders')} className="text-xs font-bold text-amber-400 hover:underline">View My Orders →</button>
+    </div>
     <form className="space-y-4" onSubmit={async e=>{e.preventDefault();setBusy(true);setMessage('');try{setMessage(await updateCustomerProfile({name: name.trim(), email: email.trim()}) ? 'Profile saved.' : 'Could not save profile. Check your details and try again.');}finally{setBusy(false);}}}>
       <div className="grid sm:grid-cols-2 gap-4"><Input label="Username" value={name} onChange={e=>setName(e.target.value)} minLength={3} maxLength={150} pattern="[a-zA-Z0-9_.@+\-]+" required />
         <Input label="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} maxLength={254} /></div>

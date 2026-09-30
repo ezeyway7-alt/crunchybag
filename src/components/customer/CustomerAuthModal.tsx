@@ -71,6 +71,16 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setNewPin("");
     setNewPassword("");
     setOtpDigits(["", "", "", ""]);
+
+    // If currently on /profile, immediately return to /menu unless returning to checkout
+    if (typeof window !== "undefined") {
+      const returnToCheckout = sessionStorage.getItem("customer:return-to-checkout") === "yes";
+      if (!returnToCheckout && (window.location.pathname === "/profile" || window.location.pathname === "/orders")) {
+        window.history.pushState(null, "", "/menu");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
+    }
+
     if (onSuccess) onSuccess();
     else onClose();
   };
@@ -327,14 +337,51 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       setInfoMessage('SMS code requested. It may take a moment to arrive.');
     });
   };
-  const handleVerifyOtpLogin=()=>{
-    if(otpDigits.some(d=>!d)){setError('Enter the four-digit SMS code.');return;}
-    void perform(async()=>{const result=await apiClient.post<any>(customerPath('auth/recovery-verify/'),{challenge_id:challenge,code:otpDigits.join('')},{skipAuth:true});setResetToken(result.reset_token);setNewPassword('');setNewPin('');setAuthView('RESET_PASSWORD');});
+  const handleVerifyOtpLogin = () => {
+    const code = otpDigits.join("");
+    if (code.length < 4 || otpDigits.some((d) => !d)) {
+      setError("Please enter all 4 digits of the SMS recovery code.");
+      return;
+    }
+    void perform(async () => {
+      const result = await apiClient.post<any>(
+        customerPath("auth/recovery-verify/"),
+        { challenge_id: challenge, code },
+        { skipAuth: true }
+      );
+      setResetToken(result.reset_token);
+      setNewPassword("");
+      setNewPin("");
+      setError("");
+      setInfoMessage("Recovery code verified! Set your new password and 4-digit PIN below.");
+      setAuthView("RESET_PASSWORD");
+    });
   };
-  const handleResetPassword=(e:React.FormEvent)=>{
+
+  const handleResetPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if(newPassword.length<8 || !/^\d{4}$/.test(newPin)){setError('Use a password of at least 8 characters and a four-digit PIN.');return;}
-    void perform(async()=>{const result=await apiClient.post<any>(customerPath('auth/reset/'),{reset_token:resetToken,password:newPassword,pin:newPin},{skipAuth:true});setResetToken('');finish(result);});
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      setError("Please enter a 4-digit numeric MPIN (e.g. 1234).");
+      return;
+    }
+    void perform(async () => {
+      const result = await apiClient.post<any>(
+        customerPath("auth/reset/"),
+        { reset_token: resetToken, password: newPassword, pin: newPin },
+        { skipAuth: true }
+      );
+      setResetToken("");
+      addToast({
+        title: "Password & PIN Updated",
+        message: "Your new credentials have been saved. Welcome back!",
+        type: "success",
+      });
+      finish(result);
+    });
   };
   const checkSmsStatus=()=>void perform(async()=>{
     const result=await apiClient.post<any>(customerPath('auth/sms-status/'),{challenge_id:challenge},{skipAuth:true});
@@ -860,12 +907,91 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           </div>
         )}
         {(authView==='SIGNUP_OTP'||authView==='OTP_LOGIN_OTP')&&<button type="button" onClick={checkSmsStatus} className="mt-3 text-xs text-amber-500 underline">Check SMS delivery</button>}
-        {authView==='RESET_PASSWORD'&&<form onSubmit={handleResetPassword} className="space-y-4 py-2">
-          <p className="text-xs text-zinc-400">Mobile verified. Set your new password and quick PIN.</p>
-          <label className="block text-xs">New password<Input aria-label="New password" type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required/></label>
-          <label className="block text-xs">New 4-digit PIN<Input aria-label="New 4-digit PIN" type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" autoComplete="new-password" value={newPin} onChange={e=>setNewPin(e.target.value.replace(/\D/g,''))} required/></label>
-          <Button type="submit" className="w-full" disabled={busy}>Save and sign in</Button>
-        </form>}
+        {/* -------------------------------------------------------------
+            VIEW 7: RESET PASSWORD & PIN (After successful SMS recovery OTP)
+        ------------------------------------------------------------- */}
+        {authView === "RESET_PASSWORD" && (
+          <form onSubmit={handleResetPassword} className="space-y-4 py-1">
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span>Mobile number verified! Create your new password and 4-digit PIN below.</span>
+            </div>
+
+            <div className="space-y-3">
+              {/* New Password */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    New Password
+                  </label>
+                  <span className="text-[10px] text-zinc-400">Min. 8 characters</span>
+                </div>
+                <div className="relative flex items-center">
+                  <Lock className="absolute left-3 w-4 h-4 text-zinc-400 pointer-events-none" />
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    aria-label="New Password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    maxLength={128}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password (min. 8 chars)"
+                    className="w-full pl-9 pr-10 h-10 text-base sm:text-sm bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                    required
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 p-1 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* New 4-Digit MPIN */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    New 4-Digit Quick MPIN
+                  </label>
+                  <span className="text-[10px] text-zinc-400">4 numeric digits</span>
+                </div>
+                <div className="relative flex items-center">
+                  <KeyRound className="absolute left-3 w-4 h-4 text-zinc-400 pointer-events-none" />
+                  <input
+                    type="password"
+                    maxLength={4}
+                    minLength={4}
+                    pattern="[0-9]{4}"
+                    inputMode="numeric"
+                    aria-label="New 4-Digit Quick PIN"
+                    autoComplete="new-password"
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="••••"
+                    className="w-full pl-9 pr-3 h-10 text-base sm:text-sm font-mono tracking-widest bg-zinc-50/70 dark:bg-[#161619] border border-zinc-200 dark:border-zinc-800 rounded-none focus:border-amber-500 focus:outline-none text-zinc-900 dark:text-white transition-colors"
+                    required
+                  />
+                </div>
+                <p className="text-[10px] text-zinc-400">Used for fast 1-tap checkout and returning login.</p>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full font-bold h-11 rounded-none shadow-none cursor-pointer mt-2"
+              rightIcon={<CheckCircle2 className="h-4 w-4" />}
+            >
+              Save New Credentials & Sign In
+            </Button>
+          </form>
+        )}
       </fieldset>
     </Modal>
   );

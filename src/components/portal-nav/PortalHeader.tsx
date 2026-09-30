@@ -231,14 +231,14 @@ export const PortalHeader: React.FC = () => {
                   <div className="px-3.5 py-2.5 border-b border-zinc-800/80 bg-[#161619]">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 bg-amber-500 text-black font-black text-xs flex items-center justify-center shrink-0 border border-amber-600">
-                        {customerProfile.name.charAt(0) || "?"}
+                        {authUser?.role === "CUSTOMER" ? (customerProfile.name?.charAt(0) || "U") : "?"}
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-bold truncate text-white">
-                          {customerProfile.name}
+                          {authUser?.role === "CUSTOMER" ? customerProfile.name : "Guest Customer"}
                         </p>
                         <p className="text-[10px] text-zinc-400 truncate">
-                          {customerProfile.email}
+                          {authUser?.role === "CUSTOMER" ? customerProfile.email : "Tap to sign in or register"}
                         </p>
                       </div>
                     </div>
@@ -246,12 +246,16 @@ export const PortalHeader: React.FC = () => {
 
                   {/* Sub-menu Options */}
                   <div className="py-1">
-                    {/* 1. My Profile */}
+                    {/* 1. My Profile / Sign In */}
                     <button
                       id="menu-my-profile-btn"
                       onClick={() => {
                         setIsProfileMenuOpen(false);
-                        setCustomerActiveTab('profile');
+                        if (authUser?.role === "CUSTOMER") {
+                          setCustomerActiveTab("profile");
+                        } else {
+                          window.dispatchEvent(new Event("customer:login"));
+                        }
                       }}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-amber-500/10 hover:text-amber-400 transition-colors text-left cursor-pointer"
                     >
