@@ -165,8 +165,10 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
       const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await proof.arrayBuffer()))).map(x=>x.toString(16).padStart(2,'0')).join('');
       const fingerprint=JSON.stringify(body)+digest;
       const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');
-      if(pending&&pending.fingerprint!==fingerprint)throw new Error('A previous checkout is awaiting confirmation. Check My Orders before changing and resubmitting it.');
-      const requestKey=pending?.key || crypto.randomUUID();sessionStorage.setItem(pendingKey,JSON.stringify({key:requestKey,fingerprint,cartLineIds:payload.cart_line_ids}));
+      // If cart/proof changed, clear the stale idempotency session and start fresh
+      if(pending&&pending.fingerprint!==fingerprint)sessionStorage.removeItem(pendingKey);
+      const freshPending=pending?.fingerprint===fingerprint ? pending : null;
+      const requestKey=freshPending?.key || crypto.randomUUID();sessionStorage.setItem(pendingKey,JSON.stringify({key:requestKey,fingerprint,cartLineIds:payload.cart_line_ids}));
       const form=new FormData();form.append('payload',JSON.stringify(body));form.append('receipt',proof);
       const result=await apiClient.post<any>(customerPath('checkout/'),form,{headers:{'Idempotency-Key':requestKey}});
       setProof(null);finishOrder(result);
