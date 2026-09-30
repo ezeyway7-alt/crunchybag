@@ -249,6 +249,14 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                       </div>
                     )}
 
+                    {/* Row 2.5: Delivery Address preview if delivery */}
+                    {order.fulfillmentType === "DELIVERY" && order.deliveryAddress && (
+                      <p className="text-[10px] text-zinc-400 truncate flex items-center gap-1 mb-1">
+                        <MapPin className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                        <span className="truncate">{order.deliveryAddress.split('\n')[0]}</span>
+                      </p>
+                    )}
+
                     {/* Row 3: Items summary snippet */}
                     <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate mb-1">
                       {order.items?.map((i) => `${i.quantity}x ${i.productName}`)?.join(", ") || "No items"}

@@ -1,4 +1,4 @@
-import { DeliveryOrderDetails, deliveryInfo } from "../customer/DeliveryOrderDetails";
+import { DeliveryOrderDetails, deliveryInfo, DeliveryDispatchModal } from "../customer/DeliveryOrderDetails";
 import React, { useState, useMemo, useEffect } from "react";
 import {
   Plus,
@@ -36,6 +36,9 @@ import {
   Wallet,
   Zap,
   Bell,
+  MapPin,
+  Share2,
+  Navigation,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import {
@@ -133,6 +136,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   // Modals & Drawers
   const [selectedOrderForDrawer, setSelectedOrderForDrawer] = useState<Order | null>(null);
   const [printSlipOrder, setPrintSlipOrder] = useState<Order | null>(null);
+  const [dispatchOrder, setDispatchOrder] = useState<Order | null>(null);
 
   // -------------------------------------------------------------
   // ORDERS DATATABLE & FILTER STATE
@@ -348,10 +352,11 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
         const matchOrderNum = o.orderNumber.toLowerCase().includes(q);
         const matchCust = o.customerName.toLowerCase().includes(q);
         const matchPhone = (o.customerPhone || "").toLowerCase().includes(q);
+        const matchAddress = (o.deliveryAddress || "").toLowerCase().includes(q);
         const matchTable = (o.tableNumber || "").toLowerCase().includes(q);
         const matchMethod = (o.paymentMethod || "").toLowerCase().includes(q);
         const matchItem = o.items.some((i) => i.productName.toLowerCase().includes(q));
-        if (!matchToken && !matchOrderNum && !matchCust && !matchPhone && !matchTable && !matchMethod && !matchItem) {
+        if (!matchToken && !matchOrderNum && !matchCust && !matchPhone && !matchAddress && !matchTable && !matchMethod && !matchItem) {
           return false;
         }
       }
@@ -1604,14 +1609,35 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                       </td>
 
                       {/* Customer & Channel */}
-                      <td className="p-2.5 min-w-[130px]">
-                        <p className="font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-[140px]">
+                      <td
+                        onClick={() => setSelectedOrderForDrawer(order)}
+                        className="p-2.5 min-w-[140px] cursor-pointer hover:bg-zinc-100/70 dark:hover:bg-zinc-800/40 transition-colors"
+                        title="Click to view full order details & map location"
+                      >
+                        <p className="font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-[150px]">
                           {order.customerName}
                         </p>
-                        {order.fulfillmentType === "DELIVERY" && deliveryInfo(order).address && (
-                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[180px]" title={deliveryInfo(order).address}>
-                            {deliveryInfo(order).address.split('\n')[0]}
-                          </p>
+                        {order.fulfillmentType === "DELIVERY" && (
+                          <div className="flex items-center gap-1.5 mt-0.5 group/addr">
+                            <MapPin className="w-3 h-3 text-amber-500 shrink-0" />
+                            <p
+                              className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[130px]"
+                              title={deliveryInfo(order).address || "Delivery destination"}
+                            >
+                              {deliveryInfo(order).address?.split('\n')[0] || "Online Delivery"}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDispatchOrder(order);
+                              }}
+                              className="p-0.5 hover:bg-amber-500 text-zinc-400 hover:text-black border border-zinc-300 dark:border-zinc-700 hover:border-amber-500 rounded-xs transition-colors shrink-0"
+                              title="Share & Dispatch: Open Pathao, Yango, Google Maps"
+                            >
+                              <Share2 className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
                         )}
                         <div className="flex items-center gap-1 mt-0.5">
                           <span
@@ -2253,6 +2279,13 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
           </div>
         </Modal>
       )}
+
+      {/* Online Order Location & Dispatch Modal */}
+      <DeliveryDispatchModal
+        order={dispatchOrder}
+        isOpen={!!dispatchOrder}
+        onClose={() => setDispatchOrder(null)}
+      />
     </div>
   );
 };
