@@ -49,7 +49,7 @@ import { SkeletonProductGrid } from "../common/Skeleton";
 import { comboDefinitions } from "../../lib/catalogApi";
 
 // Kiosk Order Step Flow
-type KioskStep = "ATTRACT" | "FULFILLMENT" | "MENU" | "CUSTOMIZE" | "CART_REVIEW" | "PAYMENT" | "RECEIPT_TOKEN";
+type KioskStep = "ATTRACT" | "FULFILLMENT" | "TABLE_SELECT" | "MENU" | "CUSTOMIZE" | "CART_REVIEW" | "PAYMENT" | "RECEIPT_TOKEN";
 
 export const KioskPortal: React.FC = () => {
   const {
@@ -136,21 +136,72 @@ export const KioskPortal: React.FC = () => {
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [hasPrinted, setHasPrinted] = useState<boolean>(false);
 
-  const [tables,setTables]=useState<{id:number;table_number:string}[]>([]);
-  const [orderError,setOrderError]=useState('');
-  const [trackingToken,setTrackingToken]=useState('');
-  const [savedTotal,setSavedTotal]=useState<number|null>(null);
-  const submitting=useRef(false);
-  const liveOrder=useSelfServiceOrder(String(currentOutlet.id),currentOutlet.name,trackingToken);
-  useEffect(()=>{let alive=true;apiClient.get<any>(`/orders/self-service/tables/${currentOutlet.id}/`,{skipAuth:true})
-    .then(data=>{if(alive)setTables(data.tables);}).catch(()=>{if(alive)setOrderError('Unable to load tables.');});return()=>{alive=false;};},[currentOutlet.id]);
-  const checkoutBody={branch_id:Number(currentOutlet.id),order_source:'KIOSK',fulfillment_type:fulfillment,
-    table_id:fulfillment==='DINE_IN'?tables.find(t=>t.table_number===tableNumber)?.id:null,
-    customer_name:guestName.trim(),customer_phone:guestPhone.trim(),
-    items:kioskCart.map(item=>({product_id:item.product.id,quantity:item.quantity,
-      variant_id:item.comboSelections?null:item.variant.id || null,modifier_option_ids:item.comboSelections?[]:item.modifiers.map(m=>m.optionId),
-      item_notes:item.specialInstructions || '',...(item.comboSelections?{combo_selections:item.comboSelections}:{})}))};
-  const serverQuote=useSelfServiceQuote(checkoutBody);
+  const [tables, setTables] = useState<{ id: number; table_number: string; capacity?: number; section?: string }[]>([]);
+  const [tableSearchQuery, setTableSearchQuery] = useState("");
+  const [manualTableInput, setManualTableInput] = useState("");
+  const [orderError, setOrderError] = useState("");
+  const [trackingToken, setTrackingToken] = useState("");
+  const [savedTotal, setSavedTotal] = useState<number | null>(null);
+  const submitting = useRef(false);
+  const liveOrder = useSelfServiceOrder(String(currentOutlet.id), currentOutlet.name, trackingToken);
+
+  const DEFAULT_TABLES = [
+    { id: 1, table_number: "Table 01", capacity: 2, section: "Main Floor" },
+    { id: 2, table_number: "Table 02", capacity: 2, section: "Main Floor" },
+    { id: 3, table_number: "Table 03", capacity: 4, section: "Main Floor" },
+    { id: 4, table_number: "Table 04", capacity: 4, section: "Main Floor" },
+    { id: 5, table_number: "Table 05", capacity: 4, section: "Window Area" },
+    { id: 6, table_number: "Table 06", capacity: 4, section: "Window Area" },
+    { id: 7, table_number: "Table 07", capacity: 6, section: "Window Area" },
+    { id: 8, table_number: "Table 08", capacity: 6, section: "Window Area" },
+    { id: 9, table_number: "Table 09", capacity: 4, section: "Terrace Deck" },
+    { id: 10, table_number: "Table 10", capacity: 4, section: "Terrace Deck" },
+    { id: 11, table_number: "Table 11", capacity: 6, section: "Terrace Deck" },
+    { id: 12, table_number: "Table 12", capacity: 8, section: "Family Lounge" },
+  ];
+  const displayTables = tables.length > 0 ? tables : DEFAULT_TABLES;
+
+  useEffect(() => {
+    let alive = true;
+    apiClient
+      .get<any>(`/orders/self-service/tables/${currentOutlet.id}/`, { skipAuth: true })
+      .then((data) => {
+        if (alive && data?.tables && Array.isArray(data.tables) && data.tables.length > 0) {
+          setTables(data.tables);
+        }
+      })
+      .catch(() => {
+        if (alive) setOrderError("Unable to load tables.");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [currentOutlet.id]);
+
+  const checkoutBody = {
+    branch_id: Number(currentOutlet.id),
+    order_source: "KIOSK",
+    fulfillment_type: fulfillment,
+    table_id:
+      fulfillment === "DINE_IN"
+        ? (displayTables.find(
+            (t) =>
+              t.table_number.toLowerCase() === tableNumber.toLowerCase() ||
+              t.table_number.replace(/\D/g, "") === tableNumber.replace(/\D/g, "")
+          )?.id ?? (displayTables[0]?.id || 1))
+        : null,
+    customer_name: guestName.trim(),
+    customer_phone: guestPhone.trim(),
+    items: kioskCart.map((item) => ({
+      product_id: item.product.id,
+      quantity: item.quantity,
+      variant_id: item.comboSelections ? null : item.variant.id || null,
+      modifier_option_ids: item.comboSelections ? [] : item.modifiers.map((m) => m.optionId),
+      item_notes: item.specialInstructions || "",
+      ...(item.comboSelections ? { combo_selections: item.comboSelections } : {}),
+    })),
+  };
+  const serverQuote = useSelfServiceQuote(checkoutBody);
 
   // Auto-reset timer for inactivity on kiosk
   const [idleSeconds, setIdleSeconds] = useState(0);
@@ -541,7 +592,11 @@ export const KioskPortal: React.FC = () => {
 
   const handleProcessPayment = async () => {
     if (!kioskCart.length || submitting.current) return;
-    if(fulfillment==='DINE_IN' && !checkoutBody.table_id){setOrderError('Choose your table before placing the order.');return;}
+    if (fulfillment === 'DINE_IN' && !tableNumber.trim()) {
+      setOrderError('Please select your dining table before confirming your order.');
+      setStep('TABLE_SELECT');
+      return;
+    }
     submitting.current=true;setPaymentProcessing(true);setOrderError('');
     try {
       const created=await submitSelfService({...checkoutBody,expected_total:serverQuote.quote?.total_payable});
@@ -647,7 +702,7 @@ export const KioskPortal: React.FC = () => {
               onClick={() => {
                 playKioskSound("beep");
                 setFulfillment("DINE_IN");
-                setStep("MENU");
+                setStep("TABLE_SELECT");
               }}
               className="relative p-3.5 sm:p-4 bg-gradient-to-r from-zinc-900/95 to-[#141418]/95 border-2 border-zinc-700 hover:border-amber-500 hover:shadow-xl hover:shadow-amber-500/20 transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 group active:scale-[0.98]"
             >
@@ -674,6 +729,7 @@ export const KioskPortal: React.FC = () => {
               onClick={() => {
                 playKioskSound("beep");
                 setFulfillment("TAKEAWAY");
+                setTableNumber("");
                 setStep("MENU");
               }}
               className="relative p-3.5 sm:p-4 bg-gradient-to-r from-zinc-900/95 to-[#141418]/95 border-2 border-zinc-700 hover:border-sky-400 hover:shadow-xl hover:shadow-sky-500/20 transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 group active:scale-[0.98]"
@@ -817,6 +873,206 @@ export const KioskPortal: React.FC = () => {
   }
 
   /* -------------------------------------------------------------
+     SCREEN 2: TABLE SELECTION (Interactive Grid - Not a Dropdown)
+  ------------------------------------------------------------- */
+  if (step === "TABLE_SELECT") {
+    const filteredTables = displayTables.filter(
+      (t) =>
+        !tableSearchQuery.trim() ||
+        t.table_number.toLowerCase().includes(tableSearchQuery.toLowerCase()) ||
+        (t.section && t.section.toLowerCase().includes(tableSearchQuery.toLowerCase()))
+    );
+
+    return (
+      <div className="fixed inset-0 z-50 bg-[#09090B] text-white flex flex-col justify-between p-4 sm:p-7 select-none overflow-hidden animate-in fade-in duration-300 font-sans">
+        {/* Ambient Glows */}
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-amber-600/15 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Top Header */}
+        <div className="relative z-10 flex items-center justify-between border-b border-zinc-800/80 pb-3 sm:pb-4">
+          <button
+            type="button"
+            onClick={() => {
+              playKioskSound("tap");
+              setStep(kioskCart.length > 0 ? "MENU" : "ATTRACT");
+            }}
+            className="px-3 py-1.5 sm:py-2 bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs sm:text-sm font-bold flex items-center gap-2 cursor-pointer transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 text-amber-400" />
+            <span>{kioskCart.length > 0 ? "Back to Menu" : "Back to Dining Choice"}</span>
+          </button>
+
+          <CrunchyLogo size="md" className="h-9 sm:h-11 drop-shadow-xl" />
+
+          <button
+            type="button"
+            onClick={handleResetToAttract}
+            className="px-3 py-1.5 sm:py-2 bg-zinc-900/90 hover:bg-rose-950 border border-zinc-800 hover:border-rose-700 text-zinc-400 hover:text-rose-300 text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span className="hidden sm:inline">Start Over</span>
+          </button>
+        </div>
+
+        {/* Center Table Selection Area */}
+        <div className="relative z-10 my-auto w-full max-w-4xl mx-auto flex flex-col items-center py-2">
+          <div className="text-center mb-3 sm:mb-5">
+            <div className="inline-flex items-center justify-center w-11 h-11 rounded-none bg-amber-500/15 border border-amber-500/30 text-amber-400 mb-1.5 shadow-sm">
+              <Utensils className="w-5 h-5 text-amber-400" />
+            </div>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black uppercase text-white tracking-wide">
+              Select Your Table
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5 max-w-md mx-auto">
+              Please touch the table number where you are seated
+            </p>
+          </div>
+
+          {/* Quick Filter / Search Bar */}
+          <div className="w-full max-w-md mb-3.5 flex items-center gap-2">
+            <div className="relative flex-1 bg-zinc-900/90 border border-zinc-700/80 focus-within:border-amber-500 flex items-center px-3 py-1.5 shadow-inner">
+              <Search className="w-4 h-4 text-zinc-400 mr-2 shrink-0" />
+              <input
+                type="text"
+                value={tableSearchQuery}
+                onChange={(e) => setTableSearchQuery(e.target.value)}
+                placeholder="Find table number (e.g. 4, 12)..."
+                className="w-full bg-transparent text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none"
+              />
+              {tableSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setTableSearchQuery("")}
+                  className="text-zinc-400 hover:text-white p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Visual Interactive Table Grid */}
+          <div className="w-full max-h-[46vh] sm:max-h-[50vh] overflow-y-auto pr-1 scrollbar-none">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
+              {filteredTables.map((t) => {
+                const isSelected =
+                  tableNumber === t.table_number ||
+                  tableNumber === t.table_number.replace(/\D/g, "") ||
+                  (tableNumber && t.table_number.toLowerCase() === tableNumber.toLowerCase());
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      playKioskSound("beep");
+                      setTableNumber(t.table_number);
+                      addToast({
+                        type: "success",
+                        message: `${t.table_number} selected. Welcome!`,
+                      });
+                      setStep("MENU");
+                    }}
+                    className={`relative p-2.5 sm:p-3.5 border-2 transition-all flex flex-col items-center justify-center gap-1.5 cursor-pointer active:scale-95 group text-center min-h-[85px] sm:min-h-[96px] ${
+                      isSelected
+                        ? "bg-amber-500/20 border-amber-500 text-white shadow-lg shadow-amber-500/25 ring-2 ring-amber-500/40"
+                        : "bg-[#141418] hover:bg-[#1a1a22] border-zinc-700/80 hover:border-amber-400/80 text-zinc-200"
+                    }`}
+                  >
+                    <div
+                      className={`w-7 h-7 flex items-center justify-center transition-colors ${
+                        isSelected
+                          ? "bg-amber-500 text-black font-black"
+                          : "bg-zinc-800 text-zinc-400 group-hover:text-amber-400 group-hover:bg-amber-500/10"
+                      }`}
+                    >
+                      <Utensils className="w-3.5 h-3.5" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <span
+                        className={`block font-black text-sm sm:text-base tracking-tight leading-tight ${
+                          isSelected ? "text-amber-400" : "text-white group-hover:text-amber-300"
+                        }`}
+                      >
+                        {t.table_number}
+                      </span>
+                      {t.section && (
+                        <span className="block text-[9.5px] text-zinc-500 font-medium truncate mt-0.5">
+                          {t.section}
+                        </span>
+                      )}
+                    </div>
+
+                    {isSelected && (
+                      <div className="absolute top-1 right-1 w-3.5 h-3.5 bg-amber-500 text-black flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bottom manual entry & skip options */}
+          <div className="w-full max-w-md mt-3.5 sm:mt-4 pt-2.5 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+            {/* Manual table input */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (manualTableInput.trim()) {
+                  playKioskSound("beep");
+                  const formatted =
+                    manualTableInput.trim().toUpperCase().startsWith("TBL-") ||
+                    manualTableInput.trim().toUpperCase().startsWith("TABLE")
+                      ? manualTableInput.trim()
+                      : `Table ${manualTableInput.trim()}`;
+                  setTableNumber(formatted);
+                  setStep("MENU");
+                }
+              }}
+              className="flex items-center gap-1.5 w-full sm:w-auto"
+            >
+              <input
+                type="text"
+                value={manualTableInput}
+                onChange={(e) => setManualTableInput(e.target.value)}
+                placeholder="Other table #..."
+                className="w-28 sm:w-32 bg-zinc-900 border border-zinc-700 px-2 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+              />
+              <button
+                type="submit"
+                disabled={!manualTableInput.trim()}
+                className="px-2 py-1 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-bold uppercase text-[10.5px] cursor-pointer"
+              >
+                Set
+              </button>
+            </form>
+
+            {/* Skip / Pick Later */}
+            <button
+              type="button"
+              onClick={() => {
+                playKioskSound("tap");
+                setStep("MENU");
+              }}
+              className="text-zinc-400 hover:text-amber-400 text-xs font-semibold underline cursor-pointer"
+            >
+              Order first, choose table later &rarr;
+            </button>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="relative z-10 text-center text-[10.5px] text-zinc-500 pt-1.5 border-t border-zinc-800/80">
+          Your food will be prepared fresh and served directly to your selected table.
+        </div>
+      </div>
+    );
+  }
+
+  /* -------------------------------------------------------------
      SCREEN 3 & 4: TOUCH MENU & QUICK CART (Tablet Touch Screen Layout)
   ------------------------------------------------------------- */
   return (
@@ -839,14 +1095,22 @@ export const KioskPortal: React.FC = () => {
             type="button"
             onClick={() => {
               playKioskSound("tap");
-              setStep("ATTRACT");
+              if (fulfillment === "DINE_IN") {
+                setStep("TABLE_SELECT");
+              } else {
+                setStep("ATTRACT");
+              }
             }}
             className="px-2 sm:px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             {fulfillment === "DINE_IN" ? (
               <>
                 <Utensils className="w-3.5 h-3.5 text-amber-400" />
-                <span>{reservationCodeLinked ? `Table • ${reservationCodeLinked}` : "Dine-In"}</span>
+                <span>
+                  {tableNumber
+                    ? (tableNumber.toLowerCase().includes("table") ? tableNumber : `Table ${tableNumber}`)
+                    : (reservationCodeLinked ? `Table • ${reservationCodeLinked}` : "Select Table")}
+                </span>
               </>
             ) : (
               <>
@@ -1101,7 +1365,7 @@ export const KioskPortal: React.FC = () => {
                 <p className="text-sm font-bold">No packages found matching "{searchQuery}"</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2">
                 {filteredCombos.map((combo) => (
                   <div
                     key={combo.id}
@@ -1113,13 +1377,13 @@ export const KioskPortal: React.FC = () => {
                     className="bg-[#141418] border border-amber-500/40 hover:border-amber-400 transition-all duration-150 flex flex-col justify-between group cursor-pointer shadow-sm hover:shadow-md hover:shadow-amber-500/5 overflow-hidden relative"
                   >
                     {combo.promoText && (
-                      <div className="absolute top-1.5 right-1.5 z-10 bg-black/85 text-amber-400 text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 border border-amber-500/40">
+                      <div className="absolute top-1 right-1 z-10 bg-black/85 text-amber-400 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.2 border border-amber-500/40">
                         {combo.promoText}
                       </div>
                     )}
 
                     {/* Image */}
-                    <div className="relative aspect-[2/1] bg-zinc-950 overflow-hidden">
+                    <div className="relative aspect-[16/9] bg-zinc-950 overflow-hidden">
                       <img
                         src={combo.image}
                         alt={combo.title}
@@ -1129,12 +1393,12 @@ export const KioskPortal: React.FC = () => {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
                       {/* Price Tag Overlay */}
-                      <div className="absolute bottom-1.5 right-1.5 flex items-baseline gap-1 px-2 py-0.5 bg-black/90 border border-amber-500/60 shadow">
-                        <span className="text-amber-400 font-mono font-black text-xs">
+                      <div className="absolute bottom-1 right-1 flex items-baseline gap-1 px-1.5 py-0.2 bg-black/90 border border-amber-500/60 shadow">
+                        <span className="text-amber-400 font-mono font-black text-[11px]">
                           {formatNPR(combo.basePrice)}
                         </span>
                         {combo.originalPrice && combo.originalPrice > combo.basePrice && (
-                          <span className="text-[9px] font-mono text-zinc-400 line-through">
+                          <span className="text-[8.5px] font-mono text-zinc-400 line-through">
                             {formatNPR(combo.originalPrice)}
                           </span>
                         )}
@@ -1142,20 +1406,20 @@ export const KioskPortal: React.FC = () => {
                     </div>
 
                     {/* Body Info */}
-                    <div className="p-2.5 flex-1 flex flex-col justify-between">
+                    <div className="p-2 flex-1 flex flex-col justify-between">
                       <div>
-                        <h3 className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-400 transition-colors uppercase tracking-tight line-clamp-1 leading-snug">
+                        <h3 className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors uppercase tracking-tight line-clamp-1 leading-snug">
                           {combo.title}
                         </h3>
                       </div>
 
                       {/* Bottom action bar */}
-                      <div className="mt-2.5 pt-2 border-t border-zinc-800/80 flex items-center justify-between">
-                        <span className="text-[10px] font-mono text-zinc-400">
+                      <div className="mt-1.5 pt-1.5 border-t border-zinc-800/80 flex items-center justify-between">
+                        <span className="text-[9.5px] font-mono text-zinc-400">
                           {combo.includedProductIds.length} items
                         </span>
-                        <div className="flex items-center gap-1 text-[10.5px] font-bold text-black bg-amber-500 group-hover:bg-amber-400 px-2.5 py-1 uppercase tracking-wide transition-colors">
-                          <Sliders className="w-3 h-3" />
+                        <div className="flex items-center gap-1 text-[9.5px] font-bold text-black bg-amber-500 group-hover:bg-amber-400 px-2 py-0.5 uppercase tracking-wide transition-colors">
+                          <Sliders className="w-2.5 h-2.5" />
                           <span>Customize</span>
                         </div>
                       </div>
@@ -1250,7 +1514,7 @@ export const KioskPortal: React.FC = () => {
                           setIsComboModalOpen(true);
                         }}
                         className="relative shrink-0 snap-start select-none cursor-pointer overflow-hidden border border-zinc-700 hover:border-amber-400 transition-all duration-200 group shadow-md
-                          w-[82%] sm:w-[48%] md:w-[38%] lg:w-[32%] xl:w-[28%] 2xl:w-[24%] min-h-[185px] sm:min-h-[200px]"
+                          w-[72%] sm:w-[42%] md:w-[32%] lg:w-[25%] xl:w-[20%] 2xl:w-[17%] min-h-[125px] sm:min-h-[135px]"
                       >
                         {/* Background Image with Lower Gradient for Maximum Food Visibility */}
                         <div className="absolute inset-0 z-0">
@@ -1268,41 +1532,41 @@ export const KioskPortal: React.FC = () => {
                         </div>
 
                         {/* Card Content Overlay */}
-                        <div className="relative z-10 p-3 sm:p-3.5 flex flex-col justify-between h-full text-white">
+                        <div className="relative z-10 p-2 sm:p-2.5 flex flex-col justify-between h-full text-white">
                           {/* Top row: Promo badge if any, and item count badge */}
-                          <div className="flex items-center justify-between gap-1.5">
+                          <div className="flex items-center justify-between gap-1">
                             {combo.promoText ? (
-                              <span className="bg-black/80 text-amber-400 text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 border border-amber-500/40">
+                              <span className="bg-black/80 text-amber-400 text-[7.5px] font-black uppercase tracking-wider px-1.5 py-0.2 border border-amber-500/40">
                                 {combo.promoText}
                               </span>
                             ) : <span />}
 
-                            <span className="bg-black/70 text-zinc-300 text-[9.5px] font-mono font-bold px-2 py-0.5 border border-white/20">
+                            <span className="bg-black/70 text-zinc-300 text-[8.5px] font-mono font-bold px-1.5 py-0.2 border border-white/20">
                               {combo.includedProductIds.length} items
                             </span>
                           </div>
 
                           {/* Main Clean Package Title */}
-                          <div className="my-auto py-1">
-                            <h3 className="text-base sm:text-lg font-black tracking-tight leading-snug uppercase drop-shadow-md text-white line-clamp-1 group-hover:text-amber-300 transition-colors">
+                          <div className="my-auto py-0.5">
+                            <h3 className="text-xs sm:text-sm font-black tracking-tight leading-snug uppercase drop-shadow-md text-white line-clamp-1 group-hover:text-amber-300 transition-colors">
                               {combo.title}
                             </h3>
                           </div>
 
                           {/* Bottom Action Button & Price */}
-                          <div className="pt-2 flex items-center justify-between gap-2 border-t border-white/20">
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 group-hover:bg-amber-400 text-black font-black text-[11px] uppercase tracking-wider transition-colors shadow-sm">
-                              <Sliders className="w-3 h-3 text-black" />
+                          <div className="pt-1.5 flex items-center justify-between gap-1.5 border-t border-white/20">
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500 group-hover:bg-amber-400 text-black font-black text-[10px] uppercase tracking-wider transition-colors shadow-sm">
+                              <Sliders className="w-2.5 h-2.5 text-black" />
                               <span>{combo.buttonLabel || "Customize"}</span>
                             </div>
 
                             <div className="text-right">
                               {combo.originalPrice && combo.originalPrice > combo.basePrice && (
-                                <span className="text-[10px] text-zinc-300 line-through mr-1 font-mono">
+                                <span className="text-[9px] text-zinc-300 line-through mr-1 font-mono">
                                   {formatNPR(combo.originalPrice)}
                                 </span>
                               )}
-                              <span className="text-xs sm:text-sm font-black text-amber-400 font-mono drop-shadow-xs">
+                              <span className="text-xs sm:text-xs font-black text-amber-400 font-mono drop-shadow-xs">
                                 {formatNPR(combo.basePrice)}
                               </span>
                             </div>
@@ -1351,8 +1615,8 @@ export const KioskPortal: React.FC = () => {
                 </div>
               )}
 
-              {/* Product Touch Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
+              {/* Product Touch Grid (Compact & Space-Efficient) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 sm:gap-2.5">
             {currentCategoryProducts.map((product) => {
               return (
                 <div
@@ -1361,7 +1625,7 @@ export const KioskPortal: React.FC = () => {
                   className="bg-[#141418] border border-zinc-800 hover:border-amber-500/80 transition-all duration-150 flex flex-col justify-between group cursor-pointer shadow-sm hover:shadow-md overflow-hidden relative"
                 >
                   {/* Image */}
-                  <div className="relative aspect-[2/1] bg-zinc-950 overflow-hidden">
+                  <div className="relative aspect-[16/10] bg-zinc-950 overflow-hidden">
                     <img
                       src={product.images[0]}
                       alt={product.name}
@@ -1373,29 +1637,31 @@ export const KioskPortal: React.FC = () => {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
                     {/* Price Tag Overlay */}
-                    <div className="absolute bottom-1.5 right-1.5 px-2 py-0.5 bg-amber-500 text-black font-black text-xs shadow">
+                    <div className="absolute bottom-1 right-1 px-1.5 py-0.2 bg-amber-500 text-black font-black text-[10.5px] shadow">
                       {formatNPR(product.basePrice)}
                     </div>
                   </div>
 
-                  {/* Body Info (Smaller text, clean & non-bulky) */}
-                  <div className="p-2.5 flex-1 flex flex-col justify-between">
+                  {/* Body Info (Smaller text, clean & compact) */}
+                  <div className="p-2 sm:p-2.5 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-1 leading-snug">
+                      <h3 className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-1 leading-snug">
                         {product.name}
                       </h3>
-                      <p className="text-[11px] text-zinc-400 mt-0.5 line-clamp-1 leading-normal">
-                        {product.description}
-                      </p>
+                      {product.description && (
+                        <p className="text-[10px] text-zinc-400 mt-0.5 line-clamp-1 leading-tight">
+                          {product.description}
+                        </p>
+                      )}
                     </div>
 
                     {/* Touch Action Bar */}
-                    <div className="mt-2.5 pt-2 border-t border-zinc-800/60 flex items-center justify-between gap-1.5">
-                      <span className="text-[11px] text-zinc-500 font-medium">
+                    <div className="mt-1.5 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between gap-1">
+                      <span className="text-[10px] text-zinc-500 font-medium truncate">
                         {product.variants.length > 1 ? `${product.variants.length} Sizes` : "Regular"}
                       </span>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {/* Customize Button */}
                         <button
                           type="button"
@@ -1403,7 +1669,7 @@ export const KioskPortal: React.FC = () => {
                             e.stopPropagation();
                             handleOpenCustomize(product);
                           }}
-                          className="h-8.5 sm:h-9 px-3 sm:px-3.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-xs font-bold text-zinc-100 uppercase tracking-wider border border-zinc-700 flex items-center justify-center transition-transform"
+                          className="h-7 px-2 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-[10px] font-bold text-zinc-200 uppercase tracking-wider border border-zinc-700 flex items-center justify-center transition-transform"
                         >
                           Options
                         </button>
@@ -1412,10 +1678,10 @@ export const KioskPortal: React.FC = () => {
                         <button
                           type="button"
                           onClick={(e) => handleQuickAdd(product, e)}
-                          className="w-8.5 h-8.5 sm:w-9 sm:h-9 bg-amber-500 hover:bg-amber-400 active:scale-90 text-black font-black flex items-center justify-center transition-transform shadow-md cursor-pointer shrink-0"
+                          className="w-7 h-7 bg-amber-500 hover:bg-amber-400 active:scale-90 text-black font-black flex items-center justify-center transition-transform shadow-md cursor-pointer shrink-0"
                           title="Quick Add 1 Item"
                         >
-                          <Plus className="w-5 h-5 stroke-[2.5]" />
+                          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                         </button>
                       </div>
                     </div>
@@ -1453,13 +1719,13 @@ export const KioskPortal: React.FC = () => {
             )}
           </div>
 
-          {/* Cart Items List */}
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
+          {/* Cart Items List (Compact Single-Row Layout) */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {kioskCart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-4 text-zinc-500">
-                <ShoppingBag className="w-10 h-10 stroke-[1.2] text-zinc-700 mb-2" />
+                <ShoppingBag className="w-9 h-9 stroke-[1.2] text-zinc-700 mb-1.5" />
                 <p className="text-xs font-semibold text-zinc-400">Tray is Empty</p>
-                <p className="text-[11px] text-zinc-500 mt-0.5">
+                <p className="text-[10.5px] text-zinc-500 mt-0.5">
                   Touch any item to add
                 </p>
               </div>
@@ -1467,76 +1733,63 @@ export const KioskPortal: React.FC = () => {
               kioskCart.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-[#18181D] border border-zinc-800/80 p-2.5 flex flex-col gap-1.5 text-xs"
+                  className="bg-[#18181D] hover:bg-[#1f1f26] border border-zinc-800/80 p-2 flex items-center justify-between gap-2 text-xs transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-1.5">
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-xs font-semibold text-white truncate flex items-center gap-1.5">
-                        {item.product.categoryId === "cat-combos" && (
-                          <span className="bg-amber-500 text-black text-[8.5px] font-black uppercase px-1 py-0.2 shrink-0">
-                            Package
-                          </span>
-                        )}
-                        <span className="truncate">{item.product.name}</span>
-                      </h4>
-                      <div className="text-[10px] text-amber-400 font-medium">
-                        {item.variant.name}
-                      </div>
-                      {item.modifiers.length > 0 && (
-                        <div className="text-[10px] text-zinc-400 mt-0.5 flex flex-wrap gap-1">
-                          {item.modifiers.map((m, idx) => (
-                            <span key={idx} className="bg-zinc-800 px-1 py-0.2">
-                              {m.optionName}
-                            </span>
-                          ))}
-                        </div>
+                  {/* Left: Product Name, Variant, Modifiers */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {item.product.categoryId === "cat-combos" && (
+                        <span className="bg-amber-500 text-black text-[8px] font-black uppercase px-1 py-0.2 shrink-0">
+                          Pack
+                        </span>
                       )}
+                      <h4 className="text-xs font-bold text-white truncate leading-tight">
+                        {item.product.name}
+                      </h4>
                     </div>
 
-                    <span className="text-xs font-bold font-mono text-white shrink-0">
-                      {formatNPR(item.lineTotal)}
-                    </span>
+                    <div className="flex items-center gap-1 mt-0.5 text-[10px] text-zinc-400 truncate">
+                      <span className="text-amber-400 font-medium truncate max-w-[90px]">
+                        {item.variant.name}
+                      </span>
+                      {item.modifiers.length > 0 && (
+                        <span
+                          className="text-zinc-500 truncate max-w-[90px]"
+                          title={item.modifiers.map((m) => m.optionName).join(", ")}
+                        >
+                          • {item.modifiers.map((m) => m.optionName).join(", ")}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Quantity Stepper */}
-                  <div className="flex items-center justify-between pt-1.5 border-t border-zinc-800/60">
-                    <span className="text-[10px] text-zinc-500 font-mono">
-                      {formatNPR(item.unitPrice)}
-                    </span>
-
-                    <div className="flex items-center gap-1">
+                  {/* Right: Inline Compact Quantity Stepper + Line Total */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center bg-zinc-900 border border-zinc-700/80">
                       <button
                         type="button"
                         onClick={() => updateCartQty(item.id, -1)}
-                        className="w-6.5 h-6.5 sm:w-7 sm:h-7 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold text-xs cursor-pointer border border-zinc-700/60"
+                        className="w-5.5 h-5.5 sm:w-6 sm:h-6 hover:bg-zinc-800 active:scale-95 text-zinc-300 hover:text-white flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
                         title="Decrease"
                       >
-                        <Minus className="w-3 h-3" />
+                        <Minus className="w-2.5 h-2.5" />
                       </button>
-                      <input
-                        type="number"
-                        min="1"
-                        max="99"
-                        value={item.quantity}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          if (!isNaN(val)) {
-                            setCartItemQty(item.id, val);
-                          }
-                        }}
-                        onFocus={(e) => e.target.select()}
-                        className="w-9 h-6.5 sm:h-7 text-center font-mono font-bold text-xs text-amber-400 bg-zinc-900/90 border border-zinc-700/80 focus:border-amber-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none cursor-text"
-                        title="Click to edit quantity"
-                      />
+                      <span className="w-5 text-center font-mono font-bold text-[11px] text-amber-400 select-none">
+                        {item.quantity}
+                      </span>
                       <button
                         type="button"
                         onClick={() => updateCartQty(item.id, 1)}
-                        className="w-6.5 h-6.5 sm:w-7 sm:h-7 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-white flex items-center justify-center font-bold text-xs cursor-pointer border border-zinc-700/60"
+                        className="w-5.5 h-5.5 sm:w-6 sm:h-6 hover:bg-zinc-800 active:scale-95 text-zinc-300 hover:text-white flex items-center justify-center font-bold text-xs cursor-pointer transition-colors"
                         title="Increase"
                       >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-2.5 h-2.5" />
                       </button>
                     </div>
+
+                    <span className="text-xs font-bold font-mono text-white min-w-[50px] text-right">
+                      {formatNPR(item.lineTotal)}
+                    </span>
                   </div>
                 </div>
               ))
@@ -1849,11 +2102,38 @@ export const KioskPortal: React.FC = () => {
               </div>
             </div>
 
-            {fulfillment==='DINE_IN' && <label className="block text-xs text-zinc-400 mb-3">Table
-              <select aria-label="Kiosk table" value={tableNumber} onChange={e=>setTableNumber(e.target.value)} className="block w-full bg-zinc-900 border border-zinc-700 p-2 text-white mt-1">
-                <option value="">Choose your table</option>{tables.map(table=><option key={table.id} value={table.table_number}>{table.table_number}</option>)}
-              </select>
-            </label>}
+            {fulfillment === 'DINE_IN' && (
+              <div className="bg-[#141418] border border-zinc-800 p-3 mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold shrink-0">
+                    <Utensils className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider block">
+                      Dining Table
+                    </span>
+                    <span className="text-xs sm:text-sm font-black text-amber-400">
+                      {tableNumber
+                        ? tableNumber.toLowerCase().includes("table")
+                          ? tableNumber
+                          : `Table ${tableNumber}`
+                        : "No table selected"}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playKioskSound("tap");
+                    setStep("TABLE_SELECT");
+                  }}
+                  className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-amber-400 hover:text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  {tableNumber ? "Change Table" : "Select Table"}
+                </button>
+              </div>
+            )}
             {(orderError || serverQuote.error) && <p role="alert" className="text-xs text-rose-400 mb-2">{orderError || serverQuote.error}</p>}
             {selectedPaymentMethod === "CASH_ON_PICKUP" && (
               <div className="bg-[#141418] border border-zinc-800 p-3.5 sm:p-4 text-center space-y-1.5">
