@@ -155,14 +155,14 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="sm"
       showCloseButton={false}
-      className="max-w-[480px] w-full h-[88vh] sm:h-[90vh] max-h-[680px] min-h-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none max-w-full"
+      className="w-full max-w-[380px] sm:max-w-[400px] h-[85vh] sm:h-auto sm:max-h-[640px] min-h-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none"
       contentClassName="p-0 h-full flex flex-col min-h-0"
     >
-      <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#121214] text-zinc-900 dark:text-zinc-100 overflow-hidden w-full max-w-full">
+      <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#121214] text-zinc-900 dark:text-zinc-100 overflow-hidden w-full">
         {/* Top Image Showcase (Proper Food Dimensions) */}
-        <div className="relative w-full h-38 sm:h-48 bg-zinc-950 shrink-0 overflow-hidden flex flex-col justify-between border-b border-zinc-200 dark:border-zinc-800">
+        <div className="relative w-full h-36 sm:h-44 bg-zinc-950 shrink-0 overflow-hidden flex flex-col justify-between border-b border-zinc-200 dark:border-zinc-800">
           <img
             src={product.images[activeImageIndex] || product.images[0]}
             alt={product.name}
@@ -373,7 +373,7 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
           </div>
 
           {/* Sticky Bottom Footer with Quantity & Add to Order */}
-          <div className="shrink-0 bg-white dark:bg-[#121214] border-t border-zinc-200 dark:border-zinc-800 p-2 sm:p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] flex items-center gap-2 z-20 shadow-lg w-full max-w-full overflow-hidden">
+          <div className="shrink-0 bg-white dark:bg-[#121214] border-t border-zinc-200 dark:border-zinc-800 p-2 sm:p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] flex items-center gap-2 z-20 shadow-lg w-full overflow-hidden">
             {/* Quantity Controls */}
             <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-none p-0.5 shrink-0">
               <button

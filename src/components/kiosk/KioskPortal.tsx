@@ -1714,7 +1714,7 @@ export const KioskPortal: React.FC = () => {
       ------------------------------------------------------------- */}
       {customizingProduct && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-[#141418] border border-zinc-700 w-full max-w-md sm:max-w-lg max-h-[82vh] flex flex-col shadow-2xl overflow-hidden rounded-none">
+          <div className="bg-[#141418] border border-zinc-700 w-full max-w-sm sm:max-w-md max-h-[82vh] flex flex-col shadow-2xl overflow-hidden rounded-none">
             {/* Modal Header */}
             <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 bg-[#18181D] border-b border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">

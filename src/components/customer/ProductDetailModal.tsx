@@ -34,6 +34,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       maxWidth="sm"
+      className="w-full max-w-[360px] sm:max-w-[380px] rounded-none"
       title={
         <div className="flex items-center gap-2">
           <Utensils className="w-3.5 h-3.5 text-amber-500" />
