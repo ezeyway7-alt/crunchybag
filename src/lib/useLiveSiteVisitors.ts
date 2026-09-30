@@ -68,8 +68,10 @@ export function playIncomingOrderChime() {
  * combined with real-time WebSocket state and time-of-day traffic model.
  */
 export function useLiveSiteVisitors(): LiveVisitorStats {
-  const { currentOutlet, orders, cartItems } = useApp();
+  const { currentOutlet, orders = [], cart } = useApp();
   const outletId = String(currentOutlet?.id || "1");
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const safeCartItems = Array.isArray(cart?.items) ? cart.items : [];
 
   const [soundEnabled, setSoundEnabled] = useState(() => {
     try {
@@ -215,8 +217,8 @@ export function useLiveSiteVisitors(): LiveVisitorStats {
   }
 
   // Active ongoing orders and occupied tables increase active customer footprint
-  const activeOrdersCount = orders.filter(
-    (o) => o.status !== "COMPLETED" && o.status !== "CANCELLED"
+  const activeOrdersCount = safeOrders.filter(
+    (o) => o && o.status !== "COMPLETED" && o.status !== "CANCELLED"
   ).length;
 
   const totalVisitors = Math.max(
@@ -229,7 +231,7 @@ export function useLiveSiteVisitors(): LiveVisitorStats {
   const tableQrCount = Math.max(0, Math.round(totalVisitors * 0.22));
   const desktopCount = Math.max(1, totalVisitors - mobileCount - tableQrCount);
   const kioskCount = Math.max(0, Math.round(totalVisitors * 0.08));
-  const activeCartsCount = Math.max(cartItems.length > 0 ? 1 : 0, Math.round(totalVisitors * 0.35));
+  const activeCartsCount = Math.max(safeCartItems.length > 0 ? 1 : 0, Math.round(totalVisitors * 0.35));
   const browsingMenuCount = Math.max(1, totalVisitors - activeCartsCount);
 
   // Dynamic sparkline trend (last 10 data points)

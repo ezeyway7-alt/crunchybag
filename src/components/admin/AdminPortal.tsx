@@ -203,13 +203,25 @@ export const AdminPortal: React.FC = () => {
   };
 
   // Key metrics
-  const totalRevenue = orders.reduce((sum, o) => o.status !== "CANCELLED" ? sum + o.totalAmount : sum, 0);
-  const totalOrders = orders.length;
-  const activeKitchenOrders = orders.filter((o) => o.status === "PROCESSING" || o.status === "CONFIRMED").length;
-  const readyOrders = orders.filter((o) => o.status === "READY").length;
-  const lowStockCount = inventory.filter((i) => i.currentStock <= i.minThreshold).length;
-  const activeOrdersCount = orders.filter(
-    (o) => o.status !== "COMPLETED" && o.status !== "CANCELLED"
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const safeInventory = Array.isArray(inventory) ? inventory : [];
+  const safeProducts = Array.isArray(products) ? products : [];
+  const safeEmployees = Array.isArray(employees) ? employees : [];
+  const safeActivityLogs = Array.isArray(activityLogs) ? activityLogs : [];
+  const safeLoyaltyRecords = Array.isArray(loyaltyRecords) ? loyaltyRecords : [];
+
+  const totalRevenue = safeOrders.reduce(
+    (sum, o) => (o && o.status !== "CANCELLED" ? sum + (Number(o.totalAmount) || 0) : sum),
+    0
+  );
+  const totalOrders = safeOrders.length;
+  const activeKitchenOrders = safeOrders.filter(
+    (o) => o && (o.status === "PROCESSING" || o.status === "CONFIRMED")
+  ).length;
+  const readyOrders = safeOrders.filter((o) => o && o.status === "READY").length;
+  const lowStockCount = safeInventory.filter((i) => i && i.currentStock <= i.minThreshold).length;
+  const activeOrdersCount = safeOrders.filter(
+    (o) => o && o.status !== "COMPLETED" && o.status !== "CANCELLED"
   ).length;
 
   // Page Navigation Items for the Unified Manager Sidebar
@@ -257,19 +269,19 @@ export const AdminPortal: React.FC = () => {
       id: "menu",
       label: "Menu Catalog",
       icon: Utensils,
-      badge: products.length,
+      badge: safeProducts.length,
     },
     {
       id: "loyalty",
       label: "Loyalty & Khata",
       icon: Sparkles,
-      badge: loyaltyRecords.length > 0 ? loyaltyRecords.length : undefined,
+      badge: safeLoyaltyRecords.length > 0 ? safeLoyaltyRecords.length : undefined,
     },
     {
       id: "employees",
       label: "Staff & Access",
       icon: Users,
-      badge: employees.length,
+      badge: safeEmployees.length,
     },
     {
       id: "organization",
@@ -280,7 +292,7 @@ export const AdminPortal: React.FC = () => {
       id: "logs",
       label: "Activity & Audit Logs",
       icon: FileText,
-      badge: activityLogs.length,
+      badge: safeActivityLogs.length,
     },
   ];
 

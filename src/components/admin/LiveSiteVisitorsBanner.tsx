@@ -51,13 +51,16 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
     toggleSound,
   } = visitorStats;
 
-  // Render SVG mini-sparkline
-  const maxVal = Math.max(...trafficTrend, 1);
-  const minVal = Math.min(...trafficTrend, 0);
+  // Render SVG mini-sparkline safely
+  const safeTrend = Array.isArray(trafficTrend) && trafficTrend.length > 1
+    ? trafficTrend
+    : [8, 10, 12, 14, 16, 14, 15, 18, 16, 17];
+  const maxVal = Math.max(...safeTrend, 1);
+  const minVal = Math.min(...safeTrend, 0);
   const range = maxVal - minVal || 1;
-  const points = trafficTrend
+  const points = safeTrend
     .map((val, idx) => {
-      const x = (idx / (trafficTrend.length - 1)) * 100;
+      const x = (idx / (safeTrend.length - 1)) * 100;
       const y = 30 - ((val - minVal) / range) * 24;
       return `${x},${y}`;
     })

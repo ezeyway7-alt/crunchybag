@@ -148,7 +148,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
   const hasInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (!hasInitializedRef.current && mergedOrders.length > 0) {
+    if (!hasInitializedRef.current && (mergedOrders || []).length > 0) {
       mergedOrders.forEach((o) => knownOrderIdsRef.current.add(o.id));
       hasInitializedRef.current = true;
       return;
@@ -169,7 +169,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
         knownOrderIdsRef.current.add(o.id);
         addToast({
           title: `🛎️ New Order #${o.orderNumber}`,
-          description: `${o.customerName} placed ${o.items.length} items (${o.fulfillmentType === "DELIVERY" ? "🛵 Delivery" : o.fulfillmentType === "DINE_IN" ? `🍽️ Table ${o.tableNumber || ""}` : "🛍️ Takeaway"}). Total: ${formatNPR(o.totalAmount)}`,
+          description: `${o.customerName} placed ${(o.items || []).length} items (${o.fulfillmentType === "DELIVERY" ? "🛵 Delivery" : o.fulfillmentType === "DINE_IN" ? `🍽️ Table ${o.tableNumber || ""}` : "🛍️ Takeaway"}). Total: ${formatNPR(o.totalAmount)}`,
           type: "success",
         });
       });
@@ -252,10 +252,10 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
   const datatableStats = useMemo(() => posStatistics(filteredOrders), [filteredOrders]);
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil((filteredOrders || []).length / pageSize));
   const paginatedOrders = useMemo(() => {
     const startIdx = (currentPage - 1) * pageSize;
-    return filteredOrders.slice(startIdx, startIdx + pageSize);
+    return (filteredOrders || []).slice(startIdx, startIdx + pageSize);
   }, [filteredOrders, currentPage, pageSize]);
 
   const handlePageChange = (newPage: number) => {
@@ -596,31 +596,31 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs font-bold">
         {(
           [
-            { key: "ALL", label: "All Orders", count: mergedOrders.length },
+            { key: "ALL", label: "All Orders", count: (mergedOrders || []).length },
             {
               key: "CONFIRMED",
               label: "Incoming New",
-              count: mergedOrders.filter((o) => o.status === "CONFIRMED").length,
+              count: (mergedOrders || []).filter((o) => o.status === "CONFIRMED").length,
             },
             {
               key: "PROCESSING",
               label: "Kitchen Cooking",
-              count: mergedOrders.filter((o) => o.status === "PROCESSING").length,
+              count: (mergedOrders || []).filter((o) => o.status === "PROCESSING").length,
             },
             {
               key: "READY",
               label: "Ready for Pickup",
-              count: mergedOrders.filter((o) => o.status === "READY").length,
+              count: (mergedOrders || []).filter((o) => o.status === "READY").length,
             },
             {
               key: "COMPLETED",
               label: "Completed / Dispatched",
-              count: mergedOrders.filter((o) => o.status === "COMPLETED").length,
+              count: (mergedOrders || []).filter((o) => o.status === "COMPLETED").length,
             },
             {
               key: "CANCELLED",
               label: "Cancelled",
-              count: mergedOrders.filter((o) => o.status === "CANCELLED").length,
+              count: (mergedOrders || []).filter((o) => o.status === "CANCELLED").length,
             },
           ] as const
         ).map((tab) => (
@@ -1157,7 +1157,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
             {/* Itemized Bill */}
             <div>
               <h5 className="font-bold uppercase tracking-wider text-[10px] text-zinc-400 mb-2">
-                Order Items ({selectedOrderForDrawer.items.length})
+                Order Items ({(selectedOrderForDrawer.items || []).length})
               </h5>
               <div className="divide-y divide-zinc-800 border border-zinc-800 rounded bg-zinc-900">
                 {selectedOrderForDrawer.items.map((item, idx) => (
