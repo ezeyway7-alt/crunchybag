@@ -1,3 +1,7 @@
+import {apiClient} from "../../lib/api";
+import {cartLines} from "../../lib/customerApi";
+import {posOrderToOrder} from "../../lib/posApi";
+import {submitSelfService,useSelfServiceOrder,useSelfServiceQuote} from "../../lib/selfService";
 import React, { useState, useMemo, useEffect } from "react";
 import {
   Utensils,
@@ -88,6 +92,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
     removeCartItem,
     clearCart,
     currentOutlet,
+    setCurrentOutlet,
     orders,
     findActiveOrderByTableOrPhone,
     placeTableOrder,
@@ -127,13 +132,29 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   const [diningMode, setDiningMode] = useState<"DINE_IN" | "TAKEAWAY">("DINE_IN");
   const [isTrackReviewOpen, setIsTrackReviewOpen] = useState(false);
 
+  const qrToken=new URLSearchParams(window.location.search).get('token') || '';
+  const [qrContext,setQrContext]=useState<any>(null);
+  const [checkoutError,setCheckoutError]=useState('');
+  const [submitting,setSubmitting]=useState(false);
+  const submitLock=React.useRef(false);
+  const [trackingToken,setTrackingToken]=useState(()=>sessionStorage.getItem(`table-order:${qrToken}`) || '');
+  useEffect(()=>{
+    if(!qrToken){setCheckoutError('Scan the QR code on your table to order.');return;}
+    let alive=true;
+    apiClient.get<any>(`/tables/qr/resolve/?token=${encodeURIComponent(qrToken)}`,{skipAuth:true}).then(data=>{
+      if(!alive)return;setQrContext(data);setTableNumber(data.table_number);setDiningMode('DINE_IN');
+      setCurrentOutlet({...currentOutlet,id:String(data.branch_id),name:data.branch_name});setCheckoutError('');
+    }).catch(error=>{if(alive)setCheckoutError(error.message || 'Invalid table QR code.');});
+    return()=>{alive=false;};
+  },[qrToken]);
+  const liveOrder=useSelfServiceOrder(String(qrContext?.branch_id || currentOutlet.id),currentOutlet.name,trackingToken);
+  useEffect(()=>{if(liveOrder)setPlacedOrderResult(liveOrder);},[liveOrder]);
+  const checkoutBody={branch_id:Number(qrContext?.branch_id || currentOutlet.id),order_source:'TABLE_QR',
+    fulfillment_type:'DINE_IN',qr_token:qrToken,customer_name:guestName.trim(),customer_phone:phoneNumber.trim(),notes:tableNotes,items:cartLines(cart.items)};
+  const serverQuote=useSelfServiceQuote(qrContext?checkoutBody:null);
+
   // Determine active running table order
-  const activeRunningOrder = useMemo(() => {
-    return findActiveOrderByTableOrPhone(
-      diningMode === "DINE_IN" ? tableNumber : null,
-      phoneNumber
-    );
-  }, [findActiveOrderByTableOrPhone, tableNumber, phoneNumber, orders, diningMode]);
+  const activeRunningOrder=liveOrder && !['COMPLETED','CANCELLED'].includes(liveOrder.status)?liveOrder:null;
 
   // Set placed order result if active order already exists on initial load
   useEffect(() => {
@@ -143,22 +164,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   }, [activeRunningOrder, placedOrderResult]);
 
   // Available tables list
-  const AVAILABLE_TABLES = [
-    "Table 01",
-    "Table 02",
-    "Table 03",
-    "Table 04",
-    "Table 05",
-    "Table 06",
-    "Table 07",
-    "Table 08",
-    "Table 10",
-    "Table 12",
-    "Table 15",
-    "Patio 01",
-    "Bar Counter",
-  ];
-
+  const AVAILABLE_TABLES: string[] = qrContext ? [qrContext.table_number] : [];
   // Category icons mapper
   const getCategoryIcon = (iconName: string) => {
     switch (iconName) {
@@ -219,31 +225,16 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       .reduce((sum, item) => sum + item.quantity, 0);
   };
 
-  // Handle Order Submit (Either initial table order or add items to running order)
-  const handleConfirmOrder = () => {
-    if (cart.items.length === 0) return;
-    playMobileSound("success");
-
-    if (activeRunningOrder) {
-      // Append to running order (Round 2+)
-      const updated = addItemsToRunningOrder(activeRunningOrder.id, cart.items);
-      if (updated) {
-        setPlacedOrderResult(updated);
-        setIsConfirmDrawerOpen(false);
-      }
-    } else {
-      // Create new table order (Round 1)
-      const newOrder = placeTableOrder({
-        tableNumber: diningMode === "DINE_IN" ? (tableNumber || "Table 04") : "Takeaway Counter",
-        customerName: guestName.trim() || "Table Guest",
-        customerPhone: phoneNumber.trim() || customerProfile.phone,
-        paymentMethod: selectedPaymentMethod,
-        fulfillmentType: diningMode === "DINE_IN" ? "DINE_IN" : "TAKEAWAY",
-        notes: tableNotes,
-      });
-      setPlacedOrderResult(newOrder);
-      setIsConfirmDrawerOpen(false);
-    }
+  const handleConfirmOrder = async () => {
+    if(!cart.items.length || !qrContext || submitLock.current)return;
+    submitLock.current=true;setSubmitting(true);setCheckoutError('');
+    try {
+      const result=await submitSelfService({...checkoutBody,expected_total:serverQuote.quote?.total_payable});
+      sessionStorage.setItem(`table-order:${qrToken}`,result.tracking_token);
+      setTrackingToken(result.tracking_token);setPlacedOrderResult(posOrderToOrder(result,currentOutlet.name));
+      clearCart();setIsConfirmDrawerOpen(false);playMobileSound('success');
+    }catch(error:any){setCheckoutError(error.message || 'Unable to confirm order. Retry to recover it.');serverQuote.refresh();}
+    finally{submitLock.current=false;setSubmitting(false);}
   };
 
   // Copy token to clipboard
@@ -260,6 +251,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
 
   return (
     <div className="min-h-screen bg-[#09090C] text-zinc-100 flex flex-col font-sans pb-28 select-none antialiased">
+      {(checkoutError || serverQuote.error) && <p role="alert" className="p-3 text-xs text-rose-400">{checkoutError || serverQuote.error}</p>}
       {/* -------------------------------------------------------------
           TOP BAR: BRAND, TABLE CHIP, DINING MODE, AND EXIT
       ------------------------------------------------------------- */}
@@ -273,7 +265,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           {/* Table Badge & Dining Mode Controls */}
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setIsTableSwitcherOpen(true)}
+              onClick={() => {if(!qrContext)setIsTableSwitcherOpen(true);}}
               className="flex items-center gap-1.5 px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/70 text-amber-400 text-xs font-bold transition-colors cursor-pointer"
               title="Change Table"
             >
@@ -298,7 +290,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               </button>
               <button
                 onClick={() => {
-                  setDiningMode("TAKEAWAY");
+                  if(!qrContext)setDiningMode("TAKEAWAY");
                   playMobileSound("tap");
                 }}
                 className={`px-2 py-0.5 transition-all ${
@@ -591,7 +583,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                 </span>
                 <span>•</span>
                 <span className="text-amber-400 font-mono font-black text-sm">
-                  Rs. {cart.finalTotal}
+                  Rs. {serverQuote.quote?.total_payable ?? cart.finalTotal}
                 </span>
               </div>
               <p className="text-[10px] text-zinc-500 truncate">
@@ -682,7 +674,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                 <div className="flex items-start gap-1.5">
                   <Printer className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                   <span>
-                    <strong>Want a physical token?</strong> Enter code <strong>{placedOrderResult.kioskToken || "TK-4821"}</strong> at any Crunchy Kiosk to print your slip anytime!
+                    <strong>Want a physical token?</strong> Show order <strong>{placedOrderResult.orderNumber}</strong> to staff for a printed slip.
                   </span>
                 </div>
               </div>
@@ -769,7 +761,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               <div className="pt-2 border-t border-zinc-800 flex items-center justify-between text-xs font-bold text-white">
                 <span>Round Total</span>
                 <span className="font-mono text-amber-400 text-sm font-black">
-                  Rs. {cart.finalTotal}
+                  Rs. {serverQuote.quote?.total_payable ?? cart.finalTotal}
                 </span>
               </div>
             </div>
@@ -785,7 +777,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                     <span>{diningMode === "DINE_IN" ? (tableNumber || "Select Table") : "Takeaway"}</span>
                     <button
                       type="button"
-                      onClick={() => setIsTableSwitcherOpen(true)}
+                      onClick={() => {if(!qrContext)setIsTableSwitcherOpen(true);}}
                       className="text-[10px] text-amber-400 underline"
                     >
                       Change
@@ -877,10 +869,12 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               </div>
             </div>
 
+            {(checkoutError || serverQuote.error) && <p role="alert" className="text-xs text-rose-400">{checkoutError || serverQuote.error}</p>}
+            {serverQuote.quote && <p className="text-xs text-zinc-300">This round: Rs. {serverQuote.quote.total_payable} ? Payment due at counter</p>}
             {/* Confirm Submit */}
             <div className="pt-2">
               <button
-                onClick={handleConfirmOrder}
+                onClick={()=>void handleConfirmOrder()} disabled={submitting || !qrContext || !serverQuote.quote}
                 className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95 cursor-pointer"
               >
                 <span>
@@ -945,7 +939,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
             <div className="pt-2 border-t border-zinc-800">
               <button
                 onClick={() => {
-                  setDiningMode("TAKEAWAY");
+                  if(!qrContext)setDiningMode("TAKEAWAY");
                   setIsTableSwitcherOpen(false);
                   playMobileSound("tap");
                 }}

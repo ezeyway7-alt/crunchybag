@@ -1,3 +1,5 @@
+import {apiClient} from "../../lib/api";
+import {submitSelfService, useSelfServiceOrder, useSelfServiceQuote} from "../../lib/selfService";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Sparkles,
@@ -54,7 +56,6 @@ export const KioskPortal: React.FC = () => {
     products,
     categories,
     currentOutlet,
-    placeTakeawayOrder,
     logout,
     addToast,
     lookupOrderByTokenOrCode,
@@ -66,7 +67,7 @@ export const KioskPortal: React.FC = () => {
   // Navigation State
   const [step, setStep] = useState<KioskStep>("ATTRACT");
   const [fulfillment, setFulfillment] = useState<FulfillmentType>("DINE_IN");
-  const [tableNumber, setTableNumber] = useState<string>("12");
+  const [tableNumber, setTableNumber] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isCategoryLoading, setIsCategoryLoading] = useState(false);
 
@@ -103,6 +104,7 @@ export const KioskPortal: React.FC = () => {
     modifiers: SelectedModifier[];
     quantity: number;
     specialInstructions?: string;
+    comboSelections?: {product_id:string;variant_id:string|null;modifier_option_ids:string[];quantity:number}[];
     unitPrice: number;
     lineTotal: number;
   }
@@ -122,7 +124,7 @@ export const KioskPortal: React.FC = () => {
   const [activeKioskSlide, setActiveKioskSlide] = useState(0);
 
   // Payment state
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("FONEPAY_QR");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("CASH_ON_PICKUP");
   const [qrProvider, setQrProvider] = useState<"ESEWA" | "KHALTI" | "BANK">("ESEWA");
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -133,6 +135,22 @@ export const KioskPortal: React.FC = () => {
   const [completedOrderNumber, setCompletedOrderNumber] = useState<string>("");
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [hasPrinted, setHasPrinted] = useState<boolean>(false);
+
+  const [tables,setTables]=useState<{id:number;table_number:string}[]>([]);
+  const [orderError,setOrderError]=useState('');
+  const [trackingToken,setTrackingToken]=useState('');
+  const [savedTotal,setSavedTotal]=useState<number|null>(null);
+  const submitting=useRef(false);
+  const liveOrder=useSelfServiceOrder(String(currentOutlet.id),currentOutlet.name,trackingToken);
+  useEffect(()=>{let alive=true;apiClient.get<any>(`/orders/self-service/tables/${currentOutlet.id}/`,{skipAuth:true})
+    .then(data=>{if(alive)setTables(data.tables);}).catch(()=>{if(alive)setOrderError('Unable to load tables.');});return()=>{alive=false;};},[currentOutlet.id]);
+  const checkoutBody={branch_id:Number(currentOutlet.id),order_source:'KIOSK',fulfillment_type:fulfillment,
+    table_id:fulfillment==='DINE_IN'?tables.find(t=>t.table_number===tableNumber)?.id:null,
+    customer_name:guestName.trim(),customer_phone:guestPhone.trim(),
+    items:kioskCart.map(item=>({product_id:item.product.id,quantity:item.quantity,
+      variant_id:item.comboSelections?null:item.variant.id || null,modifier_option_ids:item.comboSelections?[]:item.modifiers.map(m=>m.optionId),
+      item_notes:item.specialInstructions || '',...(item.comboSelections?{combo_selections:item.comboSelections}:{})}))};
+  const serverQuote=useSelfServiceQuote(checkoutBody);
 
   // Auto-reset timer for inactivity on kiosk
   const [idleSeconds, setIdleSeconds] = useState(0);
@@ -225,6 +243,8 @@ export const KioskPortal: React.FC = () => {
   };
 
   const handleResetToAttract = () => {
+    if(submitting.current)return;
+    setTrackingToken('');setSavedTotal(null);setOrderError('');setTableNumber('');
     setStep("ATTRACT");
     setKioskCart([]);
     setSelectedCategory("all");
@@ -235,7 +255,7 @@ export const KioskPortal: React.FC = () => {
     setGuestPhone("");
     setGuestName("");
     setPhoneVerified(false);
-    setSelectedPaymentMethod("FONEPAY_QR");
+    setSelectedPaymentMethod("CASH_ON_PICKUP");
     setQrProvider("ESEWA");
     setCustomizingProduct(null);
     setSelectedCombo(null);
@@ -334,9 +354,9 @@ export const KioskPortal: React.FC = () => {
 
   // Calculations for Kiosk Cart
   const subtotal = kioskCart.reduce((sum, item) => sum + item.lineTotal, 0);
-  const vatTax = +(subtotal * 0.13).toFixed(2);
+  const vatTax = Number(serverQuote.quote?.vat_included_amount || 0);
   const roundDiscount = subtotal > 0 ? +(subtotal - Math.floor(subtotal)).toFixed(2) : 0;
-  const totalPayable = Math.floor(subtotal);
+  const totalPayable = savedTotal ?? Number(serverQuote.quote?.total_payable ?? subtotal);
 
   // Cart operations
   const handleOpenCustomize = (product: Product) => {
@@ -355,6 +375,7 @@ export const KioskPortal: React.FC = () => {
 
   const handleQuickAdd = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
+    if(product.modifierGroups.some(group=>group.required) || product.variants.length>1){handleOpenCustomize(product);return;}
     playKioskSound("beep");
     const defaultVariant = product.variants.find((v) => v.isDefault) || product.variants[0] || {
       id: "v-def",
@@ -461,6 +482,7 @@ export const KioskPortal: React.FC = () => {
       modifiers: selectedModifiers,
       quantity: comboData.quantity,
       specialInstructions: "Customized Package",
+      comboSelections: comboData.comboSelections,
       unitPrice: comboData.unitPrice,
       lineTotal: comboData.unitPrice * comboData.quantity,
     };
@@ -517,61 +539,33 @@ export const KioskPortal: React.FC = () => {
     );
   };
 
-  // Complete Order & Print Simulation
-  const handleProcessPayment = () => {
-    if (kioskCart.length === 0) return;
-    playKioskSound("tap");
-    setPaymentProcessing(true);
-
-    // Simulate fast terminal POS / Fonepay QR approval
-    setTimeout(() => {
-      playKioskSound("success");
-      setPaymentProcessing(false);
-      setPaymentSuccess(true);
-
-      // Generate random high-contrast token number (e.g., T-104)
-      const tokenNumber = `T-${Math.floor(100 + Math.random() * 900)}`;
-      setGeneratedToken(tokenNumber);
-
-      // Place actual order through AppContext so Staff & Kitchen KDS hear and receive it immediately!
-      const createdOrder = placeTakeawayOrder({
-        customerName: guestName.trim() ? guestName.trim() : `Kiosk Guest #${tokenNumber}`,
-        customerPhone: guestPhone.trim() ? guestPhone.trim() : "Touchscreen Terminal 1",
-        fulfillmentType: fulfillment,
-        paymentMethod: selectedPaymentMethod,
-        notes: `Kiosk Self-Order | Token: ${tokenNumber} ${
-          fulfillment === "DINE_IN"
-            ? reservationCodeLinked
-              ? `| Reserved: ${reservationCodeLinked} (Table #${tableNumber})`
-              : `| Table #${tableNumber}`
-            : "| Express Takeaway"
-        }${guestName.trim() ? ` | Guest: ${guestName.trim()}` : ""}${guestPhone.trim() ? ` | Ph: ${guestPhone.trim()}` : ""}`,
-      });
-
-      setCompletedOrderNumber(createdOrder.orderNumber);
+  const handleProcessPayment = async () => {
+    if (!kioskCart.length || submitting.current) return;
+    if(fulfillment==='DINE_IN' && !checkoutBody.table_id){setOrderError('Choose your table before placing the order.');return;}
+    submitting.current=true;setPaymentProcessing(true);setOrderError('');
+    try {
+      const created=await submitSelfService({...checkoutBody,expected_total:serverQuote.quote?.total_payable});
+      setGeneratedToken(created.order_number);setCompletedOrderNumber(created.order_number);
+      setSavedTotal(Number(created.total_payable));setTrackingToken(created.tracking_token);
       setOrderTimeEstimate(`In ${currentOutlet.estimatedPrepTimeMin || 12} mins`);
-
-      // Switch to receipt token screen
-      setStep("RECEIPT_TOKEN");
-
-      // Auto trigger printing after 600ms
-      setTimeout(() => {
-        handleTriggerPrint();
-      }, 700);
-    }, 1800);
+      playKioskSound('success');setPaymentSuccess(true);setStep('RECEIPT_TOKEN');
+    } catch(error:any){setOrderError(error.message || 'Order not confirmed. Retry to recover the same request.');serverQuote.refresh();}
+    finally{submitting.current=false;setPaymentProcessing(false);}
   };
 
   const handleTriggerPrint = () => {
-    setIsPrinting(true);
-    playKioskSound("print");
-
-    const printTimer = setTimeout(() => {
-      setIsPrinting(false);
-      setHasPrinted(true);
-      playKioskSound("beep");
-    }, 2400);
-
-    return () => clearTimeout(printTimer);
+    if(!completedOrderNumber){setOrderError('Place an order before printing its token.');return;}
+    const popup=window.open('', '_blank', 'width=380,height=600');
+    if(!popup){setOrderError('Allow popups to open the print dialog.');return;}
+    popup.document.title=`Token ${completedOrderNumber}`;
+    const style=popup.document.createElement('style');
+    style.textContent='body{font:13px monospace;padding:12px;color:#000;background:#fff}h1{font-size:20px;overflow-wrap:anywhere}p{white-space:pre-wrap}@page{margin:6mm}';
+    popup.document.head.append(style);
+    const heading=popup.document.createElement('h1');heading.textContent=completedOrderNumber;popup.document.body.append(heading);
+    const details=popup.document.createElement('p');
+    details.textContent=[currentOutlet.name,fulfillment==='DINE_IN'?`Table: ${tableNumber}`:'Takeaway',guestName,
+      ...kioskCart.map(item=>`${item.quantity} x ${item.product.name}`),`Payment due: Rs. ${totalPayable}`].filter(Boolean).join('\n');
+    popup.document.body.append(details);popup.focus();popup.print();setHasPrinted(true);
   };
 
   // Filtered Combos from BANNER_SLIDES
@@ -828,6 +822,7 @@ export const KioskPortal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 bg-[#0A0A0C] text-white flex flex-col select-none overflow-hidden font-sans">
       {/* 1. KIOSK TOP APP BAR */}
+      {trackingToken && <div role="status" className="text-center text-xs text-amber-400 py-1">Order status: {liveOrder?.status || 'CONFIRMED'} | Payment due at counter</div>}
       <header className="h-13 sm:h-15 bg-[#121215] border-b border-zinc-800 px-3 sm:px-6 flex items-center justify-between gap-2 shrink-0 z-20">
         <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
           <div
@@ -892,7 +887,7 @@ export const KioskPortal: React.FC = () => {
                   setPhoneVerified(!phoneVerified);
                 }
               }}
-              title={phoneVerified ? "Mobile verified" : "Tap tick to verify"}
+              title={phoneVerified ? "Mobile entered" : "Mark mobile as entered"}
               className={`p-0.5 transition-colors cursor-pointer ${
                 phoneVerified
                   ? "text-emerald-400"
@@ -1106,7 +1101,7 @@ export const KioskPortal: React.FC = () => {
                 <p className="text-sm font-bold">No packages found matching "{searchQuery}"</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
                 {filteredCombos.map((combo) => (
                   <div
                     key={combo.id}
@@ -1124,7 +1119,7 @@ export const KioskPortal: React.FC = () => {
                     )}
 
                     {/* Image */}
-                    <div className="relative aspect-[16/10] bg-zinc-950 overflow-hidden">
+                    <div className="relative aspect-[2/1] bg-zinc-950 overflow-hidden">
                       <img
                         src={combo.image}
                         alt={combo.title}
@@ -1357,7 +1352,7 @@ export const KioskPortal: React.FC = () => {
               )}
 
               {/* Product Touch Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
             {currentCategoryProducts.map((product) => {
               return (
                 <div
@@ -1366,7 +1361,7 @@ export const KioskPortal: React.FC = () => {
                   className="bg-[#141418] border border-zinc-800 hover:border-amber-500/80 transition-all duration-150 flex flex-col justify-between group cursor-pointer shadow-sm hover:shadow-md overflow-hidden relative"
                 >
                   {/* Image */}
-                  <div className="relative aspect-[16/10] bg-zinc-950 overflow-hidden">
+                  <div className="relative aspect-[2/1] bg-zinc-950 overflow-hidden">
                     <img
                       src={product.images[0]}
                       alt={product.name}
@@ -1854,296 +1849,12 @@ export const KioskPortal: React.FC = () => {
               </div>
             </div>
 
-            {/* 2. PAYMENT METHODS (Scan QR & Cash at Counter) */}
-            <div className="grid grid-cols-2 gap-2 sm:gap-2.5 mb-2.5 sm:mb-3">
-              {/* Option 1: Scan QR Code */}
-              <button
-                type="button"
-                onClick={() => {
-                  playKioskSound("tap");
-                  setSelectedPaymentMethod("FONEPAY_QR");
-                }}
-                className={`p-2 sm:p-2.5 border-2 cursor-pointer flex items-center gap-2.5 transition-all text-left ${
-                  selectedPaymentMethod === "FONEPAY_QR"
-                    ? "border-amber-500 bg-amber-500/10 shadow-sm"
-                    : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700"
-                }`}
-              >
-                <div
-                  className={`w-8 h-8 flex items-center justify-center shrink-0 ${
-                    selectedPaymentMethod === "FONEPAY_QR"
-                      ? "bg-amber-500 text-black"
-                      : "bg-zinc-800 text-amber-400"
-                  }`}
-                >
-                  <QrCode className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-xs sm:text-sm font-bold uppercase text-white truncate">Scan & Pay QR</h3>
-                  <p className="text-[10px] text-zinc-400 truncate">eSewa • Khalti • Bank</p>
-                </div>
-              </button>
-
-              {/* Option 2: Pay Cash at Counter */}
-              <button
-                type="button"
-                onClick={() => {
-                  playKioskSound("tap");
-                  setSelectedPaymentMethod("CASH_ON_PICKUP");
-                }}
-                className={`p-2 sm:p-2.5 border-2 cursor-pointer flex items-center gap-2.5 transition-all text-left ${
-                  selectedPaymentMethod === "CASH_ON_PICKUP"
-                    ? "border-amber-500 bg-amber-500/10 shadow-sm"
-                    : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700"
-                }`}
-              >
-                <div
-                  className={`w-8 h-8 flex items-center justify-center shrink-0 ${
-                    selectedPaymentMethod === "CASH_ON_PICKUP"
-                      ? "bg-emerald-500 text-black"
-                      : "bg-zinc-800 text-emerald-400"
-                  }`}
-                >
-                  <Banknote className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-xs sm:text-sm font-bold uppercase text-white truncate">Cash at Counter</h3>
-                  <p className="text-[10px] text-zinc-400 truncate">Order now, pay at pickup</p>
-                </div>
-              </button>
-            </div>
-
-            {/* 3. ACTIVE PAYMENT DETAILS */}
-            {selectedPaymentMethod === "FONEPAY_QR" && (
-              <div className="bg-[#141418] border border-zinc-800 p-2.5 sm:p-3.5 space-y-2">
-                {/* QR Provider Tabs (eSewa, Khalti, Bank) */}
-                <div className="flex items-center gap-1.5 border-b border-zinc-800 pb-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playKioskSound("tap");
-                      setQrProvider("ESEWA");
-                    }}
-                    className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
-                      qrProvider === "ESEWA"
-                        ? "bg-emerald-500/15 border-emerald-500 text-emerald-400"
-                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    eSewa QR
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playKioskSound("tap");
-                      setQrProvider("KHALTI");
-                    }}
-                    className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
-                      qrProvider === "KHALTI"
-                        ? "bg-purple-500/15 border-purple-500 text-purple-400"
-                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    Khalti QR
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playKioskSound("tap");
-                      setQrProvider("BANK");
-                    }}
-                    className={`px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider transition-all border cursor-pointer ${
-                      qrProvider === "BANK"
-                        ? "bg-blue-500/15 border-blue-500 text-blue-400"
-                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    Bank / Fonepay
-                  </button>
-                </div>
-
-                {/* QR Display + Side Account Details */}
-                <div className="flex items-center gap-3.5 sm:gap-5 pt-0.5">
-                  {/* Clean Crisp QR Code */}
-                  <div className="p-2 bg-white border border-zinc-300 shrink-0 shadow-sm flex flex-col items-center">
-                    <svg
-                      viewBox="0 0 160 160"
-                      className="w-24 h-24 sm:w-28 sm:h-28 text-black"
-                      fill="currentColor"
-                    >
-                      {/* Corner 1: Top-Left Finder Box */}
-                      <rect x="10" y="10" width="40" height="40" rx="3" fill="#000" />
-                      <rect x="16" y="16" width="28" height="28" fill="#FFF" />
-                      <rect x="22" y="22" width="16" height="16" rx="1" fill={qrProvider === "ESEWA" ? "#16a34a" : qrProvider === "KHALTI" ? "#7c3aed" : "#2563eb"} />
-
-                      {/* Corner 2: Top-Right Finder Box */}
-                      <rect x="110" y="10" width="40" height="40" rx="3" fill="#000" />
-                      <rect x="116" y="16" width="28" height="28" fill="#FFF" />
-                      <rect x="122" y="22" width="16" height="16" rx="1" fill={qrProvider === "ESEWA" ? "#16a34a" : qrProvider === "KHALTI" ? "#7c3aed" : "#2563eb"} />
-
-                      {/* Corner 3: Bottom-Left Finder Box */}
-                      <rect x="10" y="110" width="40" height="40" rx="3" fill="#000" />
-                      <rect x="16" y="116" width="28" height="28" fill="#FFF" />
-                      <rect x="22" y="122" width="16" height="16" rx="1" fill={qrProvider === "ESEWA" ? "#16a34a" : qrProvider === "KHALTI" ? "#7c3aed" : "#2563eb"} />
-
-                      {/* Pattern Matrix Dots */}
-                      <rect x="58" y="14" width="6" height="6" fill="#000" />
-                      <rect x="70" y="14" width="6" height="6" fill="#000" />
-                      <rect x="82" y="14" width="6" height="6" fill="#000" />
-                      <rect x="94" y="14" width="6" height="6" fill="#000" />
-                      <rect x="58" y="26" width="6" height="6" fill="#000" />
-                      <rect x="82" y="26" width="6" height="6" fill="#000" />
-                      <rect x="94" y="26" width="6" height="6" fill="#000" />
-                      <rect x="58" y="38" width="6" height="6" fill="#000" />
-                      <rect x="70" y="38" width="6" height="6" fill="#000" />
-                      <rect x="82" y="38" width="6" height="6" fill="#000" />
-
-                      {/* Middle horizontal timing */}
-                      <rect x="14" y="58" width="6" height="6" fill="#000" />
-                      <rect x="26" y="58" width="6" height="6" fill="#000" />
-                      <rect x="38" y="58" width="6" height="6" fill="#000" />
-                      <rect x="58" y="58" width="6" height="6" fill="#000" />
-                      <rect x="70" y="58" width="6" height="6" fill="#000" />
-                      <rect x="94" y="58" width="6" height="6" fill="#000" />
-                      <rect x="118" y="58" width="6" height="6" fill="#000" />
-                      <rect x="130" y="58" width="6" height="6" fill="#000" />
-                      <rect x="142" y="58" width="6" height="6" fill="#000" />
-
-                      {/* Middle Data */}
-                      <rect x="14" y="70" width="6" height="6" fill="#000" />
-                      <rect x="38" y="70" width="6" height="6" fill="#000" />
-                      <rect x="58" y="70" width="6" height="6" fill="#000" />
-                      <rect x="82" y="70" width="6" height="6" fill="#000" />
-                      <rect x="106" y="70" width="6" height="6" fill="#000" />
-                      <rect x="130" y="70" width="6" height="6" fill="#000" />
-                      <rect x="142" y="70" width="6" height="6" fill="#000" />
-
-                      <rect x="14" y="82" width="6" height="6" fill="#000" />
-                      <rect x="26" y="82" width="6" height="6" fill="#000" />
-                      <rect x="58" y="82" width="6" height="6" fill="#000" />
-                      <rect x="70" y="82" width="6" height="6" fill="#000" />
-                      <rect x="94" y="82" width="6" height="6" fill="#000" />
-                      <rect x="118" y="82" width="6" height="6" fill="#000" />
-                      <rect x="142" y="82" width="6" height="6" fill="#000" />
-
-                      {/* Bottom data */}
-                      <rect x="58" y="110" width="6" height="6" fill="#000" />
-                      <rect x="70" y="110" width="6" height="6" fill="#000" />
-                      <rect x="94" y="110" width="6" height="6" fill="#000" />
-                      <rect x="106" y="110" width="6" height="6" fill="#000" />
-                      <rect x="130" y="110" width="6" height="6" fill="#000" />
-                      <rect x="142" y="110" width="6" height="6" fill="#000" />
-                      <rect x="58" y="122" width="6" height="6" fill="#000" />
-                      <rect x="82" y="122" width="6" height="6" fill="#000" />
-                      <rect x="94" y="122" width="6" height="6" fill="#000" />
-                      <rect x="118" y="122" width="6" height="6" fill="#000" />
-                      <rect x="142" y="122" width="6" height="6" fill="#000" />
-                      <rect x="58" y="134" width="6" height="6" fill="#000" />
-                      <rect x="70" y="134" width="6" height="6" fill="#000" />
-                      <rect x="82" y="134" width="6" height="6" fill="#000" />
-                      <rect x="106" y="134" width="6" height="6" fill="#000" />
-                      <rect x="130" y="134" width="6" height="6" fill="#000" />
-
-                      {/* Center Brand Badge */}
-                      <rect x="55" y="55" width="50" height="50" rx="4" fill="#FFF" stroke="#E4E4E7" strokeWidth="2" />
-                      <text
-                        x="80"
-                        y="84"
-                        textAnchor="middle"
-                        fontSize="13"
-                        fontWeight="900"
-                        fill={qrProvider === "ESEWA" ? "#16a34a" : qrProvider === "KHALTI" ? "#7c3aed" : "#2563eb"}
-                        fontFamily="sans-serif"
-                      >
-                        {qrProvider === "ESEWA" ? "eSewa" : qrProvider === "KHALTI" ? "Khalti" : "Fonepay"}
-                      </text>
-                    </svg>
-                    <span className="text-[9px] font-bold text-zinc-600 mt-0.5 uppercase font-mono">
-                      NPR {totalPayable}
-                    </span>
-                  </div>
-
-                  {/* Side Details (eSewa / Khalti / Bank account number & name) */}
-                  <div className="space-y-1.5 text-left flex-1 min-w-0">
-                    {qrProvider === "ESEWA" && (
-                      <>
-                        <div>
-                          <span className="text-[10px] text-zinc-400 uppercase font-semibold block leading-tight">
-                            eSewa Mobile / ID
-                          </span>
-                          <div className="text-lg sm:text-xl font-black font-mono text-emerald-400 tracking-wider leading-tight">
-                            9801234567
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-zinc-400 uppercase font-semibold block leading-tight">
-                            Account Name
-                          </span>
-                          <div className="text-xs sm:text-sm font-bold text-white leading-tight">
-                            CRUNCHY FRIED CHICKEN PVT. LTD.
-                          </div>
-                        </div>
-                        <div className="text-[11px] text-zinc-400 leading-snug">
-                          Scan with eSewa app or send directly to the ID above.
-                        </div>
-                      </>
-                    )}
-
-                    {qrProvider === "KHALTI" && (
-                      <>
-                        <div>
-                          <span className="text-[10px] text-zinc-400 uppercase font-semibold block leading-tight">
-                            Khalti Mobile / ID
-                          </span>
-                          <div className="text-lg sm:text-xl font-black font-mono text-purple-400 tracking-wider leading-tight">
-                            9801234567
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-zinc-400 uppercase font-semibold block leading-tight">
-                            Account Name
-                          </span>
-                          <div className="text-xs sm:text-sm font-bold text-white leading-tight">
-                            CRUNCHY FRIED CHICKEN PVT. LTD.
-                          </div>
-                        </div>
-                        <div className="text-[11px] text-zinc-400 leading-snug">
-                          Scan with Khalti app or transfer to the mobile number above.
-                        </div>
-                      </>
-                    )}
-
-                    {qrProvider === "BANK" && (
-                      <>
-                        <div>
-                          <span className="text-[10px] text-zinc-400 uppercase font-semibold block leading-tight">
-                            Bank & Account Number
-                          </span>
-                          <div className="text-xs font-semibold text-zinc-300">Nabil Bank Limited</div>
-                          <div className="text-base sm:text-lg font-black font-mono text-blue-400 tracking-wider leading-tight">
-                            01201017500982
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-zinc-400 uppercase font-semibold block leading-tight">
-                            Account Name
-                          </span>
-                          <div className="text-xs sm:text-sm font-bold text-white leading-tight">
-                            CRUNCHY FRIED CHICKEN PVT. LTD.
-                          </div>
-                        </div>
-                        <div className="text-[10.5px] text-zinc-400 leading-snug">
-                          Branch: Durbar Marg, Kathmandu • Fonepay QR enabled.
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
+            {fulfillment==='DINE_IN' && <label className="block text-xs text-zinc-400 mb-3">Table
+              <select aria-label="Kiosk table" value={tableNumber} onChange={e=>setTableNumber(e.target.value)} className="block w-full bg-zinc-900 border border-zinc-700 p-2 text-white mt-1">
+                <option value="">Choose your table</option>{tables.map(table=><option key={table.id} value={table.table_number}>{table.table_number}</option>)}
+              </select>
+            </label>}
+            {(orderError || serverQuote.error) && <p role="alert" className="text-xs text-rose-400 mb-2">{orderError || serverQuote.error}</p>}
             {selectedPaymentMethod === "CASH_ON_PICKUP" && (
               <div className="bg-[#141418] border border-zinc-800 p-3.5 sm:p-4 text-center space-y-1.5">
                 <div className="w-10 h-10 bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
@@ -2153,7 +1864,7 @@ export const KioskPortal: React.FC = () => {
                   Pay Cash at Pickup Counter
                 </h4>
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                  Your order token will print now. Please keep{" "}
+                  Your order will be saved with payment due. Please keep{" "}
                   <span className="text-amber-400 font-mono font-bold">{formatNPR(totalPayable)}</span>{" "}
                   cash ready to pay at the counter when your token is called.
                 </p>
@@ -2164,14 +1875,14 @@ export const KioskPortal: React.FC = () => {
             <div className="mt-2.5 sm:mt-3 text-center max-w-sm mx-auto w-full">
               <button
                 type="button"
-                disabled={paymentProcessing}
-                onClick={handleProcessPayment}
+                disabled={paymentProcessing || !serverQuote.quote}
+                onClick={()=>void handleProcessPayment()}
                 className="w-full py-2.5 sm:py-3 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider text-sm sm:text-base flex items-center justify-center gap-2 shadow-xl transition-transform active:scale-98 cursor-pointer disabled:opacity-50"
               >
                 {paymentProcessing ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Confirming & Printing...</span>
+                    <span>Confirming order...</span>
                   </>
                 ) : selectedPaymentMethod === "FONEPAY_QR" ? (
                   <>
@@ -2199,6 +1910,7 @@ export const KioskPortal: React.FC = () => {
       ------------------------------------------------------------- */}
       {step === "RECEIPT_TOKEN" && (
         <div className="fixed inset-0 z-50 bg-[#09090B] text-white flex flex-col justify-between p-3 sm:p-5 lg:p-6 select-none overflow-y-auto">
+          <p role="status" className="text-center text-xs text-amber-400 pb-2">Order status: {liveOrder?.status || 'CONFIRMED'} | Payment due at counter</p>
           {/* Top banner */}
           <div className="flex items-center justify-between pb-2.5 sm:pb-3 border-b border-zinc-800 shrink-0">
             <CrunchyLogo size="md" className="h-8 sm:h-9" />
@@ -2233,10 +1945,10 @@ export const KioskPortal: React.FC = () => {
                   YOUR CALL TOKEN NUMBER
                 </span>
                 <span className="text-5xl sm:text-6xl md:text-7xl font-black font-mono text-amber-400 tracking-tight block py-1 leading-none">
-                  {generatedToken || "T-108"}
+                  {generatedToken}
                 </span>
                 <div className="flex items-center justify-center gap-2.5 text-[11px] text-zinc-400 font-mono mt-1.5">
-                  <span>Ref: {completedOrderNumber || "CR-8921"}</span>
+                  <span>Ref: {completedOrderNumber}</span>
                   <span>•</span>
                   <span className="text-amber-400 font-bold uppercase">
                     {fulfillment === "DINE_IN"
@@ -2285,7 +1997,7 @@ export const KioskPortal: React.FC = () => {
                       CALL TOKEN NUMBER
                     </span>
                     <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-black block leading-none py-0.5">
-                      {generatedToken || "T-108"}
+                      {generatedToken}
                     </span>
                     <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-wider block">
                       {fulfillment === "DINE_IN" ? "Dine-In" : "Takeaway"}
@@ -2295,7 +2007,7 @@ export const KioskPortal: React.FC = () => {
                   <div className="py-1 border-b border-dashed border-zinc-400 text-[9px] space-y-0.5">
                     <div className="flex justify-between">
                       <span>Order Ref:</span>
-                      <span className="font-bold">{completedOrderNumber || "CR-8921"}</span>
+                      <span className="font-bold">{completedOrderNumber}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Payment:</span>
@@ -2414,12 +2126,12 @@ export const KioskPortal: React.FC = () => {
                     </div>
 
                     <p className="text-[8px] font-mono font-bold text-zinc-700 mt-0.5">
-                      crunchy.app/t/{completedOrderNumber || "CR-8921"}
+                      crunchy.app/t/{completedOrderNumber}
                     </p>
                   </div>
 
                   <p className="text-[7.5px] text-zinc-500 text-center mt-1 border-t border-dashed border-zinc-300 pt-0.5">
-                    Thank you! Wait for Token {generatedToken || "T-108"}
+                    Thank you! Wait for Token {generatedToken}
                   </p>
                 </div>
               </div>

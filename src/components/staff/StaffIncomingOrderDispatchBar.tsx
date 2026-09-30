@@ -1,3 +1,4 @@
+import {apiClient} from "../../lib/api";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Bell,
@@ -73,7 +74,7 @@ export const StaffIncomingOrderDispatchBar: React.FC<Props> = ({
     (o) =>
       o.status !== "CANCELLED" &&
       (o.status === "CONFIRMED" || o.status === "PENDING") &&
-      (o.orderSource === "TABLE_QR" ||
+      (o.orderSource === "KIOSK" || o.orderSource === "TABLE_QR" ||
         o.orderSource === "WEBSITE" ||
         o.fulfillmentType === "DELIVERY" ||
         (o.fulfillmentType === "DINE_IN" && o.isTableSessionActive))
@@ -87,23 +88,16 @@ export const StaffIncomingOrderDispatchBar: React.FC<Props> = ({
     prevCountRef.current = incomingOrders.length;
   }, [incomingOrders.length, soundEnabled]);
 
-  const handleAcceptToKitchen = (order: Order) => {
-    updateOrderStatus(order.id, "PROCESSING");
-    addToast({
-      title: "Order Accepted & Sent to KDS",
-      description: `Order #${order.orderNumber} sent to kitchen cook line.`,
-      type: "success",
-    });
+  const transition = async (order:Order,status:string) => {
+    try {
+      const raw=(order as any)._posOrder;
+      await apiClient.post(`/orders/pos/${raw.id}/transition/?outlet_id=${order.outletId}`,{version:raw.version,status,reason:'Incoming order action'},
+        {headers:{'Idempotency-Key':`incoming:${order.id}:${raw.version}:${status}`}});
+      addToast({title:'Order updated',description:order.orderNumber,type:'success'});
+    }catch(error:any){addToast({title:'Unable to update order',description:error.message,type:'error'});}
   };
-
-  const handleReject = (order: Order) => {
-    updateOrderStatus(order.id, "CANCELLED");
-    addToast({
-      title: "Order Rejected",
-      description: `Order #${order.orderNumber} cancelled by POS cashier.`,
-      type: "info",
-    });
-  };
+  const handleAcceptToKitchen=(order:Order)=>void transition(order,(order as any)._posOrder?.status==='PENDING'?'ACCEPTED':'PREPARING');
+  const handleReject=(order:Order)=>void transition(order,'CANCELLED');
 
   if (incomingOrders.length === 0) {
     return (

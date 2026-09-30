@@ -83,7 +83,7 @@ export const QrOrderTrackAndReviewModal: React.FC<QrOrderTrackAndReviewModalProp
 
   if (!isOpen) return null;
 
-  const currentOrder = orders.find((o) => o.id === selectedOrderId) || orders[0] || null;
+  const currentOrder = initialOrder || orders.find((o) => o.id === selectedOrderId) || null;
 
   const handleTokenSearch = (e: React.FormEvent) => {
     e.preventDefault();

@@ -28,20 +28,21 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
   const [isCrossed, setIsCrossed] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const prevCountRef = useRef<number>(0);
+  const seenOrdersRef = useRef<Set<string>>(new Set());
+  const [pendingOrder,setPendingOrder]=useState<string|null>(null);
 
   // Filter pending/incoming orders for this outlet
   const incomingOrders = orders.filter(
     (o) =>
       o.status !== "CANCELLED" &&
       o.status !== "COMPLETED" &&
-      (o.status === "CONFIRMED" || o.status === "PENDING" || o.status === "ACCEPTED") &&
+      (o.status === "CONFIRMED" || o.status === "PENDING" || o.status === "AWAITING_PAYMENT" || o.status === "ACCEPTED") &&
       (!o.outletId || !currentOutlet?.id || String(o.outletId) === String(currentOutlet.id))
   );
 
   // Play audio chime and auto-re-open floating notice whenever a NEW order arrives
   useEffect(() => {
-    if (incomingOrders.length > prevCountRef.current) {
+    if (incomingOrders.some(order=>!seenOrdersRef.current.has(order.id))) {
       setIsCrossed(false); // un-dismiss on fresh incoming order
       setIsMinimized(false);
       if (soundEnabled) {
@@ -70,76 +71,23 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
         }
       }
     }
-    prevCountRef.current = incomingOrders.length;
-  }, [incomingOrders.length, soundEnabled]);
+    incomingOrders.forEach(order=>seenOrdersRef.current.add(order.id));
+  }, [incomingOrders.map(order=>order.id).join(","), soundEnabled]);
 
-  const handleAcceptToKitchen = async (order: Order) => {
-    updateOrderStatus(order.id, "PROCESSING");
-    const outletId = order.outletId || currentOutlet?.id || "1";
+  const transition = async (order:Order, status:string) => {
+    if(pendingOrder)return;
+    setPendingOrder(order.id);
     try {
-      await apiClient.post(
-        `/orders/${order.id}/transition/?outlet_id=${encodeURIComponent(outletId)}`,
-        {
-          outlet_id: Number(outletId) || 1,
-          to_status: "PREPARING",
-          status: "PREPARING",
-          notes: "Accepted order to kitchen",
-        }
-      );
-    } catch {
-      try {
-        await apiClient.post(
-          `/orders/pos/${order.id}/transition/?outlet_id=${encodeURIComponent(outletId)}`,
-          {
-            outlet_id: Number(outletId) || 1,
-            version: 1,
-            status: "PREPARING",
-            to_status: "PREPARING",
-            reason: "Accepted order to kitchen",
-          }
-        );
-      } catch {}
-    }
-    addToast({
-      title: "Order Accepted & Sent to KDS",
-      description: `Order #${order.orderNumber} sent to kitchen cook line.`,
-      type: "success",
-    });
+      const raw=(order as any)._posOrder;
+      await apiClient.post(`/orders/pos/${raw.id}/transition/?outlet_id=${order.outletId}`,{
+        version:raw.version,status,reason:status==='CANCELLED'?'Rejected by staff':'Accepted from incoming order notice'
+      },{headers:{'Idempotency-Key':`notice:${order.id}:${raw.version}:${status}`}});
+      addToast({title:'Order updated',description:`Order ${order.orderNumber} updated.`,type:'success'});
+    } catch(error:any){addToast({title:'Order could not be updated',description:error.message,type:'error'});}
+    finally{setPendingOrder(null);}
   };
-
-  const handleReject = async (order: Order) => {
-    updateOrderStatus(order.id, "CANCELLED");
-    const outletId = order.outletId || currentOutlet?.id || "1";
-    try {
-      await apiClient.post(
-        `/orders/${order.id}/transition/?outlet_id=${encodeURIComponent(outletId)}`,
-        {
-          outlet_id: Number(outletId) || 1,
-          to_status: "CANCELLED",
-          status: "CANCELLED",
-          reason: "Cancelled by staff",
-        }
-      );
-    } catch {
-      try {
-        await apiClient.post(
-          `/orders/pos/${order.id}/transition/?outlet_id=${encodeURIComponent(outletId)}`,
-          {
-            outlet_id: Number(outletId) || 1,
-            version: 1,
-            status: "CANCELLED",
-            to_status: "CANCELLED",
-            reason: "Cancelled by staff",
-          }
-        );
-      } catch {}
-    }
-    addToast({
-      title: "Order Cancelled",
-      description: `Order #${order.orderNumber} rejected.`,
-      type: "info",
-    });
-  };
+  const handleAcceptToKitchen=(order:Order)=>transition(order,(order as any)._posOrder?.status==='PENDING'?'ACCEPTED':'PREPARING');
+  const handleReject=(order:Order)=>transition(order,'CANCELLED');
 
   const formatNPR = (val: number) => `Rs. ${val.toLocaleString("en-NP")}`;
 

@@ -1,3 +1,4 @@
+import {useOutletEvents} from "../../lib/useOutletEvents";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Flame,
@@ -177,227 +178,27 @@ export const KDSPortal: React.FC = () => {
    * Returns active kitchen preparation orders (PENDING, ACCEPTED, PREPARING, READY)
    * Non-kitchen items are automatically excluded by backend
    */
+  const fetchGeneration = useRef(0);
   const fetchKitchenTickets = useCallback(async (isSilent = false) => {
-    if (!isSilent) setIsSyncing(true);
-    setAuthErrorNotice(null);
+    const generation=++fetchGeneration.current;
+    if(!isSilent)setIsSyncing(true);
     try {
-      let tickets: BackendKitchenTicket[] = [];
-
-      // 1. Primary KDS endpoint: GET /api/v1/orders/kitchen/me/?outlet_id=<outlet_id>
-      try {
-        const data = await apiClient.get<BackendKitchenTicket[]>(
-          `/orders/kitchen/me/?outlet_id=${encodeURIComponent(effectiveOutletId)}`
-        );
-        if (Array.isArray(data)) {
-          tickets = data.map((t) => ({
-            ...t,
-            outlet_id: t.outlet_id || effectiveOutletId,
-          }));
-        }
-      } catch (err: any) {
-        const status = err?.status || err?.response?.status;
-        if (status === 401 || status === 403) {
-          setAuthErrorNotice(
-            status === 401
-              ? "Authentication credentials required to access the live kitchen display station."
-              : "Your account does not have Kitchen Staff, Chef, or Admin permissions to view this station."
-          );
-        } else {
-          console.warn("Notice: /api/v1/orders/kitchen/me/ unavailable:", err);
-        }
+      const tickets: BackendKitchenTicket[]=[];
+      for(let page=1;;page++) {
+        const data=await apiClient.get<any>(`/orders/pos/?kitchen=true&outlet_id=${encodeURIComponent(effectiveOutletId)}&page_size=100&page=${page}`);
+        tickets.push(...data.results);
+        if(!data.results.length || tickets.length>=data.count)break;
       }
-
-      // 2. Dual check: Also fetch active POS orders for this outlet
-      // Catches all orders placed from POS, Kiosk, Table QR, or Web
-      try {
-        const posRes = await apiClient.get<any>(
-          `/orders/pos/?kitchen=1&outlet_id=${encodeURIComponent(effectiveOutletId)}&status=PENDING,ACCEPTED,PREPARING,READY`
-        );
-        const posOrders: any[] = Array.isArray(posRes?.results)
-          ? posRes.results
-          : Array.isArray(posRes)
-          ? posRes
-          : [];
-
-        const existingIds = new Set(tickets.map((t) => String(t.id)));
-        const existingOrderNums = new Set(tickets.map((t) => t.order_number));
-
-        for (const po of posOrders) {
-          if (po.status === "COMPLETED" || po.status === "CANCELLED") continue;
-          const poId = String(po.id);
-          const poNum = po.order_number;
-          if (!existingIds.has(poId) && !existingOrderNums.has(poNum)) {
-            const kitchenItems = (po.items || []).filter(
-              (i: any) => i.requires_kitchen !== false
-            );
-            if (kitchenItems.length > 0 || (po.items || []).length === 0) {
-              tickets.push({
-                id: po.id,
-                order_number: po.order_number,
-                status: po.status,
-                outlet_id: po.outlet_id || effectiveOutletId,
-                version: po.version || 1,
-                fulfillment_type: po.fulfillment_type || "TAKEAWAY",
-                table_number: po.table_number,
-                round_number: po.round_number || 1,
-                created_at: po.created_at,
-                notes: po.notes,
-                customer_name: po.customer_name,
-                kiosk_token: po.kiosk_token,
-                items: (po.items || []).map((it: any) => ({
-                  id: it.id,
-                  product_name: it.product_name || it.name,
-                  variant_name: it.variant_name || "",
-                  quantity: it.quantity || 1,
-                  requires_kitchen: it.requires_kitchen !== false,
-                  kitchen_status: it.kitchen_status || "WAITING",
-                  round_number: it.round_number || 1,
-                  item_notes: it.item_notes,
-                  modifiers: it.modifiers,
-                })),
-              });
-            }
-          }
-        }
-      } catch (posErr) {
-        // POS endpoint silent fallback
-      }
-
-      setServerTickets(tickets);
-      setLastSyncTime(new Date());
-    } catch (err: any) {
-      console.warn("Error synchronizing kitchen tickets:", err);
-    } finally {
-      if (!isSilent) setIsSyncing(false);
-      setIsInitialLoading(false);
-    }
-  }, [effectiveOutletId]);
-
-  // Initial fetch on mount or when outlet changes
-  useEffect(() => {
-    void fetchKitchenTickets();
-  }, [fetchKitchenTickets, effectiveOutletId]);
-
-  /**
-   * 2. LIVE WEBSOCKET STREAM: Persistent real-time ticket stream
-   * ws://crunchybag.com/ws/outlets/{outlet_id}/kitchen/
-   * Consumer: KitchenConsumer
-   * Listens for ORDER_CREATED, ROUND_APPENDED, STATUS_CHANGED, ITEM_VOIDED
-   */
-  useEffect(() => {
-    let isDisposed = false;
-
-    const connectWs = () => {
-      if (isDisposed) return;
-
-      // Close previous connection if any
-      if (wsRef.current) {
-        try {
-          wsRef.current.close();
-        } catch {}
-      }
-
-      const wsUrl = getKitchenWebSocketUrl(effectiveOutletId);
-      try {
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          if (isDisposed) return;
-          setIsWsConnected(true);
-
-          // Heartbeat ping every 25 seconds
-          if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-          pingIntervalRef.current = setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              try {
-                ws.send(JSON.stringify({ type: "ping", action: "ping" }));
-              } catch {}
-            }
-          }, 25000);
-
-          // Silent sync on reconnection
-          void fetchKitchenTickets(true);
-        };
-
-        ws.onmessage = (event) => {
-          if (isDisposed) return;
-          try {
-            const data = JSON.parse(event.data);
-
-            // Handle kitchen_ticket_update broadcast events
-            if (
-              data.type === "kitchen_ticket_update" ||
-              data.event === "ORDER_CREATED" ||
-              data.event === "ROUND_APPENDED" ||
-              data.event === "STATUS_CHANGED" ||
-              data.event_type === "KITCHEN_TICKET_UPDATE"
-            ) {
-              // Refresh active tickets live from server
-              void fetchKitchenTickets(true);
-
-              // Play audio alert for newly incoming orders or additional food rounds
-              if (
-                data.event === "ORDER_CREATED" ||
-                data.event === "ROUND_APPENDED"
-              ) {
-                if (kdsSoundEnabled) playKitchenChime("advance");
-                addToast({
-                  title: data.event === "ROUND_APPENDED" ? "New Round Appended" : "New Order Fired",
-                  description: `Order #${data.order_number || data.order_id || ""} sent to kitchen.`,
-                  type: "info",
-                });
-              } else if (data.event === "STATUS_CHANGED" && data.status === "READY") {
-                if (kdsSoundEnabled) playKitchenChime("complete");
-              }
-            }
-          } catch (e) {
-            console.warn("KDS WS message parse error:", e);
-          }
-        };
-
-        ws.onclose = () => {
-          if (isDisposed) return;
-          setIsWsConnected(false);
-          if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-
-          // Auto-reconnect after 3 seconds with backoff
-          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = setTimeout(connectWs, 3500);
-        };
-
-        ws.onerror = (err) => {
-          if (isDisposed) return;
-          console.warn("KDS WebSocket connection notice:", err);
-          setIsWsConnected(false);
-        };
-      } catch (err) {
-        console.warn("Failed to create KDS WebSocket:", err);
-        setIsWsConnected(false);
-        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = setTimeout(connectWs, 5000);
-      }
-    };
-
-    connectWs();
-
-    // Background safety poll every 15 seconds to ensure zero missed tickets
-    const safetyPoll = setInterval(() => {
-      void fetchKitchenTickets(true);
-    }, 15000);
-
-    return () => {
-      isDisposed = true;
-      if (wsRef.current) {
-        try {
-          wsRef.current.close();
-        } catch {}
-      }
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-      clearInterval(safetyPoll);
-    };
-  }, [effectiveOutletId, fetchKitchenTickets, kdsSoundEnabled, addToast]);
+      if(generation!==fetchGeneration.current)return;
+      setServerTickets(tickets);setLastSyncTime(new Date());setAuthErrorNotice(null);
+    }catch(error:any){if(generation===fetchGeneration.current)setAuthErrorNotice(error.message || 'Unable to sync kitchen orders.');}
+    finally{if(generation===fetchGeneration.current){setIsSyncing(false);setIsInitialLoading(false);}}
+  },[effectiveOutletId]);
+  useEffect(()=>{setServerTickets([]);void fetchKitchenTickets();return()=>{fetchGeneration.current++;};},[fetchKitchenTickets]);
+  const kitchenLive=useOutletEvents(String(effectiveOutletId),true,()=>void fetchKitchenTickets(true),event=>{
+    if(['ORDER_CREATE','ORDER_APPEND'].includes(event.event_type) && kdsSoundEnabled)playKitchenChime('advance');
+  });
+  useEffect(()=>setIsWsConnected(kitchenLive),[kitchenLive]);
 
   // Map backend tickets to KDS Ticket display format
   const kdsTickets: (KdsTicket & { orderNotes?: string })[] = useMemo(() => {
@@ -416,15 +217,7 @@ export const KDSPortal: React.FC = () => {
         }
 
         // Token Slip number
-        let tokenStr = t.kiosk_token || "";
-        if (!tokenStr) {
-          if (t.order_number?.startsWith("POS-")) {
-            const numPart = t.order_number.replace(/^POS-\d+-0*/, "");
-            tokenStr = `TK-${numPart || t.id}`;
-          } else {
-            tokenStr = t.order_number;
-          }
-        }
+        const tokenStr = t.order_number;
 
         // Calculate elapsed seconds from created_at
         const elapsedSec = t.created_at
@@ -497,7 +290,7 @@ export const KDSPortal: React.FC = () => {
     const ticket = serverTickets.find((t) => String(t.id) === ticketId);
     const nextStatus =
       currentColumn === "QUEUED"
-        ? "PREPARING"
+        ? (ticket?.status === "PENDING" ? "ACCEPTED" : "PREPARING")
         : currentColumn === "PREPARING"
         ? "READY"
         : ticket?.fulfillment_type === "DELIVERY" ? "OUT_FOR_DELIVERY" : "COMPLETED";
@@ -565,11 +358,6 @@ export const KDSPortal: React.FC = () => {
         );
       }
 
-      // AppContext sync fallback
-      if (appBumpKdsTicket && nextStatus !== "OUT_FOR_DELIVERY") {
-        appBumpKdsTicket(ticketId);
-      }
-
       // Refresh to confirm with server
       void fetchKitchenTickets(true);
     } catch (err: any) {
@@ -600,7 +388,7 @@ export const KDSPortal: React.FC = () => {
     try {
       await apiClient.post(
         `/orders/pos/${ticket.id}/call/?outlet_id=${encodeURIComponent(targetOutletId)}`,
-        { version: 1, outlet_id: numericOutletId },
+        { version: serverTickets.find(row=>String(row.id)===String(ticket.id))?.version, outlet_id: numericOutletId },
         {
           headers: {
             "Idempotency-Key": `call-${ticket.id}-${Date.now()}`,
@@ -614,16 +402,8 @@ export const KDSPortal: React.FC = () => {
         type: "success",
       });
     } catch (err: any) {
-      // Fallback local notification
-      if (appTriggerKitchenCall) {
-        appTriggerKitchenCall({
-          orderNumber: ticket.orderNumber,
-          kioskToken: ticket.kioskToken,
-          customerName: ticket.customerName,
-          fulfillmentType: ticket.fulfillmentType,
-          tableNumber: ticket.tableNumber,
-        });
-      }
+      addToast({title:'Call could not be sent',description:err.message || 'Refresh the order status and retry.',type:'error'});
+      void fetchKitchenTickets(true);
     }
   };
 

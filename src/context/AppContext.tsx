@@ -1,3 +1,4 @@
+import { useOutletEvents } from "../lib/useOutletEvents";
 import { usePersistentCart } from './usePersistentCart';
 import { useCustomerAccount, customerRefresh } from "../lib/customerApi";
 import { useCatalog } from "./useCatalog";
@@ -820,125 +821,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => { if(customerAccount.error) addToast({title:'Customer request failed',description:customerAccount.error,type:'error'}); }, [customerAccount.error]);
 
-  // Live Active Orders Sync & Real-Time Outlet WebSocket Stream
+  const staffOrdersEnabled = ['admin','staff','kitchen'].includes(activePortal) && !!authStorage.getAccessToken();
+  const orderScopeRef = React.useRef('');
+  const orderLoadRef = React.useRef(0);
+  orderScopeRef.current = staffOrdersEnabled ? String(currentOutlet.id) : '';
   const fetchActiveOrders = useCallback(async () => {
-    if (!currentOutlet?.id) return;
+    if (!staffOrdersEnabled) return;
+    const scope = String(currentOutlet.id), sequence = ++orderLoadRef.current;
     try {
-      const res = await apiClient.get<any>(
-        `/orders/pos/?outlet_id=${encodeURIComponent(currentOutlet.id)}&status=PENDING,ACCEPTED,CONFIRMED,PREPARING,READY`
-      );
-      const posOrders: any[] = Array.isArray(res?.results)
-        ? res.results
-        : Array.isArray(res)
-        ? res
-        : [];
-      if (posOrders.length >= 0) {
-        setOrders((prev) => {
-          const remoteMapped: Order[] = posOrders.map((po) =>
-            posOrderToOrder(po, currentOutlet.name)
-          );
-          const remoteIds = new Set(remoteMapped.map((o) => String(o.id)));
-          const localOnly = prev.filter(
-            (o) =>
-              !remoteIds.has(String(o.id)) &&
-              String(o.id).startsWith("ord-") &&
-              o.status !== "COMPLETED" &&
-              o.status !== "CANCELLED"
-          );
-          return [...localOnly, ...remoteMapped];
-        });
+      const remote: any[] = [];
+      for (let page=1;;page++) {
+        const res = await apiClient.get<any>(`/orders/pos/?outlet_id=${encodeURIComponent(scope)}&open_tabs=true&page_size=100&page=${page}`);
+        remote.push(...res.results);
+        if (!res.results.length || remote.length >= res.count) break;
       }
-    } catch {
-      // Endpoint fallback
-    }
-  }, [currentOutlet.id, currentOutlet.name]);
-
-  useEffect(() => {
-    let disposed = false;
-    let ws: WebSocket | null = null;
-    let pingInterval: any = null;
-    let reconnectTimer: any = null;
-
-    void fetchActiveOrders();
-
-    const connectWs = () => {
-      if (disposed) return;
-      if (ws) {
-        try {
-          ws.close();
-        } catch {}
-      }
-
-      const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-      const protocol = isHttps ? "wss:" : "ws:";
-      const isLocal =
-        typeof window !== "undefined" &&
-        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-      const wsUrl = isLocal
-        ? `wss://crunchybag.com/ws/outlets/${encodeURIComponent(currentOutlet.id)}/kitchen/`
-        : `${protocol}//${window.location.host}/ws/outlets/${encodeURIComponent(currentOutlet.id)}/kitchen/`;
-
-      try {
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-          if (disposed) return;
-          clearInterval(pingInterval);
-          pingInterval = setInterval(() => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              try {
-                ws.send(JSON.stringify({ type: "ping" }));
-              } catch {}
-            }
-          }, 25000);
-          void fetchActiveOrders();
-        };
-
-        ws.onmessage = (event) => {
-          if (disposed) return;
-          try {
-            const data = JSON.parse(event.data);
-            if (
-              data.type === "kitchen_ticket_update" ||
-              data.event === "ORDER_CREATED" ||
-              data.event === "ROUND_APPENDED" ||
-              data.event === "STATUS_CHANGED" ||
-              data.event_type === "KITCHEN_TICKET_UPDATE"
-            ) {
-              void fetchActiveOrders();
-            }
-          } catch {}
-        };
-
-        ws.onclose = () => {
-          if (disposed) return;
-          clearInterval(pingInterval);
-          clearTimeout(reconnectTimer);
-          reconnectTimer = setTimeout(connectWs, 4000);
-        };
-
-        ws.onerror = () => {
-          if (disposed) return;
-          try {
-            ws?.close();
-          } catch {}
-        };
-      } catch {}
-    };
-
-    connectWs();
-
-    return () => {
-      disposed = true;
-      clearInterval(pingInterval);
-      clearTimeout(reconnectTimer);
-      if (ws) {
-        try {
-          ws.close();
-        } catch {}
-      }
-    };
-  }, [currentOutlet.id, fetchActiveOrders]);
+      if (orderScopeRef.current === scope && sequence === orderLoadRef.current) setOrders(remote.map(po=>posOrderToOrder(po,currentOutlet.name)));
+    } catch (error) { console.warn('Unable to sync live staff orders', error); }
+  }, [staffOrdersEnabled,currentOutlet.id,currentOutlet.name]);
+  useEffect(()=>{setOrders([]);void fetchActiveOrders();},[fetchActiveOrders]);
+  useOutletEvents(String(currentOutlet.id),staffOrdersEnabled,()=>void fetchActiveOrders());
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));

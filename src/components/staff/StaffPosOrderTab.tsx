@@ -1,3 +1,4 @@
+import { DeliveryOrderDetails, deliveryInfo } from "../customer/DeliveryOrderDetails";
 import React, { useState, useMemo, useEffect } from "react";
 import {
   Plus,
@@ -1606,6 +1607,11 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                         <p className="font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-[140px]">
                           {order.customerName}
                         </p>
+                        {order.fulfillmentType === "DELIVERY" && deliveryInfo(order).address && (
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[180px]" title={deliveryInfo(order).address}>
+                            {deliveryInfo(order).address.split('\n')[0]}
+                          </p>
+                        )}
                         <div className="flex items-center gap-1 mt-0.5">
                           <span
                             className={`text-[9px] font-black uppercase px-1 py-0.2 border ${
@@ -1987,6 +1993,10 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                 Type: {selectedOrderForDrawer.fulfillmentType} • Table: {selectedOrderForDrawer.tableNumber || "N/A"}
               </p>
             </div>
+
+            {selectedOrderForDrawer.fulfillmentType === "DELIVERY" && (
+              <DeliveryOrderDetails key={selectedOrderForDrawer.id} order={selectedOrderForDrawer} compact />
+            )}
 
             {/* Items list with Kitchen vs Direct Counter distinction */}
             <div className="space-y-2">

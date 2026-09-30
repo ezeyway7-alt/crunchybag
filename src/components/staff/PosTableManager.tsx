@@ -1,3 +1,4 @@
+import {apiClient} from "../../lib/api";
 import React, { useState } from "react";
 import { Modal } from "../common/Modal";
 import { PosSession, usePosCommand } from "../../lib/posApi";
@@ -14,6 +15,15 @@ export function PosTableManager({ session, onClose }: { session: PosSession; onC
   const [capacity, setCapacity] = useState(4);
   const [section, setSection] = useState(String(groups[0]?.id || ''));
   const [active, setActive] = useState(true);
+  const [qr,setQr]=useState<{image:string;url:string;table_number:string}|null>(null);
+  const [qrError,setQrError]=useState('');
+  const [qrBusy,setQrBusy]=useState(false);
+  const showQr=async(id:string)=>{
+    setQr(null);setQrError('');setQrBusy(true);
+    try{setQr(await apiClient.get<any>(`/tables/${id}/qr/?outlet_id=${session.outlet}`));}
+    catch(error:any){setQrError(error.message || 'Unable to generate table QR.');}
+    finally{setQrBusy(false);}
+  };
   const disabled = !session.meta?.permissions.orders || command.busy || command.hasPending;
   const input = "w-full h-9 px-2 bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-xs focus:outline-none focus:border-amber-500";
   const button = "px-3 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs disabled:opacity-50";
@@ -36,11 +46,11 @@ export function PosTableManager({ session, onClose }: { session: PosSession; onC
       <form className="space-y-2 border-t border-zinc-200 dark:border-zinc-800 pt-4" onSubmit={async e => {
         e.preventDefault(); if (disabled) return;
         const result = await command.run(tableId ? `tables/${tableId}/` : 'tables/', { table_number: label.trim(), capacity, group_id: Number(section), is_active: active });
-        if (result) { setTableId(''); setLabel(''); setCapacity(4); setActive(true); }
+        if (result) { setTableId(String(result.id)); if(active)void showQr(String(result.id)); }
       }}>
         <h3 className="font-bold">Table</h3>
         <select aria-label="Edit table" className={input} value={tableId} onChange={e => {
-          setTableId(e.target.value); const table = tables.find(t => String(t.id) === e.target.value);
+          setQr(null);setQrError('');setTableId(e.target.value); const table = tables.find(t => String(t.id) === e.target.value);
           setLabel(table?.table_number || ''); setCapacity(table?.capacity || 4);
           setSection(String(groups.find(g => g.name === table?.section)?.id || groups[0]?.id || ''));
           setActive(!table || !('is_active' in table) || table.is_active);
@@ -53,6 +63,16 @@ export function PosTableManager({ session, onClose }: { session: PosSession; onC
         <label className="flex items-center gap-2"><input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} /> Active table</label>
         <button className={button} disabled={disabled || !section}>{tableId ? 'Save table' : 'Add table'}</button>
       </form>
+      {tableId && active && <button type="button" className={button} disabled={disabled || qrBusy} onClick={()=>void showQr(tableId)}>{qrBusy?'Generating QR?':'Generate table QR'}</button>}
+      {qrError && <p role="alert" className="text-rose-500">{qrError}</p>}
+      {qr && <section aria-label="Table QR code" className="border border-zinc-700 p-3 space-y-2 text-center">
+        <h3 className="font-bold">{qr.table_number} ? Scan to order</h3>
+        <img src={qr.image} alt={`Order at ${qr.table_number}`} className="w-48 h-48 mx-auto bg-white" />
+        <div className="flex flex-wrap justify-center gap-3">
+          <a href={qr.image} download={`table-${tableId}-qr.svg`} className="text-amber-500 underline">Download printable QR</a>
+          <a href={qr.url} target="_blank" rel="noopener noreferrer" className="text-amber-500 underline">Open table menu</a>
+        </div>
+      </section>}
     </div>
   </Modal>;
 }

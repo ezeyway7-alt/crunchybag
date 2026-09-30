@@ -19,7 +19,7 @@ export function useCatalog(outletId: string, portal: string, tableMode: boolean,
   const isAdminRoute = typeof window !== 'undefined' && (/^\/(admin|superadmin|brand|outlet|dashboard)/i.test(window.location.pathname) || window.location.pathname.startsWith('/admin'));
   const isManagementPortal = portal === 'admin' || isAdminRoute;
   const management = isManagementPortal && !!authStorage.getAccessToken();
-  const channel = portal === 'kiosk' ? 'kiosk' : portal === 'staff' || portal === 'admin' || isManagementPortal ? 'pos' : tableMode ? 'qr' : 'web';
+  const channel = portal === 'kiosk' ? 'kiosk' : portal === 'staff' || portal === 'admin' || isManagementPortal ? 'pos' : (tableMode || portal === 'table-qr') ? 'qr' : 'web';
 
   // Normalize outlet ID: extracts numeric ID or defaults to "1"
   const effectiveOutletId = normalizeOutletId(outletId);

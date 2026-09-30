@@ -1,3 +1,5 @@
+import { apiClient } from "../../lib/api";
+import { useOutletEvents } from "../../lib/useOutletEvents";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Volume2,
@@ -40,14 +42,36 @@ interface TvOrderDisplayPortalProps {
 
 export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onClose }) => {
   const {
-    orders,
     products,
     currentOutlet,
     updateOrderStatus,
     setActivePortal,
     isLoadingSkeleton,
-    lastKitchenCall,
   } = useApp();
+
+  const [orders,setOrders] = useState<Order[]>([]);
+  const [lastKitchenCall,setLastKitchenCall] = useState<CallingAnnouncement|null>(null);
+  const [syncError,setSyncError] = useState('');
+  const loadSequence = useRef(0);
+  const loadDisplay = async () => {
+    const seq=++loadSequence.current;
+    try {
+      const data=await apiClient.get<any>(`/orders/display/${currentOutlet.id}/`,{skipAuth:true});
+      if(seq!==loadSequence.current)return;
+      setOrders((data.tickets || []).map((row:any)=>({
+        id:String(row.id),orderNumber:row.order_number,kioskToken:row.order_number,
+        status:row.status==='ACCEPTED'?'CONFIRMED':row.status==='PREPARING'?'PROCESSING':row.status,
+        fulfillmentType:row.fulfillment_type,tableNumber:row.table_number,createdAt:row.created_at,
+        customerName:'',outletId:String(currentOutlet.id),items:[],
+      } as Order)));
+      setSyncError('');
+    }catch{setSyncError('Unable to sync orders');}
+  };
+  useEffect(()=>{setOrders([]);void loadDisplay();return()=>{loadSequence.current++;};},[currentOutlet.id]);
+  const displayLive=useOutletEvents(String(currentOutlet.id),true,()=>void loadDisplay(),event=>{
+    if(event.event_type==='ORDER_CALL')setLastKitchenCall({id:String(event.aggregate_id),orderNumber:event.order_number,
+      token:event.order_number,customerName:'',fulfillmentType:event.fulfillment_type,tableNumber:event.table_number,timestamp:Date.now()});
+  });
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -61,6 +85,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   // Active Calling Announcement Spotlight (The animated focus small rectangle UI)
   const [activeCall, setActiveCall] = useState<CallingAnnouncement | null>(null);
   const [callProgress, setCallProgress] = useState(100);
+  const [callQueue,setCallQueue] = useState<CallingAnnouncement[]>([]);
 
   // Sliding Menu Carousel index
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
@@ -179,8 +204,6 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
   // Trigger calling an order (Chime + Speech + Small Focus Rectangle UI)
   const triggerOrderCall = (order: Order) => {
-    playAirportChime();
-
     const announcement: CallingAnnouncement = {
       id: order.id,
       orderNumber: order.orderNumber,
@@ -191,11 +214,14 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
       timestamp: Date.now(),
     };
 
-    setActiveCall(announcement);
-    setCallProgress(100);
-
-    speakAnnouncement(announcement);
+    setCallQueue(queue=>[...queue,announcement]);
   };
+
+  useEffect(()=>{
+    if(activeCall || !callQueue.length)return;
+    const [next,...rest]=callQueue;setCallQueue(rest);setActiveCall(next);setCallProgress(100);
+    playAirportChime();speakAnnouncement(next);
+  },[activeCall,callQueue]);
 
   // Auto-dismiss the calling spotlight rectangle over 8 seconds with smooth progress bar
   useEffect(() => {
@@ -255,10 +281,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
         tableNumber: lastKitchenCall.tableNumber,
         timestamp: lastKitchenCall.timestamp,
       };
-      setActiveCall(manualAnnouncement);
-      setCallProgress(100);
-      playAirportChime();
-      speakAnnouncement(manualAnnouncement);
+      setCallQueue(queue=>[...queue,manualAnnouncement]);
     }
   }, [lastKitchenCall]);
 
@@ -325,92 +348,6 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
-  // Test simulation: add random order to test multi-order display
-  const handleAddSampleOrder = () => {
-    const randomToken = `TK-${Math.floor(1000 + Math.random() * 9000)}`;
-    const randomNum = `CR-${Math.floor(8000 + Math.random() * 1000)}`;
-    const isTable = Math.random() > 0.4;
-    const tableNum = isTable ? `Table 0${Math.floor(1 + Math.random() * 8)}` : undefined;
-
-    const dummyOrder: Order = {
-      id: `ord-sim-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      orderNumber: randomNum,
-      outletId: currentOutlet.id,
-      outletName: currentOutlet.name,
-      customerName: isTable ? "Table Guest" : "Takeaway Guest",
-      customerPhone: "+977 9800-000000",
-      fulfillmentType: isTable ? "DINE_IN" : "TAKEAWAY",
-      tableNumber: tableNum,
-      kioskToken: randomToken,
-      status: "PROCESSING",
-      items: [
-        {
-          id: `item-${Date.now()}-1`,
-          productName: "The Golden Crunchy Beast",
-          variantName: "Single Patty",
-          modifiersSummary: ["Garlic Aioli"],
-          unitPrice: 580,
-          quantity: 1,
-          lineTotal: 580,
-        },
-      ],
-      subtotal: 580,
-      vatIncludedAmount: 66.7,
-      totalAmount: 580,
-      createdAt: new Date().toISOString(),
-      estimatedPickupTime: "In 8 mins",
-      elapsedSeconds: 0,
-      paymentMethod: "CASH_ON_PICKUP",
-    };
-
-    updateOrderStatus(dummyOrder.id, "PROCESSING");
-  };
-
-  // Test simulation: bump next preparing order to ready
-  const handleBumpNextReady = () => {
-    if (preparingOrders.length > 0) {
-      const nextOrder = preparingOrders[0];
-      updateOrderStatus(nextOrder.id, "READY");
-      triggerOrderCall({ ...nextOrder, status: "READY" });
-    } else {
-      // Create and make ready
-      const randomToken = `TK-${Math.floor(1000 + Math.random() * 9000)}`;
-      const dummyReadyOrder: Order = {
-        id: `ord-ready-${Date.now()}`,
-        orderNumber: `CR-${Math.floor(8000 + Math.random() * 1000)}`,
-        outletId: currentOutlet.id,
-        outletName: currentOutlet.name,
-        customerName: "Dine-In Guest",
-        customerPhone: "+977 9800-000000",
-        fulfillmentType: "DINE_IN",
-        tableNumber: `Table 0${Math.floor(1 + Math.random() * 8)}`,
-        kioskToken: randomToken,
-        status: "READY",
-        items: [
-          {
-            id: `item-${Date.now()}`,
-            productName: "Crunchy Feast Box",
-            variantName: "Standard",
-            modifiersSummary: [],
-            unitPrice: 650,
-            quantity: 1,
-            lineTotal: 650,
-          },
-        ],
-        subtotal: 650,
-        vatIncludedAmount: 74,
-        totalAmount: 650,
-        createdAt: new Date().toISOString(),
-        estimatedPickupTime: "Ready Now",
-        elapsedSeconds: 0,
-        paymentMethod: "CASH_ON_PICKUP",
-      };
-      updateOrderStatus(dummyReadyOrder.id, "READY");
-      triggerOrderCall(dummyReadyOrder);
-    }
-  };
-
-  const hasLiveOrders = preparingOrders.length > 0 || readyOrders.length > 0;
   const currentSlideProduct = showcaseProducts[activeSlideIndex] || showcaseProducts[0];
 
   return (
@@ -457,26 +394,6 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
           >
             <Volume2 className="w-3.5 h-3.5 text-amber-400" />
             <span className="hidden sm:inline text-[11px]">SPEAKER TEST</span>
-          </button>
-
-          {/* Quick Demo Simulators */}
-          <button
-            id="tv-sim-add-btn"
-            onClick={handleAddSampleOrder}
-            className="hidden lg:flex items-center gap-1 px-2 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-[11px] font-bold transition-colors cursor-pointer"
-            title="Simulate incoming order"
-          >
-            <Plus className="w-3 h-3 text-amber-500" />
-            <span>+ Order</span>
-          </button>
-          <button
-            id="tv-sim-ready-btn"
-            onClick={handleBumpNextReady}
-            className="hidden lg:flex items-center gap-1 px-2 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-emerald-400 border border-zinc-800 text-[11px] font-bold transition-colors cursor-pointer"
-            title="Simulate bumping next order to Ready"
-          >
-            <Bell className="w-3 h-3 text-emerald-400" />
-            <span>Ready Next</span>
           </button>
 
           {/* Audio toggle */}
@@ -979,7 +896,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
         </div>
 
         <div className="flex items-center gap-2 font-mono text-[10px] text-zinc-500">
-          <span>AUTO-PAGE ACTIVE</span>
+          <span role="status">{syncError || (displayLive ? "LIVE" : "RECONNECTING")}</span>
           <span className="text-zinc-700">•</span>
           <span>1080P/4K WIDESCREEN READY</span>
         </div>

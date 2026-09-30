@@ -201,9 +201,7 @@ export function posOrderToOrder(
   return {
     id: `pos-${posOrder.id}`,
     orderNumber: posOrder.order_number,
-    kioskToken:
-      posOrder.receipts?.find((r) => r.kind === "TOKEN")?.number ||
-      posOrder.order_number,
+    kioskToken: posOrder.order_number,
     outletId: String(posOrder.outlet_id),
     outletName: outletName || "Crunchy Bag",
     customerName: posOrder.customer_name || "Walk-in Guest",
