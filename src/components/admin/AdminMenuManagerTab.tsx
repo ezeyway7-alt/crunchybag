@@ -620,6 +620,21 @@ export const AdminMenuManagerTab: React.FC = () => {
     );
   };
 
+  const handleUpdateSectionLimits = (secId: string, field: 'maxSelections' | 'minSelections', val: number) => {
+    setFormModifierSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== secId) return s;
+        const updated = { ...s, [field]: val };
+        // Keep minSelections <= maxSelections
+        if (field === 'maxSelections' && updated.minSelections > val) updated.minSelections = val;
+        if (field === 'minSelections' && val > updated.maxSelections) updated.maxSelections = val;
+        // required is true iff minSelections >= 1
+        updated.required = updated.minSelections >= 1;
+        return updated;
+      })
+    );
+  };
+
   const handleAddOptionToSection = (secId: string) => {
     const newOpt: ModifierOption = {
       id: `opt-${Date.now()}`,
@@ -1557,50 +1572,93 @@ export const AdminMenuManagerTab: React.FC = () => {
                   key={sec.id}
                   className="p-2.5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                    <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                      <span className="text-[10px] font-black text-zinc-400 uppercase">
-                        Section #{secIdx + 1}:
-                      </span>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Section name"
-                        value={sec.name}
-                        onChange={(e) => handleUpdateSectionName(sec.id, e.target.value)}
-                        className="flex-1 max-w-xs px-2 py-1 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white"
-                      />
+                  <div className="space-y-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                    {/* Row 1: Name + Delete */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+                        <span className="text-[10px] font-black text-zinc-400 uppercase shrink-0">
+                          #{secIdx + 1}:
+                        </span>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Section name (e.g. Toppings, Bun Type)"
+                          value={sec.name}
+                          onChange={(e) => handleUpdateSectionName(sec.id, e.target.value)}
+                          className="flex-1 px-2 py-1 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-900 dark:text-white"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleAddOptionToSection(sec.id)}
+                          className="px-2 py-0.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-[10px] font-bold text-zinc-800 dark:text-zinc-200"
+                        >
+                          + Add Choice
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveModifierSection(sec.id)}
+                          className="text-zinc-400 hover:text-rose-500 p-1"
+                          title="Delete Section"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <label className="inline-flex items-center gap-1 cursor-pointer text-[11px]">
+                    {/* Row 2: Multi-select controls */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      {/* Allow Multiple toggle */}
+                      <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] select-none">
                         <input
                           type="checkbox"
-                          checked={sec.required}
-                          onChange={() => handleToggleSectionRequired(sec.id)}
+                          checked={sec.maxSelections > 1}
+                          onChange={(e) => handleUpdateSectionLimits(sec.id, 'maxSelections', e.target.checked ? Math.max(2, sec.options.length || 2) : 1)}
                           className="accent-amber-500"
                         />
                         <span className="font-bold text-zinc-700 dark:text-zinc-300">
-                          {sec.required ? "Required Section" : "Optional"}
+                          Allow Multiple Selections
                         </span>
                       </label>
 
-                      <button
-                        type="button"
-                        onClick={() => handleAddOptionToSection(sec.id)}
-                        className="px-2 py-0.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-[10px] font-bold text-zinc-800 dark:text-zinc-200"
-                      >
-                        + Add Choice
-                      </button>
+                      {/* Max Selections (shown only when multi) */}
+                      {sec.maxSelections > 1 && (
+                        <label className="flex items-center gap-1 text-[11px]">
+                          <span className="text-zinc-500 dark:text-zinc-400">Max picks:</span>
+                          <input
+                            type="number"
+                            min={2}
+                            max={sec.options.length || 99}
+                            value={sec.maxSelections}
+                            onChange={(e) => handleUpdateSectionLimits(sec.id, 'maxSelections', Math.max(2, parseInt(e.target.value) || 2))}
+                            className="w-12 px-1 py-0.5 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-white text-center"
+                          />
+                        </label>
+                      )}
 
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveModifierSection(sec.id)}
-                        className="text-zinc-400 hover:text-rose-500 p-1"
-                        title="Delete Section"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Min Selections */}
+                      <label className="flex items-center gap-1 text-[11px]">
+                        <span className="text-zinc-500 dark:text-zinc-400">Min picks:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={sec.maxSelections}
+                          value={sec.minSelections}
+                          onChange={(e) => handleUpdateSectionLimits(sec.id, 'minSelections', Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-12 px-1 py-0.5 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-mono text-zinc-900 dark:text-white text-center"
+                        />
+                      </label>
+
+                      {/* Required / Optional badge */}
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 border ${sec.required ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-300 dark:border-zinc-700'}`}>
+                        {sec.required ? 'Required' : 'Optional'}
+                      </span>
+
+                      {/* Summary hint */}
+                      <span className="text-[10px] text-zinc-400 font-mono">
+                        {sec.maxSelections === 1 ? 'Single choice (radio)' : `Multi-select (${sec.minSelections}–${sec.maxSelections})`}
+                      </span>
                     </div>
                   </div>
 

@@ -157,7 +157,7 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
       onClose={onClose}
       maxWidth="sm"
       showCloseButton={false}
-      className="w-full max-w-[380px] sm:max-w-[400px] h-[85vh] sm:h-auto sm:max-h-[640px] min-h-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none"
+      className="w-full max-w-[460px] sm:max-w-[520px] h-[85vh] sm:h-auto sm:max-h-[640px] min-h-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none"
       contentClassName="p-0 h-full flex flex-col min-h-0"
     >
       <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#121214] text-zinc-900 dark:text-zinc-100 overflow-hidden w-full">
@@ -292,8 +292,11 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
             {/* Modifier Groups (Sauces, Add-ons, etc.) */}
             {product.modifierGroups.map((group) => {
               const selectionsInGroup = selectedModifiers.filter((m) => m.groupId === group.id);
+              const count = selectionsInGroup.length;
+              const isMulti = group.maxSelections > 1;
               const isSatisfied =
-                !group.required || selectionsInGroup.length >= group.minSelections;
+                !group.required || count >= group.minSelections;
+              const atMax = count >= group.maxSelections;
 
               return (
                 <div
@@ -306,22 +309,31 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
                         {group.name}
                       </h3>
                       <p className="text-[10px] text-zinc-400">
-                        {group.maxSelections === 1
-                          ? "Pick 1 option"
-                          : `Pick up to ${group.maxSelections} options`}
+                        {isMulti
+                          ? group.minSelections > 0
+                            ? `Pick ${group.minSelections}–${group.maxSelections} options`
+                            : `Pick up to ${group.maxSelections} options`
+                          : "Pick 1 option"}
                       </p>
                     </div>
-                    <span
-                      className={`text-[9px] font-mono font-bold px-1.5 py-0.2 border ${
-                        isSatisfied
-                          ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-                          : group.required
-                          ? "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20"
-                          : "text-zinc-500 bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
-                      }`}
-                    >
-                      {group.required ? (isSatisfied ? "Selected" : "Required") : "Optional"}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      {isMulti && (
+                        <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 border ${atMax ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20' : 'text-zinc-500 bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}>
+                          {count}/{group.maxSelections}
+                        </span>
+                      )}
+                      <span
+                        className={`text-[9px] font-mono font-bold px-1.5 py-0.2 border ${
+                          isSatisfied
+                            ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                            : group.required
+                            ? "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20"
+                            : "text-zinc-500 bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                        }`}
+                      >
+                        {group.required ? (isSatisfied ? "✓" : "Required") : "Optional"}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-1.5">
@@ -329,21 +341,28 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
                       const isChecked = selectionsInGroup.some(
                         (m) => m.optionId === option.id
                       );
+                      const isDisabled = !isChecked && atMax;
 
                       return (
                         <button
                           key={option.id}
                           type="button"
                           onClick={() => handleToggleModifier(group, option)}
-                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-none border text-left transition-all cursor-pointer min-h-[30px] sm:min-h-[34px] ${
-                            isChecked
-                              ? "bg-amber-500/15 border-amber-500 text-zinc-950 dark:text-white font-bold ring-1 ring-amber-500"
-                              : "bg-zinc-50/70 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700"
+                          disabled={isDisabled}
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-none border text-left transition-all min-h-[30px] sm:min-h-[34px] ${
+                            isDisabled
+                              ? "opacity-40 cursor-not-allowed bg-zinc-50/40 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-800"
+                              : isChecked
+                              ? "bg-amber-500/15 border-amber-500 text-zinc-950 dark:text-white font-bold ring-1 ring-amber-500 cursor-pointer"
+                              : "bg-zinc-50/70 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700 cursor-pointer"
                           }`}
                         >
                           <div className="flex items-center gap-1.5 truncate">
+                            {/* Circle for radio (single), Square for checkbox (multi) */}
                             <div
-                              className={`w-3 h-3 rounded-none border flex items-center justify-center shrink-0 ${
+                              className={`w-3 h-3 border flex items-center justify-center shrink-0 ${
+                                isMulti ? "rounded-none" : "rounded-full"
+                              } ${
                                 isChecked
                                   ? "border-amber-500 bg-amber-500 text-black"
                                   : "border-zinc-400 dark:border-zinc-600"
