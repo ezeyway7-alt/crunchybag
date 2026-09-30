@@ -1227,11 +1227,12 @@ export const KioskPortal: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* CENTER PRODUCT TOUCH GRID */}
         <main className="flex-1 overflow-y-auto p-2 sm:p-2.5 bg-[#0B0B0E]">
-          {/* Category Title (Hidden on 'All' to save space) + Fast Compact Search */}
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="flex items-center gap-1.5">
+          {/* Header Row: Category Badge (Left) + Centered Wide Search Bar */}
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            {/* Left: Category info & item count */}
+            <div className="flex items-center gap-1.5 shrink-0 min-w-0">
               {selectedCategory !== "all" && (
-                <h2 className="text-xs sm:text-sm font-black uppercase tracking-tight text-white flex items-center gap-1.5">
+                <h2 className="text-xs sm:text-sm font-black uppercase tracking-tight text-white flex items-center gap-1.5 whitespace-nowrap">
                   {selectedCategory === "packages" ? (
                     <>
                       <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -1242,7 +1243,7 @@ export const KioskPortal: React.FC = () => {
                   )}
                 </h2>
               )}
-              <span className="text-[11px] font-mono text-zinc-400 font-medium">
+              <span className="text-[11px] font-mono text-zinc-400 font-medium whitespace-nowrap">
                 ({selectedCategory === "packages"
                   ? filteredCombos.length
                   : selectedCategory === "all"
@@ -1251,25 +1252,32 @@ export const KioskPortal: React.FC = () => {
               </span>
             </div>
 
-            {/* Quick Touch Search (Ultra Compact) */}
-            <div className="relative w-36 sm:w-48">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search menu..."
-                className="w-full bg-zinc-900/90 border border-zinc-700/80 px-2 py-1 text-[11px] text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 font-medium"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
+            {/* Center: Wide Search Bar (Eliminates awkward right empty space) */}
+            <div className="flex-1 flex justify-center px-1 sm:px-3">
+              <div className="relative w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl">
+                <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search dishes, packages, combos..."
+                  className="w-full bg-zinc-900/95 border border-zinc-700/80 hover:border-zinc-500 focus:border-amber-500 pl-8 pr-7 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-amber-500/30 transition-all font-medium shadow-inner"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-0.5 cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Right: Balance spacer so the search bar stays centered */}
+            <div className="shrink-0 min-w-0 hidden md:block w-16" />
           </div>
 
           {isLoadingSkeleton || isCategoryLoading ? (
