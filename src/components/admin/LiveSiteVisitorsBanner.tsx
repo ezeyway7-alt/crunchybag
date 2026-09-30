@@ -71,17 +71,17 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
       {/* -------------------------------------------------------------
           TOP LIVE STOREFRONT RADAR & REAL-TIME PRESENCE CARD
       ------------------------------------------------------------- */}
-      <div className="relative overflow-hidden rounded-md border border-zinc-800 bg-gradient-to-r from-[#121214] via-[#151518] to-[#121214] p-3.5 sm:p-4 shadow-lg">
+      <div className="relative overflow-hidden rounded-none border border-zinc-800 bg-gradient-to-r from-[#121214] via-[#151518] to-[#121214] p-3.5 sm:p-4 shadow-lg">
         {/* Subtle background glow */}
-        <div className="absolute top-0 right-1/4 -mt-12 w-64 h-24 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 -mb-10 w-48 h-20 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute top-0 right-1/4 -mt-12 w-64 h-24 bg-emerald-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 -mb-10 w-48 h-20 bg-amber-500/10 blur-2xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           {/* Left: Big Live Counter with Pulse Radar */}
           <div className="flex items-center gap-4 sm:gap-6 flex-wrap sm:flex-nowrap">
             {/* Live Indicator Icon */}
             <div className="flex items-center gap-3">
-              <div className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shrink-0">
+              <div className="relative flex items-center justify-center w-12 h-12 rounded-none bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shrink-0">
                 <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 ring-2 ring-[#121214]" />
@@ -94,11 +94,11 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
                   <span className="text-2xl sm:text-3xl font-black font-mono text-zinc-100 tracking-tight">
                     {totalVisitors}
                   </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-none bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Live on Site
                   </span>
-                  <span className="hidden sm:inline-block text-[11px] font-medium text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                  <span className="hidden sm:inline-block text-[11px] font-medium text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-none">
                     ⚡ {peakStatus}
                   </span>
                 </div>
@@ -113,7 +113,7 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
             </div>
 
             {/* Sparkline Visual */}
-            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded bg-zinc-900/60 border border-zinc-800/80">
+            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-none bg-zinc-900/60 border border-zinc-800/80">
               <div className="w-24 h-8">
                 <svg className="w-full h-full overflow-visible" viewBox="0 0 100 32">
                   <polyline
@@ -136,21 +136,21 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
           {/* Center/Right: Device Breakdown & Channel Pills */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {/* Mobile Visitors */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-zinc-900/80 border border-zinc-800 text-xs">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-none bg-zinc-900/80 border border-zinc-800 text-xs">
               <Smartphone className="w-3.5 h-3.5 text-sky-400" />
               <span className="text-zinc-400">Mobile:</span>
               <span className="font-mono font-bold text-zinc-100">{mobileCount}</span>
             </div>
 
             {/* Table QR Guests */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-zinc-900/80 border border-zinc-800 text-xs">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-none bg-zinc-900/80 border border-zinc-800 text-xs">
               <QrCode className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-zinc-400">Table QR:</span>
               <span className="font-mono font-bold text-zinc-100">{tableQrCount}</span>
             </div>
 
             {/* Desktop / Web Storefront */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-zinc-900/80 border border-zinc-800 text-xs">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-none bg-zinc-900/80 border border-zinc-800 text-xs">
               <Monitor className="w-3.5 h-3.5 text-violet-400" />
               <span className="text-zinc-400">Desktop:</span>
               <span className="font-mono font-bold text-zinc-100">{desktopCount}</span>
@@ -158,7 +158,7 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
 
             {/* WSS Status Pill */}
             <div
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-mono transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-none border text-xs font-mono transition-colors ${
                 wssLive
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                   : "bg-rose-500/10 border-rose-500/30 text-rose-400"
@@ -183,7 +183,7 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
             <button
               type="button"
               onClick={toggleSound}
-              className={`p-1.5 rounded border text-xs flex items-center gap-1 cursor-pointer transition-colors ${
+              className={`p-1.5 rounded-none border text-xs flex items-center gap-1 cursor-pointer transition-colors ${
                 soundEnabled
                   ? "bg-amber-500/10 border-amber-500/40 text-amber-400 hover:bg-amber-500/20"
                   : "bg-zinc-800/80 border-zinc-700 text-zinc-400 hover:text-zinc-200"
@@ -211,7 +211,7 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
       ------------------------------------------------------------- */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
         {/* Net Sales */}
-        <div className="bg-[#121214] border border-zinc-800/80 rounded p-2.5 flex items-center justify-between">
+        <div className="bg-[#121214] border border-zinc-800/80 rounded-none p-2.5 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
               Today's Net Sales
@@ -220,13 +220,13 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
               {formatNPR(totalRevenue)}
             </span>
           </div>
-          <div className="w-8 h-8 rounded bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-none bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
             <TrendingUp className="w-4 h-4" />
           </div>
         </div>
 
         {/* Total Orders */}
-        <div className="bg-[#121214] border border-zinc-800/80 rounded p-2.5 flex items-center justify-between">
+        <div className="bg-[#121214] border border-zinc-800/80 rounded-none p-2.5 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
               Orders Today
@@ -235,13 +235,13 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
               {totalOrders}
             </span>
           </div>
-          <div className="w-8 h-8 rounded bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-none bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
             <Receipt className="w-4 h-4" />
           </div>
         </div>
 
         {/* Active Kitchen Queue */}
-        <div className="bg-[#121214] border border-zinc-800/80 rounded p-2.5 flex items-center justify-between">
+        <div className="bg-[#121214] border border-zinc-800/80 rounded-none p-2.5 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
               In Kitchen Queue
@@ -250,13 +250,13 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
               {activeKitchenOrders}
             </span>
           </div>
-          <div className="w-8 h-8 rounded bg-rose-500/10 text-rose-400 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-none bg-rose-500/10 text-rose-400 flex items-center justify-center shrink-0">
             <Flame className="w-4 h-4" />
           </div>
         </div>
 
         {/* Ready for Pickup */}
-        <div className="bg-[#121214] border border-zinc-800/80 rounded p-2.5 flex items-center justify-between">
+        <div className="bg-[#121214] border border-zinc-800/80 rounded-none p-2.5 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
               Ready / Pickup
@@ -265,13 +265,13 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
               {readyOrders}
             </span>
           </div>
-          <div className="w-8 h-8 rounded bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-none bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
             <Package className="w-4 h-4" />
           </div>
         </div>
 
         {/* Low Stock or Status */}
-        <div className="col-span-2 sm:col-span-1 bg-[#121214] border border-zinc-800/80 rounded p-2.5 flex items-center justify-between">
+        <div className="col-span-2 sm:col-span-1 bg-[#121214] border border-zinc-800/80 rounded-none p-2.5 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
               Low Stock Alerts
@@ -285,7 +285,7 @@ export const LiveSiteVisitorsBanner: React.FC<Props> = ({
             </span>
           </div>
           <div
-            className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${
+            className={`w-8 h-8 rounded-none flex items-center justify-center shrink-0 ${
               lowStockCount > 0
                 ? "bg-rose-500/10 text-rose-400 animate-pulse"
                 : "bg-zinc-800 text-zinc-500"

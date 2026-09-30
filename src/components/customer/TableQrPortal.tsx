@@ -489,7 +489,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               </div>
 
               {showActiveTabDetails && (
-                <div className="mt-2 pt-2 border-t border-zinc-800 space-y-1 max-h-32 overflow-y-auto no-scrollbar overscroll-contain touch-pan-y">
+                <div className="mt-2 pt-2 border-t border-zinc-800 space-y-1 max-h-32 overflow-y-auto no-scrollbar">
                   {activeRunningOrder.items.map((item, idx) => (
                     <div
                       key={idx}
@@ -512,7 +512,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           CATEGORY FILTER TRACK (HORIZONTAL SCROLL WITH OVERSCROLL CONTAINMENT)
       ------------------------------------------------------------- */}
       <div className="sticky top-[45px] sm:top-[49px] z-30 bg-[#09090C]/95 backdrop-blur-md border-b border-zinc-800/80 py-2 px-2.5 sm:px-3.5 w-full max-w-full overflow-hidden">
-        <div className="max-w-md mx-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+        <div className="max-w-md mx-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           <button
             onClick={() => handleCategorySelect("all")}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold whitespace-nowrap transition-all border ${
@@ -719,7 +719,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           SUCCESS & KIOSK PRINT TOKEN MODAL
       ------------------------------------------------------------- */}
       {placedOrderResult && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain touch-pan-y">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-[#121217] border border-amber-500/60 max-w-sm w-full max-h-[90vh] p-3 text-center space-y-3 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto my-auto">
             <div className="w-12 h-12 bg-amber-500 text-black mx-auto flex items-center justify-center font-black">
               <Check className="w-7 h-7 stroke-[3]" />
@@ -782,8 +782,8 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           CONFIRM ORDER MODAL / DRAWER
       ------------------------------------------------------------- */}
       {isConfirmDrawerOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden overscroll-contain touch-pan-y">
-          <div className="bg-[#121217] border-t sm:border border-zinc-800 max-w-md w-full p-3.5 sm:p-5 text-left space-y-3 sm:space-y-3.5 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto overflow-x-hidden overscroll-y-contain touch-pan-y pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden">
+          <div className="bg-[#121217] border-t sm:border border-zinc-800 max-w-md w-full p-3.5 sm:p-5 text-left space-y-3 sm:space-y-3.5 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto overflow-x-hidden pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
               <div className="flex items-center gap-2 min-w-0">
                 <Utensils className="w-4 h-4 text-amber-400 shrink-0" />
@@ -991,7 +991,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           TABLE SWITCHER MODAL
       ------------------------------------------------------------- */}
       {isTableSwitcherOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overscroll-contain touch-pan-y overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-[#121217] border border-zinc-800 max-w-sm w-full p-4 space-y-3 overflow-hidden my-auto">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
               <div className="flex items-center gap-2 min-w-0">

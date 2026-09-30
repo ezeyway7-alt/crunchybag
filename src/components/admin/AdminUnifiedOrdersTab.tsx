@@ -359,7 +359,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
       {/* -------------------------------------------------------------
           FILTER & WORKSPACE CONTROLS BAR
       ------------------------------------------------------------- */}
-      <div className="bg-[#121214] border border-zinc-800 rounded p-3 space-y-3">
+      <div className="bg-[#121214] border border-zinc-800 rounded-none p-3 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-end">
           {/* Start Date */}
           <div className="lg:col-span-2">
@@ -373,7 +373,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                 setStartDate(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700/80 rounded text-zinc-100 font-mono focus:outline-none focus:border-amber-500"
+              className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700/80 rounded-none text-zinc-100 font-mono focus:outline-none focus:border-amber-500"
             />
           </div>
 
@@ -389,7 +389,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                 setEndDate(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700/80 rounded text-zinc-100 font-mono focus:outline-none focus:border-amber-500"
+              className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700/80 rounded-none text-zinc-100 font-mono focus:outline-none focus:border-amber-500"
             />
           </div>
 
@@ -404,7 +404,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                 setOrderTypeFilter(e.target.value as any);
                 setCurrentPage(1);
               }}
-              className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700/80 rounded text-zinc-100 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
+              className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700/80 rounded-none text-zinc-100 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
             >
               <option value="ALL">All Channels (POS, Delivery, Dine-In, Kiosk)</option>
               <option value="ONLINE_DELIVERY">🛵 Online & Delivery Orders</option>
@@ -424,7 +424,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                 setSettlementFilter(e.target.value as any);
                 setCurrentPage(1);
               }}
-              className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700/80 rounded text-zinc-100 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
+              className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-700/80 rounded-none text-zinc-100 font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
             >
               <option value="ALL">All Bills</option>
               <option value="PAID">✅ Paid / Settled</option>
@@ -448,7 +448,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                   setCurrentPage(1);
                 }}
                 placeholder="Token, #CR, item, phone..."
-                className="w-full h-8 pl-7 pr-6 text-xs bg-zinc-900 border border-zinc-700/80 rounded text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 font-mono"
+                className="w-full h-8 pl-7 pr-6 text-xs bg-zinc-900 border border-zinc-700/80 rounded-none text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-amber-500 font-mono"
               />
               {tableSearchQuery && (
                 <button
@@ -477,7 +477,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                   setPageSize(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="w-full h-8 px-1 text-xs bg-zinc-900 border border-zinc-700/80 rounded text-zinc-300 focus:outline-none cursor-pointer text-center"
+                className="w-full h-8 px-1 text-xs bg-zinc-900 border border-zinc-700/80 rounded-none text-zinc-300 focus:outline-none cursor-pointer text-center"
                 title="Rows per page"
               >
                 <option value={10}>10/p</option>
@@ -488,7 +488,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => posSession.refresh?.()}
-              className="h-8 px-2 mt-auto bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+              className="h-8 px-2 mt-auto bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-none text-zinc-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
               title="Refresh live orders"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -631,7 +631,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
               setStatusFilter(tab.key);
               setCurrentPage(1);
             }}
-            className={`px-3 py-1.5 rounded transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
+            className={`px-3 py-1.5 rounded-none transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
               statusFilter === tab.key
                 ? "bg-amber-500 text-black border-amber-500 font-black shadow-sm"
                 : "bg-[#121214] text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-200"
@@ -639,7 +639,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
           >
             <span>{tab.label}</span>
             <span
-              className={`font-mono text-[10px] px-1.5 py-0.2 rounded ${
+              className={`font-mono text-[10px] px-1.5 py-0.2 rounded-none ${
                 statusFilter === tab.key
                   ? "bg-black/20 text-black font-black"
                   : "bg-zinc-800 text-zinc-400"
@@ -654,7 +654,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
       {/* -------------------------------------------------------------
           THE UNIFIED ORDER DETAIL DATATABLE
       ------------------------------------------------------------- */}
-      <div className="overflow-x-auto rounded border border-zinc-800 bg-[#121214]">
+      <div className="overflow-x-auto rounded-none border border-zinc-800 bg-[#121214]">
         <table className="w-full text-left text-xs text-zinc-300">
           <thead className="bg-[#17171a] text-zinc-400 uppercase text-[10px] font-bold tracking-wider border-b border-zinc-800">
             <tr>
@@ -709,13 +709,13 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                     {/* Token Slip */}
                     <td className="p-2.5 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs font-black px-1.5 py-0.5 rounded bg-amber-500 text-black shadow-xs">
+                        <span className="font-mono text-xs font-black px-1.5 py-0.5 rounded-none bg-amber-500 text-black shadow-xs">
                           {order.kioskToken || order.orderNumber}
                         </span>
                         <button
                           type="button"
                           onClick={() => setPrintSlipOrder(order)}
-                          className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white cursor-pointer transition-colors"
+                          className="p-1 hover:bg-zinc-800 rounded-none text-zinc-400 hover:text-white cursor-pointer transition-colors"
                           title="Print Kitchen Receipt / Token Slip"
                         >
                           <Printer className="w-3.5 h-3.5" />
@@ -738,7 +738,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                     {/* Customer & Channel */}
                     <td
                       onClick={() => setSelectedOrderForDrawer(order)}
-                      className="p-2.5 min-w-[150px] cursor-pointer hover:bg-zinc-800/60 rounded transition-colors"
+                      className="p-2.5 min-w-[150px] cursor-pointer hover:bg-zinc-800/60 rounded-none transition-colors"
                       title="Click to view full order details & map location"
                     >
                       <div className="flex items-center gap-1.5">
@@ -764,7 +764,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                               e.stopPropagation();
                               setDispatchOrder(order);
                             }}
-                            className="p-0.5 hover:bg-amber-500 text-zinc-400 hover:text-black border border-zinc-700 hover:border-amber-500 rounded transition-colors shrink-0"
+                            className="p-0.5 hover:bg-amber-500 text-zinc-400 hover:text-black border border-zinc-700 hover:border-amber-500 rounded-none transition-colors shrink-0"
                             title="Share & Dispatch: Open Pathao, Yango, Google Maps"
                           >
                             <Share2 className="w-2.5 h-2.5" />
@@ -774,7 +774,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
 
                       <div className="flex items-center gap-1.5 mt-1">
                         <span
-                          className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${
+                          className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-none border ${
                             order.fulfillmentType === "DINE_IN"
                               ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
                               : order.fulfillmentType === "DELIVERY"
@@ -855,7 +855,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                         if (isCreditOrder) {
                           return (
                             <div className="inline-flex flex-col items-center gap-0.5">
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-black rounded-none bg-amber-500/20 text-amber-400 border border-amber-500/40">
                                 <BookOpen className="w-2.5 h-2.5 text-amber-400" />
                                 {order.splitPayments && order.splitPayments.length > 1
                                   ? "Split Khata"
@@ -876,7 +876,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                         if (isBilledOrPaid) {
                           return (
                             <div className="inline-flex flex-col items-center gap-0.5">
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-none bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                                 <CheckCircle2 className="w-2.5 h-2.5" /> Paid •{" "}
                                 {order.paymentMethod === "CASH_ON_PICKUP" ||
                                 order.paymentMethod === "CASH_ON_DELIVERY"
@@ -900,7 +900,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
 
                         return (
                           <div className="inline-flex flex-col items-center gap-0.5">
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded-none bg-amber-500/15 text-amber-400 border border-amber-500/30">
                               Unpaid
                             </span>
                             <span className="font-mono text-[10px] text-zinc-400">
@@ -914,11 +914,11 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                     {/* Refund */}
                     <td className="p-2.5 whitespace-nowrap text-center">
                       {order.refundStatus === "REFUNDED" ? (
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded">
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-none">
                           Refunded
                         </span>
                       ) : order.refundStatus === "VOIDED" || order.status === "CANCELLED" ? (
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded">
+                        <span className="px-1.5 py-0.5 text-[10px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-none">
                           Voided
                         </span>
                       ) : (
@@ -929,7 +929,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                     {/* Lifecycle Status */}
                     <td className="p-2.5 whitespace-nowrap text-center">
                       <span
-                        className={`inline-block px-2 py-0.5 text-[10px] font-black uppercase rounded border ${
+                        className={`inline-block px-2 py-0.5 text-[10px] font-black uppercase rounded-none border ${
                           isReady
                             ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50"
                             : isProcessing
@@ -953,7 +953,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                           <button
                             type="button"
                             onClick={() => handleQuickBumpStatus(order)}
-                            className={`px-2.5 py-1 text-xs font-black uppercase tracking-wider rounded flex items-center gap-1 cursor-pointer transition-colors ${
+                            className={`px-2.5 py-1 text-xs font-black uppercase tracking-wider rounded-none flex items-center gap-1 cursor-pointer transition-colors ${
                               isConfirmed
                                 ? "bg-amber-500 hover:bg-amber-400 text-black shadow-xs"
                                 : isProcessing
@@ -995,7 +995,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                               : order.status
                           }
                           onChange={(e) => handleTransitionStatus(order, e.target.value)}
-                          className="h-7 px-1.5 text-[10px] font-bold bg-zinc-900 border border-zinc-700 rounded text-zinc-300 focus:outline-none focus:border-amber-500 cursor-pointer"
+                          className="h-7 px-1.5 text-[10px] font-bold bg-zinc-900 border border-zinc-700 rounded-none text-zinc-300 focus:outline-none focus:border-amber-500 cursor-pointer"
                           title="Override Order Lifecycle Status"
                         >
                           <option value="PENDING">PENDING</option>
@@ -1011,7 +1011,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => setSelectedOrderForDrawer(order)}
-                          className="p-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-zinc-300 hover:text-white cursor-pointer transition-colors"
+                          className="p-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-none text-zinc-300 hover:text-white cursor-pointer transition-colors"
                           title="View complete order details & item audit"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -1022,7 +1022,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                           <button
                             type="button"
                             onClick={() => onOpenBillingForOrder(order)}
-                            className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded text-emerald-400 cursor-pointer transition-colors"
+                            className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-none text-emerald-400 cursor-pointer transition-colors"
                             title="Settle bill & accept payment"
                           >
                             <CreditCard className="w-3.5 h-3.5" />
@@ -1060,7 +1060,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
               type="button"
               disabled={currentPage <= 1}
               onClick={() => handlePageChange(currentPage - 1)}
-              className="p-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-zinc-800 rounded text-zinc-300 cursor-pointer disabled:cursor-not-allowed"
+              className="p-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-zinc-800 rounded-none text-zinc-300 cursor-pointer disabled:cursor-not-allowed"
               title="Previous Page"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -1072,7 +1072,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
               type="button"
               disabled={currentPage >= totalPages}
               onClick={() => handlePageChange(currentPage + 1)}
-              className="p-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-zinc-800 rounded text-zinc-300 cursor-pointer disabled:cursor-not-allowed"
+              className="p-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:hover:bg-zinc-800 rounded-none text-zinc-300 cursor-pointer disabled:cursor-not-allowed"
               title="Next Page"
             >
               <ChevronRight className="w-4 h-4" />
@@ -1095,7 +1095,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
         >
           <div className="space-y-4 p-4 text-xs">
             {/* Customer & Channel Header */}
-            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded flex items-center justify-between">
+            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-none flex items-center justify-between">
               <div>
                 <h4 className="font-bold text-sm text-zinc-100">
                   {selectedOrderForDrawer.customerName}
@@ -1126,7 +1126,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
 
             {/* Delivery Location & Map Links (if Delivery) */}
             {selectedOrderForDrawer.fulfillmentType === "DELIVERY" && (
-              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded space-y-2">
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-none space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-amber-400" />
@@ -1137,7 +1137,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                     onClick={() => {
                       setDispatchOrder(selectedOrderForDrawer);
                     }}
-                    className="px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-black rounded flex items-center gap-1 cursor-pointer"
+                    className="px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-black rounded-none flex items-center gap-1 cursor-pointer"
                   >
                     <Share2 className="w-3 h-3" />
                     <span>Rider Dispatch & Navigation</span>
@@ -1147,7 +1147,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                   {deliveryInfo(selectedOrderForDrawer).address || "Address not provided"}
                 </p>
                 {selectedOrderForDrawer.notes && (
-                  <p className="text-amber-400 bg-amber-500/10 p-2 rounded border border-amber-500/20">
+                  <p className="text-amber-400 bg-amber-500/10 p-2 rounded-none border border-amber-500/20">
                     Delivery Instructions: "{selectedOrderForDrawer.notes}"
                   </p>
                 )}
@@ -1159,7 +1159,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
               <h5 className="font-bold uppercase tracking-wider text-[10px] text-zinc-400 mb-2">
                 Order Items ({(selectedOrderForDrawer.items || []).length})
               </h5>
-              <div className="divide-y divide-zinc-800 border border-zinc-800 rounded bg-zinc-900">
+              <div className="divide-y divide-zinc-800 border border-zinc-800 rounded-none bg-zinc-900">
                 {selectedOrderForDrawer.items.map((item, idx) => (
                   <div key={idx} className="p-2.5 flex items-center justify-between">
                     <div className="min-w-0 flex-1">
@@ -1171,7 +1171,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                           {item.productName}
                         </span>
                         {item.variantName && item.variantName !== "Standard" && (
-                          <span className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.2 rounded">
+                          <span className="text-[10px] text-zinc-400 bg-zinc-800 px-1.5 py-0.2 rounded-none">
                             {item.variantName}
                           </span>
                         )}
@@ -1191,7 +1191,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
             </div>
 
             {/* Financial Totals */}
-            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded space-y-1.5 font-mono">
+            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-none space-y-1.5 font-mono">
               <div className="flex justify-between text-zinc-400">
                 <span>Subtotal:</span>
                 <span>
@@ -1223,7 +1223,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setCancellingOrder(selectedOrderForDrawer)}
-                className="px-3 py-2 text-xs font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded cursor-pointer"
+                className="px-3 py-2 text-xs font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-none cursor-pointer"
               >
                 Cancel Order
               </button>
@@ -1232,7 +1232,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setPrintSlipOrder(selectedOrderForDrawer)}
-                  className="px-3 py-2 text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded flex items-center gap-1 cursor-pointer"
+                  className="px-3 py-2 text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-none flex items-center gap-1 cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Print Slip</span>
@@ -1245,7 +1245,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                         onOpenBillingForOrder(selectedOrderForDrawer);
                         setSelectedOrderForDrawer(null);
                       }}
-                      className="px-3 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black rounded flex items-center gap-1 cursor-pointer"
+                      className="px-3 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-black rounded-none flex items-center gap-1 cursor-pointer"
                     >
                       <CreditCard className="w-3.5 h-3.5" />
                       <span>Settle Bill</span>
@@ -1278,7 +1278,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="px-4 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black rounded flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black rounded-none flex items-center gap-1.5 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>Print Document</span>
@@ -1319,7 +1319,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="e.g. Customer cancelled, out of ingredients..."
-                className="w-full h-8 px-2.5 text-xs bg-zinc-900 border border-zinc-700 rounded text-zinc-100 focus:outline-none focus:border-rose-500"
+                className="w-full h-8 px-2.5 text-xs bg-zinc-900 border border-zinc-700 rounded-none text-zinc-100 focus:outline-none focus:border-rose-500"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
@@ -1335,7 +1335,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                 type="button"
                 disabled={isCancelling}
                 onClick={handleConfirmCancel}
-                className="px-4 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded cursor-pointer disabled:opacity-50"
+                className="px-4 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white rounded-none cursor-pointer disabled:opacity-50"
               >
                 {isCancelling ? "Cancelling..." : "Confirm Cancellation"}
               </button>
@@ -1346,3 +1346,4 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
     </div>
   );
 };
+

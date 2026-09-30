@@ -293,7 +293,7 @@ const AppContent: React.FC = () => {
 
   // 13. Default Customer Storefront & Menu (/menu or /)
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#09090b] text-zinc-100 antialiased selection:bg-amber-500 selection:text-black overscroll-none touch-pan-y">
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 antialiased selection:bg-amber-500 selection:text-black">
       <PortalHeader />
       <CustomerPortal />
 

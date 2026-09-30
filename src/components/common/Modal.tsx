@@ -69,7 +69,7 @@ export const Modal: React.FC<ModalProps> = ({
       {isOpen && (
         <div
           className={cn(
-            "fixed inset-0 z-50 flex justify-center p-2.5 sm:p-6 overflow-y-auto overflow-x-hidden touch-pan-y overscroll-contain",
+            "fixed inset-0 z-50 flex justify-center p-2.5 sm:p-6 overflow-y-auto overflow-x-hidden",
             position === "top" ? "items-start pt-8 sm:pt-20" : "items-center"
           )}
         >
@@ -90,7 +90,7 @@ export const Modal: React.FC<ModalProps> = ({
             exit={{ opacity: 0, scale: 0.96, y: position === "top" ? -10 : 15 }}
             transition={{ type: "spring", damping: 26, stiffness: 320 }}
             className={cn(
-              "relative w-full max-w-full bg-[#121214] border border-white/15 rounded-none shadow-2xl overflow-hidden z-10 text-zinc-100 touch-pan-y overscroll-contain",
+              "relative w-full max-w-full bg-[#121214] border border-white/15 rounded-none shadow-2xl overflow-hidden z-10 text-zinc-100",
               position !== "top" && "my-auto",
               maxWidthClasses[maxWidth],
               className
