@@ -288,6 +288,7 @@ export interface KdsTicketItem {
 export interface KdsTicket {
   id: string;
   orderNumber: string;
+  outletId?: string;
   station: string; // e.g. "Grill & Fryer 1"
   fulfillmentType: FulfillmentType;
   column: KdsColumn;

@@ -48,6 +48,7 @@ import { StaffBillingTab } from "../staff/StaffBillingTab";
 import { StaffInventoryTab } from "../staff/StaffInventoryTab";
 import { StaffDaybookTab } from "../staff/StaffDaybookTab";
 import { KDSPortal } from "../kds/KDSPortal";
+import { StaffFloatingOrderNotice } from "../staff/StaffFloatingOrderNotice";
 import { AdminEmployeesTab } from "./AdminEmployeesTab";
 import { AdminLoyaltyTab } from "./AdminLoyaltyTab";
 import { AdminMenuManagerTab } from "./AdminMenuManagerTab";
@@ -277,7 +278,15 @@ export const AdminPortal: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col md:flex-row transition-colors">
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col md:flex-row transition-colors relative">
+      {/* Floating incoming order notification banner for admin side (shown on other tabs to notify admin) */}
+      {activeTab !== "kitchen" && (
+        <StaffFloatingOrderNotice
+          onOpenBillingForOrder={() => setActiveTab("billing")}
+          onOpenOngoingOrder={() => setActiveTab("kitchen")}
+        />
+      )}
+
       {/* -------------------------------------------------------------
           MOBILE TOP BAR (Clean & Minimal)
       ------------------------------------------------------------- */}

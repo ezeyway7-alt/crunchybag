@@ -70,7 +70,8 @@ import {
   INITIAL_DAYBOOK_ENTRIES,
 } from "../mock/adminData";
 import { authStorage } from "../lib/authStorage";
-import { branchApi, normalizeOutletId } from "../lib/api";
+import { branchApi, normalizeOutletId, apiClient } from "../lib/api";
+import { posOrderToOrder } from "../lib/posApi";
 
 export interface ToastItem {
   id: string;
@@ -819,6 +820,126 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => { if(customerAccount.error) addToast({title:'Customer request failed',description:customerAccount.error,type:'error'}); }, [customerAccount.error]);
 
+  // Live Active Orders Sync & Real-Time Outlet WebSocket Stream
+  const fetchActiveOrders = useCallback(async () => {
+    if (!currentOutlet?.id) return;
+    try {
+      const res = await apiClient.get<any>(
+        `/orders/pos/?outlet_id=${encodeURIComponent(currentOutlet.id)}&status=PENDING,ACCEPTED,CONFIRMED,PREPARING,READY`
+      );
+      const posOrders: any[] = Array.isArray(res?.results)
+        ? res.results
+        : Array.isArray(res)
+        ? res
+        : [];
+      if (posOrders.length >= 0) {
+        setOrders((prev) => {
+          const remoteMapped: Order[] = posOrders.map((po) =>
+            posOrderToOrder(po, currentOutlet.name)
+          );
+          const remoteIds = new Set(remoteMapped.map((o) => String(o.id)));
+          const localOnly = prev.filter(
+            (o) =>
+              !remoteIds.has(String(o.id)) &&
+              String(o.id).startsWith("ord-") &&
+              o.status !== "COMPLETED" &&
+              o.status !== "CANCELLED"
+          );
+          return [...localOnly, ...remoteMapped];
+        });
+      }
+    } catch {
+      // Endpoint fallback
+    }
+  }, [currentOutlet.id, currentOutlet.name]);
+
+  useEffect(() => {
+    let disposed = false;
+    let ws: WebSocket | null = null;
+    let pingInterval: any = null;
+    let reconnectTimer: any = null;
+
+    void fetchActiveOrders();
+
+    const connectWs = () => {
+      if (disposed) return;
+      if (ws) {
+        try {
+          ws.close();
+        } catch {}
+      }
+
+      const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+      const protocol = isHttps ? "wss:" : "ws:";
+      const isLocal =
+        typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+      const wsUrl = isLocal
+        ? `wss://crunchybag.com/ws/outlets/${encodeURIComponent(currentOutlet.id)}/kitchen/`
+        : `${protocol}//${window.location.host}/ws/outlets/${encodeURIComponent(currentOutlet.id)}/kitchen/`;
+
+      try {
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          if (disposed) return;
+          clearInterval(pingInterval);
+          pingInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(JSON.stringify({ type: "ping" }));
+              } catch {}
+            }
+          }, 25000);
+          void fetchActiveOrders();
+        };
+
+        ws.onmessage = (event) => {
+          if (disposed) return;
+          try {
+            const data = JSON.parse(event.data);
+            if (
+              data.type === "kitchen_ticket_update" ||
+              data.event === "ORDER_CREATED" ||
+              data.event === "ROUND_APPENDED" ||
+              data.event === "STATUS_CHANGED" ||
+              data.event_type === "KITCHEN_TICKET_UPDATE"
+            ) {
+              void fetchActiveOrders();
+            }
+          } catch {}
+        };
+
+        ws.onclose = () => {
+          if (disposed) return;
+          clearInterval(pingInterval);
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(connectWs, 4000);
+        };
+
+        ws.onerror = () => {
+          if (disposed) return;
+          try {
+            ws?.close();
+          } catch {}
+        };
+      } catch {}
+    };
+
+    connectWs();
+
+    return () => {
+      disposed = true;
+      clearInterval(pingInterval);
+      clearTimeout(reconnectTimer);
+      if (ws) {
+        try {
+          ws.close();
+        } catch {}
+      }
+    };
+  }, [currentOutlet.id, fetchActiveOrders]);
+
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
@@ -1071,6 +1192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       elapsedSeconds: 0,
       customerName: details.customerName,
       deliveryAddress: details.deliveryAddress,
+      outletId: currentOutlet.id,
       items: cart.items.map((ci) => ({
         id: ci.cartItemId,
         productName: ci.productName,
@@ -1192,6 +1314,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       station: "Kitchen Main Line",
       fulfillmentType: effectiveFulfillment,
       tableNumber: details.tableNumber,
+      outletId: currentOutlet.id,
       kioskToken: shortToken,
       roundNumber: 1,
       column: "QUEUED",
@@ -1303,6 +1426,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         station: "Kitchen Main Line",
         fulfillmentType: targetOrder.fulfillmentType,
         tableNumber: targetOrder.tableNumber,
+        outletId: targetOrder.outletId || currentOutlet.id,
         kioskToken: targetOrder.kioskToken,
         roundNumber: nextRoundNumber,
         isAddOnRound: true,
@@ -1683,6 +1807,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .map((ticket) => {
           if (ticket.id === ticketId) {
             if (ticket.column === "QUEUED") {
+              setOrders((ords) => ords.map((o) => o.orderNumber === ticket.orderNumber || o.id === ticket.id ? { ...o, status: "PREPARING" } : o));
               return { ...ticket, column: "PREPARING" as const };
             } else if (ticket.column === "PREPARING") {
               // Mark order ready in order list too!

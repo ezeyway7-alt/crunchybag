@@ -125,6 +125,8 @@ export interface BackendKitchenTicket {
   order_number: string;
   status: string;
   fulfillment_type: FulfillmentType;
+  outlet_id?: number | string;
+  version?: number;
   table_number?: string | null;
   round_number?: number;
   created_at?: string;
@@ -171,7 +173,7 @@ export const KDSPortal: React.FC = () => {
 
   /**
    * 1. REST API: Fetch Active Kitchen Preparation Tickets
-   * GET /api/v1/orders/kitchen/me/
+   * GET /api/v1/orders/kitchen/me/?outlet_id=<outlet_id>
    * Returns active kitchen preparation orders (PENDING, ACCEPTED, PREPARING, READY)
    * Non-kitchen items are automatically excluded by backend
    */
@@ -181,11 +183,16 @@ export const KDSPortal: React.FC = () => {
     try {
       let tickets: BackendKitchenTicket[] = [];
 
-      // 1. Primary KDS endpoint: GET /api/v1/orders/kitchen/me/
+      // 1. Primary KDS endpoint: GET /api/v1/orders/kitchen/me/?outlet_id=<outlet_id>
       try {
-        const data = await apiClient.get<BackendKitchenTicket[]>("/orders/kitchen/me/");
+        const data = await apiClient.get<BackendKitchenTicket[]>(
+          `/orders/kitchen/me/?outlet_id=${encodeURIComponent(effectiveOutletId)}`
+        );
         if (Array.isArray(data)) {
-          tickets = data;
+          tickets = data.map((t) => ({
+            ...t,
+            outlet_id: t.outlet_id || effectiveOutletId,
+          }));
         }
       } catch (err: any) {
         const status = err?.status || err?.response?.status;
@@ -204,7 +211,7 @@ export const KDSPortal: React.FC = () => {
       // Catches all orders placed from POS, Kiosk, Table QR, or Web
       try {
         const posRes = await apiClient.get<any>(
-          `/orders/pos/?outlet_id=${encodeURIComponent(effectiveOutletId)}&status=PENDING,ACCEPTED,PREPARING,READY`
+          `/orders/pos/?kitchen=1&outlet_id=${encodeURIComponent(effectiveOutletId)}&status=PENDING,ACCEPTED,PREPARING,READY`
         );
         const posOrders: any[] = Array.isArray(posRes?.results)
           ? posRes.results
@@ -216,6 +223,7 @@ export const KDSPortal: React.FC = () => {
         const existingOrderNums = new Set(tickets.map((t) => t.order_number));
 
         for (const po of posOrders) {
+          if (po.status === "COMPLETED" || po.status === "CANCELLED") continue;
           const poId = String(po.id);
           const poNum = po.order_number;
           if (!existingIds.has(poId) && !existingOrderNums.has(poNum)) {
@@ -227,6 +235,8 @@ export const KDSPortal: React.FC = () => {
                 id: po.id,
                 order_number: po.order_number,
                 status: po.status,
+                outlet_id: po.outlet_id || effectiveOutletId,
+                version: po.version || 1,
                 fulfillment_type: po.fulfillment_type || "TAKEAWAY",
                 table_number: po.table_number,
                 round_number: po.round_number || 1,
@@ -449,6 +459,7 @@ export const KDSPortal: React.FC = () => {
         return {
           id: String(t.id),
           orderNumber: t.order_number,
+          outletId: String(t.outlet_id || effectiveOutletId),
           station: "",
           fulfillmentType: t.fulfillment_type || "TAKEAWAY",
           column,
@@ -470,7 +481,7 @@ export const KDSPortal: React.FC = () => {
 
     // Pure real queue: When 0 orders are waiting, return empty list (No fake mock tickets)
     return [];
-  }, [serverTickets, now]);
+  }, [serverTickets, now, effectiveOutletId]);
 
   const orders: Order[] = useMemo(() => {
     return appOrders || [];
@@ -478,7 +489,7 @@ export const KDSPortal: React.FC = () => {
 
   /**
    * 3. Transition Kitchen Ticket Status
-   * Universal Endpoint: POST /api/v1/orders/<order_id>/transition/
+   * Universal Endpoint: POST /api/v1/orders/<order_id>/transition/?outlet_id=<outlet_id>
    * Status Pipeline: PENDING -> ACCEPTED -> PREPARING -> READY -> COMPLETED
    * Automatically broadcasts WebSocket notification to KDS screens and TV displays
    */
@@ -495,6 +506,13 @@ export const KDSPortal: React.FC = () => {
       playKitchenChime(nextStatus === "READY" ? "complete" : "advance");
     }
 
+    // Resolve accurate outlet_id and version for this ticket
+    const ticket = serverTickets.find((t) => String(t.id) === ticketId);
+    const appOrder = appOrders.find(
+      (o) => String(o.id) === ticketId || o.orderNumber === ticket?.order_number
+    );
+    const currentVersion = ticket?.version || (appOrder as any)?.version || 1;
+
     // Optimistic local state update for zero latency
     setServerTickets((prev) =>
       prev
@@ -502,26 +520,47 @@ export const KDSPortal: React.FC = () => {
           String(t.id) === ticketId
             ? nextStatus === "COMPLETED"
               ? null
-              : { ...t, status: nextStatus }
+              : { ...t, status: nextStatus, version: currentVersion + 1 }
             : t
         )
         .filter(Boolean) as BackendKitchenTicket[]
     );
 
+    const ticketOutletId = String(
+      ticket?.outlet_id ||
+      appOrder?.outletId ||
+      effectiveOutletId ||
+      currentOutlet?.id ||
+      authOutlet?.id ||
+      "1"
+    );
+    const numericOutletId = parseInt(ticketOutletId, 10) || 1;
+
     try {
-      // Primary: Universal KDS transition endpoint (POST /api/v1/orders/<order_id>/transition/)
+      // Primary: POS staff command transition (POST /api/v1/orders/pos/<order_id>/transition/?outlet_id=<outlet_id>)
       try {
-        await apiClient.post(`/orders/${ticketId}/transition/`, {
-          to_status: nextStatus,
-          notes: `Kitchen transitioned order to ${nextStatus}`,
-        });
-      } catch (postErr) {
-        // Fallback: POS staff command transition (POST /api/v1/orders/pos/<order_id>/transition/)
-        await apiClient.post(`/orders/pos/${ticketId}/transition/`, {
-          version: 1,
-          status: nextStatus,
-          reason: `Kitchen transitioned order to ${nextStatus}`,
-        });
+        await apiClient.post(
+          `/orders/pos/${ticketId}/transition/?outlet_id=${encodeURIComponent(ticketOutletId)}`,
+          {
+            outlet_id: numericOutletId,
+            version: currentVersion,
+            status: nextStatus,
+            to_status: nextStatus,
+            reason: `Kitchen transitioned order to ${nextStatus}`,
+          }
+        );
+      } catch (posErr) {
+        // Fallback: Universal KDS transition endpoint (POST /api/v1/orders/<order_id>/transition/?outlet_id=<outlet_id>)
+        await apiClient.post(
+          `/orders/${ticketId}/transition/?outlet_id=${encodeURIComponent(ticketOutletId)}`,
+          {
+            outlet_id: numericOutletId,
+            to_status: nextStatus,
+            status: nextStatus,
+            version: currentVersion,
+            notes: `Kitchen transitioned order to ${nextStatus}`,
+          }
+        );
       }
 
       // AppContext sync fallback
@@ -545,16 +584,21 @@ export const KDSPortal: React.FC = () => {
 
   /**
    * 4. Audio Bell / Call Order Notification
-   * Method & Route: POST /api/v1/orders/pos/<order_id>/call/
+   * Method & Route: POST /api/v1/orders/pos/<order_id>/call/?outlet_id=<outlet_id>
    * Triggers audible ding/bell alert on KDS and Customer TV Waiting Area screen
    */
   const triggerKitchenCall = async (ticket: KdsTicket & { orderNotes?: string }) => {
     if (kdsSoundEnabled) playKitchenChime("bell");
 
+    const targetOutletId = String(
+      ticket.outletId || effectiveOutletId || currentOutlet?.id || authOutlet?.id || "1"
+    );
+    const numericOutletId = parseInt(targetOutletId, 10) || 1;
+
     try {
       await apiClient.post(
-        `/orders/pos/${ticket.id}/call/`,
-        { version: 1 },
+        `/orders/pos/${ticket.id}/call/?outlet_id=${encodeURIComponent(targetOutletId)}`,
+        { version: 1, outlet_id: numericOutletId },
         {
           headers: {
             "Idempotency-Key": `call-${ticket.id}-${Date.now()}`,
@@ -958,10 +1002,11 @@ export const KDSPortal: React.FC = () => {
             <button
               type="button"
               onClick={() => handleBump(ticket.id, "PREPARING")}
+              aria-label="MARK READY FOR PICKUP"
               className="w-full h-8 sm:h-8.5 bg-sky-500 hover:bg-sky-400 text-black font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 rounded transition-all active:scale-[0.98] cursor-pointer shadow-sm"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>MARK READY</span>
+              <span>MARK READY FOR PICKUP</span>
             </button>
           )}
 
@@ -980,10 +1025,11 @@ export const KDSPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleBump(ticket.id, "READY")}
+                aria-label="DISPATCH & HAND OVER"
                 className="flex-1 h-8 sm:h-8.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1 rounded transition-all active:scale-[0.98] cursor-pointer shadow-sm"
               >
                 <Package className="w-3.5 h-3.5" />
-                <span>DISPATCH</span>
+                <span>DISPATCH & HAND OVER</span>
               </button>
             </div>
           )}

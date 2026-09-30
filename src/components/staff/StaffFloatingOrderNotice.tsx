@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Order } from "../../types";
+import { apiClient } from "../../lib/api";
 
 interface Props {
   onOpenBillingForOrder?: (order: Order) => void;
@@ -23,21 +24,19 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
   onOpenBillingForOrder,
   onOpenOngoingOrder,
 }) => {
-  const { orders, updateOrderStatus, addToast, simulateIncomingOrder } = useApp();
+  const { orders, updateOrderStatus, addToast, simulateIncomingOrder, currentOutlet } = useApp();
   const [isCrossed, setIsCrossed] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const prevCountRef = useRef<number>(0);
 
-  // Filter pending/incoming web and table QR orders
+  // Filter pending/incoming orders for this outlet
   const incomingOrders = orders.filter(
     (o) =>
       o.status !== "CANCELLED" &&
-      (o.status === "CONFIRMED" || o.status === "PENDING") &&
-      (o.orderSource === "TABLE_QR" ||
-        o.orderSource === "WEBSITE" ||
-        o.fulfillmentType === "DELIVERY" ||
-        (o.fulfillmentType === "DINE_IN" && o.isTableSessionActive))
+      o.status !== "COMPLETED" &&
+      (o.status === "CONFIRMED" || o.status === "PENDING" || o.status === "ACCEPTED") &&
+      (!o.outletId || !currentOutlet?.id || String(o.outletId) === String(currentOutlet.id))
   );
 
   // Play audio chime and auto-re-open floating notice whenever a NEW order arrives
@@ -74,8 +73,33 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
     prevCountRef.current = incomingOrders.length;
   }, [incomingOrders.length, soundEnabled]);
 
-  const handleAcceptToKitchen = (order: Order) => {
+  const handleAcceptToKitchen = async (order: Order) => {
     updateOrderStatus(order.id, "PROCESSING");
+    const outletId = order.outletId || currentOutlet?.id || "1";
+    try {
+      await apiClient.post(
+        `/orders/${order.id}/transition/?outlet_id=${encodeURIComponent(outletId)}`,
+        {
+          outlet_id: Number(outletId) || 1,
+          to_status: "PREPARING",
+          status: "PREPARING",
+          notes: "Accepted order to kitchen",
+        }
+      );
+    } catch {
+      try {
+        await apiClient.post(
+          `/orders/pos/${order.id}/transition/?outlet_id=${encodeURIComponent(outletId)}`,
+          {
+            outlet_id: Number(outletId) || 1,
+            version: 1,
+            status: "PREPARING",
+            to_status: "PREPARING",
+            reason: "Accepted order to kitchen",
+          }
+        );
+      } catch {}
+    }
     addToast({
       title: "Order Accepted & Sent to KDS",
       description: `Order #${order.orderNumber} sent to kitchen cook line.`,
@@ -83,8 +107,33 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
     });
   };
 
-  const handleReject = (order: Order) => {
+  const handleReject = async (order: Order) => {
     updateOrderStatus(order.id, "CANCELLED");
+    const outletId = order.outletId || currentOutlet?.id || "1";
+    try {
+      await apiClient.post(
+        `/orders/${order.id}/transition/?outlet_id=${encodeURIComponent(outletId)}`,
+        {
+          outlet_id: Number(outletId) || 1,
+          to_status: "CANCELLED",
+          status: "CANCELLED",
+          reason: "Cancelled by staff",
+        }
+      );
+    } catch {
+      try {
+        await apiClient.post(
+          `/orders/pos/${order.id}/transition/?outlet_id=${encodeURIComponent(outletId)}`,
+          {
+            outlet_id: Number(outletId) || 1,
+            version: 1,
+            status: "CANCELLED",
+            to_status: "CANCELLED",
+            reason: "Cancelled by staff",
+          }
+        );
+      } catch {}
+    }
     addToast({
       title: "Order Cancelled",
       description: `Order #${order.orderNumber} rejected.`,

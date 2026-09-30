@@ -5,59 +5,155 @@ import { apiClient, ApiError, extractErrorMessage, normalizeOutletId } from '../
 import { CartLineItem } from '../types';
 
 type StoredCart = { items: CartLineItem[]; base: CartLineItem[]; mergeId: string };
-const empty = (): StoredCart => ({items: [], base: [], mergeId: crypto.randomUUID()});
+const empty = (): StoredCart => ({ items: [], base: [], mergeId: crypto.randomUUID() });
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const storageKey = (scope: string) => `crunchy-cart-v1:${scope}`;
+
+function normalizeItem(raw: any): CartLineItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const cartItemId = String(
+    raw.cartItemId || raw.id || `ci-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+  );
+  const productId = String(raw.productId ?? raw.product_id ?? raw.id ?? "");
+  if (!productId) return null;
+  const quantity = Math.max(1, Math.min(100, Math.floor(Number(raw.quantity) || 1)));
+  const unitPrice = Number(raw.unitPrice ?? raw.unit_price ?? raw.price ?? 0);
+  const lineTotal = Number(raw.lineTotal ?? raw.line_total ?? unitPrice * quantity);
+  const variant = raw.variant
+    ? {
+        id: String(raw.variant.id ?? "standard"),
+        name: String(raw.variant.name || "Standard"),
+        price: Number(raw.variant.price ?? unitPrice),
+        isDefault: Boolean(raw.variant.isDefault),
+      }
+    : { id: "standard", name: "Standard", price: unitPrice };
+  const selectedModifiers = Array.isArray(raw.selectedModifiers)
+    ? raw.selectedModifiers
+    : Array.isArray(raw.modifiers)
+    ? raw.modifiers.map((m: any, idx: number) =>
+        typeof m === "string"
+          ? {
+              groupId: `mod-${idx}`,
+              groupName: m,
+              optionId: `opt-${idx}`,
+              optionName: m,
+              priceDelta: 0,
+            }
+          : m
+      )
+    : [];
+
+  return {
+    cartItemId,
+    productId,
+    productName: String(raw.productName || raw.name || "Item"),
+    image: String(raw.image || raw.images?.[0] || ""),
+    variant,
+    selectedModifiers,
+    quantity,
+    unitPrice,
+    lineTotal,
+    addedAt: Number(raw.addedAt || Date.now()),
+    quoteExpiresAt: Number(raw.quoteExpiresAt || Date.now() + 15 * 60 * 1000),
+    comboSelections: raw.comboSelections,
+  };
+}
+
 function read(scope: string): StoredCart {
   try {
-    const value = JSON.parse(localStorage.getItem(storageKey(scope)) || 'null');
-    if (value && Array.isArray(value.items) && Array.isArray(value.base) && typeof value.mergeId === 'string') {
-      const valid = (item: any) => item && typeof item.cartItemId === 'string' && typeof item.productId === 'string'
-        && Number.isInteger(item.quantity) && item.quantity > 0 && item.quantity <= 100
-        && item.variant && Number.isFinite(item.unitPrice) && Number.isFinite(item.lineTotal) && Array.isArray(item.selectedModifiers);
-      return {...value, items: value.items.filter(valid), base: value.base.filter(valid)};
+    const rawVal = localStorage.getItem(storageKey(scope));
+    let value = JSON.parse(rawVal || "null");
+
+    // Fallback: If scoped storage is empty or missing, check guest scope for this outlet
+    if (!value || !Array.isArray(value.items) || value.items.length === 0) {
+      const parts = scope.split(":");
+      const outlet = parts[parts.length - 1] || "1";
+      const guestVal = JSON.parse(localStorage.getItem(storageKey(`guest:${outlet}`)) || "null");
+      if (guestVal && Array.isArray(guestVal.items) && guestVal.items.length > 0) {
+        value = guestVal;
+      }
     }
-  } catch { /* Corrupt local data must not prevent the menu from opening. */ }
+
+    if (value && Array.isArray(value.items)) {
+      const validItems = value.items.map(normalizeItem).filter(Boolean) as CartLineItem[];
+      const validBase = Array.isArray(value.base)
+        ? (value.base.map(normalizeItem).filter(Boolean) as CartLineItem[])
+        : [];
+      const mergeId = typeof value.mergeId === "string" ? value.mergeId : crypto.randomUUID();
+      return { items: validItems, base: validBase, mergeId };
+    }
+  } catch {
+    /* Corrupt local data must not prevent the menu from opening. */
+  }
   return empty();
 }
+
 // Apply only this device's edits to the latest server cart, preserving other devices' additions.
 function rebase(remote: CartLineItem[], base: CartLineItem[], local: CartLineItem[]) {
-  const before = new Map(base.map(row => [row.cartItemId, row]));
-  const after = new Map(local.map(row => [row.cartItemId, row]));
-  const result = new Map(remote.map(row => [row.cartItemId, row]));
-  for (const id of before.keys()) if (!after.has(id)) result.delete(id);
-  for (const row of local) if (!same(row, before.get(row.cartItemId))) result.set(row.cartItemId, row);
+  // If remote returned empty or failed, NEVER discard locally added items on refresh!
+  if ((!remote || remote.length === 0) && local.length > 0) {
+    return local;
+  }
+  const before = new Map(base.map((row) => [row.cartItemId, row]));
+  const after = new Map(local.map((row) => [row.cartItemId, row]));
+  const result = new Map(remote.map((row) => [row.cartItemId, row]));
+  for (const id of before.keys()) {
+    if (!after.has(id)) result.delete(id);
+  }
+  for (const row of local) {
+    if (!same(row, before.get(row.cartItemId))) {
+      result.set(row.cartItemId, row);
+    } else if (!result.has(row.cartItemId)) {
+      // Retain items present locally so remote fetch does not clear cart on reload
+      result.set(row.cartItemId, row);
+    }
+  }
   return [...result.values()];
 }
 
 export function usePersistentCart(outletId: string) {
-  const {authUser, isLoading} = useAuth();
+  const { authUser, isLoading } = useAuth();
   const outlet = normalizeOutletId(outletId);
-  const user = authUser?.role === 'CUSTOMER' ? String(authUser.id) : 'guest';
+  const user = authUser?.role === "CUSTOMER" ? String(authUser.id) : "guest";
   const scope = `${user}:${outlet}`;
   const [, redraw] = useState(0);
-  const [status, setStatus] = useState({scope, busy: user !== 'guest', error: ''});
-  const current = useRef<{scope: string; value: StoredCart} | null>(null);
-  if (!current.current || current.current.scope !== scope) current.current = {scope, value: read(scope)};
+  const [status, setStatus] = useState({ scope, busy: user !== "guest", error: "" });
+  const current = useRef<{ scope: string; value: StoredCart } | null>(null);
+  if (!current.current || current.current.scope !== scope) current.current = { scope, value: read(scope) };
   const syncRef = useRef<() => Promise<void>>(async () => {});
   const persist = (target: string, value: StoredCart) => {
-    try { localStorage.setItem(storageKey(target), JSON.stringify(value)); }
-    catch { setStatus({scope: target, busy: false, error: 'Cart storage is unavailable. Keep this tab open until checkout.'}); }
-  };
-  const setItems = useCallback((update: SetStateAction<CartLineItem[]>) => {
-    if (current.current.scope !== scope) return;
-    const record = current.current.value;
-    const items = typeof update === 'function' ? update(record.items) : update;
-    if (items.length > 100 || items.some(item => item.quantity > 100)) {
-      setStatus({scope, busy: false, error: 'Your cart allows up to 100 lines and 100 of each item.'});
-      return;
+    try {
+      localStorage.setItem(storageKey(target), JSON.stringify(value));
+    } catch {
+      setStatus({ scope: target, busy: false, error: "Cart storage is unavailable. Keep this tab open until checkout." });
     }
-    current.current.value = {...record, items, ...(user === 'guest' ? {mergeId: crypto.randomUUID()} : {})};
-    persist(scope, current.current.value);
-    redraw(v => v + 1);
-    // Persist locally synchronously; server writes are serialized by the sync worker.
-    void syncRef.current();
-  }, [scope, user]);
+  };
+  const setItems = useCallback(
+    (update: SetStateAction<CartLineItem[]>) => {
+      if (!current.current || current.current.scope !== scope) {
+        current.current = { scope, value: read(scope) };
+      }
+      const record = current.current.value;
+      const items = typeof update === "function" ? update(record.items) : update;
+      if (items.length > 100 || items.some((item) => item.quantity > 100)) {
+        setStatus({ scope, busy: false, error: "Your cart allows up to 100 lines and 100 of each item." });
+        return;
+      }
+      current.current.value = {
+        ...record,
+        items,
+        ...(user === "guest" ? { mergeId: crypto.randomUUID() } : {}),
+      };
+      persist(scope, current.current.value);
+      if (user === "guest") {
+        persist(`guest:${outlet}`, current.current.value);
+      }
+      redraw((v) => v + 1);
+      // Persist locally synchronously; server writes are serialized by the sync worker.
+      void syncRef.current();
+    },
+    [scope, user, outlet]
+  );
 
   useEffect(() => {
     if (user === 'guest' || isLoading) {
