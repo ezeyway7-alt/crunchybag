@@ -2,41 +2,245 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   
-  <!-- Homepage / Main Online Ordering Storefront -->
+  <!-- Core Storefront Pages -->
   <url>
     <loc>https://crunchybag.com/</loc>
     <lastmod>2026-09-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <image:image>
-      <image:loc>https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&amp;fit=crop&amp;w=1200&amp;h=630&amp;q=80</image:loc>
-      <image:title>Crunchy Crispy Fried Chicken and Burgers Kathmandu</image:title>
-      <image:caption>Crunchy Restaurant Kathmandu - Best Crispy Chicken &amp; Burgers</image:caption>
+      <image:loc>https://crunchybag.com/crunchy_logo.png</image:loc>
+      <image:title>Crunchy Bag Kathmandu - Online Food Delivery, Burgers, Chicken &amp; Combos</image:title>
     </image:image>
   </url>
-
-  <!-- Digital Menu Section -->
   <url>
-    <loc>https://crunchybag.com/#menu</loc>
+    <loc>https://crunchybag.com/?page=menu</loc>
     <lastmod>2026-09-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
-
-  <!-- Delivery Information & Online Tracking -->
   <url>
-    <loc>https://crunchybag.com/#delivery</loc>
+    <loc>https://crunchybag.com/?page=combos</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?page=delivery</loc>
     <lastmod>2026-09-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
-
-  <!-- Restaurant Location & About Us -->
   <url>
-    <loc>https://crunchybag.com/#about</loc>
+    <loc>https://crunchybag.com/?page=reserve</loc>
     <lastmod>2026-09-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+
+  <!-- Categories -->
+  <url><loc>https://crunchybag.com/?category=cat-burgers-97a60a528a81</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-fried-chiken-330fbd829bc2</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-special-combo-12ad6cad202d</loc><changefreq>weekly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-pakoda-ff49ba205060</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-fries-crispy-0ebc7a494c41</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-sandwiches-82dedfda123f</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-drinks-5493c0ec1baf</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-breverages-2e8578f6bda0</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-salads-982fbd7a16e3</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-sauces-841daa4b5d18</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+
+  <!-- Products & Special Combos (Direct URLs with Media Images) -->
+  <url>
+    <loc>https://crunchybag.com/?product=prod-aloo-tikki-burger-f1168a550eab</loc>
+    <changefreq>weekly</changefreq><priority>0.85</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/1d0d6acfdd6571d97694201d78b4e25b01163c46d82b3ee97b1419c0898332d8.png</image:loc><image:title>Aloo Tikki Burger Kathmandu</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-new-item-e3e0dadb97b5</loc>
+    <changefreq>weekly</changefreq><priority>0.85</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/75a5b55878a214cd50a2f9fd5e6ffa2ccb19345b3504ee5db8c065ab22d32771.png</image:loc><image:title>Chicken Burger Kathmandu</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-pizza-veg-27c34985033e</loc>
+    <changefreq>weekly</changefreq><priority>0.85</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/445d87b75b60d5b4023844cef47fe2b4f62a19a07b766c98039831aff2e5e2d5.png</image:loc><image:title>Crunchy Fried chicken Burger</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-crunchy-fried-chicken-0a5da9922717</loc>
+    <changefreq>weekly</changefreq><priority>0.85</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/f9c1c3b1804b613423cb2b5114671c6a198467cf754e62d6defe6288b986afc6.png</image:loc><image:title>Crunchy Fried Chicken</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-crunchy-family-bag-f182f11d777e</loc>
+    <changefreq>weekly</changefreq><priority>0.9</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/6a479b0396e875a0469968dfbf55c8ff831f6571aa88917eead943e63a4d963e.png</image:loc><image:title>Crunchy Family Bag Combo Deal</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-crunchy-beast-combo-8996a2c37936</loc>
+    <changefreq>weekly</changefreq><priority>0.9</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/ceaaaa9ba24bb50a457896bd5b680338a7602cde094af6dd496d6cc285a3a44c.png</image:loc><image:title>Crunchy Beast Combo Feast</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-crunchy-duo-combo-49a6969348ad</loc>
+    <changefreq>weekly</changefreq><priority>0.85</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/683e1627277fa90a87c49f42aa329a94e353c8e6c7f35b965f044cf27aa0f09c.png</image:loc><image:title>Crunchy Duo Combo</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-crunchy-chicken-combo-bdb9434dbe9c</loc>
+    <changefreq>weekly</changefreq><priority>0.85</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/e1e04e14ede99551e94650850908bc576db727ca796784314411a5872733c50a.png</image:loc><image:title>Crunchy Chicken Combo</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-crunchy-loaded-combo-228c7d8f1f37</loc>
+    <changefreq>weekly</changefreq><priority>0.85</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/7467177098df2dd723b33b02929cdac3a891de71e02f09495083b60cc5b132c4.png</image:loc><image:title>Crunchy Loaded Veg Combo</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-crunchy-starter-combo-b641d8d27fe4</loc>
+    <changefreq>weekly</changefreq><priority>0.85</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/799a87741947d5f4053a1816f361be34b47b01d8acaf8ffcdf9c1da447313324.png</image:loc><image:title>Crunchy Starter Combo</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-buger-fired-best-combo-packages-22d9b39730ad</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-green-chicken-pakoda-2419478e9e10</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/f90921f4b7fecc71fc748ab8cbb44c9cddd9c90df0787252ab7c0519f73ddb0c.png</image:loc><image:title>Green Chicken Pakoda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-chicken-65-pakoda-520d8e87ad56</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/514e1e784394b34f1ad852caaab799b990690ab912682e054020426333370e07.png</image:loc><image:title>Chicken 65 Pakoda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-seasme-chicken-pakoda-ee78c1b63402</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/dcf582f2bbcbc974fb696d728f19e4cce129237ca385993a006a6a6f15d51ae2.png</image:loc><image:title>Seasme Chicken Pakoda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-paneer-pakoda-2e4d08e69b67</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/b7984f118001e2074a02557d6a046d26d9de598bb1fae01991b865b2e5e98164.png</image:loc><image:title>Paneer Pakoda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-classic-chicken-pakoda-ec85493d7b6a</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/9056df55b4bb41094636ddea789d30507cef06704a213903f702d1fba7616daf.png</image:loc><image:title>Classic Chicken Pakoda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-gobi-pakoda-d6d34fca0bbb</loc>
+    <changefreq>weekly</changefreq><priority>0.75</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/b5ac2829ed6bfe285e4d10e52d55ca1b97c4c1ced066e732b445572128d01384.png</image:loc><image:title>Gobi Pakoda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-onion-pakoda-cca533c5d602</loc>
+    <changefreq>weekly</changefreq><priority>0.75</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/b0e1aa9eeb63338b7cc9a81cc03e114a0b2d8bfdbec7594dad509d8e9f6d5da6.png</image:loc><image:title>Onion Pakoda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-veg-pakoda-cbe7c1b902cc</loc>
+    <changefreq>weekly</changefreq><priority>0.75</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/fdce63faf7b104341977f3d48898628fbe2e9cc8eecd865057f919db47365d94.png</image:loc><image:title>Veg Pakoda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-classic-pakoda-087973d01a13</loc>
+    <changefreq>weekly</changefreq><priority>0.75</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/e61df9d5fb84bf47c093daf126a73b92fc3ac2439204223fe1d523fa75bc8811.png</image:loc><image:title>Classic Pakoda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-french-friess-5f06b09954d9</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/db6485d802194b8b246000ee5863eff6999b9eaa103e686208fc50c6bbee954f.png</image:loc><image:title>French Fries Kathmandu</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-crispy-potatoes-6e8f133152fa</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/712dd743a8e51dcf904de95c4502cc7ccd29b663d771a339a9f33bb3bfa0ed70.png</image:loc><image:title>Crispy Potatoes</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-chicken-grilled-sandwich-1adee98feada</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/e5627fe03933b685ae1b73d0868d0717f9df20154752fd6b408482927f9a6dc7.png</image:loc><image:title>Chicken Grilled Sandwich</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-veg-grilled-sandwich-619d917e99a0</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/024f1f31b2f8cc27eff7f447c2b9ce4a9ba0ed7c31e37f4fe48a67008aee5ebc.png</image:loc><image:title>Veg Grilled Sandwich</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-plain-sandwich-6d0889e4b609</loc>
+    <changefreq>weekly</changefreq><priority>0.75</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/9ed896a7ad091c13c1864d3708ebff57de6f522a7402758b2dfc4373bc1dd87b.png</image:loc><image:title>Plain Sandwich</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-fresh-fruits-salad-4824f7a0e061</loc>
+    <changefreq>weekly</changefreq><priority>0.75</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/0bab36efbd514895478b08a58f7cda2a398f8d870d82a5e46a42507e0b56c192.png</image:loc><image:title>Fresh Fruits Salad</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-cold-coffee-469955c644d4</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/1f807459707c49da2b428da443e1bfa5fd8aab8fcfd4388c03419ca2f108e9ba.png</image:loc><image:title>Cold Coffee Kathmandu</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-fresh-fruit-juice-b9c810c592c2</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/f771608bf2ecea31ac16de92bc9ecb88854e395cdaa4db638d14624b2f45f351.png</image:loc><image:title>Fresh Fruit Juice</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-milk-shake-63d7db029b2a</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/e1245c6861d5c8c3f8db10b9c1dfb6fa0f8aa65294338fbc4d132e1872f6cb74.png</image:loc><image:title>Milk Shake</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-lassi-1eaa30d4ec44</loc>
+    <changefreq>weekly</changefreq><priority>0.8</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/afbfdc93569eaf95a525c84a86445f4789ba7d34f028b8870d747e82ca20f3ed.png</image:loc><image:title>Lassi Kathmandu</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/?product=prod-coke-ca7879363c6b</loc>
+    <changefreq>weekly</changefreq><priority>0.75</priority>
+    <image:image><image:loc>https://crunchybag.com/media/menu/1/0f7c7fb33ec3098c17fb5436f29ac8beffed92b5c4d7d392488125ef8a04d73b.png</image:loc><image:title>Coke Cold Drink</image:title></image:image>
+  </url>
+
+  <!-- Delivery Area URLs (35+ Kathmandu Valley Hubs) -->
+  <url><loc>https://crunchybag.com/?location=imadol</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=balkumari</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=bojhpokhari</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=tikathali</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=koteshwor</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=tinkune</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=baneshwor</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=new-baneshwor</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=minbhawan</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=jadibuti</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=thimi</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=bhaktapur</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=gwarko</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=sanepa</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=kupandole</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=lagankhel</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=satdobato</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=kumaripati</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=jawalakhel</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=jhamsikhel</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=durbar-marg</loc><changefreq>weekly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?location=thamel</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?location=chabahil</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=bouddha</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=maharajgunj</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=baluwatar</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=lazimpat</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=kalanki</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=kirtipur</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=sinamangal</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=gaushala</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=old-baneshwor</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=maitighar</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=tripureshwor</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
+  <url><loc>https://crunchybag.com/?location=putalisadak</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
 
 </urlset>

@@ -470,9 +470,90 @@ export const CustomerFooter: React.FC = () => {
             </div>
           </div>
 
+          {/* SEO Fast Food & Location Directory for Kathmandu Valley (Google & User Indexing) */}
+          <div className="pt-6 pb-2 border-t border-zinc-200/60 dark:border-zinc-800/60 text-[11px] text-zinc-500 space-y-3">
+            {/* Frontend Sitemaps & Search Engines Hub */}
+            <div className="flex flex-wrap items-center gap-2 pb-1 text-xs">
+              <span className="font-bold text-amber-500 uppercase tracking-wider text-[10px] mr-1">
+                Sitemaps:
+              </span>
+              <a
+                href="/?page=menu"
+                className="hover:text-amber-400 underline decoration-zinc-700 underline-offset-4 transition-colors"
+                title="Explore Complete Crunchy Bag Online Menu"
+              >
+                📋 Menu Sitemap
+              </a>
+              <span className="text-zinc-700">•</span>
+              <a
+                href="/?page=combos"
+                className="hover:text-amber-400 underline decoration-zinc-700 underline-offset-4 transition-colors"
+                title="Explore Family Bags & Special Combos"
+              >
+                ⚡ Combos &amp; Family Bags Sitemap
+              </a>
+              <span className="text-zinc-700">•</span>
+              <a
+                href="/?page=delivery"
+                className="hover:text-amber-400 underline decoration-zinc-700 underline-offset-4 transition-colors"
+                title="Delivery Areas & Coverage Across Kathmandu Valley"
+              >
+                🛵 Delivery Coverage Sitemap
+              </a>
+              <span className="text-zinc-700">•</span>
+              <a
+                href="/sitemap.xml"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-amber-400 underline decoration-zinc-700 underline-offset-4 transition-colors"
+                title="Official Google &amp; Bing XML Sitemap"
+              >
+                🌐 Google XML Index
+              </a>
+            </div>
+
+            <div>
+              <span className="font-bold text-zinc-400 dark:text-zinc-300 uppercase tracking-wider text-[10px] mr-2">
+                Popular Food Searches:
+              </span>
+              <span className="leading-relaxed">
+                <a href="/?product=prod-aloo-tikki-burger-f1168a550eab" className="hover:text-amber-400">Aloo Tikki Burger</a> • 
+                <a href="/?product=prod-new-item-e3e0dadb97b5" className="hover:text-amber-400"> Chicken Burger</a> • 
+                <a href="/?product=prod-pizza-veg-27c34985033e" className="hover:text-amber-400"> Crunchy Fried Chicken Burger</a> • 
+                <a href="/?product=prod-crunchy-fried-chicken-0a5da9922717" className="hover:text-amber-400"> Crunchy Fried Chicken</a> • 
+                <a href="/?product=prod-crunchy-family-bag-f182f11d777e" className="hover:text-amber-400"> Crunchy Family Bag</a> • 
+                <a href="/?product=prod-crunchy-beast-combo-8996a2c37936" className="hover:text-amber-400"> Crunchy Beast Combo</a> • 
+                <a href="/?product=prod-chicken-65-pakoda-520d8e87ad56" className="hover:text-amber-400"> Chicken 65 Pakoda</a> • 
+                <a href="/?product=prod-classic-chicken-pakoda-ec85493d7b6a" className="hover:text-amber-400"> Classic Chicken Pakoda</a> • 
+                <a href="/?product=prod-paneer-pakoda-2e4d08e69b67" className="hover:text-amber-400"> Paneer Pakoda</a> • 
+                <a href="/?product=prod-french-friess-5f06b09954d9" className="hover:text-amber-400"> French Fries</a> • 
+                <a href="/?product=prod-crispy-potatoes-6e8f133152fa" className="hover:text-amber-400"> Crispy Potatoes</a> • 
+                <a href="/?product=prod-cold-coffee-469955c644d4" className="hover:text-amber-400"> Cold Coffee</a> • 
+                <a href="/?product=prod-coke-ca7879363c6b" className="hover:text-amber-400"> Cold Drinks Online</a> • 
+                <a href="/?page=reserve" className="hover:text-amber-400"> Book Table Near Me</a>
+              </span>
+            </div>
+            <div>
+              <span className="font-bold text-zinc-400 dark:text-zinc-300 uppercase tracking-wider text-[10px] mr-2">
+                Fast Delivery Areas in Kathmandu Valley:
+              </span>
+              <span className="leading-relaxed">
+                Imadol • Balkumari • Bojhpokhari • Tikathali • Koteshwor • Tinkune • Baneshwor • New Baneshwor • Minbhawan • Jadibuti • Thimi • Bhaktapur • Gwarko • Sanepa • Kupandole • Lagankhel • Satdobato • Kumaripati • Jawalakhel • Jhamsikhel • Durbar Marg • Thamel • Chabahil • Bouddha • Maharajgunj • Baluwatar • Lazimpat • Kalanki • Kirtipur • Sinamangal • Gaushala • Old Baneshwor • Maitighar • Tripureshwor • Putalisadak
+              </span>
+            </div>
+            <div>
+              <span className="font-bold text-zinc-400 dark:text-zinc-300 uppercase tracking-wider text-[10px] mr-2">
+                Brand &amp; Keywords:
+              </span>
+              <span className="leading-relaxed text-zinc-600 dark:text-zinc-500">
+                Crunchy Bag • CrunchyBag • Crunch Bag • Crunhy Bag • crunchyabg • Best fast food delivery Nepal
+              </span>
+            </div>
+          </div>
+
           {/* Bottom Bar: Legal & Policy Direct Quick Links */}
-          <div className="pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 flex flex-col md:flex-row items-center justify-between gap-3 text-[11px] text-zinc-500">
-            <p>© {new Date().getFullYear()} Crunchy Restaurant. All rights reserved.</p>
+          <div className="pt-4 border-t border-zinc-200/80 dark:border-zinc-800/80 flex flex-col md:flex-row items-center justify-between gap-3 text-[11px] text-zinc-500">
+            <p>© {new Date().getFullYear()} Crunchy Bag Restaurant. All rights reserved.</p>
 
             <nav aria-label="Footer Legal and Policy Links" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
               <button

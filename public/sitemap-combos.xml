@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://crunchybag.com/?page=combos</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url><loc>https://crunchybag.com/?product=prod-crunchy-family-bag-f182f11d777e</loc><priority>0.9</priority></url>
+  <url><loc>https://crunchybag.com/?product=prod-crunchy-beast-combo-8996a2c37936</loc><priority>0.9</priority></url>
+  <url><loc>https://crunchybag.com/?product=prod-crunchy-duo-combo-49a6969348ad</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?product=prod-crunchy-chicken-combo-bdb9434dbe9c</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?product=prod-crunchy-loaded-combo-228c7d8f1f37</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?product=prod-crunchy-starter-combo-b641d8d27fe4</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?product=prod-buger-fired-best-combo-packages-22d9b39730ad</loc><priority>0.8</priority></url>
+</urlset>

@@ -1,6 +1,7 @@
 import { ComboPackageModal } from "./ComboPackageModal";
 import { comboDefinitions } from "../../lib/catalogApi";
 import { useAuth } from "../../context/AuthContext";
+import { updatePageSEO } from "../../lib/seo";
 import React, { useState, useEffect } from "react";
 import {
   Flame,
@@ -75,6 +76,15 @@ export const CustomerPortal: React.FC = () => {
     if (catId === selectedCategory) return;
     setIsCategoryLoading(true);
     setSelectedCategory(catId);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (catId === "all") {
+        url.searchParams.delete("category");
+      } else {
+        url.searchParams.set("category", catId);
+      }
+      window.history.replaceState({}, "", url.toString());
+    }
     setTimeout(() => setIsCategoryLoading(false), 200);
   };
 
@@ -87,6 +97,60 @@ export const CustomerPortal: React.FC = () => {
 
   // Modals
   const [activeProductForConfig, setActiveProductForConfig] = useState<Product | null>(null);
+
+  const handleOpenProduct = (product: Product) => {
+    setActiveProductForConfig(product);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("product", product.id);
+      window.history.replaceState({}, "", url.toString());
+      updatePageSEO({
+        title: `${product.name} (NPR ${product.basePrice}) | Crunchy Bag Kathmandu`,
+        description: product.description || `Order ${product.name} online from Crunchy Bag Kathmandu with fast delivery & instant eSewa.`,
+        image: product.images?.[0] || "https://crunchybag.com/crunchy_logo.png",
+        canonical: `https://crunchybag.com/?product=${encodeURIComponent(product.id)}`,
+      });
+    }
+  };
+
+  const handleCloseProduct = () => {
+    setActiveProductForConfig(null);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("product");
+      url.searchParams.delete("item");
+      url.searchParams.delete("combo");
+      window.history.replaceState({}, "", url.toString());
+      updatePageSEO({});
+    }
+  };
+
+  // Deep-linking effect for shareable URLs: ?product=..., ?category=..., ?page=...
+  useEffect(() => {
+    if (typeof window === "undefined" || products.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const prodParam = params.get("product") || params.get("item") || params.get("combo");
+    const catParam = params.get("category");
+    const pageParam = params.get("page");
+
+    if (catParam) {
+      setSelectedCategory(catParam);
+    } else if (pageParam === "combos" || pageParam === "special") {
+      setSelectedCategory("cat-special-combo-12ad6cad202d");
+    }
+
+    if (prodParam) {
+      const found = products.find(
+        (p) =>
+          p.id === prodParam ||
+          p.id.toLowerCase().includes(prodParam.toLowerCase()) ||
+          p.name.toLowerCase().replace(/[^a-z0-9]/g, "-").includes(prodParam.toLowerCase())
+      );
+      if (found) {
+        handleOpenProduct(found);
+      }
+    }
+  }, [products]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { isAuthenticated, authUser } = useAuth();
   const [resumeCheckout, setResumeCheckout] = useState(() => sessionStorage.getItem('customer:return-to-checkout') === 'yes');
@@ -365,7 +429,7 @@ export const CustomerPortal: React.FC = () => {
                   key={product.id}
                   product={product}
                   isLoading={false}
-                  onSelect={(p) => setActiveProductForConfig(p)}
+                  onSelect={(p) => handleOpenProduct(p)}
                   onQuickAdd={handleQuickAdd}
                 />
               ))}
@@ -420,12 +484,12 @@ export const CustomerPortal: React.FC = () => {
         <ProductConfiguratorModal
           product={activeProductForConfig}
           isOpen={!!activeProductForConfig}
-          onClose={() => setActiveProductForConfig(null)}
+          onClose={handleCloseProduct}
           onAddToCart={addToCart}
         />
       )}
 
-      {activeProductForConfig?.isComboPackage && <ComboPackageModal combo={comboDefinitions([activeProductForConfig])[0]} isOpen onClose={()=>setActiveProductForConfig(null)} />}
+      {activeProductForConfig?.isComboPackage && <ComboPackageModal combo={comboDefinitions([activeProductForConfig])[0]} isOpen onClose={handleCloseProduct} />}
       {/* Persistent Cart Drawer */}
       <CartDrawer onOpenCheckout={openCheckout} />
 
@@ -442,7 +506,7 @@ export const CustomerPortal: React.FC = () => {
         onClose={() => setIsSearchModalOpen(false)}
         onSelectProduct={(p) => {
           setIsSearchModalOpen(false);
-          setActiveProductForConfig(p);
+          handleOpenProduct(p);
         }}
       />
 

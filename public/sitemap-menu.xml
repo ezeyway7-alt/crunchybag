@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://crunchybag.com/?page=menu</loc>
+    <lastmod>2026-09-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url><loc>https://crunchybag.com/?category=cat-burgers-97a60a528a81</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-fried-chiken-330fbd829bc2</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-pakoda-ff49ba205060</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-fries-crispy-0ebc7a494c41</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-sandwiches-82dedfda123f</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-drinks-5493c0ec1baf</loc><priority>0.85</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-breverages-2e8578f6bda0</loc><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-salads-982fbd7a16e3</loc><priority>0.8</priority></url>
+  <url><loc>https://crunchybag.com/?category=cat-sauces-841daa4b5d18</loc><priority>0.8</priority></url>
+</urlset>

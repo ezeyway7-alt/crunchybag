@@ -25,5 +25,8 @@ Allow: /
 User-agent: Bingbot
 Allow: /
 
-# Sitemap Location
+# Sitemap Locations
 Sitemap: https://crunchybag.com/sitemap.xml
+Sitemap: https://crunchybag.com/sitemap-menu.xml
+Sitemap: https://crunchybag.com/sitemap-combos.xml
+Sitemap: https://crunchybag.com/sitemap-delivery.xml
