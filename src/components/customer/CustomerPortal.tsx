@@ -125,9 +125,10 @@ export const CustomerPortal: React.FC = () => {
     }
   };
 
-  // Deep-linking effect for shareable URLs: ?product=..., ?category=..., ?page=...
+  // Deep-linking effect for shareable URLs: clean paths or ?product=..., ?category=..., ?page=...
   useEffect(() => {
     if (typeof window === "undefined" || products.length === 0) return;
+    const path = window.location.pathname.toLowerCase();
     const params = new URLSearchParams(window.location.search);
     const prodParam = params.get("product") || params.get("item") || params.get("combo");
     const catParam = params.get("category");
@@ -135,8 +136,20 @@ export const CustomerPortal: React.FC = () => {
 
     if (catParam) {
       setSelectedCategory(catParam);
-    } else if (pageParam === "combos" || pageParam === "special") {
+    } else if (pageParam === "combos" || pageParam === "special" || path.includes("/combos")) {
       setSelectedCategory("cat-special-combo-12ad6cad202d");
+    } else if (path.includes("/burger")) {
+      setSelectedCategory("cat-burgers-97a60a528a81");
+    } else if (path.includes("/fried-chicken")) {
+      setSelectedCategory("cat-fried-chiken-330fbd829bc2");
+    } else if (path.includes("/pakoda")) {
+      setSelectedCategory("cat-pakoda-ff49ba205060");
+    } else if (path.includes("/fries")) {
+      setSelectedCategory("cat-fries-crispy-0ebc7a494c41");
+    } else if (path.includes("/sandwich")) {
+      setSelectedCategory("cat-sandwiches-82dedfda123f");
+    } else if (path.includes("/drink") || path.includes("/shake")) {
+      setSelectedCategory("cat-drinks-5493c0ec1baf");
     }
 
     if (prodParam) {
