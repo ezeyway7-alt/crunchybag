@@ -269,4 +269,72 @@
   <url><loc>https://crunchybag.com/delivery/tripureshwor</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
   <url><loc>https://crunchybag.com/delivery/putalisadak</loc><changefreq>weekly</changefreq><priority>0.75</priority></url>
 
+  <!-- Culinary Blogs & Food Stories (Indexable Full URLs) -->
+  <url>
+    <loc>https://crunchybag.com/blogs</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/blog/secret-to-kathmandus-crispiest-chicken</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>The Science of the Crunch: How We Achieve Kathmandu's Crispiest Chicken</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/blog/himalayan-timur-spices-sourcing</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>From Kavre to Imadol: Sourcing Ethical Poultry and Himalayan Spices</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/blog/guide-to-ordering-with-esewa</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1556742049-0a67c5574f73?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>Zero-Friction Dining: How eSewa Instant Online Checkout Speeds Up Your Order</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/blog/perfect-burger-anatomy-kathmandu</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>The Anatomy of a Smash Burger: Why Lacy Edges Matter</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/blog/ultimate-nepali-spiced-pakoda-guide</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>The Ultimate Guide to Spiced Pakodas in Kathmandu</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://crunchybag.com/blog/inside-imadol-kitchen-thermal-delivery</loc>
+    <lastmod>2026-10-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1526367790999-0150786686a2?auto=format&amp;fit=crop&amp;w=1200&amp;q=80</image:loc>
+      <image:title>Inside Our Imadol Kitchen: How Thermal Bag Tech Keeps Delivery Piping Hot</image:title>
+    </image:image>
+  </url>
+
 </urlset>

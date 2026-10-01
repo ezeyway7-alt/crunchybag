@@ -12,101 +12,9 @@ import {
 } from "lucide-react";
 import { Modal } from "../common/Modal";
 
-interface BlogArticle {
-  id: string;
-  slug: string;
-  title: string;
-  excerpt: string;
-  content: string[];
-  category: "Kitchen Secrets" | "Food Guides" | "Local Sourcing" | "Delivery Tips";
-  author: string;
-  date: string;
-  readTime: string;
-  image: string;
-  tags: string[];
-}
+import { BLOG_ARTICLES, BlogArticle } from "../../data/blogData";
 
-// Configurable backend schema placeholder:
-// In the future, this array will be fetched directly from GET /api/cms/blogs
-export const INITIAL_BLOG_ARTICLES: BlogArticle[] = [
-  {
-    id: "blog-1",
-    slug: "secret-to-kathmandus-crispiest-chicken",
-    title: "The Science of the Crunch: How We Achieve Kathmandu's Crispiest Chicken",
-    excerpt:
-      "Ever wonder why ordinary fried chicken gets soggy on the way to Lalitpur while Crunchy stays shatteringly crisp? Here is the culinary physics behind our double-dredge method.",
-    category: "Kitchen Secrets",
-    author: "Head Chef Bikas Thapa",
-    date: "Sep 12, 2026",
-    readTime: "4 min read",
-    image: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=800&q=80",
-    tags: ["Fried Chicken", "Kitchen Secrets", "Kathmandu Food"],
-    content: [
-      "Most fried chicken suffers from a single fatal flaw: moisture migration from the steaming interior turns the outer crust into a damp sponge within ten minutes of leaving the fryer.",
-      "At Crunchy, we tackled this challenge using a precision three-stage technique engineered specifically for Kathmandu's high altitude and fast-paced delivery geography.",
-      "First, our poultry undergoes an 18-hour cold brine infused with Timur peppercorns, garlic, and buttermilk. The acidity breaks down collagen fibers, ensuring the meat retains its natural juices even at high frying temperatures.",
-      "Second, we employ a proprietary cornstarch-and-rice-flour dredge ratio rather than standard wheat flour. Rice flour absorbs 50% less oil and forms a microscopic cellular lattice that repels ambient steam.",
-      "Finally, our flash-frying process at 175°C locks in the crunch. Even after a 25-minute motorcycle journey through Lazimpat or Baneshwor, opening the box delivers that unmistakably loud, satisfying bite.",
-    ],
-  },
-  {
-    id: "blog-2",
-    slug: "himalayan-timur-spices-sourcing",
-    title: "From Kavre to Durbar Marg: Sourcing Ethical Poultry & Himalayan Spices",
-    excerpt:
-      "A deep dive into our farm-to-table supply chain in Nepal, partnering with organic smallholders for Timur, ginger, and free-range mountain chickens.",
-    category: "Local Sourcing",
-    author: "Sourcing Director Priya Shrestha",
-    date: "Aug 28, 2026",
-    readTime: "3 min read",
-    image: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=800&q=80",
-    tags: ["Local Sourcing", "Nepal Agriculture", "Organic Spices"],
-    content: [
-      "Great fast food should not come at the expense of environmental ethics or local livelihoods. Since our founding, 100% of our chicken has been sourced from certified contract farmers in Kavre and Chitwan.",
-      "These farms adhere to zero-antibiotic preventative standards, humane stocking densities, and natural grain feeding regimes. The result is firmer muscle texture and richer natural umami.",
-      "For our seasoning blends, we source wild Timur peppers directly from organic cooperatives in Rolpa and Makwanpur. When combined with fresh local garlic and cold-pressed mustard oil, they provide that tingling citrus heat unique to the Himalayas.",
-      "Every time you order a Crunchy bucket, you are directly supporting dozens of farming families across rural Nepal.",
-    ],
-  },
-  {
-    id: "blog-3",
-    slug: "guide-to-ordering-with-esewa",
-    title: "Zero-Friction Dining: How eSewa Instant Online Checkout Speeds Up Your Order",
-    excerpt:
-      "Why we moved to streamlined eSewa digital payments, ensuring instantaneous kitchen ticket printing and contact-free express courier handoffs.",
-    category: "Delivery Tips",
-    author: "Crunchy Operations Team",
-    date: "Aug 15, 2026",
-    readTime: "2 min read",
-    image: "https://images.unsplash.com/photo-1556742049-0a67c5574f73?auto=format&fit=crop&w=800&q=80",
-    tags: ["eSewa", "Digital Nepal", "Fast Delivery"],
-    content: [
-      "In modern food delivery, seconds count. Cash on delivery often leads to courier delays while counting change, finding loose notes in the rain, or waiting at the doorstep.",
-      "By integrating direct eSewa digital wallet settlement, your order triggers our Kitchen Display System (KDS) immediately within 0.8 seconds of payment authorization.",
-      "Couriers receive clear digital manifests and can hand over your food in under 5 seconds upon arrival. No card terminals that drop Wi-Fi signal, and no cash exchange hurdles.",
-      "Look out for special monthly cashbacks and exclusive eSewa loyalty points on all Crunchy combo packages!",
-    ],
-  },
-  {
-    id: "blog-4",
-    slug: "perfect-burger-anatomy-kathmandu",
-    title: "The Anatomy of a Smash Burger: Why Lacy Edges Matter",
-    excerpt:
-      "Thick pucks are out; wafer-thin, caramelized smashed beef and chicken patties are in. Here is why the smash technique unlocks maximum flavor.",
-    category: "Food Guides",
-    author: "Head Chef Bikas Thapa",
-    date: "Jul 30, 2026",
-    readTime: "3 min read",
-    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80",
-    tags: ["Smash Burgers", "Food Science", "Kathmandu Eats"],
-    content: [
-      "When a meatball hits a 230°C cast-iron flattop and is violently smashed with a heavy steel press, something magical occurs: the Maillard reaction goes into overdrive.",
-      "Instead of a soggy sponge of minced meat, smashing creates thousands of microscopic browned ridges and lace-thin crispy perimeter edges.",
-      "At Crunchy, we pair this intense crust with toasted butter brioche buns baked daily in Patan, house-made dill pickles, and our signature burger sauce.",
-      "The result is a burger that can be eaten cleanly with one hand without falling apart.",
-    ],
-  },
-];
+export const INITIAL_BLOG_ARTICLES = BLOG_ARTICLES;
 
 interface BlogsModalProps {
   isOpen: boolean;
@@ -147,22 +55,56 @@ export const BlogsModal: React.FC<BlogsModalProps> = ({ isOpen, onClose }) => {
         </div>
       }
       description={
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          Kitchen secrets, local sourcing guides, and news from Kathmandu
-        </span>
+        <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+          <span>Kitchen secrets, local sourcing guides, and news from Kathmandu</span>
+          <a
+            href="/blogs"
+            onClick={(e) => {
+              e.preventDefault();
+              onClose();
+              if (typeof window !== "undefined") {
+                window.history.pushState(null, "", "/blogs");
+                window.dispatchEvent(new PopStateEvent("popstate"));
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
+            className="text-amber-500 hover:underline font-bold text-[11px] ml-2 shrink-0"
+          >
+            Blogs Portal &rarr;
+          </a>
+        </div>
       }
     >
       <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
         {selectedArticle ? (
           /* Single Article Reader View */
           <div className="space-y-5">
-            <button
-              onClick={() => setSelectedArticle(null)}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to all articles</span>
-            </button>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setSelectedArticle(null)}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to all articles</span>
+              </button>
+
+              <a
+                href={`/blog/${selectedArticle.slug}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onClose();
+                  if (typeof window !== "undefined") {
+                    window.history.pushState(null, "", `/blog/${selectedArticle.slug}`);
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-xs transition-colors"
+              >
+                <span>Full Page View</span>
+                <ArrowRight className="w-3 h-3" />
+              </a>
+            </div>
 
             {/* Article Image */}
             <div className="relative h-48 sm:h-64 w-full overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-900">

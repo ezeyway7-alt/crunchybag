@@ -1,3 +1,5 @@
+import { BlogsPortalPage } from "./BlogsPortalPage";
+import { BlogDetailPage } from "./BlogDetailPage";
 import { ComboPackageModal } from "./ComboPackageModal";
 import { comboDefinitions } from "../../lib/catalogApi";
 import { useAuth } from "../../context/AuthContext";
@@ -94,6 +96,30 @@ export const CustomerPortal: React.FC = () => {
     setSelectedDietaryFilter(filterId);
     setTimeout(() => setIsCategoryLoading(false), 180);
   };
+
+  // Track current route for deep-linking blogs & portal pages
+  const [currentRoutePath, setCurrentRoutePath] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return window.location.pathname.toLowerCase().replace(/\/+$/, "") || "/";
+    }
+    return "/";
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== "undefined") {
+        setCurrentRoutePath(window.location.pathname.toLowerCase().replace(/\/+$/, "") || "/");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const isBlogsPortalRoute = currentRoutePath === "/blogs" || currentRoutePath === "/blog";
+  const isBlogDetailRoute = currentRoutePath.startsWith("/blog/") || currentRoutePath.startsWith("/blogs/");
+  const blogSlug = isBlogDetailRoute
+    ? currentRoutePath.replace(/^\/(?:blogs?)\//, "").replace(/\/+$/, "")
+    : "";
 
   // Modals
   const [activeProductForConfig, setActiveProductForConfig] = useState<Product | null>(null);
@@ -296,7 +322,16 @@ export const CustomerPortal: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-zinc-100 transition-colors">
-      {customerActiveTab === "menu" ? (
+      {isBlogDetailRoute && blogSlug ? (
+        <BlogDetailPage
+          slug={blogSlug}
+          onNavigate={(path) => setCurrentRoutePath(path.toLowerCase().replace(/\/+$/, "") || "/")}
+        />
+      ) : isBlogsPortalRoute ? (
+        <BlogsPortalPage
+          onNavigate={(path) => setCurrentRoutePath(path.toLowerCase().replace(/\/+$/, "") || "/")}
+        />
+      ) : customerActiveTab === "menu" ? (
         <main id="menu" className="max-w-7xl mx-auto px-4 sm:px-6 pt-0 pb-8 space-y-6">
           {/* Semantic SEO Primary Headline for Search Engines & Screen Readers */}
           <h1 className="sr-only">

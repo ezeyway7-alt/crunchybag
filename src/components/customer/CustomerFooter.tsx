@@ -372,16 +372,24 @@ export const CustomerFooter: React.FC = () => {
                   </button>
                 </li>
                 <li>
-                  <button
-                    type="button"
-                    onClick={() => setIsBlogsModalOpen(true)}
-                    className="hover:text-amber-500 transition-colors cursor-pointer text-left font-medium flex items-center gap-1"
+                  <a
+                    href="/blogs"
+                    onClick={(e) => {
+                      if (e.ctrlKey || e.metaKey || e.button === 1) return;
+                      e.preventDefault();
+                      if (typeof window !== "undefined") {
+                        window.history.pushState(null, "", "/blogs");
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }
+                    }}
+                    className="hover:text-amber-500 transition-colors cursor-pointer text-left font-medium flex items-center gap-1 text-zinc-600 dark:text-zinc-400"
                   >
                     <span>Culinary Blog</span>
                     <span className="text-[9px] px-1 bg-amber-500/20 text-amber-600 dark:text-amber-400 font-mono font-bold">
-                      NEW
+                      PORTAL
                     </span>
-                  </button>
+                  </a>
                 </li>
                 <li>
                   <button
@@ -603,13 +611,21 @@ export const CustomerFooter: React.FC = () => {
                 About Us
               </button>
               <span>•</span>
-              <button
-                type="button"
-                onClick={() => setIsBlogsModalOpen(true)}
-                className="hover:text-amber-500 transition-colors cursor-pointer"
+              <a
+                href="/blogs"
+                onClick={(e) => {
+                  if (e.ctrlKey || e.metaKey || e.button === 1) return;
+                  e.preventDefault();
+                  if (typeof window !== "undefined") {
+                    window.history.pushState(null, "", "/blogs");
+                    window.dispatchEvent(new PopStateEvent("popstate"));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+                className="hover:text-amber-500 transition-colors cursor-pointer text-zinc-500 hover:text-amber-500"
               >
                 Blogs
-              </button>
+              </a>
               <span>•</span>
               <button
                 type="button"

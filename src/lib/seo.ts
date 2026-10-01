@@ -10,15 +10,22 @@ export interface SEOMetadata {
   canonical?: string;
   image?: string;
   noIndex?: boolean;
+  type?: 'website' | 'article';
+  author?: string;
+  publishedTime?: string;
+  section?: string;
+  tags?: string[];
+  schema?: Record<string, unknown>;
 }
 
 const DEFAULT_METADATA: SEOMetadata = {
-  title: 'Crunchy Bag - Crispy Fried Chicken & Burgers in Kathmandu',
+  title: 'Crunchy Bag - Best Crispy Fried Chicken, Burgers & Food Delivery in Kathmandu',
   description:
-    'Order crispy fried chicken, smash burgers & snacks online with fast food delivery across Kathmandu Valley. Book tables & order online with instant eSewa.',
+    "Order Kathmandu's best crispy fried chicken, gourmet smash burgers, crunchy pakodas, and combos online from Crunchy Bag. Express food delivery across Kathmandu, Lalitpur & Bhaktapur with instant eSewa & cash payment.",
   canonical: 'https://crunchybag.com/',
   image: 'https://crunchybag.com/crunchy_logo.png',
   noIndex: false,
+  type: 'website',
 };
 
 export function updatePageSEO(meta: SEOMetadata) {
@@ -77,5 +84,28 @@ export function updatePageSEO(meta: SEOMetadata) {
   if (merged.image) {
     setMetaTag("meta[property='og:image']", 'content', merged.image);
     setMetaTag("meta[name='twitter:image']", 'content', merged.image);
+  }
+
+  // 8. Update OG Type & Article Attributes
+  setMetaTag("meta[property='og:type']", 'content', merged.type || 'website');
+  if (merged.type === 'article') {
+    if (merged.author) setMetaTag("meta[property='article:author']", 'content', merged.author);
+    if (merged.publishedTime) setMetaTag("meta[property='article:published_time']", 'content', merged.publishedTime);
+    if (merged.section) setMetaTag("meta[property='article:section']", 'content', merged.section);
+  }
+
+  // 9. Update Dynamic JSON-LD Schema (e.g. BlogPosting)
+  const existingSchema = document.getElementById('dynamic-route-schema');
+  if (merged.schema) {
+    let scriptEl = existingSchema as HTMLScriptElement;
+    if (!scriptEl) {
+      scriptEl = document.createElement('script');
+      scriptEl.id = 'dynamic-route-schema';
+      scriptEl.type = 'application/ld+json';
+      document.head.appendChild(scriptEl);
+    }
+    scriptEl.textContent = JSON.stringify(merged.schema, null, 2);
+  } else if (existingSchema) {
+    existingSchema.remove();
   }
 }

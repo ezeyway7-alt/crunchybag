@@ -77,7 +77,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           </h4>
           <p>We process your personal information strictly for legitimate operational purposes:</p>
           <ul className="list-disc pl-5 space-y-1 text-zinc-600 dark:text-zinc-400">
-            <li>Routing orders to kitchen display systems (KDS) for immediate cooking.</li>
+            <li>Routing orders to our kitchen staff for immediate cooking and preparation.</li>
             <li>Providing real-time live order tracking and countdown status.</li>
             <li>Enabling delivery couriers to contact you upon doorstep arrival.</li>
             <li>Issuing official fiscal VAT tax invoices in accordance with the Inland Revenue Department (IRD) of Nepal.</li>

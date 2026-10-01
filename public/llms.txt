@@ -29,6 +29,15 @@
 - Contact Email: hello@crunchybag.com
 - Call / Order Hotline: 9761503339
 
+## Culinary Blogs & Guides
+- [Culinary Blogs Portal](https://crunchybag.com/blogs): Kathmandu food stories, kitchen science, and recipes.
+- [The Science of the Crunch](https://crunchybag.com/blog/secret-to-kathmandus-crispiest-chicken): How 18-hour cold brining and rice flour dredge create Kathmandu's crispiest fried chicken.
+- [Himalayan Timur & Spice Sourcing](https://crunchybag.com/blog/himalayan-timur-spices-sourcing): Farm-to-table partnerships with Nepali smallholders for ethical poultry and wild Timur peppercorns.
+- [Ordering with eSewa Guide](https://crunchybag.com/blog/guide-to-ordering-with-esewa): Zero-friction digital checkout and 0.8-second automated KDS kitchen dispatch.
+- [Anatomy of a Smash Burger](https://crunchybag.com/blog/perfect-burger-anatomy-kathmandu): The Maillard reaction, caramelized lacy edges, and brioche bun craft.
+- [Nepali Spiced Pakoda Guide](https://crunchybag.com/blog/ultimate-nepali-spiced-pakoda-guide): Cold-milled besan batter, ajwain spices, and Chicken 65 / Paneer pakodas.
+- [Inside Imadol Central Kitchen](https://crunchybag.com/blog/inside-imadol-kitchen-thermal-delivery): Heat-sealed thermal delivery bags keeping food hot across Kathmandu Valley.
+
 ## Policies & Help
 - [About Us](https://crunchybag.com/about): Brand story, kitchen philosophy, and hygiene standards.
 - [Privacy Policy](https://crunchybag.com/privacy): Customer data protection and privacy practices.

@@ -9,8 +9,8 @@ interface FaqModalProps {
 
 export const FAQS_DATA = [
   {
-    q: "How do I order food online from Crunchy in Kathmandu?",
-    a: "Select your favorite dishes from our online menu, choose delivery or takeaway, and complete instant payment using your eSewa digital wallet. Your order is sent directly to our kitchen display system for immediate cooking.",
+    q: "How do I order food online from Crunchy Bag in Kathmandu?",
+    a: "Select your favorite dishes from our online menu, choose delivery or takeaway, and complete instant payment using your eSewa digital wallet. Your order is sent directly to our kitchen team for immediate cooking.",
   },
   {
     q: "What payment methods are supported on Crunchy?",
