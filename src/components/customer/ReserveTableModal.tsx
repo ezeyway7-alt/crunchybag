@@ -25,8 +25,8 @@ interface ReserveTableModalProps {
 export const ReserveTableModal: React.FC<ReserveTableModalProps> = ({
   isOpen,
   onClose,
-  outletName = "Durbar Marg Flagship",
-  outletAddress = "Kings Way, Opposite Narayanhiti Palace, Kathmandu",
+  outletName = "Crunchy Bag - Imadol Outlet",
+  outletAddress = "Imadol, Lalitpur, Nepal",
 }) => {
   const { customerProfile } = useApp();
 

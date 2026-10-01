@@ -577,14 +577,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (mounted && Array.isArray(liveBranches) && liveBranches.length > 0) {
           const mapped: Outlet[] = liveBranches.map((b: any) => ({
             id: String(b.id),
-            name: b.name ? (b.name === "Main" ? "Crunchy Main - Kathmandu" : b.name) : "Main Branch",
+            name: b.name ? (b.name === "Main" ? "Crunchy Bag - Imadol Outlet" : b.name) : "Main Branch",
             code: b.branch_code || `0${b.id}`,
-            address: b.address_line || "Kathmandu, Nepal",
-            city: b.city || "Kathmandu",
-            phone: b.phone_number || "+977 1-4229988",
+            address: b.address_line || "Imadol, Lalitpur, Nepal",
+            city: b.city || "Lalitpur",
+            phone: b.phone_number || "9761503339",
             isOpen: b.accepting_orders ?? b.is_active ?? true,
             timezone: "Asia/Kathmandu (NPT +05:45)",
-            operatingHours: "10:30 AM – 11:00 PM",
+            operatingHours: "10:00 AM – 11:30 PM",
             estimatedPrepTimeMin: 15,
             serviceModes: ["Dine-in", "Takeaway", "Delivery"],
           }));
@@ -599,7 +599,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return {
               ...prev,
               id: matched.id,
-              name: prev.name && prev.name !== "Crunchy Flagship - Durbar Marg" ? prev.name : matched.name,
+              name: prev.name && prev.name !== "Crunchy Bag - Imadol Outlet & Kitchen" ? prev.name : matched.name,
               code: matched.code || prev.code,
               address: matched.address || prev.address,
               phone: matched.phone || prev.phone,

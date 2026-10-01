@@ -153,8 +153,8 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           </p>
           <div className="font-mono text-[11px] space-y-0.5 text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900/50 p-2.5 border border-zinc-200 dark:border-zinc-800">
             <div>Email: privacy@crunchybag.com</div>
-            <div>Hotline: +977 1-4229988</div>
-            <div>Address: Kings Way, Durbar Marg, Kathmandu, Nepal</div>
+            <div>Hotline: 9761503339</div>
+            <div>Address: Imadol, Lalitpur 44700, Nepal</div>
           </div>
         </div>
       </div>

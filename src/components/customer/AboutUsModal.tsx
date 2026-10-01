@@ -22,11 +22,11 @@ interface AboutUsModalProps {
 // In the future, this object can be fetched directly from GET /api/cms/about
 export const ABOUT_US_DATA = {
   headline: "Crispy Perfection Handcrafted in Kathmandu",
-  tagline: "Durbar Marg's premier destination for artisan fried chicken, smash burgers, and signature shakes.",
+  tagline: "Imadol's premier destination for artisan fried chicken, smash burgers, and signature shakes.",
   story: [
-    "Crunchy was founded with a single obsession: to bring world-class crispy fried chicken and juicy artisanal smash burgers to the heart of Kathmandu Valley, prepared with uncompromising freshness and authentic Himalayan spices.",
+    "Crunchy Bag was founded with a single obsession: to bring world-class crispy fried chicken and juicy artisanal smash burgers to Kathmandu Valley, prepared with uncompromising freshness and authentic Himalayan spices.",
     "Every piece of chicken is marinated for 18 hours in our secret herbal brine, hand-breaded in small batches with our signature 12-spice crunch coating, and flash-fried to golden perfection in 100% clean vegetable oil.",
-    "From our flagship dining room on Kings Way opposite Narayanhiti Palace to our lightning-fast 30-minute delivery fleet across Kathmandu, Patan, and Lalitpur, we treat every order as a signature culinary experience.",
+    "From our central outlet and kitchen in Imadol, Lalitpur to our lightning-fast 20-30 minute delivery fleet across Lalitpur, Kathmandu, and Bhaktapur, we treat every order as a signature culinary experience.",
   ],
   pillars: [
     {
@@ -163,10 +163,10 @@ export const AboutUsModal: React.FC<AboutUsModalProps> = ({
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 font-bold text-zinc-900 dark:text-white">
               <MapPin className="w-3.5 h-3.5 text-amber-500" />
-              <span>Durbar Marg Flagship Restaurant</span>
+              <span>Crunchy Bag - Imadol Outlet &amp; Kitchen</span>
             </div>
             <p className="text-zinc-500 dark:text-zinc-400 text-[11px]">
-              Kings Way, Opposite Narayanhiti Palace, Kathmandu • Open Daily 10:00 AM – 11:30 PM
+              Imadol, Lalitpur, Nepal • Open Daily 10:00 AM – 11:30 PM • Hotline: 9761503339
             </p>
           </div>
           {onExploreMenu && (

@@ -65,7 +65,7 @@ export const DeliveryRider3DAnimation: React.FC<DeliveryRider3DAnimationProps> =
           {/* Kathmandu Landmark Beacons along the highway */}
           <div className="absolute -top-6 left-6 [transform:translateZ(25px)] flex items-center gap-1 text-[9px] font-mono font-black text-amber-400 bg-black/90 px-1.5 py-0.5 border border-amber-500/60 shadow-md">
             <MapPin className="h-2.5 w-2.5 text-amber-500 animate-bounce" />
-            <span>Durbar Marg Hub</span>
+            <span>Imadol Kitchen Hub</span>
           </div>
           <div className="absolute -bottom-6 right-8 [transform:translateZ(25px)] flex items-center gap-1 text-[9px] font-mono font-black text-zinc-300 bg-black/90 px-1.5 py-0.5 border border-zinc-700 shadow-md">
             <MapPin className="h-2.5 w-2.5 text-amber-400" />

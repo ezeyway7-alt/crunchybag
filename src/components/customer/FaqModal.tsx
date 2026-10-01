@@ -17,12 +17,12 @@ export const FAQS_DATA = [
     a: "Crunchy supports 100% secure digital payments via eSewa with real-time transaction verification.",
   },
   {
-    q: "Where is Crunchy located in Kathmandu?",
-    a: "Our flagship restaurant is located on Kings Way, opposite Narayanhiti Palace in Durbar Marg, Kathmandu. We offer dine-in, table reservations, counter takeaway, and delivery across Kathmandu Valley.",
+    q: "Where is Crunchy Bag located?",
+    a: "Our central restaurant and kitchen is located in Imadol, Lalitpur, Nepal. We offer dine-in, takeaway counter service, and express delivery across Lalitpur, Kathmandu, and Bhaktapur.",
   },
   {
     q: "How long does delivery take?",
-    a: "Average delivery time is 30 to 45 minutes across Kathmandu, Patan, and Lalitpur, with live GPS countdown tracking.",
+    a: "Average delivery time is 20 to 35 minutes across Lalitpur and Kathmandu Valley, with live GPS countdown tracking.",
   },
   {
     q: "Can I customize the spice level or request boneless chicken?",
@@ -30,7 +30,7 @@ export const FAQS_DATA = [
   },
   {
     q: "Do you cater for bulk orders or private events?",
-    a: "Yes, we accept party buckets and bulk catering for corporate events and celebrations in Kathmandu. Please contact our Durbar Marg hotline at +977 1-4229988 at least 3 hours in advance.",
+    a: "Yes, we accept party buckets and bulk catering for corporate events and celebrations across Kathmandu Valley. Please contact our hotline at 9761503339 at least 3 hours in advance.",
   },
 ];
 
@@ -52,7 +52,7 @@ export const FaqModal: React.FC<FaqModalProps> = ({ isOpen, onClose }) => {
       }
       description={
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          Everything you need to know about ordering, delivery, and dining at Crunchy
+          Everything you need to know about ordering, delivery, and dining at Crunchy Bag
         </span>
       }
     >
@@ -66,11 +66,11 @@ export const FaqModal: React.FC<FaqModalProps> = ({ isOpen, onClose }) => {
             </span>
           </div>
           <a
-            href="tel:+97714229988"
+            href="tel:9761503339"
             className="px-2.5 py-1 bg-amber-500 text-black font-bold text-[11px] shrink-0 hover:bg-amber-400 cursor-pointer flex items-center gap-1"
           >
             <Phone className="w-3 h-3" />
-            <span>Call Hotline</span>
+            <span>Call Hotline (9761503339)</span>
           </a>
         </div>
 

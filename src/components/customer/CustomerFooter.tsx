@@ -13,6 +13,8 @@ import {
   Trash2,
   Info,
   HelpCircle,
+  Instagram,
+  Share2,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
@@ -37,16 +39,31 @@ interface OutletLocation {
 }
 
 const SINGLE_OUTLET: OutletLocation = {
-  id: "durbar-marg",
-  name: "Durbar Marg Flagship",
-  area: "Central Kathmandu",
-  address: "Kings Way, Opposite Narayanhiti Palace, Kathmandu",
-  phone: "+977 1-4229988",
+  id: "imadol",
+  name: "Crunchy Bag - Imadol Outlet & Kitchen",
+  area: "Imadol, Lalitpur",
+  address: "Imadol, Lalitpur, Nepal",
+  phone: "9761503339",
   hours: "10:00 AM – 11:30 PM",
-  lat: 27.7125,
-  lng: 85.3175,
+  lat: 27.6620,
+  lng: 85.3410,
   status: "Open Now",
 };
+
+export const GOOGLE_MAPS_LOCATION_URL = "https://share.google/wJPKlrcMJueR0EmvX";
+
+export const INSTAGRAM_VIRAL_TAGS = [
+  { name: "#CrunchyBag", url: "https://www.instagram.com/explore/tags/crunchybag/" },
+  { name: "#DidYouSeeThat", url: "https://www.instagram.com/explore/tags/didyouseethat/" },
+  { name: "#StreetPrankNepal", url: "https://www.instagram.com/explore/tags/streetpranknepal/" },
+  { name: "#ImadolDiaries", url: "https://www.instagram.com/explore/tags/imadoldiaries/" },
+  { name: "#LalitpurVibes", url: "https://www.instagram.com/explore/tags/lalitpurvibes/" },
+  { name: "#ComingSoonNepal", url: "https://www.instagram.com/explore/tags/comingsoonnepal/" },
+  { name: "#PlotTwistReel", url: "https://www.instagram.com/explore/tags/plottwistreel/" },
+  { name: "#NepalViralReels", url: "https://www.instagram.com/explore/tags/nepalviralreels/" },
+  { name: "#FoodHypeNepal", url: "https://www.instagram.com/explore/tags/foodhypenepal/" },
+  { name: "#EnjoyEachBiteWithCrunch", url: "https://www.instagram.com/explore/tags/enjoyeachbitewithcrunch/" },
+];
 
 export const CustomerFooter: React.FC = () => {
   const { openLoginModal } = useAuth();
@@ -169,7 +186,7 @@ export const CustomerFooter: React.FC = () => {
                 {/* Map Floating Guide Badge */}
                 <div className="absolute bottom-2.5 left-2.5 z-20 px-2.5 py-1 bg-zinc-900/90 text-white text-[11px] font-mono border border-zinc-800 backdrop-blur-xs flex items-center gap-1.5">
                   <Compass className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Durbar Marg, Kathmandu</span>
+                  <span>Imadol, Lalitpur</span>
                 </div>
               </div>
 
@@ -216,7 +233,7 @@ export const CustomerFooter: React.FC = () => {
                 {/* Action Buttons */}
                 <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${SINGLE_OUTLET.lat},${SINGLE_OUTLET.lng}`}
+                    href={GOOGLE_MAPS_LOCATION_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 py-2 px-3 text-center text-xs font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-700 transition-colors flex items-center justify-center gap-1.5"
@@ -235,6 +252,84 @@ export const CustomerFooter: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Social Viral Reel & Spot Us Callout Card */}
+          <div className="p-4 sm:p-5 border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-zinc-900/40 to-black text-zinc-900 dark:text-zinc-100 shadow-sm space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 text-[10px] font-mono font-black uppercase tracking-wider bg-rose-500/20 text-rose-500 border border-rose-500/30 flex items-center gap-1">
+                    <Instagram className="w-3 h-3" />
+                    <span>Viral Reel &amp; Street Pranks</span>
+                  </span>
+                  <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                    Nepal Street Vibes
+                  </span>
+                </div>
+                <h4 className="text-sm sm:text-base font-black text-zinc-950 dark:text-white">
+                  Share this with a friend who always falls for pranks! 😂👇
+                </h4>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                  <a
+                    href={GOOGLE_MAPS_LOCATION_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-bold text-amber-600 dark:text-amber-400 hover:underline"
+                  >
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <span>📍 Spot Us: Imadol, Lalitpur</span>
+                  </a>
+                  <a
+                    href={`tel:${SINGLE_OUTLET.phone}`}
+                    className="inline-flex items-center gap-1 font-mono font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                  >
+                    <Phone className="w-3.5 h-3.5 shrink-0" />
+                    <span>📞 Call / Order: {SINGLE_OUTLET.phone}</span>
+                  </a>
+                  <span className="text-zinc-500 text-[11px]">
+                    Location: Imadol, Lalitpur
+                  </span>
+                </div>
+              </div>
+
+              {/* Direct Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={GOOGLE_MAPS_LOCATION_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-2 text-xs font-black bg-amber-500 hover:bg-amber-400 text-black border border-black shadow-xs transition-colors flex items-center gap-1.5"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Google Maps</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+                <a
+                  href={`tel:${SINGLE_OUTLET.phone}`}
+                  className="px-3 py-2 text-xs font-mono font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-300 dark:border-zinc-700 transition-colors flex items-center gap-1.5"
+                >
+                  <Phone className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{SINGLE_OUTLET.phone}</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Viral Hashtags */}
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mr-1">Trending:</span>
+              {INSTAGRAM_VIRAL_TAGS.map((tag) => (
+                <a
+                  key={tag.name}
+                  href={tag.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-mono px-2 py-0.5 bg-zinc-200/70 dark:bg-zinc-800/80 hover:bg-amber-500/20 text-zinc-700 dark:text-zinc-300 hover:text-amber-500 border border-zinc-300/80 dark:border-zinc-700 transition-colors"
+                >
+                  {tag.name}
+                </a>
+              ))}
             </div>
           </div>
 
@@ -444,13 +539,23 @@ export const CustomerFooter: React.FC = () => {
               </h5>
               <ul className="space-y-1.5 text-zinc-600 dark:text-zinc-400">
                 <li className="font-mono text-zinc-900 dark:text-zinc-200 font-bold">
-                  +977 1-4229988
+                  <a href={`tel:${SINGLE_OUTLET.phone}`} className="hover:text-amber-500 transition-colors">
+                    {SINGLE_OUTLET.phone}
+                  </a>
                 </li>
                 <li className="text-zinc-500">
                   Email: hello@crunchybag.com
                 </li>
-                <li className="text-[11px] text-zinc-500">
-                  Durbar Marg, Kathmandu
+                <li className="text-[11px]">
+                  <a
+                    href={GOOGLE_MAPS_LOCATION_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-amber-500 transition-colors inline-flex items-center gap-1 text-zinc-700 dark:text-zinc-300 font-medium"
+                  >
+                    <span>Imadol, Lalitpur</span>
+                    <ExternalLink className="w-2.5 h-2.5 text-amber-500" />
+                  </a>
                 </li>
                 <li className="pt-2">
                   <button
@@ -470,47 +575,18 @@ export const CustomerFooter: React.FC = () => {
             </div>
           </div>
 
-          {/* SEO Fast Food & Location Directory for Kathmandu Valley (Search Engine & Screen Reader Architecture - Hidden from visual UI) */}
-          <div className="sr-only" aria-label="Crunchy Bag Fast Food & Location Directory">
-            {/* Frontend Sitemaps & Search Engines Hub */}
-            <div>
-              <span>Sitemaps: </span>
-              <a href="/menu">Menu Sitemap</a> • 
-              <a href="/combos">Combos &amp; Family Bags Sitemap</a> • 
-              <a href="/delivery">Delivery Coverage Sitemap</a> • 
-              <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer">Google XML Index</a>
-            </div>
-
-            <div>
-              <span>Popular Food Searches: </span>
-              <span>
-                <a href="/product/prod-aloo-tikki-burger-f1168a550eab">Aloo Tikki Burger</a> • 
-                <a href="/product/prod-new-item-e3e0dadb97b5">Chicken Burger</a> • 
-                <a href="/product/prod-pizza-veg-27c34985033e">Crunchy Fried Chicken Burger</a> • 
-                <a href="/product/prod-crunchy-fried-chicken-0a5da9922717">Crunchy Fried Chicken</a> • 
-                <a href="/product/prod-crunchy-family-bag-f182f11d777e">Crunchy Family Bag</a> • 
-                <a href="/product/prod-crunchy-beast-combo-8996a2c37936">Crunchy Beast Combo</a> • 
-                <a href="/product/prod-chicken-65-pakoda-520d8e87ad56">Chicken 65 Pakoda</a> • 
-                <a href="/product/prod-classic-chicken-pakoda-ec85493d7b6a">Classic Chicken Pakoda</a> • 
-                <a href="/product/prod-paneer-pakoda-2e4d08e69b67">Paneer Pakoda</a> • 
-                <a href="/product/prod-french-friess-5f06b09954d9">French Fries</a> • 
-                <a href="/product/prod-crispy-potatoes-6e8f133152fa">Crispy Potatoes</a> • 
-                <a href="/product/prod-cold-coffee-469955c644d4">Cold Coffee</a> • 
-                <a href="/product/prod-coke-ca7879363c6b">Cold Drinks Online</a> • 
-                <a href="/reserve">Book Table Near Me</a>
-              </span>
-            </div>
-            <div>
-              <span>Fast Delivery Areas in Kathmandu Valley: </span>
-              <span>
-                Imadol, Balkumari, Bojhpokhari, Tikathali, Koteshwor, Tinkune, Baneshwor, New Baneshwor, Minbhawan, Jadibuti, Thimi, Bhaktapur, Gwarko, Sanepa, Kupandole, Lagankhel, Satdobato, Kumaripati, Jawalakhel, Jhamsikhel, Durbar Marg, Thamel, Chabahil, Bouddha, Maharajgunj, Baluwatar, Lazimpat, Kalanki, Kirtipur, Sinamangal, Gaushala, Old Baneshwor, Maitighar, Tripureshwor, Putalisadak
-              </span>
-            </div>
-            <div>
-              <span>Brand &amp; Keywords: </span>
-              <span>
-                Crunchy Bag, CrunchyBag, Crunch Bag, Crunhy Bag, crunchyabg, Best fast food delivery Nepal
-              </span>
+          {/* Quick Directory: Clean, 100% visible navigation */}
+          <div className="pt-3 border-t border-zinc-200/80 dark:border-zinc-800/80 text-[11px] text-zinc-500 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-bold text-zinc-700 dark:text-zinc-300">Quick Delivery Hubs:</span>
+              <a href="/delivery/imadol" className="hover:text-amber-500 transition-colors font-medium">Imadol Hub</a> •
+              <a href="/delivery/balkumari" className="hover:text-amber-500 transition-colors">Balkumari</a> •
+              <a href="/delivery/gwarko" className="hover:text-amber-500 transition-colors">Gwarko</a> •
+              <a href="/delivery/koteshwor" className="hover:text-amber-500 transition-colors">Koteshwor</a> •
+              <a href="/delivery/baneshwor" className="hover:text-amber-500 transition-colors">Baneshwor</a> •
+              <a href="/delivery/jhamsikhel" className="hover:text-amber-500 transition-colors">Jhamsikhel</a> •
+              <a href="/delivery/thamel" className="hover:text-amber-500 transition-colors">Thamel</a> •
+              <a href="/delivery" className="text-amber-600 dark:text-amber-400 hover:underline font-bold">View All 19+ Hubs &rarr;</a>
             </div>
           </div>
 
@@ -593,7 +669,14 @@ export const CustomerFooter: React.FC = () => {
                 Admin Login
               </button>
               <span>•</span>
-              <span>Durbar Marg, Kathmandu</span>
+              <a
+                href={GOOGLE_MAPS_LOCATION_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-amber-500 transition-colors"
+              >
+                Imadol, Lalitpur
+              </a>
             </nav>
           </div>
         </div>
