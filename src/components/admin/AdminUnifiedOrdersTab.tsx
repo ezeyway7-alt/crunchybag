@@ -1,3 +1,4 @@
+import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Search,
@@ -79,6 +80,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
   // Backend POS session — WebSocket live, fetches meta, tables, perms
   const posSession = usePosSession();
   const posCommand = usePosCommand(posSession);
+  useEffect(()=>{if(posCommand.error)addToast({title:'Order update failed',description:posCommand.error,type:'error'});},[posCommand.error]);
 
   // Filter State
   const [startDate, setStartDate] = useState<string>(() => todayNepal());
@@ -278,10 +280,11 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
     const next = nextMap[order.status];
     if (next) {
       try {
-        await posCommand.run(`${order.id}/transition/`, {
+        const result = await posCommand.run(`${order.id}/transition/`, {
           version: order.version,
           status: next,
         });
+        if(!result)return;
         addToast({
           title: "Status Updated",
           description: `Order #${order.order_number} marked as ${next}`,
@@ -303,10 +306,11 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
     const order = backendOrder(row);
     if (!order) return;
     try {
-      await posCommand.run(`${order.id}/transition/`, {
+      const result = await posCommand.run(`${order.id}/transition/`, {
         version: order.version,
         status: targetStatus,
       });
+      if(!result)return;
       addToast({
         title: "Status Updated",
         description: `Order #${order.order_number} transitioned to ${targetStatus}`,
@@ -329,11 +333,12 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
     if (!order) return;
     setIsCancelling(true);
     try {
-      await posCommand.run(`${order.id}/transition/`, {
+      const result = await posCommand.run(`${order.id}/transition/`, {
         version: order.version,
         status: "CANCELLED",
         reason: cancelReason || "Cancelled by manager in unified orders dashboard",
       });
+      if(!result)return;
       addToast({
         title: "Order Cancelled",
         description: `Order #${order.order_number} has been cancelled.`,
@@ -1125,6 +1130,18 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
             </div>
 
             {/* Delivery Location & Map Links (if Delivery) */}
+            <OrderRoundsPanel order={backendOrder(selectedOrderForDrawer)} busy={posCommand.busy}
+              onAction={posSession.meta?.permissions.kitchen ? async (round,status)=>{
+                const order=backendOrder(selectedOrderForDrawer);if(!order)return;
+                const result=await posCommand.run(`${order.id}/${status==='CALL'?'call':'round'}/`,{version:order.version,round_number:round,...(status==='CALL'?{}:{status})});
+                if(result)setSelectedOrderForDrawer(posOrderToOrder(result,currentOutlet.name));
+              }:undefined}
+              onRemove={posSession.meta?.permissions.discount ? async (itemId,quantity)=>{
+                const order=backendOrder(selectedOrderForDrawer);if(!order)return;
+                const reason=window.prompt('Reason for reducing or removing this waiting item');if(!reason?.trim())return;
+                const result=await posCommand.run(`${order.id}/void/`,{version:order.version,item_id:itemId,quantity,reason});
+                if(result)setSelectedOrderForDrawer(posOrderToOrder(result,currentOutlet.name));
+              }:undefined}/>
             {selectedOrderForDrawer.fulfillmentType === "DELIVERY" && (
               <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-none space-y-2">
                 <div className="flex items-center justify-between">

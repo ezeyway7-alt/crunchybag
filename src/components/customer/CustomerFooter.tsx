@@ -484,19 +484,19 @@ export const CustomerFooter: React.FC = () => {
             <div>
               <span>Popular Food Searches: </span>
               <span>
-                <a href="/?product=prod-aloo-tikki-burger-f1168a550eab" rel="nofollow">Aloo Tikki Burger</a> • 
-                <a href="/?product=prod-new-item-e3e0dadb97b5" rel="nofollow">Chicken Burger</a> • 
-                <a href="/?product=prod-pizza-veg-27c34985033e" rel="nofollow">Crunchy Fried Chicken Burger</a> • 
-                <a href="/?product=prod-crunchy-fried-chicken-0a5da9922717" rel="nofollow">Crunchy Fried Chicken</a> • 
-                <a href="/?product=prod-crunchy-family-bag-f182f11d777e" rel="nofollow">Crunchy Family Bag</a> • 
-                <a href="/?product=prod-crunchy-beast-combo-8996a2c37936" rel="nofollow">Crunchy Beast Combo</a> • 
-                <a href="/?product=prod-chicken-65-pakoda-520d8e87ad56" rel="nofollow">Chicken 65 Pakoda</a> • 
-                <a href="/?product=prod-classic-chicken-pakoda-ec85493d7b6a" rel="nofollow">Classic Chicken Pakoda</a> • 
-                <a href="/?product=prod-paneer-pakoda-2e4d08e69b67" rel="nofollow">Paneer Pakoda</a> • 
-                <a href="/?product=prod-french-friess-5f06b09954d9" rel="nofollow">French Fries</a> • 
-                <a href="/?product=prod-crispy-potatoes-6e8f133152fa" rel="nofollow">Crispy Potatoes</a> • 
-                <a href="/?product=prod-cold-coffee-469955c644d4" rel="nofollow">Cold Coffee</a> • 
-                <a href="/?product=prod-coke-ca7879363c6b" rel="nofollow">Cold Drinks Online</a> • 
+                <a href="/product/prod-aloo-tikki-burger-f1168a550eab">Aloo Tikki Burger</a> • 
+                <a href="/product/prod-new-item-e3e0dadb97b5">Chicken Burger</a> • 
+                <a href="/product/prod-pizza-veg-27c34985033e">Crunchy Fried Chicken Burger</a> • 
+                <a href="/product/prod-crunchy-fried-chicken-0a5da9922717">Crunchy Fried Chicken</a> • 
+                <a href="/product/prod-crunchy-family-bag-f182f11d777e">Crunchy Family Bag</a> • 
+                <a href="/product/prod-crunchy-beast-combo-8996a2c37936">Crunchy Beast Combo</a> • 
+                <a href="/product/prod-chicken-65-pakoda-520d8e87ad56">Chicken 65 Pakoda</a> • 
+                <a href="/product/prod-classic-chicken-pakoda-ec85493d7b6a">Classic Chicken Pakoda</a> • 
+                <a href="/product/prod-paneer-pakoda-2e4d08e69b67">Paneer Pakoda</a> • 
+                <a href="/product/prod-french-friess-5f06b09954d9">French Fries</a> • 
+                <a href="/product/prod-crispy-potatoes-6e8f133152fa">Crispy Potatoes</a> • 
+                <a href="/product/prod-cold-coffee-469955c644d4">Cold Coffee</a> • 
+                <a href="/product/prod-coke-ca7879363c6b">Cold Drinks Online</a> • 
                 <a href="/reserve">Book Table Near Me</a>
               </span>
             </div>

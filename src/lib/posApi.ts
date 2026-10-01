@@ -24,7 +24,18 @@ export interface PosLine {
   item_notes?: string;
   combo_selections?: PosLine[];
 }
+export interface PreparationRound {
+  number:number;
+  status:'WAITING'|'PREPARING'|'READY'|'SERVED';
+  created_at:string;
+  preparation_started_at?:string|null;
+  ready_at?:string|null;
+  served_at?:string|null;
+}
 export interface PosItem {
+  can_remove?:boolean;
+  created_at?:string;
+  preparation_started_at?:string|null;
   id: number;
   product_id: string;
   product_name: string;
@@ -51,6 +62,9 @@ export interface PosItem {
   }[];
 }
 export interface PosOrder {
+  rounds?:PreparationRound[];
+  can_append?:boolean;
+  partial_ready?:boolean;
   id: number;
   outlet_id: number;
   billed_at: string | null;

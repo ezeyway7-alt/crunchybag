@@ -101,14 +101,13 @@ export const CustomerPortal: React.FC = () => {
   const handleOpenProduct = (product: Product) => {
     setActiveProductForConfig(product);
     if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("product", product.id);
-      window.history.replaceState({}, "", url.toString());
+      const cleanPath = `/product/${product.id}`;
+      window.history.replaceState({}, "", cleanPath);
       updatePageSEO({
         title: `${product.name} (NPR ${product.basePrice}) | Crunchy Bag Kathmandu`,
         description: product.description || `Order ${product.name} online from Crunchy Bag Kathmandu with fast delivery & instant eSewa.`,
         image: product.images?.[0] || "https://crunchybag.com/crunchy_logo.png",
-        canonical: `https://crunchybag.com/?product=${encodeURIComponent(product.id)}`,
+        canonical: `https://crunchybag.com/product/${encodeURIComponent(product.id)}`,
       });
     }
   };
@@ -116,11 +115,9 @@ export const CustomerPortal: React.FC = () => {
   const handleCloseProduct = () => {
     setActiveProductForConfig(null);
     if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("product");
-      url.searchParams.delete("item");
-      url.searchParams.delete("combo");
-      window.history.replaceState({}, "", url.toString());
+      const current = window.location.pathname.toLowerCase();
+      const returnPath = current.startsWith("/product/") ? "/menu" : current || "/";
+      window.history.replaceState({}, "", returnPath);
       updatePageSEO({});
     }
   };
@@ -130,7 +127,12 @@ export const CustomerPortal: React.FC = () => {
     if (typeof window === "undefined" || products.length === 0) return;
     const path = window.location.pathname.toLowerCase();
     const params = new URLSearchParams(window.location.search);
-    const prodParam = params.get("product") || params.get("item") || params.get("combo");
+    let prodParam = params.get("product") || params.get("item") || params.get("combo");
+    if (!prodParam && path.includes("/product/")) {
+      prodParam = path.split("/product/")[1]?.replace(/\/+$/, "");
+    } else if (!prodParam && path.includes("/item/")) {
+      prodParam = path.split("/item/")[1]?.replace(/\/+$/, "");
+    }
     const catParam = params.get("category");
     const pageParam = params.get("page");
 
@@ -153,11 +155,12 @@ export const CustomerPortal: React.FC = () => {
     }
 
     if (prodParam) {
+      const cleanProdId = decodeURIComponent(prodParam).toLowerCase();
       const found = products.find(
         (p) =>
-          p.id === prodParam ||
-          p.id.toLowerCase().includes(prodParam.toLowerCase()) ||
-          p.name.toLowerCase().replace(/[^a-z0-9]/g, "-").includes(prodParam.toLowerCase())
+          p.id.toLowerCase() === cleanProdId ||
+          p.id.toLowerCase().includes(cleanProdId) ||
+          p.name.toLowerCase().replace(/[^a-z0-9]/g, "-").includes(cleanProdId)
       );
       if (found) {
         handleOpenProduct(found);

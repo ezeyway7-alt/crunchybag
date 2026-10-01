@@ -185,6 +185,7 @@ async function setup(page: Page) {
         outlet_id: 1,
         order_number: "POS-TEST-1",
         version: 1,
+        can_append: true,
         status: "ACCEPTED",
         customer_name: body.customer_name,
         customer_phone: body.customer_phone,
@@ -253,6 +254,13 @@ async function setup(page: Page) {
           ),
         };
       else if (path.endsWith('/transition/')) { result.status = body.status; result.version++; }
+      else if (path.endsWith('/round/')) {
+        result.rounds ||= [{number:1,status:result.status,created_at:result.created_at}];
+        result.rounds.find((r:any)=>r.number===body.round_number).status=body.status;
+        result.items.filter((i:any)=>i.round_number===body.round_number).forEach((i:any)=>i.kitchen_status=body.status);
+        result.status=result.rounds.every((r:any)=>r.status==='SERVED')?'COMPLETED':result.rounds.every((r:any)=>['READY','SERVED'].includes(r.status))?'READY':'PREPARING';
+        result.version++;
+      }
       else if (path.endsWith('/bill/')) { saveReceipt(result, 'BILL'); result.version++; }
       else if (path.endsWith("/append/")) {
         if (
@@ -467,10 +475,10 @@ test('restored kitchen cards use actual orders and backend transitions', async (
   await expect.poll(() => state.orders[0].status).toBe('PREPARING');
   await page.getByRole('button', { name: 'MARK READY FOR PICKUP' }).click();
   await expect.poll(() => state.orders[0].status).toBe('READY');
-  await page.getByRole('button', { name: 'DISPATCH & HAND OVER' }).click();
+  await page.getByRole('button', { name: 'HAND OVER ROUND' }).click();
   await expect(page.getByText('Test Burger', { exact: true })).toHaveCount(0);
   expect(state.orders[0].status).toBe('COMPLETED');
-  expect(state.writes.filter(w => w.path.endsWith('/transition/')).map(w => w.body.version)).toEqual([1, 2, 3]);
+  expect(state.writes.filter(w => w.path.endsWith('/round/')).map(w => w.body.version)).toEqual([1, 2, 3]);
 });
 
 test('delivery kitchen handover dispatches instead of completing the order',async({page})=>{
@@ -478,7 +486,7 @@ test('delivery kitchen handover dispatches instead of completing the order',asyn
   await expect.poll(()=>state.orders.length).toBe(1);
   Object.assign(state.orders[0],{fulfillment_type:'DELIVERY',status:'READY'});
   await page.goto('/admin?tab=kitchen');
-  await page.getByRole('button',{name:'DISPATCH & HAND OVER',exact:true}).click();
+  await page.getByRole('button',{name:'DISPATCH ORDER',exact:true}).click();
   await expect.poll(()=>state.orders[0].status).toBe('OUT_FOR_DELIVERY');
   await expect(page.getByText('Test Burger',{exact:true})).toHaveCount(0);
   const command=state.writes.find(w=>w.path.endsWith('/transition/'));
@@ -541,4 +549,26 @@ test('organization SMS token stays write only and blank keeps existing credentia
   await page.getByLabel('Sparrow SMS API Token').fill('new-secret');
   await page.getByRole('button',{name:'Save SMS Settings'}).click();
   await expect(page.getByLabel('Sparrow SMS API Token')).toHaveValue('');expect(writes.at(-1).sms_api_token).toBe('new-secret');
+});
+
+
+test('kitchen hands over a ready round while the next round keeps its own timer and progress',async({page})=>{
+  const state=await setup(page);await addBurger(page);await fireOrder(page).click();
+  await expect.poll(()=>state.orders.length).toBe(1);
+  const order=state.orders[0],first=new Date(Date.now()-15*60000).toISOString(),second=new Date(Date.now()-2*60000).toISOString();
+  order.status='PREPARING';order.items[0].kitchen_status='READY';
+  order.items.push({...order.items[0],id:2,round_number:2,kitchen_status:'PREPARING',product_name:'Later Burger'});
+  order.rounds=[{number:1,status:'READY',created_at:first},{number:2,status:'PREPARING',created_at:second}];
+  await page.goto('/admin?tab=kitchen');
+  await expect(page.getByText('Later Burger',{exact:true})).toBeVisible();
+  await expect(page.getByText('Test Burger',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'HAND OVER ROUND',exact:true}).click();
+  await expect(page.getByText('Test Burger',{exact:true})).toHaveCount(0);
+  await expect(page.getByText('Later Burger',{exact:true})).toBeVisible();
+  expect(order.status).toBe('PREPARING');expect(order.rounds[1].created_at).toBe(second);
+  expect(state.writes.find((w:any)=>w.path.endsWith('/round/')).body).toMatchObject({round_number:1,status:'SERVED',version:1});
+  await page.getByRole('button',{name:'MARK READY FOR PICKUP'}).click();
+  await page.getByRole('button',{name:'HAND OVER ROUND',exact:true}).click();
+  await expect.poll(()=>order.status).toBe('COMPLETED');
+  expect(state.writes.filter((w:any)=>w.path.endsWith('/round/')).map((w:any)=>w.body.round_number)).toEqual([1,2,2]);
 });

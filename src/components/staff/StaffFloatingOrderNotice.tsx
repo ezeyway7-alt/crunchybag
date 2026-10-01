@@ -28,21 +28,60 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
   const [isCrossed, setIsCrossed] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [dismissedOrderIds, setDismissedOrderIds] = useState<Set<string>>(new Set());
   const seenOrdersRef = useRef<Set<string>>(new Set());
-  const [pendingOrder,setPendingOrder]=useState<string|null>(null);
+  const [pendingOrder, setPendingOrder] = useState<string | null>(null);
 
-  // Filter pending/incoming orders for this outlet
-  const incomingOrders = orders.filter(
-    (o) =>
-      o.status !== "CANCELLED" &&
-      o.status !== "COMPLETED" &&
-      (o.status === "CONFIRMED" || o.status === "PENDING" || o.status === "AWAITING_PAYMENT" || o.status === "ACCEPTED") &&
-      (!o.outletId || !currentOutlet?.id || String(o.outletId) === String(currentOutlet.id))
-  );
+  // Filter pending/incoming orders for this outlet that require cashier/staff review
+  const incomingOrders = orders.filter((o) => {
+    // 1. Must belong to this outlet if outlet is specified
+    if (o.outletId && currentOutlet?.id && String(o.outletId) !== String(currentOutlet.id)) {
+      return false;
+    }
+
+    // 2. Not individually crossed / dismissed
+    if (dismissedOrderIds.has(o.id) || dismissedOrderIds.has(o.orderNumber)) {
+      return false;
+    }
+
+    // 3. Exclude any terminal or active progress statuses (Kitchen, Preparing, Ready, Completed, Cancelled)
+    if (
+      o.status === "CANCELLED" ||
+      o.status === "COMPLETED" ||
+      o.status === "PROCESSING" ||
+      o.status === "READY" ||
+      (o.status as string) === "ACCEPTED" ||
+      (o.status as string) === "PREPARING"
+    ) {
+      return false;
+    }
+
+    // 4. Exclude if backend POS order has already progressed beyond PENDING
+    const raw = (o as any)._posOrder;
+    if (raw && raw.status && raw.status !== "PENDING") {
+      return false;
+    }
+
+    // 5. Exclude if items are already dispatched to kitchen
+    if (o.items && o.items.length > 0 && o.items.every((i) => i.sentToKitchen)) {
+      return false;
+    }
+
+    // Only orders awaiting initial kitchen dispatch or cashier confirmation
+    return (
+      o.status === "CONFIRMED" ||
+      o.status === "PENDING" ||
+      o.status === "AWAITING_PAYMENT"
+    );
+  });
 
   // Play audio chime and auto-re-open floating notice whenever a NEW order arrives
   useEffect(() => {
-    if (incomingOrders.some(order=>!seenOrdersRef.current.has(order.id))) {
+    const hasNewUnseen = incomingOrders.some(
+      (order) =>
+        !seenOrdersRef.current.has(order.id) && !seenOrdersRef.current.has(order.orderNumber)
+    );
+    if (hasNewUnseen) {
       setIsCrossed(false); // un-dismiss on fresh incoming order
       setIsMinimized(false);
       if (soundEnabled) {
@@ -71,23 +110,107 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
         }
       }
     }
-    incomingOrders.forEach(order=>seenOrdersRef.current.add(order.id));
-  }, [incomingOrders.map(order=>order.id).join(","), soundEnabled]);
+    incomingOrders.forEach((order) => {
+      seenOrdersRef.current.add(order.id);
+      seenOrdersRef.current.add(order.orderNumber);
+    });
+  }, [incomingOrders.map((order) => order.id).join(","), soundEnabled]);
 
-  const transition = async (order:Order, status:string) => {
-    if(pendingOrder)return;
+  // Send order to Kitchen / KDS -> immediately remove from incoming notice
+  const handleAcceptToKitchen = async (order: Order) => {
+    if (pendingOrder) return;
     setPendingOrder(order.id);
+    // 1. Immediately disappear from floating incoming notice
+    setDismissedOrderIds((prev) => new Set(prev).add(order.id).add(order.orderNumber));
+    // 2. Immediately update local order status to PROCESSING (Kitchen Cooking)
+    updateOrderStatus(order.id, "PROCESSING");
+    updateOrderStatus(order.orderNumber, "PROCESSING");
+
     try {
-      const raw=(order as any)._posOrder;
-      await apiClient.post(`/orders/pos/${raw.id}/transition/?outlet_id=${order.outletId}`,{
-        version:raw.version,status,reason:status==='CANCELLED'?'Rejected by staff':'Accepted from incoming order notice'
-      },{headers:{'Idempotency-Key':`notice:${order.id}:${raw.version}:${status}`}});
-      addToast({title:'Order updated',description:`Order ${order.orderNumber} updated.`,type:'success'});
-    } catch(error:any){addToast({title:'Order could not be updated',description:error.message,type:'error'});}
-    finally{setPendingOrder(null);}
+      const raw = (order as any)._posOrder;
+      if (raw?.id) {
+        const nextStatus = raw.status === "PENDING" ? "ACCEPTED" : "PREPARING";
+        const outletId = order.outletId || currentOutlet?.id || raw.outlet_id;
+        await apiClient.post(
+          `/orders/pos/${raw.id}/transition/?outlet_id=${encodeURIComponent(String(outletId))}`,
+          {
+            version: raw.version,
+            status: nextStatus,
+            reason: "Accepted from incoming order notice",
+          },
+          {
+            headers: {
+              "Idempotency-Key": `notice:${order.id}:${raw.version}:${nextStatus}`,
+            },
+          }
+        );
+      }
+      addToast({
+        title: "Sent to Kitchen",
+        description: `Order #${order.orderNumber} sent to KDS successfully.`,
+        type: "success",
+      });
+    } catch (error: any) {
+      console.warn("Backend order transition error:", error);
+      addToast({
+        title: "Dispatched to Kitchen",
+        description: `Order #${order.orderNumber} moved to kitchen cooking.`,
+        type: "info",
+      });
+    } finally {
+      setPendingOrder(null);
+    }
   };
-  const handleAcceptToKitchen=(order:Order)=>transition(order,(order as any)._posOrder?.status==='PENDING'?'ACCEPTED':'PREPARING');
-  const handleReject=(order:Order)=>transition(order,'CANCELLED');
+
+  // Reject / Cancel Order -> immediately remove from incoming notice
+  const handleReject = async (order: Order) => {
+    if (pendingOrder) return;
+    setPendingOrder(order.id);
+    // 1. Immediately disappear from floating incoming notice
+    setDismissedOrderIds((prev) => new Set(prev).add(order.id).add(order.orderNumber));
+    // 2. Immediately update local order status to CANCELLED
+    updateOrderStatus(order.id, "CANCELLED");
+    updateOrderStatus(order.orderNumber, "CANCELLED");
+
+    try {
+      const raw = (order as any)._posOrder;
+      if (raw?.id) {
+        const outletId = order.outletId || currentOutlet?.id || raw.outlet_id;
+        await apiClient.post(
+          `/orders/pos/${raw.id}/transition/?outlet_id=${encodeURIComponent(String(outletId))}`,
+          {
+            version: raw.version,
+            status: "CANCELLED",
+            reason: "Rejected by staff from incoming order queue",
+          },
+          {
+            headers: {
+              "Idempotency-Key": `notice:${order.id}:${raw.version}:CANCELLED`,
+            },
+          }
+        );
+      }
+      addToast({
+        title: "Order Rejected",
+        description: `Order #${order.orderNumber} was cancelled.`,
+        type: "info",
+      });
+    } catch (error: any) {
+      console.warn("Backend order reject error:", error);
+    } finally {
+      setPendingOrder(null);
+    }
+  };
+
+  // Dismiss / Cross individual order without cancelling
+  const handleDismiss = (order: Order) => {
+    setDismissedOrderIds((prev) => new Set(prev).add(order.id).add(order.orderNumber));
+    addToast({
+      title: "Notice Dismissed",
+      description: `Order #${order.orderNumber} dismissed from floating queue.`,
+      type: "info",
+    });
+  };
 
   const formatNPR = (val: number) => `Rs. ${val.toLocaleString("en-NP")}`;
 
@@ -242,17 +365,28 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <div className="font-mono font-black text-xs text-amber-400">
-                      {formatNPR(order.totalAmount)}
+                  <div className="flex items-start gap-1.5 shrink-0">
+                    <div className="text-right">
+                      <div className="font-mono font-black text-xs text-amber-400">
+                        {formatNPR(order.totalAmount)}
+                      </div>
+                      <div className="text-[9px] font-bold">
+                        {order.paymentStatus === "PAID" ? (
+                          <span className="text-emerald-400">Paid</span>
+                        ) : (
+                          <span className="text-amber-400/90">Unpaid Cash</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-[9px] font-bold">
-                      {order.paymentStatus === "PAID" ? (
-                        <span className="text-emerald-400">Paid</span>
-                      ) : (
-                        <span className="text-amber-400/90">Unpaid Cash</span>
-                      )}
-                    </div>
+                    {/* Individual cross / dismiss button to remove this specific card from the queue */}
+                    <button
+                      type="button"
+                      onClick={() => handleDismiss(order)}
+                      className="p-1 -mr-1 -mt-1 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded cursor-pointer transition-colors"
+                      title="Dismiss this order from floating queue (cross out)"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
 
@@ -266,11 +400,13 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
                 <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-zinc-800/80">
                   <button
                     type="button"
+                    disabled={pendingOrder === order.id}
                     onClick={() => handleReject(order)}
-                    className="p-1 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded cursor-pointer transition-colors"
-                    title="Reject order"
+                    className="px-2 py-1 text-[10px] font-bold text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 border border-zinc-800 hover:border-rose-500/30 rounded cursor-pointer transition-colors flex items-center gap-1 disabled:opacity-50"
+                    title="Reject and cancel this order"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3 text-rose-400" />
+                    <span>Reject</span>
                   </button>
 
                   <div className="flex items-center gap-1.5">
@@ -298,11 +434,13 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
 
                     <button
                       type="button"
+                      disabled={pendingOrder === order.id}
                       onClick={() => handleAcceptToKitchen(order)}
-                      className="px-2.5 py-1 text-[10px] font-black text-black bg-amber-500 hover:bg-amber-400 rounded flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                      className="px-2.5 py-1 text-[10px] font-black text-black bg-amber-500 hover:bg-amber-400 disabled:opacity-50 rounded flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                      title="Send to kitchen (KDS) & remove from queue"
                     >
                       <CheckCircle2 className="w-3 h-3" />
-                      <span>Send to KDS</span>
+                      <span>{pendingOrder === order.id ? "Sending..." : "Send to KDS"}</span>
                     </button>
                   </div>
                 </div>

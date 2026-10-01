@@ -1,3 +1,4 @@
+import {PreparationRound} from '../../lib/posApi';
 import {useOutletEvents} from "../../lib/useOutletEvents";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
@@ -115,6 +116,7 @@ export interface BackendKitchenItem {
   quantity: number;
   requires_kitchen?: boolean;
   kitchen_status?: string;
+  is_voided?: boolean;
   round_number?: number;
   item_notes?: string;
   modifiers?: (BackendKitchenItemModifier | string)[];
@@ -122,6 +124,7 @@ export interface BackendKitchenItem {
 }
 
 export interface BackendKitchenTicket {
+  rounds?: PreparationRound[];
   id: number | string;
   order_number: string;
   status: string;
@@ -204,7 +207,13 @@ export const KDSPortal: React.FC = () => {
   const kdsTickets: (KdsTicket & { orderNotes?: string })[] = useMemo(() => {
     // If backend tickets exist from GET /api/v1/orders/kitchen/me/, use them
     if (serverTickets && serverTickets.length > 0) {
-      return serverTickets.map((t) => {
+      return serverTickets.flatMap(order => (order.rounds || [{number:1,status:order.status,created_at:order.created_at}])
+        .filter(round => round.status !== 'SERVED')
+        .map(round => ({...order,id:`${order.id}:r${round.number}`,round_number:round.number,
+          status:order.status==='PENDING'?'PENDING':round.status,
+          created_at:round.created_at,
+          items:order.items.filter(item=>!item.is_voided && (item.round_number || 1)===round.number)})))
+        .filter(t=>t.items.some(item=>item.requires_kitchen!==false)).map((t) => {
         // Derive clean KDS column (PENDING/ACCEPTED -> QUEUED, PREPARING -> PREPARING, READY -> READY)
         const statusUpper = (t.status || "").toUpperCase();
         let column: KdsColumn = "QUEUED";
@@ -286,90 +295,26 @@ export const KDSPortal: React.FC = () => {
    * Status Pipeline: PENDING -> ACCEPTED -> PREPARING -> READY -> COMPLETED
    * Automatically broadcasts WebSocket notification to KDS screens and TV displays
    */
+  const pendingRounds = useRef(new Set<string>());
   const handleBump = async (ticketId: string, currentColumn: KdsColumn) => {
-    const ticket = serverTickets.find((t) => String(t.id) === ticketId);
-    const nextStatus =
-      currentColumn === "QUEUED"
-        ? (ticket?.status === "PENDING" ? "ACCEPTED" : "PREPARING")
-        : currentColumn === "PREPARING"
-        ? "READY"
-        : ticket?.fulfillment_type === "DELIVERY" ? "OUT_FOR_DELIVERY" : "COMPLETED";
-
-    // Immediate sound feedback
-    if (kdsSoundEnabled) {
-      playKitchenChime(nextStatus === "READY" ? "complete" : "advance");
+    const [orderId, round] = ticketId.split(':r');
+    const ticket = serverTickets.find(t=>String(t.id)===orderId);
+    if(!ticket || pendingRounds.current.has(orderId))return;
+    const dispatch=currentColumn==='READY' && ticket.fulfillment_type==='DELIVERY';
+    if(dispatch && ticket.status!=='READY') {
+      addToast({title:'Other rounds are still preparing',description:'Dispatch once all rounds are ready.',type:'info'});return;
     }
-
-    // Resolve accurate outlet_id and version for this ticket
-    const appOrder = appOrders.find(
-      (o) => String(o.id) === ticketId || o.orderNumber === ticket?.order_number
-    );
-    const currentVersion = ticket?.version || (appOrder as any)?.version || 1;
-
-    // Optimistic local state update for zero latency
-    setServerTickets((prev) =>
-      prev
-        .map((t) =>
-          String(t.id) === ticketId
-            ? (nextStatus === "COMPLETED" || nextStatus === "OUT_FOR_DELIVERY")
-              ? null
-              : { ...t, status: nextStatus, version: currentVersion + 1 }
-            : t
-        )
-        .filter(Boolean) as BackendKitchenTicket[]
-    );
-
-    const ticketOutletId = String(
-      ticket?.outlet_id ||
-      appOrder?.outletId ||
-      effectiveOutletId ||
-      currentOutlet?.id ||
-      authOutlet?.id ||
-      "1"
-    );
-    const numericOutletId = parseInt(ticketOutletId, 10) || 1;
-
+    const accept=ticket.status==='PENDING';
+    const status=accept?'ACCEPTED':dispatch?'OUT_FOR_DELIVERY':currentColumn==='QUEUED'?'PREPARING':currentColumn==='PREPARING'?'READY':'SERVED';
+    const action=accept || dispatch?'transition':'round';
+    pendingRounds.current.add(orderId);
     try {
-      // Primary: POS staff command transition (POST /api/v1/orders/pos/<order_id>/transition/?outlet_id=<outlet_id>)
-      try {
-        await apiClient.post(
-          `/orders/pos/${ticketId}/transition/?outlet_id=${encodeURIComponent(ticketOutletId)}`,
-          {
-            outlet_id: numericOutletId,
-            version: currentVersion,
-            status: nextStatus,
-            to_status: nextStatus,
-            reason: `Kitchen transitioned order to ${nextStatus}`,
-          },
-          {headers: {"Idempotency-Key": `kds-transition:${ticketOutletId}:${ticketId}:${currentVersion}:${nextStatus}`}}
-        );
-      } catch (posErr) {
-        if ((posErr as any)?.status !== 404) throw posErr;
-        // Fallback: Universal KDS transition endpoint (POST /api/v1/orders/<order_id>/transition/?outlet_id=<outlet_id>)
-        await apiClient.post(
-          `/orders/${ticketId}/transition/?outlet_id=${encodeURIComponent(ticketOutletId)}`,
-          {
-            outlet_id: numericOutletId,
-            to_status: nextStatus,
-            status: nextStatus,
-            version: currentVersion,
-            notes: `Kitchen transitioned order to ${nextStatus}`,
-          }
-        );
-      }
-
-      // Refresh to confirm with server
-      void fetchKitchenTickets(true);
-    } catch (err: any) {
-      console.warn("Failed transition API call:", err);
-      // If server transition failed, re-fetch to restore accurate state
-      void fetchKitchenTickets(true);
-      addToast({
-        title: "Status update warning",
-        description: extractErrorMessage(err) || "Failed to update ticket status on server.",
-        type: "error",
-      });
-    }
+      await apiClient.post(`/orders/pos/${orderId}/${action}/?outlet_id=${encodeURIComponent(effectiveOutletId)}`,
+        {version:ticket.version,status,...(action==='round'?{round_number:Number(round)}:{})},
+        {headers:{'Idempotency-Key':`kds:${effectiveOutletId}:${ticketId}:${ticket.version}:${status}`}});
+      if(kdsSoundEnabled)playKitchenChime(status==='READY'?'complete':'advance');
+    }catch(error){addToast({title:'Could not update round',description:extractErrorMessage(error),type:'error'});}
+    finally{await fetchKitchenTickets(true);pendingRounds.current.delete(orderId);}
   };
 
   /**
@@ -387,8 +332,8 @@ export const KDSPortal: React.FC = () => {
 
     try {
       await apiClient.post(
-        `/orders/pos/${ticket.id}/call/?outlet_id=${encodeURIComponent(targetOutletId)}`,
-        { version: serverTickets.find(row=>String(row.id)===String(ticket.id))?.version, outlet_id: numericOutletId },
+        `/orders/pos/${ticket.id.split(':r')[0]}/call/?outlet_id=${encodeURIComponent(targetOutletId)}`,
+        { version: serverTickets.find(row=>String(row.id)===ticket.id.split(':r')[0])?.version, round_number:ticket.roundNumber, outlet_id: numericOutletId },
         {
           headers: {
             "Idempotency-Key": `call-${ticket.id}-${Date.now()}`,
@@ -396,6 +341,7 @@ export const KDSPortal: React.FC = () => {
         }
       );
 
+      await fetchKitchenTickets(true);
       addToast({
         title: "Kitchen Bell Rung",
         description: `Called ${ticket.kioskToken || ticket.orderNumber} for collection.`,
@@ -807,11 +753,11 @@ export const KDSPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleBump(ticket.id, "READY")}
-                aria-label="DISPATCH & HAND OVER"
+                aria-label={ticket.fulfillmentType==='DELIVERY'?'DISPATCH ORDER':'HAND OVER ROUND'}
                 className="flex-1 h-8 sm:h-8.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wide flex items-center justify-center gap-1 rounded transition-all active:scale-[0.98] cursor-pointer shadow-sm"
               >
                 <Package className="w-3.5 h-3.5" />
-                <span>DISPATCH & HAND OVER</span>
+                <span>{ticket.fulfillmentType==='DELIVERY'?'DISPATCH ORDER':'HAND OVER ROUND'}</span>
               </button>
             </div>
           )}

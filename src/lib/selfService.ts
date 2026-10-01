@@ -29,6 +29,7 @@ export function useSelfServiceOrder(outlet:string,name:string,token:string) {
     }catch{}
   };
   useEffect(()=>{setOrder(null);void refresh();return()=>{seq.current++;};},[token,outlet]);
+  useEffect(()=>{const listener=()=>void refresh();window.addEventListener('self-service:refresh',listener);return()=>window.removeEventListener('self-service:refresh',listener);},[token,outlet]);
   useOutletEvents(outlet,!!token,()=>void refresh());
   return order;
 }

@@ -1,0 +1,35 @@
+# Crunchy Bag
+
+> Crunchy Bag is Kathmandu Valley's premier fast-food brand serving crispy fried chicken, gourmet smash burgers, traditional Nepali spiced pakodas, crispy potato sides, and cold beverages with express delivery across Kathmandu, Lalitpur, and Bhaktapur, digital cashless checkout with eSewa and FonePay, and table reservations.
+
+## Core Services
+- [Online Food Menu](https://crunchybag.com/menu): Comprehensive food menu featuring crispy fried chicken, smash burgers, pakodas, fries, and cold drinks.
+- [Special Value Combos](https://crunchybag.com/combos): Multi-item meal deals, Family Bags, Beast combos, and student value deals.
+- [Delivery Coverage](https://crunchybag.com/delivery): Express food delivery across 35+ neighborhoods in Kathmandu, Lalitpur, and Bhaktapur.
+- [Table Reservations](https://crunchybag.com/reserve): Instant table booking at our flagship Durbar Marg dine-in restaurant.
+- [Live Order Tracking](https://crunchybag.com/orders): Real-time receipt tracking and delivery order status.
+
+## Food Categories
+- [Crispy Fried Chicken](https://crunchybag.com/fried-chicken): Pressure-fried golden crispy chicken, hot wings, and crunchy tenders prepared with Himalayan spice marination.
+- [Gourmet Smash Burgers](https://crunchybag.com/burger): Signature chicken burgers, crunchy fried chicken burgers, and vegetarian aloo tikki burgers on toasted brioche buns.
+- [Nepali Spiced Pakodas](https://crunchybag.com/pakoda): Chicken 65, paneer pakoda, gobi pakoda, onion pakoda, and traditional crispy mixed vegetable fritters.
+- [Golden Fries & Sides](https://crunchybag.com/fries): French fries, crispy spiced potatoes, and signature dipping sauces.
+- [Beverages & Shakes](https://crunchybag.com/drink): Handcrafted cold coffee, thick Oreo milkshakes, sweet yogurt lassi, and cold drinks.
+
+## Company & Location
+- Brand Name: Crunchy Bag
+- Flagship Address: Kings Way, Durbar Marg, Kathmandu 44600, Nepal
+- Service Options: Dine-in, Takeaway, Curbside Pickup, Online Food Delivery
+- Operating Hours: 10:00 AM – 10:00 PM Daily (Sunday to Saturday)
+- Delivery Radius: Kathmandu, Lalitpur, and Bhaktapur Valley (35+ delivery hubs)
+- Payment Methods: Cash on Delivery, eSewa Digital Wallet, FonePay QR, Visa, Mastercard
+- Official Website: https://crunchybag.com
+- Contact Email: support@crunchybag.com
+- Phone: +977-9800000000 / +977-01-4400000
+
+## Policies & Help
+- [About Us](https://crunchybag.com/about): Brand story, kitchen philosophy, and hygiene standards.
+- [Privacy Policy](https://crunchybag.com/privacy): Customer data protection and privacy practices.
+- [Terms of Service](https://crunchybag.com/terms): Conditions for ordering food, online delivery, and table reservations.
+- [Help & FAQ](https://crunchybag.com/faq): Common questions regarding delivery fees, timing, and digital payment issues.
+- [Contact](https://crunchybag.com/contact): Customer care, inquiries, and store directions.

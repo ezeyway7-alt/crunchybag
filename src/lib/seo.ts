@@ -13,9 +13,9 @@ export interface SEOMetadata {
 }
 
 const DEFAULT_METADATA: SEOMetadata = {
-  title: 'Crunchy Bag - Best Crispy Fried Chicken, Burgers & Food Delivery in Kathmandu',
+  title: 'Crunchy Bag - Crispy Fried Chicken & Burgers in Kathmandu',
   description:
-    'Order best crispy fried chicken, gourmet smash burgers, cold drinks, pizza & pakoda snacks online with fast food delivery across Kathmandu, Imadol, Balkumari, Koteshwor, Baneshwor, Bhaktapur & Lalitpur. Book table & order online with instant eSewa.',
+    'Order crispy fried chicken, smash burgers & snacks online with fast food delivery across Kathmandu Valley. Book tables & order online with instant eSewa.',
   canonical: 'https://crunchybag.com/',
   image: 'https://crunchybag.com/crunchy_logo.png',
   noIndex: false,

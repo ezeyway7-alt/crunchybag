@@ -1,3 +1,4 @@
+import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
 import {useOrderReceipt} from "../../lib/orderReceipt";
 import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
 import { DeliveryOrderDetails, deliveryInfo, DeliveryDispatchModal } from "../customer/DeliveryOrderDetails";
@@ -292,12 +293,17 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   };
   const triggerKitchenCall = async (info: { orderNumber: string; [key: string]: unknown }) => {
     const order = backendOrder([...orders,...ongoingOrders].find(o => o.orderNumber === info.orderNumber));
-    if (order) await posCommand.run(`${order.id}/call/`, { version: order.version });
+    if (order) {
+      const ready=order.rounds?.filter(round=>round.status==='READY') || [];
+      if(ready.length!==1){setSelectedOrderForDrawer(posOrderToOrder(order,currentOutlet.name));return;}
+      await posCommand.run(`${order.id}/call/`, { version: order.version,round_number:ready[0].number });
+    }
   };
 
 
   // Initiate Adding Items from Table Row
   const handleStartAddingItemsToOrder = (order: Order) => {
+    if(!backendOrder(order)?.can_append){addToast({title:'This order cannot accept more items',description:'Create a new order after dispatch or final handover.',type:'info'});return;}
     setPosMode("ADD_TO_ONGOING");
     setSelectedOngoingOrderId(order.id);
     setSelectedItems([]);
@@ -1810,7 +1816,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                       <td className="p-2.5 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* Add Items to Ongoing Order Tab */}
-                          {!isCompleted && !isCancelled && (
+                          {backendOrder(order)?.can_append && (
                             <button
                               type="button"
                               onClick={() => handleStartAddingItemsToOrder(order)}
@@ -2024,6 +2030,18 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
               </p>
             </div>
 
+            <OrderRoundsPanel order={backendOrder(selectedOrderForDrawer)} busy={posCommand.busy}
+              onAction={posSession.meta?.permissions.kitchen ? async (round,status)=>{
+                const order=backendOrder(selectedOrderForDrawer);if(!order)return;
+                const result=await posCommand.run(`${order.id}/${status==='CALL'?'call':'round'}/`,{version:order.version,round_number:round,...(status==='CALL'?{}:{status})});
+                if(result)setSelectedOrderForDrawer(posOrderToOrder(result,currentOutlet.name));
+              }:undefined}
+              onRemove={posSession.meta?.permissions.discount ? async (itemId,quantity)=>{
+                const order=backendOrder(selectedOrderForDrawer);if(!order)return;
+                const reason=window.prompt('Reason for reducing or removing this waiting item');if(!reason?.trim())return;
+                const result=await posCommand.run(`${order.id}/void/`,{version:order.version,item_id:itemId,quantity,reason});
+                if(result)setSelectedOrderForDrawer(posOrderToOrder(result,currentOutlet.name));
+              }:undefined}/>
             {selectedOrderForDrawer.fulfillmentType === "DELIVERY" && (
               <DeliveryOrderDetails key={selectedOrderForDrawer.id} order={selectedOrderForDrawer} compact adminOnly />
             )}
@@ -2070,7 +2088,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                         </span>
 
                         {/* Removal button for ongoing orders */}
-                        {selectedOrderForDrawer.status !== "COMPLETED" && selectedOrderForDrawer.status !== "CANCELLED" && (
+                        {backendOrder(selectedOrderForDrawer)?.items.find(row=>String(row.id)===it.id.replace('pos-item-',''))?.can_remove && (
                           <button
                             type="button"
                             onClick={() => void handleRemoveItemFromRunningOrder(selectedOrderForDrawer.id, it.id)}
@@ -2159,7 +2177,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
               )}
 
               {/* Add more items to ongoing tab */}
-              {selectedOrderForDrawer.status !== "COMPLETED" && selectedOrderForDrawer.status !== "CANCELLED" && (
+              {backendOrder(selectedOrderForDrawer)?.can_append && (
                 <button
                   type="button"
                   onClick={() => {

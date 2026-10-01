@@ -58,8 +58,12 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     try {
       const data=await apiClient.get<any>(`/orders/display/${currentOutlet.id}/`,{skipAuth:true});
       if(seq!==loadSequence.current)return;
-      setOrders((data.tickets || []).map((row:any)=>({
-        id:String(row.id),orderNumber:row.order_number,kioskToken:row.order_number,
+      setOrders((data.tickets || []).flatMap((order:any)=>(order.rounds || [{number:1,status:order.status,created_at:order.created_at}]).map((round:any)=>({
+        ...order,id:`${order.id}:r${round.number}`,round_number:round.number,
+        status:round.status==='WAITING'?'ACCEPTED':round.status==='SERVED'?'COMPLETED':round.status,
+        created_at:round.created_at,
+      }))).map((row:any)=>({
+        id:String(row.id),orderNumber:row.order_number,kioskToken:`${row.order_number} / R${row.round_number}`,
         status:row.status==='ACCEPTED'?'CONFIRMED':row.status==='PREPARING'?'PROCESSING':row.status,
         fulfillmentType:row.fulfillment_type,tableNumber:row.table_number,createdAt:row.created_at,
         customerName:'',outletId:String(currentOutlet.id),items:[],
@@ -69,8 +73,8 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   };
   useEffect(()=>{setOrders([]);void loadDisplay();return()=>{loadSequence.current++;};},[currentOutlet.id]);
   const displayLive=useOutletEvents(String(currentOutlet.id),true,()=>void loadDisplay(),event=>{
-    if(event.event_type==='ORDER_CALL')setLastKitchenCall({id:String(event.aggregate_id),orderNumber:event.order_number,
-      token:event.order_number,customerName:'',fulfillmentType:event.fulfillment_type,tableNumber:event.table_number,timestamp:Date.now()});
+    if(event.event_type==='ORDER_CALL')setLastKitchenCall({id:`${event.aggregate_id}:r${event.round_number || 1}`,orderNumber:event.order_number,
+      token:`${event.order_number} / R${event.round_number || 1}`,customerName:'',fulfillmentType:event.fulfillment_type,tableNumber:event.table_number,timestamp:Date.now()});
   });
 
   // Fullscreen state
@@ -172,9 +176,9 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
       let text = "";
 
       if (isDineIn && announcement.tableNumber) {
-        text = `Attention please. Order Token ${announcement.token}, for ${announcement.tableNumber}, your order is ready for collection at the counter.`;
+        text = `Attention please. Order Token ${announcement.token}, for ${announcement.tableNumber}, this round is ready for collection at the counter.`;
       } else {
-        text = `Attention please. Takeaway Order Token ${announcement.token}, your order is ready for pickup at Counter A.`;
+        text = `Attention please. Takeaway Order Token ${announcement.token}, this round is ready for pickup at Counter A.`;
       }
 
       const utterance = new SpeechSynthesisUtterance(text);
@@ -205,31 +209,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   // Helper to format token cleanly for 20-foot visibility without clipping or truncation
   const formatTvToken = (order: { kioskToken?: string; orderNumber?: string }) => {
     const raw = (order.kioskToken || order.orderNumber || "").trim();
-    if (!raw) return "TK-01";
-
-    // If it's already a short token like "TK-4821", "T-108", "42", "#42"
-    if (/^(TK|T|#)?-?\d{1,4}$/i.test(raw)) {
-      return raw.toUpperCase();
-    }
-
-    // If it has "CR-POS-xxxx" or "POS-xxxx" -> "TK-xxxx"
-    if (/POS[-_](\d+)/i.test(raw)) {
-      const m = raw.match(/POS[-_](\d+)/i);
-      return `TK-${m ? m[1] : raw}`;
-    }
-
-    // If it contains a date format like "20261001-0042" or "CR-20261001-0042" -> extract last token digits
-    if (/\d{8}[-_](\d+)/.test(raw)) {
-      const m = raw.match(/\d{8}[-_](\d+)/);
-      return `TK-${m ? m[1] : raw}`;
-    }
-
-    // Replace "CR-" with "TK-"
-    if (raw.startsWith("CR-")) {
-      return `TK-${raw.slice(3)}`;
-    }
-
-    return raw.toUpperCase();
+    return raw || 'Order';
   };
 
   // Dynamic responsive font size to guarantee 20-foot distance visibility while NEVER cutting off
@@ -313,7 +293,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   useEffect(() => {
     if (!lastKitchenCall) return;
     const matchOrder = orders.find(
-      (o) => o.orderNumber === lastKitchenCall.orderNumber || o.kioskToken === lastKitchenCall.token
+      (o) => o.id === lastKitchenCall.id
     );
     if (matchOrder) {
       triggerOrderCall(matchOrder);

@@ -39,7 +39,7 @@ test('TV receives preparation, ready, call and completion without navigation and
   const state=await setup(page);
   state.orders=[{id:5,order_number:'KIOSK-1-00000005',status:'ACCEPTED',fulfillment_type:'TAKEAWAY',created_at:new Date().toISOString()}];
   await page.goto('/tv?outlet_id=1');
-  await expect(page.getByText('KIOSK-1-00000005',{exact:true}).first()).toBeVisible();
+  await expect(page.getByText('KIOSK-1-00000005 / R1',{exact:true}).first()).toBeVisible();
   let navigations=0;page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++;});
   state.orders[0].status='PREPARING';emit(state);
   state.orders[0].status='READY';emit(state);
@@ -101,4 +101,46 @@ test('scanned receipt URL opens only its order and follows live status without n
   await expect(page.getByRole('status').filter({hasText:'Ready for pickup'})).toBeVisible();
   expect(navigations).toBe(0);
   await page.screenshot({path:test.info().outputPath('receipt-tracking.png'),fullPage:true});
+});
+
+
+test('TV shows ready and cooking rounds of the same order and calls the requested round',async({page})=>{
+  const state=await setup(page),created=new Date().toISOString();
+  state.orders=[{id:5,order_number:'POS-12',status:'PREPARING',fulfillment_type:'TAKEAWAY',created_at:created,
+    rounds:[{number:1,status:'READY',created_at:created},{number:2,status:'PREPARING',created_at:created}]}];
+  await page.goto('/tv?outlet_id=1');
+  await expect(page.getByText('POS-12 / R1',{exact:true}).first()).toBeVisible();
+  await expect(page.getByText('POS-12 / R2',{exact:true}).first()).toBeVisible();
+  for(const socket of state.sockets)socket.send(JSON.stringify({event_type:'ORDER_CALL',event_id:'call-r1',aggregate_id:5,order_number:'POS-12',round_number:1,fulfillment_type:'TAKEAWAY'}));
+  await expect(page.locator('#tv-calling-spotlight-card')).toContainText('POS-12 / R1');
+  await page.getByTitle('Dismiss announcement').click();
+  state.orders[0].rounds[0].status='SERVED';state.orders[0].rounds[1].status='READY';emit(state);
+  await expect(page.locator('#tv-calling-spotlight-card')).toContainText('POS-12 / R2');
+  await expect.poll(()=>page.evaluate(()=>(window as any).__speech.some((text:string)=>text.includes('POS-12 / R2')))).toBe(true);
+});
+
+
+test('table QR keeps a rejected added round in the cart and never shows false confirmation',async({page})=>{
+  const state=await setup(page);
+  await page.goto('/table-qr?outlet_id=1&token=signed-table');
+  await page.getByRole('button',{name:'Add',exact:true}).click();
+  await page.getByRole('button',{name:'Review & Order',exact:true}).first().click();
+  await page.getByRole('button',{name:'Send Order to Kitchen',exact:true}).click();
+  await expect(page.getByText('A2 Order Confirmed!')).toBeVisible();
+  state.orders[0].can_append=true;
+  state.orders[0].rounds=[{number:1,status:'PREPARING',created_at:new Date().toISOString()}];
+  state.orders[0].items[0].kitchen_status='PREPARING';
+  state.orders[0].items[0].can_remove=false;
+  emit(state);
+  await page.getByRole('button',{name:'Order More Items (Add to Table)',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Preparation rounds'})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Preparation rounds'}).getByRole('button',{name:'Remove',exact:true})).toHaveCount(0);
+  await page.route('**/api/v1/orders/self-service/checkout/',route=>route.fulfill({status:409,json:{detail:'The kitchen updated this order. Review its latest state.'}}));
+  await page.getByRole('button',{name:'Add',exact:true}).click();
+  await page.getByRole('button',{name:/Add to Tab/}).first().click();
+  const send=page.getByRole('button',{name:/Send Round 2 to Kitchen/});
+  await send.click();
+  await expect(page.getByRole('alert').last()).toContainText('The kitchen updated this order');
+  await expect(send).toBeVisible();
+  await expect(page.getByText('A2 Order Confirmed!')).toHaveCount(0);
 });

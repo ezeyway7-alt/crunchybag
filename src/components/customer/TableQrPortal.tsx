@@ -1,3 +1,5 @@
+import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
+import {backendOrder} from '../../lib/posApi';
 import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
 import {useOrderReceipt} from "../../lib/orderReceipt";
 import {printReceiptDocument} from "../../lib/receiptPrinting";
@@ -160,6 +162,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   const tableReceipt=useOrderReceipt(placedOrderResult,placedOrderResult?trackingToken:'');
 
   const checkoutBody={branch_id:Number(qrContext?.branch_id || currentOutlet.id),order_source:'TABLE_QR',
+    ...(liveOrder && !['COMPLETED','CANCELLED'].includes(liveOrder.status)?{tracking_token:trackingToken,version:backendOrder(liveOrder)?.version}:{}),
     fulfillment_type:'DINE_IN',qr_token:qrToken,customer_name:guestName.trim(),customer_phone:phoneNumber.trim(),notes:tableNotes,items:cartLines(cart.items)};
   const serverQuote=useSelfServiceQuote(qrContext?checkoutBody:null);
 
@@ -168,11 +171,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
     return findActiveOrderByTableOrPhone(tableNumber || qrContext?.table_number, phoneNumber);
   }, [findActiveOrderByTableOrPhone, tableNumber, qrContext?.table_number, phoneNumber, orders]);
 
-  const activeRunningOrder = (liveOrder && !['COMPLETED','CANCELLED'].includes(liveOrder.status))
-    ? liveOrder
-    : (localActiveOrder && !['COMPLETED','CANCELLED'].includes(localActiveOrder.status))
-    ? localActiveOrder
-    : null;
+  const activeRunningOrder = liveOrder && !['COMPLETED','CANCELLED'].includes(liveOrder.status) ? liveOrder : null;
 
   // Available tables list
   const DEFAULT_TABLES = [
@@ -265,69 +264,15 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
     setCheckoutError('');
 
     try {
-      const payableTotal = serverQuote.quote?.total_payable ?? cart.finalTotal;
-
-      if (activeRunningOrder) {
-        // MECHANISM TO ADD ITEMS TO RUNNING ORDER:
-        let apiResult: any = null;
-        if (qrContext) {
-          try {
-            apiResult = await submitSelfService({
-              ...checkoutBody,
-              expected_total: payableTotal,
-              existing_order_number: activeRunningOrder.orderNumber,
-              is_addon_round: true,
-              round_number: (activeRunningOrder.roundsCount || 1) + 1,
-            });
-          } catch (err: any) {
-            console.warn("Self-service API append notice:", err);
-          }
-        }
-
-        // Always update AppContext running order & KDS kitchen line
-        const updated = addItemsToRunningOrder(activeRunningOrder.id, cart.items);
-        if (updated) {
-          setPlacedOrderResult(updated);
-        } else if (apiResult) {
-          setPlacedOrderResult(posOrderToOrder(apiResult, currentOutlet.name));
-        }
-
-        if (apiResult?.tracking_token) {
-          sessionStorage.setItem(`table-order:${qrToken}`, apiResult.tracking_token);
-          setTrackingToken(apiResult.tracking_token);
-        }
-
-        clearCart();
-        setIsConfirmDrawerOpen(false);
-        playMobileSound('success');
-      } else {
-        // Initial Round 1 Order
-        if (qrContext) {
-          const result = await submitSelfService({
-            ...checkoutBody,
-            expected_total: payableTotal,
-          });
-          sessionStorage.setItem(`table-order:${qrToken}`, result.tracking_token);
-          setTrackingToken(result.tracking_token);
-          const mappedOrder = posOrderToOrder(result, currentOutlet.name);
-          setPlacedOrderResult(mappedOrder);
-        } else {
-          // Local/floor table mode placement
-          const newOrder = placeTableOrder({
-            tableNumber: tableNumber || "T-01",
-            customerName: guestName.trim() || "Table Guest",
-            customerPhone: phoneNumber.trim() || "",
-            paymentMethod: selectedPaymentMethod,
-            fulfillmentType: diningMode,
-            notes: tableNotes,
-          });
-          setPlacedOrderResult(newOrder);
-        }
-
-        clearCart();
-        setIsConfirmDrawerOpen(false);
-        playMobileSound('success');
-      }
+      if(!qrContext)throw new Error('Scan a valid table QR code to order.');
+      if(!serverQuote.quote)throw new Error('Please wait for the current price quote.');
+      if(activeRunningOrder && !backendOrder(activeRunningOrder)?.can_append)throw new Error('This order cannot accept more items. Ask staff to start a new order.');
+      const result=await submitSelfService({...checkoutBody,expected_total:serverQuote.quote.total_payable});
+      sessionStorage.setItem(`table-order:${qrToken}`,result.tracking_token);
+      setTrackingToken(result.tracking_token);
+      setPlacedOrderResult(posOrderToOrder(result,currentOutlet.name));
+      window.dispatchEvent(new Event('self-service:refresh'));
+      clearCart();setIsConfirmDrawerOpen(false);playMobileSound('success');
     } catch (error: any) {
       setCheckoutError(error.message || 'Unable to confirm order. Please try again.');
       serverQuote.refresh();
@@ -415,6 +360,18 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           </div>
         </div>
       </header>
+      {liveOrder && <div className="max-w-md w-full mx-auto px-3 py-2"><OrderRoundsPanel order={backendOrder(liveOrder)} busy={submitting}
+        onRemove={async(itemId,quantity)=>{
+          if(submitLock.current)return;
+          const order=backendOrder(liveOrder);if(!order)return;
+          submitLock.current=true;setSubmitting(true);setCheckoutError('');
+          try {
+            await apiClient.post('/orders/self-service/items/void/',{tracking_token:trackingToken,qr_token:qrToken,version:order.version,item_id:itemId,quantity},
+              {skipAuth:true,headers:{'Idempotency-Key':`qr-void:${order.id}:${order.version}:${itemId}:${quantity}`}});
+          }catch(error:any){setCheckoutError(error.message || 'Unable to remove item.');}
+          finally{window.dispatchEvent(new Event('self-service:refresh'));submitLock.current=false;setSubmitting(false);}
+        }}/></div>}
+
 
       {/* -------------------------------------------------------------
           BEZEL-LESS SLIM CONTACT & SEARCH BAR (NOT COMPULSORY, OPTIONAL)

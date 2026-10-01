@@ -1,3 +1,4 @@
+import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
 import React,{useEffect,useRef,useState} from 'react';
 import {apiClient} from '../../lib/api';
 import {useOutletEvents} from '../../lib/useOutletEvents';
@@ -33,6 +34,7 @@ export const ReceiptOrderTrackingPage:React.FC=()=>{
           const event=[...(order.history || [])].reverse().find((row:any)=>row.status===step);
           return <li key={step} aria-current={step===order.status?'step':undefined} className={`flex items-center justify-between gap-2 border-l-2 pl-3 py-1 ${index<=current?'border-amber-500 text-zinc-100':'border-zinc-700 text-zinc-500'}`}><span>{labels[step]}</span>{event && <time className="text-zinc-400">{new Date(event.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</time>}</li>;
         })}</ol>}
+        <OrderRoundsPanel order={order}/>
         <p className="text-[11px] text-zinc-500">{error?'Last known status':live?'Live updates connected':'Connecting to live updates...'}</p>
       </section>}
     </div>
