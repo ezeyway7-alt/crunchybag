@@ -90,9 +90,9 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   // Sliding Menu Carousel index
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
-  // Auto-pagination / scroll page for preparing orders when there are many (10-20+)
+  // Auto-pagination / scroll page for preparing orders when there are many (8-16+)
   const [prepPage, setPrepPage] = useState(0);
-  const ORDERS_PER_PREP_PAGE = 12;
+  const ORDERS_PER_PREP_PAGE = 8;
 
   // Track previously known order status map to detect automatic transitions to READY
   const knownOrderStatusesRef = useRef<Map<string, OrderStatus>>(new Map());
@@ -202,12 +202,58 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     }
   };
 
+  // Helper to format token cleanly for 20-foot visibility without clipping or truncation
+  const formatTvToken = (order: { kioskToken?: string; orderNumber?: string }) => {
+    const raw = (order.kioskToken || order.orderNumber || "").trim();
+    if (!raw) return "TK-01";
+
+    // If it's already a short token like "TK-4821", "T-108", "42", "#42"
+    if (/^(TK|T|#)?-?\d{1,4}$/i.test(raw)) {
+      return raw.toUpperCase();
+    }
+
+    // If it has "CR-POS-xxxx" or "POS-xxxx" -> "TK-xxxx"
+    if (/POS[-_](\d+)/i.test(raw)) {
+      const m = raw.match(/POS[-_](\d+)/i);
+      return `TK-${m ? m[1] : raw}`;
+    }
+
+    // If it contains a date format like "20261001-0042" or "CR-20261001-0042" -> extract last token digits
+    if (/\d{8}[-_](\d+)/.test(raw)) {
+      const m = raw.match(/\d{8}[-_](\d+)/);
+      return `TK-${m ? m[1] : raw}`;
+    }
+
+    // Replace "CR-" with "TK-"
+    if (raw.startsWith("CR-")) {
+      return `TK-${raw.slice(3)}`;
+    }
+
+    return raw.toUpperCase();
+  };
+
+  // Dynamic responsive font size to guarantee 20-foot distance visibility while NEVER cutting off
+  const getTokenFontSize = (token: string, column: "prep" | "ready") => {
+    const len = token.length;
+    if (column === "ready") {
+      if (len <= 5) return "text-4xl sm:text-5xl lg:text-6xl";
+      if (len <= 7) return "text-3xl sm:text-4xl lg:text-5xl";
+      if (len <= 10) return "text-2xl sm:text-3xl lg:text-4xl";
+      return "text-xl sm:text-2xl lg:text-3xl";
+    } else {
+      if (len <= 5) return "text-3xl sm:text-4xl lg:text-5xl";
+      if (len <= 7) return "text-2xl sm:text-3xl lg:text-4xl";
+      if (len <= 10) return "text-xl sm:text-2xl lg:text-3xl";
+      return "text-lg sm:text-xl lg:text-2xl";
+    }
+  };
+
   // Trigger calling an order (Chime + Speech + Small Focus Rectangle UI)
   const triggerOrderCall = (order: Order) => {
     const announcement: CallingAnnouncement = {
       id: order.id,
       orderNumber: order.orderNumber,
-      token: order.kioskToken || order.orderNumber.replace("CR-", "TK-"),
+      token: formatTvToken(order),
       customerName: order.customerName,
       fulfillmentType: order.fulfillmentType,
       tableNumber: order.tableNumber,
@@ -522,40 +568,43 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full content-start">
                   {visiblePrepOrders.map((order) => {
                     const isTable = order.fulfillmentType === "DINE_IN" || !!order.tableNumber;
-                    const tokenStr = order.kioskToken || order.orderNumber.replace("CR-", "TK-");
+                    const tokenStr = formatTvToken(order);
 
                     return (
                       <div
                         key={order.id}
-                        className="bg-[#0C0E14] border border-zinc-800/90 hover:border-amber-500/50 p-2.5 sm:p-3 flex flex-col justify-between gap-2 shadow-sm transition-all"
+                        className="bg-[#0C0E14] border-2 border-amber-500/30 hover:border-amber-500/80 p-2 sm:p-2.5 flex flex-col justify-between shadow-md transition-all rounded-none min-w-0"
                       >
-                        {/* Top: Bold Token Number & Table/Takeaway Badge (Never Cut Off) */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-xl sm:text-2xl font-mono font-black text-amber-400 tracking-wider whitespace-nowrap">
-                            {tokenStr}
-                          </div>
+                        {/* Top: Fulfillment Type Badge & Elapsed Kitchen Time */}
+                        <div className="flex items-center justify-between gap-1 pb-1 border-b border-zinc-800/80 shrink-0">
                           {isTable ? (
-                            <span className="inline-block px-2 py-0.5 bg-amber-500/20 border border-amber-500/50 text-amber-300 text-xs font-mono font-black uppercase whitespace-nowrap shrink-0">
-                              {order.tableNumber || "Table"}
+                            <span className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] sm:text-xs font-mono font-black uppercase whitespace-nowrap">
+                              {order.tableNumber || "Dine-In"}
                             </span>
                           ) : (
-                            <span className="inline-block px-2 py-0.5 bg-sky-500/20 border border-sky-500/50 text-sky-300 text-xs font-mono font-black uppercase whitespace-nowrap shrink-0">
+                            <span className="px-2 py-0.5 bg-sky-500/20 border border-sky-500/40 text-sky-300 text-[10px] sm:text-xs font-mono font-black uppercase whitespace-nowrap">
                               Takeaway
                             </span>
                           )}
+                          <div className="flex items-center gap-1 text-amber-400 font-mono text-[11px] sm:text-xs font-bold shrink-0">
+                            <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                            <span>{getElapsedString(order.createdAt)}</span>
+                          </div>
                         </div>
 
-                        {/* Bottom: Large Prominent Timer Badge */}
-                        <div className="flex items-center justify-between pt-1 border-t border-zinc-800/80">
-                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/15 border border-amber-500/40 text-amber-300 w-fit shrink-0">
-                            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span className="font-mono text-xs sm:text-sm font-black tracking-wider whitespace-nowrap">
-                              {getElapsedString(order.createdAt)}
-                            </span>
+                        {/* Center: Full-Width Token Number (Never Squeezed, Highly Visible from 20ft) */}
+                        <div className="py-1.5 sm:py-2 text-center overflow-visible">
+                          <div
+                            className={`${getTokenFontSize(tokenStr, "prep")} font-mono font-black text-amber-400 tracking-normal drop-shadow-sm leading-tight inline-block max-w-full break-all`}
+                          >
+                            {tokenStr}
                           </div>
-                          <span className="text-[10px] font-mono text-zinc-500 font-bold uppercase tracking-wider">
-                            PREPARING
-                          </span>
+                        </div>
+
+                        {/* Bottom: Sub-status */}
+                        <div className="pt-1 border-t border-zinc-800/60 flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase font-bold shrink-0">
+                          <span>KITCHEN PREP</span>
+                          <span className="text-amber-500/70">IN PROGRESS</span>
                         </div>
                       </div>
                     );
@@ -592,61 +641,65 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full content-start">
                   {readyOrders.map((order) => {
                     const isTable = order.fulfillmentType === "DINE_IN" || !!order.tableNumber;
-                    const tokenStr = order.kioskToken || order.orderNumber.replace("CR-", "TK-");
+                    const tokenStr = formatTvToken(order);
                     const isCalling = activeCall?.id === order.id;
 
                     return (
                       <div
                         key={order.id}
-                        className={`relative p-2.5 sm:p-3 border-2 shadow-lg transition-all min-w-0 overflow-hidden flex flex-col justify-between gap-1.5 ${
+                        className={`relative p-2.5 sm:p-3 border-2 shadow-xl transition-all min-w-0 flex flex-col justify-between gap-1 rounded-none ${
                           isCalling
-                            ? "bg-[#0E261A] border-emerald-400 ring-2 ring-emerald-500/50 scale-[1.01]"
-                            : "bg-[#0A1811] border-emerald-500/70 hover:border-emerald-400"
+                            ? "bg-[#0E261A] border-emerald-400 ring-4 ring-emerald-500/50 scale-[1.02]"
+                            : "bg-[#0A1811] border-emerald-500/80 hover:border-emerald-400"
                         }`}
                       >
                         {/* Ping beacon & Destination */}
-                        <div className="flex items-center justify-between gap-1 pb-1 border-b border-emerald-500/30 shrink-0">
-                          <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1 shrink-0">
-                            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                            <span className="whitespace-nowrap">COLLECT</span>
+                        <div className="flex items-center justify-between gap-1 pb-1.5 border-b border-emerald-500/30 shrink-0">
+                          <span className="text-[10px] sm:text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+                            <span className="font-black">READY TO COLLECT</span>
                           </span>
 
                           {isTable ? (
-                            <span className="px-2 py-0.5 bg-amber-500 text-black text-[10px] sm:text-[11px] font-mono font-black uppercase whitespace-nowrap shrink-0">
+                            <span className="px-2 py-0.5 bg-amber-500 text-black text-[10px] sm:text-xs font-mono font-black uppercase whitespace-nowrap shrink-0 shadow-xs">
                               {order.tableNumber || "Dine-In"}
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 bg-emerald-500 text-black text-[10px] sm:text-[11px] font-mono font-black uppercase whitespace-nowrap shrink-0">
+                            <span className="px-2 py-0.5 bg-emerald-500 text-black text-[10px] sm:text-xs font-mono font-black uppercase whitespace-nowrap shrink-0 shadow-xs">
                               Takeaway
                             </span>
                           )}
                         </div>
 
-                        {/* Massive Token Number for Far Viewing */}
-                        <div className="py-1 text-center min-w-0">
-                          <div className="text-2xl sm:text-3xl lg:text-4xl font-mono font-black text-white tracking-widest drop-shadow-md truncate">
+                        {/* Center: Massive Token Number for 20ft Distance Visibility */}
+                        <div className="py-2 sm:py-3 text-center overflow-visible">
+                          <div
+                            className={`${getTokenFontSize(tokenStr, "ready")} font-mono font-black text-white tracking-normal drop-shadow-[0_2px_12px_rgba(16,185,129,0.35)] leading-tight inline-block max-w-full break-all`}
+                          >
                             {tokenStr}
                           </div>
-                          <div className="text-[10px] sm:text-[11px] text-zinc-400 font-medium truncate mt-0.5">
-                            {order.customerName}
-                          </div>
+                          {order.customerName && order.customerName !== "Walk-in Guest" && order.customerName !== "Table Guest" && (
+                            <div className="text-[11px] sm:text-xs text-emerald-300/80 font-medium truncate mt-1">
+                              {order.customerName}
+                            </div>
+                          )}
                         </div>
 
-                        {/* Mini Call & Complete triggers */}
-                        <div className="pt-1.5 border-t border-emerald-500/20 flex items-center justify-between gap-1 shrink-0">
+                        {/* Action Bar */}
+                        <div className="pt-1.5 border-t border-emerald-500/20 flex items-center justify-between gap-1.5 shrink-0">
                           <button
                             onClick={() => triggerOrderCall(order)}
-                            className="flex-1 py-1 px-1.5 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black font-bold text-[10px] uppercase tracking-wider border border-amber-500/40 transition-colors cursor-pointer text-center whitespace-nowrap"
+                            className="flex-1 py-1.5 px-2 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black font-bold text-xs uppercase tracking-wider border border-amber-500/40 transition-colors cursor-pointer text-center whitespace-nowrap"
                             title="Announce token over TV speaker"
                           >
                             Call Voice
                           </button>
                           <button
                             onClick={() => updateOrderStatus(order.id, "COMPLETED")}
-                            className="py-1 px-2 bg-zinc-800 hover:bg-emerald-600 text-zinc-400 hover:text-white font-bold text-[10px] uppercase border border-zinc-700 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                            className="py-1.5 px-3 bg-zinc-800 hover:bg-emerald-600 text-zinc-300 hover:text-white font-bold text-xs uppercase border border-zinc-700 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                             title="Mark served"
                           >
-                            Served
+                            Served ✓
                           </button>
                         </div>
                       </div>
@@ -673,15 +726,15 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                 </span>
               ) : (
                 completedOrders.map((order) => {
-                  const tokenStr = order.kioskToken || order.orderNumber.replace("CR-", "TK-");
+                  const tokenStr = formatTvToken(order);
                   const isTable = order.fulfillmentType === "DINE_IN" || !!order.tableNumber;
 
                   return (
                     <span
                       key={order.id}
-                      className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#101217] border border-zinc-800 text-[11px] font-mono text-zinc-300 shrink-0 whitespace-nowrap"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#101217] border border-zinc-800 text-xs font-mono text-zinc-300 shrink-0 whitespace-nowrap"
                     >
-                      <strong className="text-zinc-100">{tokenStr}</strong>
+                      <strong className="text-zinc-100 font-bold">{tokenStr}</strong>
                       <span className="text-zinc-500">
                         ({isTable ? order.tableNumber || "Dine" : "Takeaway"})
                       </span>
@@ -846,7 +899,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                 <div className="text-[10px] text-amber-400 font-bold uppercase tracking-widest">
                   ATTENTION PLEASE
                 </div>
-                <div className="text-2xl font-mono font-black text-white tracking-widest">
+                <div className="text-2xl sm:text-3xl font-mono font-black text-white tracking-normal break-all">
                   TOKEN {activeCall.token}
                 </div>
               </div>
