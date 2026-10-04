@@ -19,7 +19,7 @@ export interface SEOMetadata {
 }
 
 const DEFAULT_METADATA: SEOMetadata = {
-  title: 'Crunchy Bag - Best Crispy Fried Chicken, Burgers & Food Delivery in Kathmandu',
+  title: 'Crunchy Bag | Fried Chicken & Burgers in Imadol, Lalitpur',
   description:
     "Order Kathmandu's best crispy fried chicken, gourmet smash burgers, crunchy pakodas, and combos online from Crunchy Bag. Express food delivery across Kathmandu, Lalitpur & Bhaktapur with instant eSewa & cash payment.",
   canonical: 'https://crunchybag.com/',
@@ -41,8 +41,9 @@ export function updatePageSEO(meta: SEOMetadata) {
     let el = document.querySelector(selector);
     if (!el) {
       el = document.createElement('meta');
-      const [key, val] = selector.replace(/[\[\]']/g, '').split('=');
-      el.setAttribute(key, val);
+      const match = selector.match(/^meta\[(name|property)='([^']+)'\]$/);
+      if (!match) return;
+      el.setAttribute(match[1], match[2]);
       document.head.appendChild(el);
     }
     el.setAttribute(attr, value);
@@ -92,6 +93,8 @@ export function updatePageSEO(meta: SEOMetadata) {
     if (merged.author) setMetaTag("meta[property='article:author']", 'content', merged.author);
     if (merged.publishedTime) setMetaTag("meta[property='article:published_time']", 'content', merged.publishedTime);
     if (merged.section) setMetaTag("meta[property='article:section']", 'content', merged.section);
+  } else {
+    document.querySelectorAll('meta[property^="article:"]').forEach(el => el.remove());
   }
 
   // 9. Update Dynamic JSON-LD Schema (e.g. BlogPosting)

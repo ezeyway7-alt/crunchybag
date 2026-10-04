@@ -13,7 +13,6 @@ import {
   Trash2,
   Info,
   HelpCircle,
-  Instagram,
   Share2,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
@@ -51,19 +50,6 @@ const SINGLE_OUTLET: OutletLocation = {
 };
 
 export const GOOGLE_MAPS_LOCATION_URL = "https://share.google/wJPKlrcMJueR0EmvX";
-
-export const INSTAGRAM_VIRAL_TAGS = [
-  { name: "#CrunchyBag", url: "https://www.instagram.com/explore/tags/crunchybag/" },
-  { name: "#DidYouSeeThat", url: "https://www.instagram.com/explore/tags/didyouseethat/" },
-  { name: "#StreetPrankNepal", url: "https://www.instagram.com/explore/tags/streetpranknepal/" },
-  { name: "#ImadolDiaries", url: "https://www.instagram.com/explore/tags/imadoldiaries/" },
-  { name: "#LalitpurVibes", url: "https://www.instagram.com/explore/tags/lalitpurvibes/" },
-  { name: "#ComingSoonNepal", url: "https://www.instagram.com/explore/tags/comingsoonnepal/" },
-  { name: "#PlotTwistReel", url: "https://www.instagram.com/explore/tags/plottwistreel/" },
-  { name: "#NepalViralReels", url: "https://www.instagram.com/explore/tags/nepalviralreels/" },
-  { name: "#FoodHypeNepal", url: "https://www.instagram.com/explore/tags/foodhypenepal/" },
-  { name: "#EnjoyEachBiteWithCrunch", url: "https://www.instagram.com/explore/tags/enjoyeachbitewithcrunch/" },
-];
 
 export const CustomerFooter: React.FC = () => {
   const { openLoginModal } = useAuth();
@@ -252,84 +238,6 @@ export const CustomerFooter: React.FC = () => {
                   </button>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Social Viral Reel & Spot Us Callout Card */}
-          <div className="p-4 sm:p-5 border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-zinc-900/40 to-black text-zinc-900 dark:text-zinc-100 shadow-sm space-y-3">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 text-[10px] font-mono font-black uppercase tracking-wider bg-rose-500/20 text-rose-500 border border-rose-500/30 flex items-center gap-1">
-                    <Instagram className="w-3 h-3" />
-                    <span>Viral Reel &amp; Street Pranks</span>
-                  </span>
-                  <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                    Nepal Street Vibes
-                  </span>
-                </div>
-                <h4 className="text-sm sm:text-base font-black text-zinc-950 dark:text-white">
-                  Share this with a friend who always falls for pranks! 😂👇
-                </h4>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                  <a
-                    href={GOOGLE_MAPS_LOCATION_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-bold text-amber-600 dark:text-amber-400 hover:underline"
-                  >
-                    <MapPin className="w-3.5 h-3.5 shrink-0" />
-                    <span>📍 Spot Us: Imadol, Lalitpur</span>
-                  </a>
-                  <a
-                    href={`tel:${SINGLE_OUTLET.phone}`}
-                    className="inline-flex items-center gap-1 font-mono font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-                  >
-                    <Phone className="w-3.5 h-3.5 shrink-0" />
-                    <span>📞 Call / Order: {SINGLE_OUTLET.phone}</span>
-                  </a>
-                  <span className="text-zinc-500 text-[11px]">
-                    Location: Imadol, Lalitpur
-                  </span>
-                </div>
-              </div>
-
-              {/* Direct Buttons */}
-              <div className="flex items-center gap-2 shrink-0">
-                <a
-                  href={GOOGLE_MAPS_LOCATION_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-2 text-xs font-black bg-amber-500 hover:bg-amber-400 text-black border border-black shadow-xs transition-colors flex items-center gap-1.5"
-                >
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span>Google Maps</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-                <a
-                  href={`tel:${SINGLE_OUTLET.phone}`}
-                  className="px-3 py-2 text-xs font-mono font-bold bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white border border-zinc-300 dark:border-zinc-700 transition-colors flex items-center gap-1.5"
-                >
-                  <Phone className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{SINGLE_OUTLET.phone}</span>
-                </a>
-              </div>
-            </div>
-
-            {/* Viral Hashtags */}
-            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mr-1">Trending:</span>
-              {INSTAGRAM_VIRAL_TAGS.map((tag) => (
-                <a
-                  key={tag.name}
-                  href={tag.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] font-mono px-2 py-0.5 bg-zinc-200/70 dark:bg-zinc-800/80 hover:bg-amber-500/20 text-zinc-700 dark:text-zinc-300 hover:text-amber-500 border border-zinc-300/80 dark:border-zinc-700 transition-colors"
-                >
-                  {tag.name}
-                </a>
-              ))}
             </div>
           </div>
 
@@ -586,15 +494,15 @@ export const CustomerFooter: React.FC = () => {
           {/* Quick Directory: Clean, 100% visible navigation */}
           <div className="pt-3 border-t border-zinc-200/80 dark:border-zinc-800/80 text-[11px] text-zinc-500 space-y-1.5">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-bold text-zinc-700 dark:text-zinc-300">Quick Delivery Hubs:</span>
-              <a href="/delivery/imadol" className="hover:text-amber-500 transition-colors font-medium">Imadol Hub</a> •
+              <span className="font-bold text-zinc-700 dark:text-zinc-300">Delivery Enquiries:</span>
+              <a href="/delivery/imadol" className="hover:text-amber-500 transition-colors font-medium">Imadol Outlet</a> •
               <a href="/delivery/balkumari" className="hover:text-amber-500 transition-colors">Balkumari</a> •
               <a href="/delivery/gwarko" className="hover:text-amber-500 transition-colors">Gwarko</a> •
               <a href="/delivery/koteshwor" className="hover:text-amber-500 transition-colors">Koteshwor</a> •
               <a href="/delivery/baneshwor" className="hover:text-amber-500 transition-colors">Baneshwor</a> •
               <a href="/delivery/jhamsikhel" className="hover:text-amber-500 transition-colors">Jhamsikhel</a> •
               <a href="/delivery/thamel" className="hover:text-amber-500 transition-colors">Thamel</a> •
-              <a href="/delivery" className="text-amber-600 dark:text-amber-400 hover:underline font-bold">View All 19+ Hubs &rarr;</a>
+              <a href="/delivery" className="text-amber-600 dark:text-amber-400 hover:underline font-bold">Delivery Information &rarr;</a>
             </div>
           </div>
 

@@ -10,7 +10,8 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test:pos": "playwright test tests/pos.spec.ts",
-    "test:customer": "playwright test tests/customer.spec.ts"
+    "test:customer": "playwright test tests/customer.spec.ts",
+    "test:seo": "npm run build && playwright test --config playwright.seo.config.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

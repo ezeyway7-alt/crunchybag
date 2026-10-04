@@ -5,6 +5,7 @@ import { formatNPR } from "../../lib/utils";
 import { SkeletonProductCard } from "../common/Skeleton";
 import { useApp } from "../../context/AppContext";
 import { ProductDetailModal } from "./ProductDetailModal";
+import { productPath } from "../../lib/productRoutes";
 
 interface ProductCardProps {
   product: Product;
@@ -121,7 +122,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div>
           <div className="flex items-start justify-between gap-2">
             <h4 className="font-bold text-xs sm:text-[13px] text-white group-hover:text-amber-500 transition-colors line-clamp-1 leading-snug">
-              {product.name}
+              <a href={productPath(product)} onClick={(event) => {
+                event.stopPropagation();
+                if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                onSelect(product);
+              }}>{product.name}</a>
             </h4>
           </div>
         </div>

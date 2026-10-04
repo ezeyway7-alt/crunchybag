@@ -195,9 +195,16 @@ export const BlogsModal: React.FC<BlogsModalProps> = ({ isOpen, onClose }) => {
             {/* Articles Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
               {filteredArticles.map((article) => (
-                <div
+                <a
                   key={article.id}
-                  onClick={() => setSelectedArticle(article)}
+                  href={`/blog/${article.slug}`}
+                  onClick={(event) => {
+                    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                    event.preventDefault();
+                    onClose();
+                    window.history.pushState(null, '', `/blog/${article.slug}`);
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                  }}
                   className="border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] hover:border-amber-500 dark:hover:border-amber-500 transition-all cursor-pointer flex flex-col justify-between group overflow-hidden"
                 >
                   <div className="relative h-36 w-full overflow-hidden bg-zinc-900">
@@ -231,7 +238,7 @@ export const BlogsModal: React.FC<BlogsModalProps> = ({ isOpen, onClose }) => {
                       <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                     </div>
                   </div>
-                </div>
+                </a>
               ))}
             </div>
 

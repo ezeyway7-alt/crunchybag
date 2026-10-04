@@ -94,6 +94,7 @@ export const BlogDetailPage: React.FC<BlogDetailPageProps> = ({ slug: propSlug, 
     } else {
       updatePageSEO({
         title: "Article Not Found | Crunchy Bag Culinary Blog",
+        noIndex: true,
         description: "The requested culinary article could not be found. Browse our latest food stories.",
         canonical: "https://crunchybag.com/blogs",
       });

@@ -103,3 +103,99 @@
   animation: shimmer-sweep 1.8s infinite ease-in-out;
 }
 
+/* TV Ad Image Slider Distinct In-Animations */
+@keyframes tvSliderZoomIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+    filter: blur(4px);
+  }
+  50% {
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0px);
+  }
+}
+
+@keyframes tvSliderZoomOut {
+  0% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tvSliderSlideRight {
+  0% {
+    opacity: 0;
+    transform: translateX(60px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes tvSliderSlideLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-60px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes tvSliderSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(50px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tvSliderTiltIn {
+  0% {
+    opacity: 0;
+    transform: perspective(800px) rotateY(12deg) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(800px) rotateY(0deg) scale(1);
+  }
+}
+
+.tv-anim-zoom-in {
+  animation: tvSliderZoomIn 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.tv-anim-zoom-out {
+  animation: tvSliderZoomOut 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.tv-anim-slide-right {
+  animation: tvSliderSlideRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.tv-anim-slide-left {
+  animation: tvSliderSlideLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.tv-anim-slide-up {
+  animation: tvSliderSlideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.tv-anim-tilt-in {
+  animation: tvSliderTiltIn 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

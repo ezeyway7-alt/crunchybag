@@ -25,6 +25,7 @@ import {
   AlertCircle,
   Eye,
   Heart,
+  UploadCloud,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Modal } from "../common/Modal";
@@ -281,61 +282,31 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
 
             {/* Conditional Fulfillment Blocks - Very Compact */}
             {selectedFulfillment === "DELIVERY" && (
-              <div className="p-2 bg-zinc-50 dark:bg-[#151518] border border-zinc-200 dark:border-zinc-800 space-y-1.5">
-                {/* Shipping Address Header & Action Buttons */}
-                <div className="flex items-center justify-between gap-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-                    <MapPin className="h-3 w-3 text-amber-500" />
-                    <span>Delivery Address</span>
-                  </span>
-
+              <div className="p-2 sm:p-2.5 bg-zinc-50 dark:bg-[#151518] border border-zinc-200 dark:border-zinc-800 space-y-1">
+                {/* Single clean line: Icon + Chosen Address Name + Edit/Choose button */}
+                <div
+                  onClick={() => setIsLocationModalOpen(true)}
+                  className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-[#1E1E22] border border-zinc-200 dark:border-zinc-700 hover:border-amber-500 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                      {deliveryAddress || "Choose delivery address"}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     id="checkout-change-location-btn"
-                    onClick={() => setIsLocationModalOpen(true)}
-                    className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-amber-500 hover:bg-amber-400 text-black border border-black cursor-pointer shadow-xs transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsLocationModalOpen(true);
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-black border border-black cursor-pointer shrink-0 transition-colors"
                   >
-                    <Plus className="h-3 w-3 stroke-[2.5]" />
-                    <span>{deliveryAddress ? "Edit address" : "Add address"}</span>
+                    {deliveryAddress ? "Edit" : "Choose"}
                   </button>
                 </div>
-
-                {savedAddresses.addresses.length > 0 && <select aria-label="Saved delivery address" value={selectedAddressId} onChange={e=>{
-                  setSelectedAddressId(e.target.value);const row=savedAddresses.addresses.find(row=>String(row.id)===e.target.value);
-                  if(row){setDeliveryAddress(row.address);setDeliveryLocation(addressPoint(row));setSaveAddress(false);}else{setDeliveryAddress('');setDeliveryLocation(undefined);}
-                }} className="w-full bg-zinc-900 border border-zinc-700 p-2 text-base sm:text-xs"><option value="">New address</option>{savedAddresses.addresses.map(row=><option key={row.id} value={row.id}>{row.label}: {row.address}</option>)}</select>}
-                {touched && addressError && <p className="text-xs text-rose-400">{addressError}</p>}
-                {savedAddresses.error && <p role="alert" className="text-xs text-rose-400">{savedAddresses.error}</p>}
-                {/* Address Card Display */}
-                <div
-                  onClick={() => setIsLocationModalOpen(true)}
-                  className="p-1.5 sm:p-2 bg-white dark:bg-[#1E1E22] border border-zinc-200 dark:border-zinc-700 hover:border-amber-500 transition-colors cursor-pointer group flex items-start justify-between gap-2"
-                >
-                  <div className="space-y-0.5 min-w-0 flex-1">
-                    <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                      {deliveryAddress || "Choose a delivery address"}
-                    </p>
-                    {deliveryLocation?.landmark && (
-                      <p className="text-[10px] text-amber-600 dark:text-amber-400 truncate">
-                        Landmark: {deliveryLocation.landmark}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-zinc-400 group-hover:text-amber-500 font-bold shrink-0">
-                    Edit &rarr;
-                  </span>
-                </div>
-
-                {!selectedAddressId && deliveryAddress && <div className="space-y-2"><label className="flex gap-2 items-center text-xs"><input type="checkbox" checked={saveAddress} onChange={e=>setSaveAddress(e.target.checked)} />Save this address</label>
-                  {saveAddress && <Input label="Address label" value={addressLabel} onChange={e=>setAddressLabel(e.target.value)} maxLength={60} required />}</div>}
-                {/* Ride Sharing Delivery Fee Note */}
-                <div className="p-1.5 bg-amber-500/10 border border-amber-500/20 flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
-                  <Bike className="h-3 w-3 text-amber-500 shrink-0" />
-                  <p className="text-[10px] leading-tight">
-                    <span className="font-bold text-zinc-900 dark:text-white">Courier Note: </span>
-                    Rider fee paid per ride sharing app rate (Pathao / InDrive / Yango).
-                  </p>
-                </div>
+                {touched && addressError && <p className="text-xs text-rose-400 font-medium">{addressError}</p>}
               </div>
             )}
 
@@ -371,7 +342,6 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   value={vehicleInfo}
                   onChange={(e) => setVehicleInfo(e.target.value)}
                   maxLength={150}
-                  placeholder="Vehicle model & plate (e.g., White Swift Ba 2 Cha 4921)"
                   className="w-full px-2 py-1 text-base sm:text-xs bg-white dark:bg-[#1E1E22] border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-amber-500"
                 />
               </div>
@@ -390,7 +360,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
             {/* Customer Contact Information (Compact grid) */}
             <div className="space-y-1">
               <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Contact & Details
+                Contact Details
               </h4>
               <div className="grid grid-cols-2 gap-2">
                 <Input
@@ -400,7 +370,6 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   onBlur={()=>setTouched(true)}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Your Name"
                   leftIcon={<User className="h-3.5 w-3.5" />}
                   className="rounded-none text-xs h-7.5"
                   required
@@ -409,7 +378,6 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   label="Phone Number"
                   value={phone}
                   readOnly
-                  placeholder="+977 98XXXXXXXX"
                   leftIcon={<Phone className="h-3.5 w-3.5" />}
                   className="rounded-none text-xs h-7.5"
                   required
@@ -421,22 +389,71 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 maxLength={1800}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Special notes"
                 className="rounded-none text-xs h-7.5"
               />
             </div>
 
             {/* Payment evidence uses the organization's uploaded merchant QR. */}
             <div className="space-y-1.5 pt-1 border-t border-zinc-200 dark:border-zinc-800">
-              <label className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Scan & Pay</label>
-              <div className="p-2 sm:p-2.5 bg-amber-500/10 border border-amber-500/30 flex items-center gap-2.5">
-                {meta?.qr_url ? <a href={meta.qr_url} target="_blank" rel="noreferrer"><img src={meta.qr_url} alt="Merchant payment QR" className="w-32 h-32 object-contain bg-white" /></a> : <p className="text-xs text-amber-500">Payment QR is not configured for this outlet yet.</p>}
-                <div className="space-y-2 min-w-0">
-                  <p className="text-xs font-bold">{meta?.merchant}</p>
-                  <p className="text-[10px] text-zinc-400">Pay {formatNPR(grandPayableTotal)}, then upload the payment receipt. The outlet will verify it.</p>
-                  <input aria-label="Payment receipt" aria-invalid={!!proofError} aria-describedby={proofError ? 'receipt-error' : undefined} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleProof} className="w-full text-xs" required />
-                  {proofError && <p id="receipt-error" role="alert" className="text-xs text-rose-400">{proofError}</p>}
-                  {proof && <p className="text-xs text-emerald-400">Receipt ready</p>}
+              <label className="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                Scan &amp; Pay (Payment Verification)
+              </label>
+              <div className="p-2.5 sm:p-3 bg-zinc-900/60 border border-zinc-700/80 flex flex-col sm:flex-row items-center gap-3">
+                {meta?.qr_url ? (
+                  <a href={meta.qr_url} target="_blank" rel="noreferrer" className="shrink-0 group relative">
+                    <img src={meta.qr_url} alt="Merchant payment QR" className="w-28 h-28 object-contain bg-white p-1 border border-zinc-700 shadow-sm" />
+                    <span className="absolute bottom-1 right-1 text-[9px] bg-black/85 text-white px-1 py-0.5 rounded font-mono">Zoom</span>
+                  </a>
+                ) : (
+                  <p className="text-xs text-amber-500">Payment QR is not configured for this outlet yet.</p>
+                )}
+                
+                <div className="space-y-2 min-w-0 flex-1 w-full">
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-xs font-bold text-white truncate">{meta?.merchant || "Crunchy Bag Outlet"}</p>
+                    <span className="text-xs font-mono font-black text-amber-400 shrink-0">{formatNPR(grandPayableTotal)}</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 leading-snug">
+                    Scan with eSewa / FonePay, complete payment, then attach receipt:
+                  </p>
+                  
+                  {/* Distinct, properly bordered Upload Zone */}
+                  <label
+                    htmlFor="checkout-payment-proof"
+                    className={`flex items-center justify-center gap-2 p-2.5 border-2 border-dashed cursor-pointer transition-all ${
+                      proof
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
+                        : proofError
+                        ? "border-rose-500 bg-rose-500/10 text-rose-300"
+                        : "border-amber-500/60 hover:border-amber-400 bg-amber-500/5 hover:bg-amber-500/10 text-zinc-200"
+                    }`}
+                  >
+                    <input
+                      id="checkout-payment-proof"
+                      aria-label="Payment receipt"
+                      aria-invalid={!!proofError}
+                      aria-describedby={proofError ? "receipt-error" : undefined}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleProof}
+                      className="sr-only"
+                      required
+                    />
+                    {proof ? (
+                      <div className="flex items-center gap-2 text-xs font-bold min-w-0">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                        <span className="truncate max-w-[180px]">Receipt: {proof.name}</span>
+                        <span className="text-[10px] text-zinc-400 underline ml-auto shrink-0">Change</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs font-bold">
+                        <UploadCloud className="h-4 w-4 text-amber-400 shrink-0" />
+                        <span>Choose Receipt Screenshot</span>
+                        <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-tight font-normal hidden sm:inline">(PNG, JPG, WEBP)</span>
+                      </div>
+                    )}
+                  </label>
+                  {proofError && <p id="receipt-error" role="alert" className="text-xs text-rose-400 font-medium">{proofError}</p>}
                 </div>
               </div>
             </div>

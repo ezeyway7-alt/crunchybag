@@ -2,6 +2,8 @@ import {receiptFixture} from "./receiptFixture";
 import {test,expect,Page} from '@playwright/test';
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0x8AAAAASUVORK5CYII=';
 async function setup(page:Page, signedIn=false) {
+  // External font availability must not hold up storefront navigation in tests.
+  await page.route('https://fonts.googleapis.com/**', route => route.abort());
   page.on('pageerror',e=>console.log('BROWSER ERROR',e.stack));
   const user={id:91,username:'web_customer',phone_number:'+9779841234567',email:'',role:'CUSTOMER',is_active:true};
   const outlet={id:1,name:'Web Outlet',branch_code:'WEB',enable_delivery:true,enable_takeaway:true,accepting_orders:true};

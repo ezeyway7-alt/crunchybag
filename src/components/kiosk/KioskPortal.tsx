@@ -4,7 +4,7 @@ import {useOrderReceipt} from "../../lib/orderReceipt";
 import {printReceiptDocument} from "../../lib/receiptPrinting";
 import {apiClient} from "../../lib/api";
 import {submitSelfService, useSelfServiceOrder, useSelfServiceQuote} from "../../lib/selfService";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Sparkles,
   Flame,
@@ -43,6 +43,8 @@ import {
   Search,
   Phone,
   User,
+  Home,
+  Lock,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Product, ProductVariant, SelectedModifier, FulfillmentType, PaymentMethod, Category, Order } from "../../types";
@@ -65,6 +67,8 @@ export const KioskPortal: React.FC = () => {
     lookupOrderByTokenOrCode,
     orders,
     isLoadingSkeleton,
+    findActiveOrderByTableOrPhone,
+    addItemsToRunningOrder,
   } = useApp();
   const BANNER_SLIDES = comboDefinitions(products);
 
@@ -139,8 +143,17 @@ export const KioskPortal: React.FC = () => {
   const [completedOrderNumber, setCompletedOrderNumber] = useState<string>("");
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [hasPrinted, setHasPrinted] = useState<boolean>(false);
+  const [receiptCountdown, setReceiptCountdown] = useState<number>(15);
 
-  const [tables, setTables] = useState<{ id: number; table_number: string; capacity?: number; section?: string }[]>([]);
+  // Table ongoing bill and append states
+  const [isAddingToExistingTab, setIsAddingToExistingTab] = useState(false);
+  const [targetOngoingOrder, setTargetOngoingOrder] = useState<Order | null>(null);
+  const [selectedTableForPendingPrompt, setSelectedTableForPendingPrompt] = useState<{
+    tableNumber: string;
+    order: Order;
+  } | null>(null);
+
+  const [tables, setTables] = useState<{ id: number; table_number: string; capacity?: number; section?: string; active_order_id?: number | null }[]>([]);
   const [orderError, setOrderError] = useState("");
   const [trackingToken, setTrackingToken] = useState("");
   const [receiptOrder,setReceiptOrder]=useState<Order|null>(null);
@@ -164,6 +177,60 @@ export const KioskPortal: React.FC = () => {
     { id: 12, table_number: "Table 12", capacity: 8, section: "Family Lounge" },
   ];
   const displayTables = tables.length > 0 ? tables : DEFAULT_TABLES;
+
+  // Helper: Detect if a table currently has an active ongoing pending bill
+  const getOngoingOrderForTable = useCallback(
+    (tableStr: string): Order | null => {
+      if (!tableStr) return null;
+      const digits = tableStr.replace(/\D/g, "");
+      const clean = tableStr.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+
+      // 1. Check if table has active_order_id from backend tables endpoint
+      const tableObj = displayTables.find(
+        (t) =>
+          t.table_number.toLowerCase() === tableStr.toLowerCase() ||
+          t.table_number.replace(/\D/g, "") === digits
+      );
+      if (tableObj && (tableObj as any).active_order_id) {
+        const activeId = (tableObj as any).active_order_id;
+        const backendMatch = orders.find(
+          (o) =>
+            (o as any)._posOrder?.id === activeId ||
+            o.id === String(activeId) ||
+            o.orderNumber === String(activeId)
+        );
+        if (backendMatch && backendMatch.status !== "COMPLETED" && backendMatch.status !== "CANCELLED") {
+          const isSettled =
+            (backendMatch.isBilled && backendMatch.paymentStatus === "PAID") ||
+            (backendMatch as any)._posOrder?.settlement === "PAID";
+          if (!isSettled) return backendMatch;
+        }
+      }
+
+      // 2. Check active orders in state
+      return (
+        orders.find((o) => {
+          if (o.status === "COMPLETED" || o.status === "CANCELLED") return false;
+          // Settled / paid orders do not count as pending bills
+          const isSettled =
+            (o.isBilled && o.paymentStatus === "PAID") ||
+            (o as any)._posOrder?.settlement === "PAID" ||
+            (Number((o as any)._posOrder?.due_amount || 0) <= 0 && (o as any)._posOrder?.settlement === "PAID");
+          if (isSettled) return false;
+
+          if (!o.tableNumber) return false;
+          const oDigits = o.tableNumber.replace(/\D/g, "");
+          if (digits && oDigits && digits === oDigits) return true;
+
+          const oClean = o.tableNumber.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+          if (oClean === clean) return true;
+
+          return false;
+        }) || null
+      );
+    },
+    [displayTables, orders]
+  );
 
   useEffect(() => {
     let alive = true;
@@ -284,6 +351,25 @@ export const KioskPortal: React.FC = () => {
     };
   }, [step]);
 
+  // Auto-return countdown timer for RECEIPT_TOKEN screen
+  useEffect(() => {
+    if (step !== "RECEIPT_TOKEN") {
+      setReceiptCountdown(15);
+      return;
+    }
+    setReceiptCountdown(15);
+    const interval = setInterval(() => {
+      setReceiptCountdown((prev) => {
+        if (prev <= 1) {
+          handleResetToAttract();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [step]);
+
   // Fullscreen toggle handler
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -320,6 +406,10 @@ export const KioskPortal: React.FC = () => {
     setHasPrinted(false);
     setIsPrinting(false);
     setIdleSeconds(0);
+    setReceiptCountdown(15);
+    setIsAddingToExistingTab(false);
+    setTargetOngoingOrder(null);
+    setSelectedTableForPendingPrompt(null);
   };
 
   const handleReservationSubmit = (e: React.FormEvent) => {
@@ -341,7 +431,16 @@ export const KioskPortal: React.FC = () => {
     setReservationCodeLinked(formatted);
     const digits = code.replace(/\D/g, "");
     if (digits) {
-      setTableNumber(digits.slice(-2) || "12");
+      const assigned = digits.slice(-2) || "12";
+      setTableNumber(assigned);
+      const ongoing = getOngoingOrderForTable(assigned);
+      if (ongoing) {
+        setTargetOngoingOrder(ongoing);
+        setIsAddingToExistingTab(true);
+      } else {
+        setTargetOngoingOrder(null);
+        setIsAddingToExistingTab(false);
+      }
       if (digits.length >= 7) {
         setGuestPhone(digits);
         setPhoneVerified(true);
@@ -600,6 +699,73 @@ export const KioskPortal: React.FC = () => {
       setStep('TABLE_SELECT');
       return;
     }
+
+    // 1. If in "Add to Table Bill" mode, append items to the ongoing order instead of creating a new bill
+    if (isAddingToExistingTab && targetOngoingOrder) {
+      submitting.current = true;
+      setPaymentProcessing(true);
+      setOrderError('');
+      try {
+        const formattedItems = kioskCart.map((item) => ({
+          id: item.id,
+          productId: item.product.id,
+          productName: item.product.name,
+          product: item.product,
+          variantId: item.variant.id,
+          variantName: item.variant.name,
+          variant: item.variant,
+          modifiers: item.modifiers.map((m) => m.optionName),
+          selectedModifiers: item.modifiers,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          lineTotal: item.lineTotal,
+          specialInstructions: item.specialInstructions,
+        }));
+
+        const updated = addItemsToRunningOrder(targetOngoingOrder.id, formattedItems);
+        const nextRound = (targetOngoingOrder.roundsCount || 1) + 1;
+        const tokenStr = `${targetOngoingOrder.orderNumber}-R${nextRound}`;
+        setGeneratedToken(tokenStr);
+        setCompletedOrderNumber(targetOngoingOrder.orderNumber);
+        setOrderTimeEstimate(`In ${currentOutlet.estimatedPrepTimeMin || 12} mins`);
+        if (updated) {
+          setReceiptOrder(updated);
+          setSavedTotal(updated.totalAmount);
+        } else {
+          setReceiptOrder(targetOngoingOrder);
+        }
+        playKioskSound('success');
+        setPaymentSuccess(true);
+        setStep('RECEIPT_TOKEN');
+        addToast({
+          type: 'success',
+          message: `Round ${nextRound} successfully sent to kitchen for Table ${tableNumber}. Added to Bill #${targetOngoingOrder.orderNumber}.`,
+        });
+      } catch (err: any) {
+        setOrderError(err.message || 'Failed to append items to table bill.');
+      } finally {
+        submitting.current = false;
+        setPaymentProcessing(false);
+      }
+      return;
+    }
+
+    // 2. Safeguard: A table with an ongoing pending bill CANNOT accept a new order!
+    if (fulfillment === 'DINE_IN' && tableNumber.trim()) {
+      const ongoing = getOngoingOrderForTable(tableNumber);
+      if (ongoing) {
+        const errorMsg = `Table ${tableNumber} already has an ongoing pending bill (#${ongoing.orderNumber}). A new order cannot be accepted for this table. Please choose an available table or add items to the active bill.`;
+        setOrderError(errorMsg);
+        addToast({
+          type: 'error',
+          message: `Table ${tableNumber} has an ongoing pending bill. New order cannot be accepted.`,
+        });
+        setStep('TABLE_SELECT');
+        return;
+      }
+    }
+
+    // 3. Normal new order checkout for vacant tables / takeaway
     submitting.current=true;setPaymentProcessing(true);setOrderError('');
     try {
       const created=await submitSelfService({...checkoutBody,expected_total:serverQuote.quote?.total_payable});
@@ -892,11 +1058,24 @@ export const KioskPortal: React.FC = () => {
             <span>{kioskCart.length > 0 ? "Back to Menu" : "Back"}</span>
           </button>
 
-          <div className="flex items-center gap-2">
-            <CrunchyLogo size="sm" className="h-7 sm:h-8" />
-            <span className="text-sm sm:text-base font-black uppercase tracking-wider text-zinc-100">
-              Select Your Table
-            </span>
+          <div className="flex flex-col items-center">
+            <div className="flex items-center gap-2">
+              <CrunchyLogo size="sm" className="h-7 sm:h-8" />
+              <span className="text-sm sm:text-base font-black uppercase tracking-wider text-zinc-100">
+                Select Your Table
+              </span>
+            </div>
+            {/* Live Indicator Legend Strip */}
+            <div className="flex items-center gap-4 text-[10.5px] mt-1 text-zinc-400 font-medium">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>Vacant (Ready for New Order)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-amber-400/90 font-bold">Ongoing Bill (New Bill Blocked • Tap to Add Items)</span>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -925,10 +1104,59 @@ export const KioskPortal: React.FC = () => {
         <div className="relative z-10 flex-1 overflow-y-auto py-4 sm:py-6 w-full max-w-6xl mx-auto flex flex-col justify-center">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4 my-auto">
             {displayTables.map((t) => {
+              const ongoingOrder = getOngoingOrderForTable(t.table_number);
+              const isOccupiedWithBill = !!ongoingOrder;
               const isSelected =
                 tableNumber === t.table_number ||
                 tableNumber === t.table_number.replace(/\D/g, "") ||
                 (tableNumber && t.table_number.toLowerCase() === tableNumber.toLowerCase());
+
+              if (isOccupiedWithBill) {
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      playKioskSound("tap");
+                      setSelectedTableForPendingPrompt({
+                        tableNumber: t.table_number,
+                        order: ongoingOrder,
+                      });
+                    }}
+                    className={`relative p-3.5 sm:p-4 border-2 transition-all flex flex-col items-center justify-between gap-1.5 cursor-pointer active:scale-95 group text-center min-h-[105px] sm:min-h-[120px] bg-gradient-to-b from-[#1C160C] to-[#12100C] border-amber-500/70 hover:border-amber-400 text-zinc-100 shadow-md ${
+                      isSelected && isAddingToExistingTab ? "ring-2 ring-amber-400 shadow-amber-500/30" : ""
+                    }`}
+                  >
+                    {/* Top Status Header */}
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1 bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 rounded-none">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                        <span className="text-[8.5px] uppercase font-black tracking-wider text-amber-400">
+                          Pending Bill
+                        </span>
+                      </div>
+                      <Lock className="w-3 h-3 text-amber-400/80" />
+                    </div>
+
+                    {/* Table Name */}
+                    <div className="my-0.5">
+                      <span className="block font-black text-base sm:text-lg tracking-tight leading-tight text-white group-hover:text-amber-300">
+                        {t.table_number}
+                      </span>
+                      <span className="block text-[10px] font-mono text-amber-400/90 font-bold truncate mt-0.5">
+                        #{ongoingOrder.orderNumber} • {formatNPR(ongoingOrder.totalAmount)}
+                      </span>
+                    </div>
+
+                    {/* Bottom Action Badge */}
+                    <div className="w-full pt-1 border-t border-amber-500/30 flex items-center justify-center gap-1 text-[10px] font-bold text-amber-400 group-hover:text-amber-300">
+                      <Plus className="w-2.5 h-2.5 stroke-[3]" />
+                      <span>Add to Bill</span>
+                    </div>
+                  </button>
+                );
+              }
+
               return (
                 <button
                   key={t.id}
@@ -936,41 +1164,52 @@ export const KioskPortal: React.FC = () => {
                   onClick={() => {
                     playKioskSound("beep");
                     setTableNumber(t.table_number);
+                    setIsAddingToExistingTab(false);
+                    setTargetOngoingOrder(null);
                     addToast({
                       type: "success",
-                      message: `${t.table_number} selected.`,
+                      message: `${t.table_number} selected for new order.`,
                     });
                     setStep("MENU");
                   }}
-                  className={`relative p-4 sm:p-5 border-2 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer active:scale-95 group text-center min-h-[96px] sm:min-h-[115px] ${
+                  className={`relative p-3.5 sm:p-4 border-2 transition-all flex flex-col items-center justify-between gap-1.5 cursor-pointer active:scale-95 group text-center min-h-[105px] sm:min-h-[120px] ${
                     isSelected
-                      ? "bg-amber-500/20 border-amber-500 text-white shadow-xl shadow-amber-500/25 ring-2 ring-amber-500/40"
-                      : "bg-[#141418] hover:bg-[#1a1a22] border-zinc-700/80 hover:border-amber-400/80 text-zinc-200"
+                      ? "bg-emerald-500/20 border-emerald-400 text-white shadow-xl shadow-emerald-500/25 ring-2 ring-emerald-400/40"
+                      : "bg-[#141418] hover:bg-[#1a1a22] border-zinc-700/80 hover:border-emerald-400/80 text-zinc-200"
                   }`}
                 >
-                  <Utensils
-                    className={`w-5 h-5 transition-colors ${
-                      isSelected ? "text-amber-400" : "text-zinc-500 group-hover:text-amber-400"
-                    }`}
-                  />
+                  {/* Top Status Header */}
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-[8.5px] uppercase font-bold text-emerald-400/90 tracking-wider">
+                      Available
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  </div>
 
-                  <div className="min-w-0">
+                  {/* Table Name */}
+                  <div className="my-0.5">
                     <span
                       className={`block font-black text-base sm:text-lg tracking-tight leading-tight ${
-                        isSelected ? "text-amber-400" : "text-white group-hover:text-amber-300"
+                        isSelected ? "text-emerald-400" : "text-white group-hover:text-emerald-300"
                       }`}
                     >
                       {t.table_number}
                     </span>
                     {t.section && (
-                      <span className="block text-[11px] text-zinc-500 font-medium truncate mt-0.5">
-                        {t.section}
+                      <span className="block text-[10.5px] text-zinc-500 font-medium truncate mt-0.5">
+                        {t.section} • {t.capacity || 4} Seats
                       </span>
                     )}
                   </div>
 
+                  {/* Bottom Action Badge */}
+                  <div className="w-full pt-1 border-t border-zinc-800 flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-400 group-hover:text-emerald-300">
+                    <Utensils className="w-2.5 h-2.5" />
+                    <span>Start Order</span>
+                  </div>
+
                   {isSelected && (
-                    <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-amber-500 text-black flex items-center justify-center">
+                    <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-emerald-500 text-black flex items-center justify-center">
                       <Check className="w-3 h-3 stroke-[3]" />
                     </div>
                   )}
@@ -982,8 +1221,115 @@ export const KioskPortal: React.FC = () => {
 
         {/* Bottom subtle guidance */}
         <div className="relative z-10 text-center text-xs text-zinc-500 pt-2 border-t border-zinc-800/80 shrink-0">
-          Touch your table number to start ordering
+          Touch a vacant table to start a new order, or an occupied table to add food to its ongoing bill
         </div>
+
+        {/* -------------------------------------------------------------
+            MODAL: OCCUPIED TABLE / ONGOING PENDING BILL PROMPT
+        ------------------------------------------------------------- */}
+        {selectedTableForPendingPrompt && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+            <div className="bg-[#121216] border-2 border-amber-500/80 w-full max-w-md shadow-2xl overflow-hidden flex flex-col font-sans">
+              {/* Header */}
+              <div className="p-3.5 sm:p-4 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 bg-amber-500/20 border border-amber-500 text-amber-400 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black uppercase text-white tracking-wide">
+                      {selectedTableForPendingPrompt.tableNumber} — Ongoing Bill
+                    </h3>
+                    <p className="text-[11px] text-amber-400 font-bold">
+                      New billing is not allowed for this table
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTableForPendingPrompt(null)}
+                  className="p-1 text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-5 space-y-3.5">
+                {/* Notice Box */}
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-zinc-200 text-xs leading-relaxed space-y-1">
+                  <div className="flex items-center gap-1.5 font-black uppercase text-amber-400 text-[11px]">
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>New Order Blocked</span>
+                  </div>
+                  <p>
+                    <strong className="text-white">{selectedTableForPendingPrompt.tableNumber}</strong> already has an active, unpaid bill (<span className="font-mono text-amber-400 font-bold">#{selectedTableForPendingPrompt.order.orderNumber}</span>). A brand new separate order/bill cannot be created for this table until the ongoing bill is cleared.
+                  </p>
+                </div>
+
+                {/* Bill Snapshot Card */}
+                <div className="p-3 bg-zinc-950 border border-zinc-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                    <span>Active Bill Reference:</span>
+                    <span className="font-mono font-bold text-white">#{selectedTableForPendingPrompt.order.orderNumber}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                    <span>Guest / Table Host:</span>
+                    <span className="font-bold text-zinc-200">{selectedTableForPendingPrompt.order.customerName}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+                    <span>Current Rounds Placed:</span>
+                    <span className="font-mono font-bold text-zinc-200">{selectedTableForPendingPrompt.order.roundsCount || 1}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-zinc-800 text-xs">
+                    <span className="font-bold text-zinc-300">Current Outstanding:</span>
+                    <span className="font-mono font-black text-amber-400 text-sm">
+                      {formatNPR(selectedTableForPendingPrompt.order.totalAmount)}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-[11.5px] text-zinc-400 leading-normal">
+                  Are you currently seated at this table and wish to order additional food or drinks? You can append items to this ongoing bill.
+                </p>
+
+                {/* Actions */}
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playKioskSound("beep");
+                      setTableNumber(selectedTableForPendingPrompt.tableNumber);
+                      setTargetOngoingOrder(selectedTableForPendingPrompt.order);
+                      setIsAddingToExistingTab(true);
+                      setSelectedTableForPendingPrompt(null);
+                      setStep("MENU");
+                      addToast({
+                        type: "info",
+                        message: `Adding items to ${selectedTableForPendingPrompt.tableNumber} Bill #${selectedTableForPendingPrompt.order.orderNumber}.`,
+                      });
+                    }}
+                    className="w-full py-2.5 sm:py-3 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-98 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                    <span>
+                      Add Items to This Table's Bill (Round {(selectedTableForPendingPrompt.order.roundsCount || 1) + 1})
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTableForPendingPrompt(null)}
+                    className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                  >
+                    Choose Another Available Table
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1023,9 +1369,13 @@ export const KioskPortal: React.FC = () => {
               <>
                 <Utensils className="w-3.5 h-3.5 text-amber-400" />
                 <span>
-                  {tableNumber
-                    ? (tableNumber.toLowerCase().includes("table") ? tableNumber : `Table ${tableNumber}`)
-                    : (reservationCodeLinked ? `Table • ${reservationCodeLinked}` : "Select Table")}
+                  {isAddingToExistingTab && targetOngoingOrder ? (
+                    `Adding to ${tableNumber} (Bill #${targetOngoingOrder.orderNumber} • R${(targetOngoingOrder.roundsCount || 1) + 1})`
+                  ) : tableNumber ? (
+                    tableNumber.toLowerCase().includes("table") ? tableNumber : `Table ${tableNumber}`
+                  ) : (
+                    reservationCodeLinked ? `Table • ${reservationCodeLinked}` : "Select Table"
+                  )}
                 </span>
               </>
             ) : (
@@ -1702,7 +2052,11 @@ export const KioskPortal: React.FC = () => {
               }}
               className="w-full py-2.5 sm:py-3 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-black uppercase tracking-wider text-xs sm:text-sm flex items-center justify-center gap-2 transition-transform active:scale-[0.99] shadow cursor-pointer"
             >
-              <span>Pay & Order</span>
+              <span>
+                {isAddingToExistingTab && targetOngoingOrder
+                  ? `Send Round ${(targetOngoingOrder.roundsCount || 1) + 1} to Kitchen`
+                  : "Pay & Order"}
+              </span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -2027,7 +2381,23 @@ export const KioskPortal: React.FC = () => {
               </div>
             )}
             {(orderError || serverQuote.error) && <p role="alert" className="text-xs text-rose-400 mb-2">{orderError || serverQuote.error}</p>}
-            {selectedPaymentMethod === "CASH_ON_PICKUP" && (
+            {isAddingToExistingTab && targetOngoingOrder ? (
+              <div className="bg-amber-500/10 border-2 border-amber-500/50 p-3.5 sm:p-4 text-center space-y-1.5">
+                <div className="w-10 h-10 bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+                  <Utensils className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-black text-amber-400 uppercase tracking-wide">
+                  Appending to Table {tableNumber} Bill
+                </h4>
+                <p className="text-xs text-zinc-300 max-w-sm mx-auto leading-relaxed">
+                  These items will be sent to the kitchen as <strong className="text-white">Round {(targetOngoingOrder.roundsCount || 1) + 1}</strong> and added to ongoing bill <strong className="text-amber-400 font-mono">#{targetOngoingOrder.orderNumber}</strong>. No new separate order will be opened.
+                </p>
+                <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between text-xs text-zinc-400 max-w-xs mx-auto">
+                  <span>Current Bill: <strong className="text-zinc-200">{formatNPR(targetOngoingOrder.totalAmount)}</strong></span>
+                  <span>+ This Round: <strong className="text-amber-400 font-mono font-bold">+{formatNPR(subtotal)}</strong></span>
+                </div>
+              </div>
+            ) : selectedPaymentMethod === "CASH_ON_PICKUP" && (
               <div className="bg-[#141418] border border-zinc-800 p-3.5 sm:p-4 text-center space-y-1.5">
                 <div className="w-10 h-10 bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
                   <Banknote className="w-5 h-5" />
@@ -2047,14 +2417,19 @@ export const KioskPortal: React.FC = () => {
             <div className="mt-2.5 sm:mt-3 text-center max-w-sm mx-auto w-full">
               <button
                 type="button"
-                disabled={paymentProcessing || !serverQuote.quote}
+                disabled={paymentProcessing || (!isAddingToExistingTab && !serverQuote.quote)}
                 onClick={()=>void handleProcessPayment()}
                 className="w-full py-2.5 sm:py-3 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider text-sm sm:text-base flex items-center justify-center gap-2 shadow-xl transition-transform active:scale-98 cursor-pointer disabled:opacity-50"
               >
                 {paymentProcessing ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Confirming order...</span>
+                    <span>{isAddingToExistingTab ? "Sending Round to Kitchen..." : "Confirming order..."}</span>
+                  </>
+                ) : isAddingToExistingTab ? (
+                  <>
+                    <span>Send Round {(targetOngoingOrder?.roundsCount || 1) + 1} to Kitchen • Add to Bill</span>
+                    <ArrowRight className="w-4 h-4" />
                   </>
                 ) : selectedPaymentMethod === "FONEPAY_QR" ? (
                   <>
@@ -2081,105 +2456,164 @@ export const KioskPortal: React.FC = () => {
           SCREEN: RECEIPT & TOKEN NUMBER SCREEN (Auto Printed)
       ------------------------------------------------------------- */}
       {step === "RECEIPT_TOKEN" && (
-        <div className="fixed inset-0 z-50 bg-[#09090B] text-white flex flex-col justify-between p-3 sm:p-5 lg:p-6 select-none overflow-y-auto">
-          <p role="status" className="text-center text-xs text-amber-400 pb-2">Order status: {liveOrder?.status || 'CONFIRMED'} | Payment due at counter</p>
-          {/* Top banner */}
-          <div className="flex items-center justify-between pb-2.5 sm:pb-3 border-b border-zinc-800 shrink-0">
-            <CrunchyLogo size="md" className="h-8 sm:h-9" />
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-              <span className="text-[11px] sm:text-xs uppercase font-bold text-emerald-400 tracking-wider">
-                Order Dispatched to Kitchen Display
-              </span>
+        <div className="fixed inset-0 z-50 bg-[#09090B] text-white flex flex-col justify-between p-3 sm:p-4 lg:p-5 select-none h-screen h-[100dvh] max-h-screen overflow-hidden">
+          {/* Top banner (shrink-0) */}
+          <div className="flex items-center justify-between pb-2 sm:pb-2.5 border-b border-zinc-800 shrink-0">
+            <CrunchyLogo size="md" className="h-7 sm:h-8" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-1.5 sm:gap-2 bg-emerald-500/10 border border-emerald-500/30 px-2 sm:px-2.5 py-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-[10px] sm:text-xs uppercase font-bold text-emerald-400 tracking-wider">
+                  Order Dispatched to Kitchen Display
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleResetToAttract}
+                className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Return to Home screen"
+              >
+                <Home className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Home</span>
+              </button>
             </div>
           </div>
 
           {/* Center: Token Card & Simulated Thermal Paper Receipt (Side-by-side to fit 1st viewport) */}
-          <div className="max-w-4xl mx-auto w-full my-auto py-2 sm:py-3 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 items-center">
-            {/* Left Column: Big Call Token Display & Instructions */}
-            <div className="text-center sm:text-left space-y-2.5">
-              <div className="flex items-center justify-center sm:justify-start gap-2">
-                <div className="inline-flex p-1.5 bg-emerald-500/20 text-emerald-400">
-                  <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7" />
-                </div>
-                <h2 className="text-lg sm:text-xl md:text-2xl font-black uppercase tracking-tight text-white">
-                  Thank You For Your Order!
-                </h2>
-              </div>
-
-              <p className="text-xs text-zinc-400 max-w-sm mx-auto sm:mx-0 leading-relaxed">
-                Keep your order number. Scan the receipt QR to follow its live status, or print a copy below.
-              </p>
-
-              {/* High-Contrast Prominent Call Token Box */}
-              <div className="p-3.5 sm:p-4 bg-zinc-900 border-2 border-amber-500 shadow-xl inline-block w-full max-w-sm text-center">
-                <span className="text-[10px] sm:text-[11px] uppercase font-black tracking-widest text-zinc-400 block mb-0.5">
-                  YOUR CALL TOKEN NUMBER
-                </span>
-                <span className="text-5xl sm:text-6xl md:text-7xl font-black font-mono text-amber-400 tracking-tight block py-1 leading-none">
-                  {generatedToken}
-                </span>
-                <div className="flex items-center justify-center gap-2.5 text-[11px] text-zinc-400 font-mono mt-1.5">
-                  <span>Ref: {completedOrderNumber}</span>
-                  <span>•</span>
-                  <span className="text-amber-400 font-bold uppercase">
-                    {fulfillment === "DINE_IN"
-                      ? reservationCodeLinked
-                        ? `Dine-In (${reservationCodeLinked})`
-                        : "Dine-In"
-                      : "Takeaway"}
-                  </span>
-                </div>
-                <div className="mt-2.5 pt-2 border-t border-zinc-800 text-[11px] text-emerald-400 font-bold flex items-center justify-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Estimated Ready: {orderTimeEstimate}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Thermal Receipt Paper Graphic with Scan QR */}
-            <div className="w-full max-w-[270px] sm:max-w-[290px] mx-auto">
-              <div className="relative">
-                {/* Printer Eject Slot Visual */}
-                <div className="h-3 bg-zinc-950 border border-zinc-700 rounded-none mb-[-2px] z-10 relative flex items-center justify-center">
-                  <div className="w-44 h-1 bg-black" />
-                </div>
-
-                {kioskReceipt.receipt ? <CompactOrderReceipt receipt={kioskReceipt.receipt}/> : kioskReceipt.error ? <div role="alert" className="p-3 text-xs text-rose-400">{kioskReceipt.error}<button onClick={kioskReceipt.retry} className="ml-2 underline">Retry</button></div> : <p role="status" className="p-3 text-xs text-zinc-400">Loading saved receipt...</p>}
-              </div>
-              {orderError && <p role="alert" className="text-xs text-rose-400">{orderError}</p>}
-
-              {/* Print Status Feedback & Reprint */}
-              <div className="mt-2 text-center">
-                {isPrinting ? (
-                  <div className="flex items-center justify-center gap-1.5 text-[11px] text-amber-400 animate-pulse font-bold">
-                    <Printer className="w-3.5 h-3.5 animate-bounce" />
-                    <span>Printing Thermal Slip...</span>
+          <div className="flex-1 min-h-0 flex items-center justify-center my-auto py-1 sm:py-2 overflow-y-auto sm:overflow-visible">
+            <div className="max-w-4xl mx-auto w-full grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6 items-center">
+              {/* Left Column: Big Call Token Display & Instructions */}
+              <div className="text-center sm:text-left space-y-2 sm:space-y-2.5">
+                <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <div className="inline-flex p-1.5 bg-emerald-500/20 text-emerald-400">
+                    <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={()=>void handleTriggerPrint()} disabled={!kioskReceipt.receipt || isPrinting}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-[11px] font-bold cursor-pointer"
-                  >
-                    <Printer className="w-3 h-3 text-amber-400" />
-                    <span>{hasPrinted?"Reprint Token Slip":"Print Token Slip"}</span>
-                  </button>
+                  <h2 className="text-base sm:text-xl md:text-2xl font-black uppercase tracking-tight text-white">
+                    {isAddingToExistingTab ? "Round Dispatched to Kitchen!" : "Thank You For Your Order!"}
+                  </h2>
+                </div>
+
+                <p className="text-[11px] sm:text-xs text-zinc-400 max-w-sm mx-auto sm:mx-0 leading-relaxed">
+                  {isAddingToExistingTab && targetOngoingOrder
+                    ? `Items added to Table ${tableNumber} Bill #${targetOngoingOrder.orderNumber}. Watch the order TV screen for your kitchen token.`
+                    : "Keep your order number handy. Watch the order TV screen or scan the receipt QR to follow live kitchen status."}
+                </p>
+
+                {/* High-Contrast Prominent Call Token Box */}
+                <div className="p-3 sm:p-4 bg-zinc-900 border-2 border-amber-500 shadow-xl inline-block w-full max-w-sm text-center">
+                  <span className="text-[10px] sm:text-[11px] uppercase font-black tracking-widest text-zinc-400 block mb-0.5">
+                    {isAddingToExistingTab ? "ROUND KITCHEN TOKEN NUMBER" : "YOUR CALL TOKEN NUMBER"}
+                  </span>
+                  <span className="text-5xl sm:text-6xl font-black font-mono text-amber-400 tracking-tight block py-0.5 leading-none">
+                    {generatedToken}
+                  </span>
+                  <div className="flex items-center justify-center gap-2 text-[10px] sm:text-[11px] text-zinc-400 font-mono mt-1">
+                    <span>Ref: {completedOrderNumber}</span>
+                    <span>•</span>
+                    <span className="text-amber-400 font-bold uppercase">
+                      {isAddingToExistingTab && targetOngoingOrder
+                        ? `Dine-In (${tableNumber} • Round ${(targetOngoingOrder.roundsCount || 1) + 1})`
+                        : fulfillment === "DINE_IN"
+                        ? reservationCodeLinked
+                          ? `Dine-In (${reservationCodeLinked})`
+                          : "Dine-In"
+                        : "Takeaway"}
+                    </span>
+                  </div>
+                  <div className="mt-2 pt-1.5 border-t border-zinc-800 text-[10px] sm:text-[11px] text-emerald-400 font-bold flex items-center justify-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Estimated Ready: {orderTimeEstimate}</span>
+                  </div>
+                </div>
+
+                {liveOrder?.status && (
+                  <p role="status" className="text-[11px] text-amber-400/90 font-medium">
+                    Order status: <span className="font-bold text-amber-400">{liveOrder.status}</span> • Payment at counter
+                  </p>
                 )}
+              </div>
+
+              {/* Right Column: Thermal Receipt Paper Graphic with Scan QR */}
+              <div className="w-full max-w-[270px] sm:max-w-[290px] mx-auto flex flex-col items-center">
+                {/* Printer Eject Slot & Thermal Slip Container */}
+                <div className="w-full relative shadow-2xl">
+                  {/* Printer Slot Graphic */}
+                  <div className="h-3.5 bg-zinc-950 border border-zinc-700 rounded-t-sm z-10 relative flex items-center justify-center shadow-inner">
+                    <div className="w-40 h-1 bg-black rounded-full" />
+                  </div>
+
+                  {/* Thermal Paper Body (Calibrated scroll container for first viewport fit) */}
+                  <div
+                    className="max-h-[36vh] sm:max-h-[42vh] md:max-h-[46vh] min-h-[140px] overflow-y-auto bg-[#fafaf8] border-x border-zinc-300 relative select-text"
+                    style={{
+                      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4)",
+                      scrollbarWidth: "thin",
+                      scrollbarColor: "#a1a1aa #f4f4f5"
+                    }}
+                  >
+                    {kioskReceipt.receipt ? (
+                      <CompactOrderReceipt receipt={kioskReceipt.receipt} />
+                    ) : kioskReceipt.error ? (
+                      <div role="alert" className="p-3 text-xs text-rose-600 bg-rose-50 font-sans">
+                        {kioskReceipt.error}
+                        <button onClick={kioskReceipt.retry} className="ml-2 underline font-bold">Retry</button>
+                      </div>
+                    ) : (
+                      <div role="status" className="p-4 text-xs text-zinc-600 text-center font-mono">
+                        <div className="w-5 h-5 border-2 border-zinc-400 border-t-zinc-800 rounded-full animate-spin mx-auto mb-2" />
+                        Generating token slip...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Realistic Serrated Receipt Paper Bottom Tear Edge */}
+                  <div
+                    className="h-2 w-full bg-[#fafaf8] relative -mt-[1px] opacity-95"
+                    style={{
+                      clipPath: "polygon(0% 0%, 5% 100%, 10% 0%, 15% 100%, 20% 0%, 25% 100%, 30% 0%, 35% 100%, 40% 0%, 45% 100%, 50% 0%, 55% 100%, 60% 0%, 65% 100%, 70% 0%, 75% 100%, 80% 0%, 85% 100%, 90% 0%, 95% 100%, 100% 0%)",
+                      filter: "drop-shadow(0 2px 2px rgba(0,0,0,0.2))"
+                    }}
+                  />
+                </div>
+
+                {orderError && <p role="alert" className="text-[11px] text-rose-400 mt-1">{orderError}</p>}
+
+                {/* Print Status Feedback & Reprint */}
+                <div className="mt-2 text-center shrink-0">
+                  {isPrinting ? (
+                    <div className="flex items-center justify-center gap-1.5 text-[11px] text-amber-400 animate-pulse font-bold">
+                      <Printer className="w-3.5 h-3.5 animate-bounce" />
+                      <span>Printing Thermal Slip...</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleTriggerPrint()}
+                      disabled={!kioskReceipt.receipt || isPrinting}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white text-[11px] font-bold cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      <Printer className="w-3 h-3 text-amber-400" />
+                      <span>{hasPrinted ? "Reprint Token Slip" : "Print Token Slip"}</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom Complete & Reset Button */}
-          <div className="pt-2.5 sm:pt-3 border-t border-zinc-800 flex items-center justify-between gap-3 shrink-0">
-            <div className="text-[10px] sm:text-xs text-zinc-500">
-              Returning to Home screen in 15 seconds...
+          {/* Bottom Complete & Reset Button (ALWAYS in first viewport, shrink-0) */}
+          <div className="pt-2 sm:pt-2.5 pb-1 border-t border-zinc-800 flex items-center justify-between gap-3 shrink-0 bg-[#09090B]">
+            <div className="flex items-center gap-2 text-[10px] sm:text-xs text-zinc-400">
+              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>
+                Returning to Home screen in <strong className="text-amber-400 font-mono font-bold">{receiptCountdown}s</strong>...
+              </span>
             </div>
 
             <button
               type="button"
               onClick={handleResetToAttract}
-              className="px-5 sm:px-6 py-2 sm:py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-wider text-xs sm:text-sm flex items-center gap-2 shadow-lg transition-transform active:scale-95 cursor-pointer shrink-0"
+              className="px-5 sm:px-7 py-2.5 sm:py-3 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-black font-black uppercase tracking-wider text-xs sm:text-sm flex items-center gap-2 shadow-xl shadow-amber-500/20 transition-all active:scale-95 cursor-pointer shrink-0 animate-pulse hover:animate-none"
             >
               <span>FINISH & RETURN TO HOME</span>
               <ArrowRight className="w-4 h-4" />

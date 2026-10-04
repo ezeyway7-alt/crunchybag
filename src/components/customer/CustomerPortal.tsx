@@ -1,9 +1,11 @@
 import { BlogsPortalPage } from "./BlogsPortalPage";
 import { BlogDetailPage } from "./BlogDetailPage";
+import { readStaticInformation, StaticInformationPage } from "./StaticInformationPage";
 import { ComboPackageModal } from "./ComboPackageModal";
 import { comboDefinitions } from "../../lib/catalogApi";
 import { useAuth } from "../../context/AuthContext";
 import { updatePageSEO } from "../../lib/seo";
+import { productPath, matchesProductRoute } from "../../lib/productRoutes";
 import React, { useState, useEffect } from "react";
 import {
   Flame,
@@ -121,19 +123,32 @@ export const CustomerPortal: React.FC = () => {
     ? currentRoutePath.replace(/^\/(?:blogs?)\//, "").replace(/\/+$/, "")
     : "";
 
+  useEffect(() => {
+    if (isBlogDetailRoute || isBlogsPortalRoute || /^\/(product|item)\//.test(currentRoutePath)) return;
+    const routeData = document.getElementById('static-route-data');
+    const initial = routeData?.textContent ? JSON.parse(routeData.textContent) : null;
+    updatePageSEO(initial?.path === currentRoutePath ? initial : {
+      canonical: `https://crunchybag.com${currentRoutePath}`,
+      ...(currentRoutePath === '/menu' ? {title: 'Menu | Crunchy Bag, Imadol'} : {}),
+    });
+  }, [currentRoutePath]);
+
   // Modals
   const [activeProductForConfig, setActiveProductForConfig] = useState<Product | null>(null);
 
   const handleOpenProduct = (product: Product) => {
     setActiveProductForConfig(product);
     if (typeof window !== "undefined") {
-      const cleanPath = `/product/${product.id}`;
-      window.history.replaceState({}, "", cleanPath);
+      const cleanPath = productPath(product);
+      if (window.location.pathname !== cleanPath) {
+        window.history.pushState({}, "", cleanPath);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
       updatePageSEO({
         title: `${product.name} (NPR ${product.basePrice}) | Crunchy Bag Kathmandu`,
         description: product.description || `Order ${product.name} online from Crunchy Bag Kathmandu with fast delivery & instant eSewa.`,
         image: product.images?.[0] || "https://crunchybag.com/crunchy_logo.png",
-        canonical: `https://crunchybag.com/product/${encodeURIComponent(product.id)}`,
+        canonical: `https://crunchybag.com${cleanPath}`,
       });
     }
   };
@@ -144,7 +159,8 @@ export const CustomerPortal: React.FC = () => {
       const current = window.location.pathname.toLowerCase();
       const returnPath = current.startsWith("/product/") ? "/menu" : current || "/";
       window.history.replaceState({}, "", returnPath);
-      updatePageSEO({});
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      updatePageSEO({canonical: `https://crunchybag.com${returnPath}`});
     }
   };
 
@@ -181,18 +197,20 @@ export const CustomerPortal: React.FC = () => {
     }
 
     if (prodParam) {
-      const cleanProdId = decodeURIComponent(prodParam).toLowerCase();
+      let cleanProdId: string;
+      try { cleanProdId = decodeURIComponent(prodParam); } catch { return; }
       const found = products.find(
-        (p) =>
-          p.id.toLowerCase() === cleanProdId ||
-          p.id.toLowerCase().includes(cleanProdId) ||
-          p.name.toLowerCase().replace(/[^a-z0-9]/g, "-").includes(cleanProdId)
+        (p) => matchesProductRoute(p, cleanProdId)
       );
       if (found) {
         handleOpenProduct(found);
+      } else {
+        updatePageSEO({title: 'Product not found | Crunchy Bag', noIndex: true, canonical: `https://crunchybag.com${path}`});
       }
+    } else {
+      setActiveProductForConfig(null);
     }
-  }, [products]);
+  }, [products, currentRoutePath]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { isAuthenticated, authUser } = useAuth();
   const [resumeCheckout, setResumeCheckout] = useState(() => sessionStorage.getItem('customer:return-to-checkout') === 'yes');
@@ -319,10 +337,11 @@ export const CustomerPortal: React.FC = () => {
   };
 
   const latestOrder = orders[0] || null;
+  const informationPage = readStaticInformation(currentRoutePath);
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-zinc-100 transition-colors">
-      {isBlogDetailRoute && blogSlug ? (
+      {informationPage ? <StaticInformationPage data={informationPage} /> : isBlogDetailRoute && blogSlug ? (
         <BlogDetailPage
           slug={blogSlug}
           onNavigate={(path) => setCurrentRoutePath(path.toLowerCase().replace(/\/+$/, "") || "/")}

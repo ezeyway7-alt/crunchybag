@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
+  testIgnore: 'seo.spec.ts', // SEO assertions use the production build and its own preview config.
   timeout: 30000,
   workers: 1,
   use: {

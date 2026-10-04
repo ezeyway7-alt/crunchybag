@@ -63,7 +63,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
         status:round.status==='WAITING'?'ACCEPTED':round.status==='SERVED'?'COMPLETED':round.status,
         created_at:round.created_at,
       }))).map((row:any)=>({
-        id:String(row.id),orderNumber:row.order_number,kioskToken:`${row.order_number} / R${row.round_number}`,
+        id:String(row.id),orderNumber:row.order_number,kioskToken:row.order_number,
         status:row.status==='ACCEPTED'?'CONFIRMED':row.status==='PREPARING'?'PROCESSING':row.status,
         fulfillmentType:row.fulfillment_type,tableNumber:row.table_number,createdAt:row.created_at,
         customerName:'',outletId:String(currentOutlet.id),items:[],
@@ -74,7 +74,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   useEffect(()=>{setOrders([]);void loadDisplay();return()=>{loadSequence.current++;};},[currentOutlet.id]);
   const displayLive=useOutletEvents(String(currentOutlet.id),true,()=>void loadDisplay(),event=>{
     if(event.event_type==='ORDER_CALL')setLastKitchenCall({id:`${event.aggregate_id}:r${event.round_number || 1}`,orderNumber:event.order_number,
-      token:`${event.order_number} / R${event.round_number || 1}`,customerName:'',fulfillmentType:event.fulfillment_type,tableNumber:event.table_number,timestamp:Date.now()});
+      token:event.order_number,customerName:'',fulfillmentType:event.fulfillment_type,tableNumber:event.table_number,timestamp:Date.now()});
   });
 
   // Fullscreen state
@@ -176,9 +176,9 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
       let text = "";
 
       if (isDineIn && announcement.tableNumber) {
-        text = `Attention please. Order Token ${announcement.token}, for ${announcement.tableNumber}, this round is ready for collection at the counter.`;
+        text = `Attention please. Order Token ${announcement.token}, for ${announcement.tableNumber}, is ready for collection at the counter.`;
       } else {
-        text = `Attention please. Takeaway Order Token ${announcement.token}, this round is ready for pickup at Counter A.`;
+        text = `Attention please. Takeaway Order Token ${announcement.token}, is ready for pickup at Counter A.`;
       }
 
       const utterance = new SpeechSynthesisUtterance(text);
@@ -206,25 +206,26 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     }
   };
 
-  // Helper to format token cleanly for 20-foot visibility without clipping or truncation
+  // Helper to format token cleanly without round suffix (like /R1, / R1, -R1)
   const formatTvToken = (order: { kioskToken?: string; orderNumber?: string }) => {
-    const raw = (order.kioskToken || order.orderNumber || "").trim();
+    let raw = (order.kioskToken || order.orderNumber || "").trim();
+    raw = raw.replace(/\s*\/\s*R\d+/gi, '').replace(/\s*-\s*R\d+$/i, '').trim();
     return raw || 'Order';
   };
 
-  // Dynamic responsive font size to guarantee 20-foot distance visibility while NEVER cutting off
+  // Dynamic responsive font size to guarantee 20-foot distance visibility while fitting snugly inside compact cards
   const getTokenFontSize = (token: string, column: "prep" | "ready") => {
     const len = token.length;
     if (column === "ready") {
-      if (len <= 5) return "text-4xl sm:text-5xl lg:text-6xl";
-      if (len <= 7) return "text-3xl sm:text-4xl lg:text-5xl";
-      if (len <= 10) return "text-2xl sm:text-3xl lg:text-4xl";
-      return "text-xl sm:text-2xl lg:text-3xl";
-    } else {
       if (len <= 5) return "text-3xl sm:text-4xl lg:text-5xl";
       if (len <= 7) return "text-2xl sm:text-3xl lg:text-4xl";
       if (len <= 10) return "text-xl sm:text-2xl lg:text-3xl";
       return "text-lg sm:text-xl lg:text-2xl";
+    } else {
+      if (len <= 5) return "text-2xl sm:text-3xl lg:text-4xl";
+      if (len <= 7) return "text-xl sm:text-2xl lg:text-3xl";
+      if (len <= 10) return "text-lg sm:text-xl lg:text-2xl";
+      return "text-base sm:text-lg lg:text-xl";
     }
   };
 
@@ -374,7 +375,18 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
+  // Different dynamic in-animation effects for promotional ad slides
+  const SLIDER_IN_ANIMATIONS = [
+    { id: 'zoom-in', label: 'Zoom In', className: 'tv-anim-zoom-in' },
+    { id: 'slide-right', label: 'Slide Right', className: 'tv-anim-slide-right' },
+    { id: 'slide-up', label: 'Elevate Up', className: 'tv-anim-slide-up' },
+    { id: 'zoom-out', label: 'Ken Burns', className: 'tv-anim-zoom-out' },
+    { id: 'slide-left', label: 'Slide Left', className: 'tv-anim-slide-left' },
+    { id: 'tilt-in', label: '3D Tilt', className: 'tv-anim-tilt-in' },
+  ];
+
   const currentSlideProduct = showcaseProducts[activeSlideIndex] || showcaseProducts[0];
+  const currentAnimation = SLIDER_IN_ANIMATIONS[activeSlideIndex % SLIDER_IN_ANIMATIONS.length];
 
   return (
     <div className="h-screen w-screen bg-[#050608] text-zinc-100 flex flex-col font-sans select-none overflow-hidden">
@@ -545,7 +557,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full content-start">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full content-start">
                   {visiblePrepOrders.map((order) => {
                     const isTable = order.fulfillmentType === "DINE_IN" || !!order.tableNumber;
                     const tokenStr = formatTvToken(order);
@@ -553,27 +565,27 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                     return (
                       <div
                         key={order.id}
-                        className="bg-[#0C0E14] border-2 border-amber-500/30 hover:border-amber-500/80 p-2 sm:p-2.5 flex flex-col justify-between shadow-md transition-all rounded-none min-w-0"
+                        className="bg-[#0C0E14] border border-amber-500/35 hover:border-amber-500/80 p-2 flex flex-col justify-between shadow-sm transition-all rounded-none min-w-0"
                       >
                         {/* Top: Fulfillment Type Badge & Elapsed Kitchen Time */}
                         <div className="flex items-center justify-between gap-1 pb-1 border-b border-zinc-800/80 shrink-0">
                           {isTable ? (
-                            <span className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] sm:text-xs font-mono font-black uppercase whitespace-nowrap">
+                            <span className="px-1.5 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] sm:text-[10px] font-mono font-black uppercase whitespace-nowrap shrink-0 max-w-[110px] truncate">
                               {order.tableNumber || "Dine-In"}
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 bg-sky-500/20 border border-sky-500/40 text-sky-300 text-[10px] sm:text-xs font-mono font-black uppercase whitespace-nowrap">
+                            <span className="px-1.5 py-0.5 bg-sky-500/20 border border-sky-500/40 text-sky-300 text-[9px] sm:text-[10px] font-mono font-black uppercase whitespace-nowrap shrink-0">
                               Takeaway
                             </span>
                           )}
-                          <div className="flex items-center gap-1 text-amber-400 font-mono text-[11px] sm:text-xs font-bold shrink-0">
-                            <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                          <div className="flex items-center gap-1 text-amber-400 font-mono text-[10px] sm:text-[11px] font-bold shrink-0">
+                            <Clock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
                             <span>{getElapsedString(order.createdAt)}</span>
                           </div>
                         </div>
 
                         {/* Center: Full-Width Token Number (Never Squeezed, Highly Visible from 20ft) */}
-                        <div className="py-1.5 sm:py-2 text-center overflow-visible">
+                        <div className="py-1 sm:py-1.5 text-center overflow-visible">
                           <div
                             className={`${getTokenFontSize(tokenStr, "prep")} font-mono font-black text-amber-400 tracking-normal drop-shadow-sm leading-tight inline-block max-w-full break-all`}
                           >
@@ -582,7 +594,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                         </div>
 
                         {/* Bottom: Sub-status */}
-                        <div className="pt-1 border-t border-zinc-800/60 flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase font-bold shrink-0">
+                        <div className="pt-0.5 border-t border-zinc-800/60 flex items-center justify-between text-[9px] font-mono text-zinc-500 uppercase font-bold shrink-0">
                           <span>KITCHEN PREP</span>
                           <span className="text-amber-500/70">IN PROGRESS</span>
                         </div>
@@ -618,7 +630,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full content-start">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full content-start">
                   {readyOrders.map((order) => {
                     const isTable = order.fulfillmentType === "DINE_IN" || !!order.tableNumber;
                     const tokenStr = formatTvToken(order);
@@ -627,56 +639,56 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                     return (
                       <div
                         key={order.id}
-                        className={`relative p-2.5 sm:p-3 border-2 shadow-xl transition-all min-w-0 flex flex-col justify-between gap-1 rounded-none ${
+                        className={`relative p-2 border-2 shadow-lg transition-all min-w-0 flex flex-col justify-between gap-1 rounded-none ${
                           isCalling
-                            ? "bg-[#0E261A] border-emerald-400 ring-4 ring-emerald-500/50 scale-[1.02]"
+                            ? "bg-[#0E261A] border-emerald-400 ring-4 ring-emerald-500/50 scale-[1.01]"
                             : "bg-[#0A1811] border-emerald-500/80 hover:border-emerald-400"
                         }`}
                       >
-                        {/* Ping beacon & Destination */}
-                        <div className="flex items-center justify-between gap-1 pb-1.5 border-b border-emerald-500/30 shrink-0">
-                          <span className="text-[10px] sm:text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-                            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                            <span className="font-black">READY TO COLLECT</span>
+                        {/* Live Ping Beacon & Clean Destination Badge (NO redundant READY TO COLLECT text) */}
+                        <div className="flex items-center justify-between gap-1 pb-1 border-b border-emerald-500/30 shrink-0">
+                          <span className="relative flex h-2 w-2 shrink-0">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
                           </span>
 
                           {isTable ? (
-                            <span className="px-2 py-0.5 bg-amber-500 text-black text-[10px] sm:text-xs font-mono font-black uppercase whitespace-nowrap shrink-0 shadow-xs">
+                            <span className="px-1.5 py-0.5 bg-amber-500 text-black text-[9px] sm:text-[10px] font-mono font-black uppercase whitespace-nowrap shrink-0 max-w-[120px] truncate shadow-xs">
                               {order.tableNumber || "Dine-In"}
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 bg-emerald-500 text-black text-[10px] sm:text-xs font-mono font-black uppercase whitespace-nowrap shrink-0 shadow-xs">
+                            <span className="px-1.5 py-0.5 bg-emerald-500 text-black text-[9px] sm:text-[10px] font-mono font-black uppercase whitespace-nowrap shrink-0 shadow-xs">
                               Takeaway
                             </span>
                           )}
                         </div>
 
-                        {/* Center: Massive Token Number for 20ft Distance Visibility */}
-                        <div className="py-2 sm:py-3 text-center overflow-visible">
+                        {/* Center: Token Number for Distance Visibility */}
+                        <div className="py-1 sm:py-1.5 text-center overflow-visible">
                           <div
                             className={`${getTokenFontSize(tokenStr, "ready")} font-mono font-black text-white tracking-normal drop-shadow-[0_2px_12px_rgba(16,185,129,0.35)] leading-tight inline-block max-w-full break-all`}
                           >
                             {tokenStr}
                           </div>
                           {order.customerName && order.customerName !== "Walk-in Guest" && order.customerName !== "Table Guest" && (
-                            <div className="text-[11px] sm:text-xs text-emerald-300/80 font-medium truncate mt-1">
+                            <div className="text-[10px] sm:text-[11px] text-emerald-300/80 font-medium truncate mt-0.5">
                               {order.customerName}
                             </div>
                           )}
                         </div>
 
                         {/* Action Bar */}
-                        <div className="pt-1.5 border-t border-emerald-500/20 flex items-center justify-between gap-1.5 shrink-0">
+                        <div className="pt-1 border-t border-emerald-500/20 flex items-center justify-between gap-1.5 shrink-0">
                           <button
                             onClick={() => triggerOrderCall(order)}
-                            className="flex-1 py-1.5 px-2 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black font-bold text-xs uppercase tracking-wider border border-amber-500/40 transition-colors cursor-pointer text-center whitespace-nowrap"
+                            className="flex-1 py-1 px-1.5 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black font-bold text-[11px] uppercase tracking-wider border border-amber-500/40 transition-colors cursor-pointer text-center whitespace-nowrap"
                             title="Announce token over TV speaker"
                           >
                             Call Voice
                           </button>
                           <button
                             onClick={() => updateOrderStatus(order.id, "COMPLETED")}
-                            className="py-1.5 px-3 bg-zinc-800 hover:bg-emerald-600 text-zinc-300 hover:text-white font-bold text-xs uppercase border border-zinc-700 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                            className="py-1 px-2.5 bg-zinc-800 hover:bg-emerald-600 text-zinc-300 hover:text-white font-bold text-[11px] uppercase border border-zinc-700 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                             title="Mark served"
                           >
                             Served ✓
@@ -737,18 +749,22 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
               {/* Product Visual Container: from full top, bezel-less, large, very subtle dark overlay */}
               <div className="relative w-full flex-1 min-h-[300px] sm:min-h-[340px] bg-[#0A0B0E] overflow-hidden flex items-center justify-center">
                 <img
-                  key={currentSlideProduct.id}
+                  key={`${currentSlideProduct.id}-${activeSlideIndex}`}
                   src={currentSlideProduct.images[0]}
                   alt={currentSlideProduct.name}
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover object-center select-none"
+                  className={`w-full h-full object-cover object-center select-none will-change-transform ${currentAnimation.className}`}
                 />
 
                 {/* Very light, delicate dark gradient overlay at the bottom as requested */}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#08090C] via-[#08090C]/20 to-black/10 pointer-events-none" />
 
-                {/* Floating Slide Counter & Controls in Top Right */}
+                {/* Floating Slide Counter & Animation Effect Badge & Controls in Top Right */}
                 <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                  <span className="text-[10px] font-mono text-amber-400 bg-black/75 px-2 py-0.5 border border-amber-500/30 backdrop-blur-sm shadow-xs flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5" />
+                    <span>{currentAnimation.label}</span>
+                  </span>
                   <span className="text-[10px] font-mono text-zinc-200 bg-black/70 px-2 py-0.5 border border-white/10 backdrop-blur-sm">
                     {activeSlideIndex + 1}/{showcaseProducts.length || 1}
                   </span>
