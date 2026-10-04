@@ -65,6 +65,7 @@ export interface PosOrder {
   rounds?:PreparationRound[];
   can_append?:boolean;
   partial_ready?:boolean;
+  tracking_token?:string;
   id: number;
   outlet_id: number;
   billed_at: string | null;

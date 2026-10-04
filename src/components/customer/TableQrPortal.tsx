@@ -1,5 +1,5 @@
 import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
-import {backendOrder} from '../../lib/posApi';
+import {backendOrder, PreparationRound, PosItem} from '../../lib/posApi';
 import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
 import {useOrderReceipt} from "../../lib/orderReceipt";
 import {printReceiptDocument} from "../../lib/receiptPrinting";
@@ -83,6 +83,46 @@ const playMobileSound = (type: "tap" | "add" | "success" | "beep") => {
   }
 };
 
+const getStoredToken = (token: string, branch?: string | number, table?: string): string => {
+  if (typeof window === 'undefined') return '';
+  if (token) {
+    const s = sessionStorage.getItem(`table-order:${token}`) || localStorage.getItem(`table-order:${token}`);
+    if (s) return s;
+  }
+  if (branch && table) {
+    const k = `table-order:${branch}:${table}`;
+    const s = sessionStorage.getItem(k) || localStorage.getItem(k);
+    if (s) return s;
+  }
+  return '';
+};
+
+const saveStoredToken = (tracking: string, token?: string, branch?: string | number, table?: string) => {
+  if (typeof window === 'undefined' || !tracking) return;
+  if (token) {
+    try { sessionStorage.setItem(`table-order:${token}`, tracking); } catch {}
+    try { localStorage.setItem(`table-order:${token}`, tracking); } catch {}
+  }
+  if (branch && table) {
+    const k = `table-order:${branch}:${table}`;
+    try { sessionStorage.setItem(k, tracking); } catch {}
+    try { localStorage.setItem(k, tracking); } catch {}
+  }
+};
+
+const clearStoredToken = (token?: string, branch?: string | number, table?: string) => {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    try { sessionStorage.removeItem(`table-order:${token}`); } catch {}
+    try { localStorage.removeItem(`table-order:${token}`); } catch {}
+  }
+  if (branch && table) {
+    const k = `table-order:${branch}:${table}`;
+    try { sessionStorage.removeItem(k); } catch {}
+    try { localStorage.removeItem(k); } catch {}
+  }
+};
+
 interface TableQrPortalProps {
   onClose?: () => void;
 }
@@ -155,7 +195,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   const [checkoutError,setCheckoutError]=useState('');
   const [submitting,setSubmitting]=useState(false);
   const submitLock=React.useRef(false);
-  const [trackingToken,setTrackingToken]=useState(()=>sessionStorage.getItem(`table-order:${qrToken}`) || '');
+  const [trackingToken,setTrackingToken]=useState(()=>getStoredToken(qrToken));
   useEffect(()=>{
     if(!qrToken){
       // Standalone table QR preview mode: auto-select first available table if none set
@@ -164,26 +204,141 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
     }
     let alive=true;
     apiClient.get<any>(`/tables/qr/resolve/?token=${encodeURIComponent(qrToken)}`,{skipAuth:true}).then(data=>{
-      if(!alive)return;setQrContext(data);setTableNumber(data.table_number);setDiningMode('DINE_IN');
-      setCurrentOutlet({...currentOutlet,id:String(data.branch_id),name:data.branch_name});setCheckoutError('');
+      if(!alive)return;
+      setQrContext(data);
+      setTableNumber(data.table_number);
+      setDiningMode('DINE_IN');
+      setCurrentOutlet({...currentOutlet,id:String(data.branch_id),name:data.branch_name});
+      setCheckoutError('');
+
+      const discoveredToken = data.tracking_token || data.active_order?.tracking_token || data.order?.tracking_token;
+      if (discoveredToken) {
+        setTrackingToken(discoveredToken);
+        saveStoredToken(discoveredToken, qrToken, data.branch_id, data.table_number);
+      } else {
+        const stored = getStoredToken(qrToken, data.branch_id, data.table_number);
+        if (stored) {
+          setTrackingToken(stored);
+        }
+      }
     }).catch(error=>{if(alive)setCheckoutError(error.message || 'Invalid table QR code.');});
     return()=>{alive=false;};
   },[qrToken]);
 
+  // Probe backend for existing ongoing order on table QR rescan if trackingToken is empty
+  useEffect(() => {
+    if (trackingToken || !qrToken) return;
+    let alive = true;
+    apiClient.get<any>(`/orders/self-service/order/?token=${encodeURIComponent(qrToken)}`, { skipAuth: true })
+      .then(data => {
+        if (!alive || !data) return;
+        const status = data.status || '';
+        if (['COMPLETED', 'CANCELLED'].includes(status)) return;
+        const token = data.tracking_token || qrToken;
+        setTrackingToken(token);
+        saveStoredToken(token, qrToken, data.outlet_id || qrContext?.branch_id || currentOutlet.id, data.table_number || tableNumber || qrContext?.table_number);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [qrToken, trackingToken, qrContext?.branch_id, currentOutlet.id, tableNumber, qrContext?.table_number]);
+
   const liveOrder=useSelfServiceOrder(String(qrContext?.branch_id || currentOutlet.id),currentOutlet.name,trackingToken);
   const tableReceipt=useOrderReceipt(placedOrderResult,placedOrderResult?trackingToken:'');
-
-  const checkoutBody={branch_id:Number(qrContext?.branch_id || currentOutlet.id),order_source:'TABLE_QR',
-    ...(liveOrder && !['COMPLETED','CANCELLED'].includes(liveOrder.status)?{tracking_token:trackingToken,version:backendOrder(liveOrder)?.version}:{}),
-    fulfillment_type:'DINE_IN',qr_token:qrToken,customer_name:guestName.trim(),customer_phone:phoneNumber.trim(),notes:tableNotes,items:cartLines(cart.items)};
-  const serverQuote=useSelfServiceQuote(qrContext?checkoutBody:null);
 
   // Determine active running table order (from backend liveOrder OR active order in orders for this table)
   const localActiveOrder = useMemo(() => {
     return findActiveOrderByTableOrPhone(tableNumber || qrContext?.table_number, phoneNumber);
   }, [findActiveOrderByTableOrPhone, tableNumber, qrContext?.table_number, phoneNumber, orders]);
 
-  const activeRunningOrder = liveOrder && !['COMPLETED','CANCELLED'].includes(liveOrder.status) ? liveOrder : null;
+  const activeRunningOrder =
+    (liveOrder && !['COMPLETED','CANCELLED'].includes(liveOrder.status) ? liveOrder : null) ||
+    (localActiveOrder && !['COMPLETED','CANCELLED'].includes(localActiveOrder.status) ? localActiveOrder : null);
+
+  // Sync token from activeRunningOrder if trackingToken wasn't set
+  useEffect(() => {
+    if (!trackingToken && activeRunningOrder) {
+      const backend = backendOrder(activeRunningOrder);
+      const token = backend?.tracking_token || (activeRunningOrder as any).trackingToken || activeRunningOrder.kioskToken;
+      if (token) {
+        setTrackingToken(token);
+        saveStoredToken(token, qrToken, qrContext?.branch_id || currentOutlet.id, tableNumber || qrContext?.table_number);
+      }
+    }
+  }, [activeRunningOrder, trackingToken, qrToken, qrContext?.branch_id, currentOutlet.id, tableNumber, qrContext?.table_number]);
+
+  // Clear token from storage when order is completed or cancelled
+  useEffect(() => {
+    if (activeRunningOrder && ['COMPLETED', 'CANCELLED'].includes(activeRunningOrder.status)) {
+      clearStoredToken(qrToken, qrContext?.branch_id || currentOutlet.id, tableNumber || qrContext?.table_number);
+    }
+  }, [activeRunningOrder?.status, qrToken, qrContext?.branch_id, currentOutlet.id, tableNumber, qrContext?.table_number]);
+
+  const activeBackend = backendOrder(activeRunningOrder) || (liveOrder ? backendOrder(liveOrder) : undefined);
+  const checkoutBody={
+    branch_id:Number(qrContext?.branch_id || currentOutlet.id),
+    order_source:'TABLE_QR',
+    ...(activeRunningOrder && !['COMPLETED','CANCELLED'].includes(activeRunningOrder.status)
+      ? {
+          tracking_token: trackingToken || activeBackend?.tracking_token || (activeRunningOrder as any).trackingToken || '',
+          version: activeBackend?.version,
+        }
+      : {}),
+    fulfillment_type:'DINE_IN',
+    qr_token:qrToken,
+    customer_name:guestName.trim(),
+    customer_phone:phoneNumber.trim(),
+    notes:tableNotes,
+    items:cartLines(cart.items)
+  };
+  const serverQuote=useSelfServiceQuote(qrContext?checkoutBody:null);
+
+  const effectiveOrderForRounds = useMemo(() => {
+    const backend = backendOrder(activeRunningOrder) || (liveOrder ? backendOrder(liveOrder) : undefined);
+    if (backend && !['COMPLETED', 'CANCELLED'].includes(backend.status)) {
+      if (!backend.rounds?.length && backend.items?.length) {
+        const roundNumbers = Array.from<number>(new Set(backend.items.map(i => i.round_number || 1))).sort((a, b) => a - b);
+        const synthRounds: PreparationRound[] = roundNumbers.map((num) => ({
+          number: num,
+          status: (backend.status === 'READY' ? 'READY' : backend.status === 'PREPARING' ? 'PREPARING' : 'WAITING') as any,
+          created_at: backend.created_at || new Date().toISOString(),
+        }));
+        return { ...backend, rounds: synthRounds };
+      }
+      return backend;
+    }
+    if (activeRunningOrder && !['COMPLETED', 'CANCELLED'].includes(activeRunningOrder.status) && activeRunningOrder.items.length) {
+      const roundNumbers = Array.from<number>(new Set(activeRunningOrder.items.map(i => i.roundNumber || 1))).sort((a, b) => a - b);
+      const synthRounds: PreparationRound[] = roundNumbers.map((num) => ({
+        number: num,
+        status: (activeRunningOrder.status === 'READY' ? 'READY' : activeRunningOrder.status === 'PROCESSING' ? 'PREPARING' : 'WAITING') as any,
+        created_at: activeRunningOrder.createdAt || new Date().toISOString(),
+      }));
+      const synthItems: PosItem[] = activeRunningOrder.items.map((it, idx) => ({
+        id: idx + 1,
+        product_id: '',
+        product_name: it.productName,
+        variant_name: it.variantName || '',
+        quantity: it.quantity,
+        unit_price: String(it.unitPrice),
+        line_total: String(it.lineTotal),
+        requires_kitchen: it.requiresKitchen ?? true,
+        kitchen_status: it.sentToKitchen ? 'PREPARING' : 'WAITING',
+        round_number: it.roundNumber || 1,
+        item_notes: '',
+        is_voided: false,
+        combo_components: [],
+        modifiers: [],
+        can_remove: false,
+      }));
+      return {
+        status: activeRunningOrder.status === 'PROCESSING' ? 'PREPARING' : activeRunningOrder.status === 'CONFIRMED' ? 'ACCEPTED' : activeRunningOrder.status,
+        fulfillment_type: activeRunningOrder.fulfillmentType,
+        rounds: synthRounds,
+        items: synthItems,
+      };
+    }
+    return null;
+  }, [activeRunningOrder, liveOrder]);
 
   // Available tables list
   const DEFAULT_TABLES = [
@@ -277,10 +432,19 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
 
     try {
       if(!qrContext)throw new Error('Scan a valid table QR code to order.');
-      if(!serverQuote.quote)throw new Error('Please wait for the current price quote.');
-      if(activeRunningOrder && !backendOrder(activeRunningOrder)?.can_append)throw new Error('This order cannot accept more items. Ask staff to start a new order.');
-      const result=await submitSelfService({...checkoutBody,expected_total:serverQuote.quote.total_payable});
-      sessionStorage.setItem(`table-order:${qrToken}`,result.tracking_token);
+      let quote = serverQuote.quote;
+      if (!quote) {
+        try {
+          quote = await apiClient.post<any>('/orders/self-service/quote/', checkoutBody, { skipAuth: true });
+        } catch (qErr: any) {
+          throw new Error(qErr.message || 'Please wait for the current price quote.');
+        }
+      }
+      if(activeRunningOrder && backendOrder(activeRunningOrder) && !backendOrder(activeRunningOrder)?.can_append) {
+        throw new Error('This order cannot accept more items. Ask staff to start a new order.');
+      }
+      const result=await submitSelfService({...checkoutBody,expected_total:quote.total_payable});
+      saveStoredToken(result.tracking_token, qrToken, qrContext?.branch_id || currentOutlet.id, tableNumber || qrContext?.table_number);
       setTrackingToken(result.tracking_token);
       setPlacedOrderResult(posOrderToOrder(result,currentOutlet.name));
       window.dispatchEvent(new Event('self-service:refresh'));
@@ -372,17 +536,40 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           </div>
         </div>
       </header>
-      {liveOrder && <div className="max-w-md w-full mx-auto px-3 py-2"><OrderRoundsPanel order={backendOrder(liveOrder)} busy={submitting}
-        onRemove={async(itemId,quantity)=>{
-          if(submitLock.current)return;
-          const order=backendOrder(liveOrder);if(!order)return;
-          submitLock.current=true;setSubmitting(true);setCheckoutError('');
-          try {
-            await apiClient.post('/orders/self-service/items/void/',{tracking_token:trackingToken,qr_token:qrToken,version:order.version,item_id:itemId,quantity},
-              {skipAuth:true,headers:{'Idempotency-Key':`qr-void:${order.id}:${order.version}:${itemId}:${quantity}`}});
-          }catch(error:any){setCheckoutError(error.message || 'Unable to remove item.');}
-          finally{window.dispatchEvent(new Event('self-service:refresh'));submitLock.current=false;setSubmitting(false);}
-        }}/></div>}
+      {effectiveOrderForRounds && (
+        <div className="max-w-md w-full mx-auto px-3 py-2">
+          <OrderRoundsPanel
+            order={effectiveOrderForRounds}
+            busy={submitting}
+            onRemove={async (itemId, quantity) => {
+              if (submitLock.current) return;
+              const order = backendOrder(activeRunningOrder) || (liveOrder ? backendOrder(liveOrder) : undefined);
+              if (!order) return;
+              submitLock.current = true;
+              setSubmitting(true);
+              setCheckoutError('');
+              try {
+                await apiClient.post('/orders/self-service/items/void/', {
+                  tracking_token: trackingToken || (order as any).tracking_token,
+                  qr_token: qrToken,
+                  version: order.version,
+                  item_id: itemId,
+                  quantity,
+                }, {
+                  skipAuth: true,
+                  headers: { 'Idempotency-Key': `qr-void:${order.id}:${order.version}:${itemId}:${quantity}` },
+                });
+              } catch (error: any) {
+                setCheckoutError(error.message || 'Unable to remove item.');
+              } finally {
+                window.dispatchEvent(new Event('self-service:refresh'));
+                submitLock.current = false;
+                setSubmitting(false);
+              }
+            }}
+          />
+        </div>
+      )}
 
 
       {/* -------------------------------------------------------------
@@ -435,18 +622,28 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
             )}
           </div>
 
-          {/* ACTIVE RUNNING TAB ALERT (Shown only when active order tab exists) */}
+          {/* ACTIVE RUNNING TAB ALERT (Shown when active ongoing order tab exists) */}
           {activeRunningOrder && (
-            <div className="bg-amber-950/30 border border-amber-500/40 p-2 text-xs text-zinc-300 w-full">
+            <div className="bg-gradient-to-r from-amber-950/40 via-zinc-900 to-[#141418] border border-amber-500/50 p-2.5 text-xs text-zinc-300 w-full shadow-md">
               <div className="flex items-center justify-between gap-2 min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0 truncate">
-                  <Receipt className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span className="font-bold text-white text-[11px] truncate">
-                    Active Tab #{activeRunningOrder.orderNumber}
+                <div className="flex items-center gap-2 min-w-0 truncate">
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
-                  <span className="text-amber-400 font-mono text-[11px] shrink-0">
-                    (Rs. {activeRunningOrder.totalAmount})
-                  </span>
+                  <div className="truncate">
+                    <div className="flex items-center gap-1.5 font-bold text-white text-[11px] truncate">
+                      <Receipt className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span>Active Tab #{activeRunningOrder.orderNumber}</span>
+                      <span className="text-amber-400 font-mono text-[11px] font-bold">
+                        (Rs. {activeRunningOrder.totalAmount})
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-zinc-400 truncate mt-0.5">
+                      {activeRunningOrder.tableNumber ? `Table ${activeRunningOrder.tableNumber} · ` : ""}
+                      Round {activeRunningOrder.roundsCount || 1} · {activeRunningOrder.status === 'PROCESSING' ? 'Cooking in Kitchen' : activeRunningOrder.status === 'READY' ? 'Ready for Pickup' : 'Order Placed'}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
@@ -470,14 +667,15 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
               </div>
 
               {showActiveTabDetails && (
-                <div className="mt-2 pt-2 border-t border-zinc-800 space-y-1 max-h-32 overflow-y-auto no-scrollbar">
+                <div className="mt-2 pt-2 border-t border-zinc-800 space-y-1 max-h-36 overflow-y-auto no-scrollbar">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">Items in active tab:</p>
                   {activeRunningOrder.items.map((item, idx) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between text-[10.5px] text-zinc-400 bg-black/40 px-2 py-0.5"
                     >
                       <span className="truncate pr-1">
-                        {item.quantity}x {item.productName} ({item.variantName})
+                        {item.quantity}x {item.productName} ({item.variantName || 'Standard'}){item.roundNumber ? ` [R${item.roundNumber}]` : ''}
                       </span>
                       <span className="font-mono text-zinc-200 shrink-0">Rs. {item.lineTotal}</span>
                     </div>
@@ -654,7 +852,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       {/* -------------------------------------------------------------
           BOTTOM STICKY ORDER BAR: CART PREVIEW & CONFIRM BUTTON
       ------------------------------------------------------------- */}
-      {cart.items.length > 0 && (
+      {cart.items.length > 0 ? (
         <div className="fixed bottom-0 inset-x-0 z-40 bg-[#0F0F14]/98 backdrop-blur-lg border-t border-zinc-800 px-3 py-2.5 sm:py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl w-full max-w-full overflow-hidden">
           <div className="max-w-md mx-auto flex items-center justify-between gap-2.5 sm:gap-3 w-full min-w-0">
             <div className="min-w-0 flex-1">
@@ -694,7 +892,44 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
             </button>
           </div>
         </div>
-      )}
+      ) : activeRunningOrder ? (
+        <div className="fixed bottom-0 inset-x-0 z-40 bg-[#0F0F14]/98 backdrop-blur-lg border-t border-amber-500/30 px-3 py-2.5 sm:py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl w-full max-w-full overflow-hidden">
+          <div className="max-w-md mx-auto flex items-center justify-between gap-2.5 sm:gap-3 w-full min-w-0">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-xs text-zinc-300 truncate">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="font-bold text-white truncate">
+                  Ongoing Tab #{activeRunningOrder.orderNumber}
+                </span>
+                <span>•</span>
+                <span className="text-amber-400 font-mono font-bold text-xs shrink-0">
+                  Rs. {activeRunningOrder.totalAmount}
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-400 truncate mt-0.5">
+                {activeRunningOrder.status === 'PROCESSING' || activeRunningOrder.status === 'CONFIRMED'
+                  ? `In Kitchen · Round ${activeRunningOrder.roundsCount || 1}`
+                  : activeRunningOrder.status === 'READY'
+                    ? `Ready for Table · Round ${activeRunningOrder.roundsCount || 1}`
+                    : `Active Tab · Round ${activeRunningOrder.roundsCount || 1}`}
+                {" · Select items to add more"}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                playMobileSound("tap");
+                setIsTrackReviewOpen(true);
+              }}
+              className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 border border-zinc-700 text-amber-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+            >
+              <span>Track Tab</span>
+              <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* -------------------------------------------------------------
           SUCCESS & KIOSK PRINT TOKEN MODAL

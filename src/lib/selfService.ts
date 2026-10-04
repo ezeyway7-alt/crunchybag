@@ -25,7 +25,7 @@ export function useSelfServiceOrder(outlet:string,name:string,token:string) {
     if(!token)return;
     const current=++seq.current;
     try{const data=await apiClient.get<any>(`/orders/self-service/order/?token=${encodeURIComponent(token)}`,{skipAuth:true});
-      if(current===seq.current)setOrder(posOrderToOrder(data,name));
+      if(current===seq.current && data && (data.id || data.order_number))setOrder(posOrderToOrder(data,name));
     }catch{}
   };
   useEffect(()=>{setOrder(null);void refresh();return()=>{seq.current++;};},[token,outlet]);

@@ -49,6 +49,9 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     isLoadingSkeleton,
   } = useApp();
 
+  const outletParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('outlet_id') : null;
+  const effectiveOutletId = outletParam || String(currentOutlet?.id || '1');
+
   const [orders,setOrders] = useState<Order[]>([]);
   const [lastKitchenCall,setLastKitchenCall] = useState<CallingAnnouncement|null>(null);
   const [syncError,setSyncError] = useState('');
@@ -56,25 +59,25 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   const loadDisplay = async () => {
     const seq=++loadSequence.current;
     try {
-      const data=await apiClient.get<any>(`/orders/display/${currentOutlet.id}/`,{skipAuth:true});
+      const data=await apiClient.get<any>(`/orders/display/${effectiveOutletId}/`,{skipAuth:true});
       if(seq!==loadSequence.current)return;
       setOrders((data.tickets || []).flatMap((order:any)=>(order.rounds || [{number:1,status:order.status,created_at:order.created_at}]).map((round:any)=>({
         ...order,id:`${order.id}:r${round.number}`,round_number:round.number,
         status:round.status==='WAITING'?'ACCEPTED':round.status==='SERVED'?'COMPLETED':round.status,
         created_at:round.created_at,
       }))).map((row:any)=>({
-        id:String(row.id),orderNumber:row.order_number,kioskToken:row.order_number,
+        id:String(row.id),orderNumber:`${row.order_number} / R${row.round_number || 1}`,kioskToken:`${row.order_number} / R${row.round_number || 1}`,
         status:row.status==='ACCEPTED'?'CONFIRMED':row.status==='PREPARING'?'PROCESSING':row.status,
         fulfillmentType:row.fulfillment_type,tableNumber:row.table_number,createdAt:row.created_at,
-        customerName:'',outletId:String(currentOutlet.id),items:[],
+        customerName:'',outletId:effectiveOutletId,items:[],
       } as Order)));
       setSyncError('');
     }catch{setSyncError('Unable to sync orders');}
   };
-  useEffect(()=>{setOrders([]);void loadDisplay();return()=>{loadSequence.current++;};},[currentOutlet.id]);
-  const displayLive=useOutletEvents(String(currentOutlet.id),true,()=>void loadDisplay(),event=>{
-    if(event.event_type==='ORDER_CALL')setLastKitchenCall({id:`${event.aggregate_id}:r${event.round_number || 1}`,orderNumber:event.order_number,
-      token:event.order_number,customerName:'',fulfillmentType:event.fulfillment_type,tableNumber:event.table_number,timestamp:Date.now()});
+  useEffect(()=>{setOrders([]);void loadDisplay();return()=>{loadSequence.current++;};},[effectiveOutletId]);
+  const displayLive=useOutletEvents(effectiveOutletId,true,()=>void loadDisplay(),event=>{
+    if(event.event_type==='ORDER_CALL')setLastKitchenCall({id:`${event.aggregate_id}:r${event.round_number || 1}`,orderNumber:`${event.order_number} / R${event.round_number || 1}`,
+      token:`${event.order_number} / R${event.round_number || 1}`,customerName:'',fulfillmentType:event.fulfillment_type,tableNumber:event.table_number,timestamp:Date.now()});
   });
 
   // Fullscreen state
@@ -206,10 +209,9 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     }
   };
 
-  // Helper to format token cleanly without round suffix (like /R1, / R1, -R1)
+  // Helper to format token
   const formatTvToken = (order: { kioskToken?: string; orderNumber?: string }) => {
-    let raw = (order.kioskToken || order.orderNumber || "").trim();
-    raw = raw.replace(/\s*\/\s*R\d+/gi, '').replace(/\s*-\s*R\d+$/i, '').trim();
+    const raw = (order.kioskToken || order.orderNumber || "").trim();
     return raw || 'Order';
   };
 

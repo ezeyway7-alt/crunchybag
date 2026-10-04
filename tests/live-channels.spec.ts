@@ -144,3 +144,31 @@ test('table QR keeps a rejected added round in the cart and never shows false co
   await expect(send).toBeVisible();
   await expect(page.getByText('A2 Order Confirmed!')).toHaveCount(0);
 });
+
+test('rescanning table QR code restores active ongoing order tab and preparation rounds',async({page})=>{
+  const state=await setup(page);
+  await page.goto('/table-qr?outlet_id=1&token=signed-table');
+  await page.getByRole('button',{name:'Add',exact:true}).click();
+  await page.getByRole('button',{name:'Review & Order',exact:true}).first().click();
+  await page.getByRole('button',{name:'Send Order to Kitchen',exact:true}).click();
+  await expect(page.getByText('A2 Order Confirmed!')).toBeVisible();
+  state.orders[0].can_append=true;
+  state.orders[0].rounds=[{number:1,status:'PREPARING',created_at:new Date().toISOString()}];
+
+  // Simulate mobile camera scan opening a fresh tab (clearing sessionStorage)
+  await page.evaluate(()=>sessionStorage.clear());
+  await page.goto('/table-qr?outlet_id=1&token=signed-table');
+
+  // Customer immediately sees their ongoing order tab, rounds, and items
+  await expect(page.getByText('Active Tab #KIOSK-1-00000005')).toBeVisible();
+  await expect(page.getByRole('region',{name:'Preparation rounds'})).toBeVisible();
+  await expect(page.getByText('Ongoing Tab #KIOSK-1-00000005')).toBeVisible();
+
+  await page.getByRole('button',{name:'View Items'}).click();
+  await expect(page.getByText('1x Live Burger (Standard) [R1]')).toBeVisible();
+
+  // Adding item shows Add to Tab (R2)
+  await page.getByRole('button',{name:'Add',exact:true}).click();
+  await expect(page.getByRole('button',{name:/Add to Tab/})).toBeVisible();
+});
+
