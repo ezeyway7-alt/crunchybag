@@ -1,3 +1,4 @@
+import { nepaliPickupText, nepaliVoice, nepaliUtterance } from "../lib/nepaliAnnouncement";
 import { useOutletEvents } from "../lib/useOutletEvents";
 import { usePersistentCart } from './usePersistentCart';
 import { useCustomerAccount, customerRefresh } from "../lib/customerApi";
@@ -1597,11 +1598,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
-        const callSubject = details.tableNumber ? `Table ${details.tableNumber}` : `Order Token ${tokenDisplay}`;
-        const utterance = new SpeechSynthesisUtterance(`Kitchen call: ${callSubject}, your order is ready at the counter!`);
-        utterance.rate = 1.0;
-        utterance.pitch = 1.05;
-        window.speechSynthesis.speak(utterance);
+        const voice = nepaliVoice(window.speechSynthesis.getVoices());
+        if (voice) window.speechSynthesis.speak(nepaliUtterance(nepaliPickupText(tokenDisplay, details.tableNumber), voice));
       }
     } catch {
       // SpeechSynthesis blocked

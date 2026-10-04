@@ -1,3 +1,4 @@
+import { nepaliPickupText, nepaliVoice, nepaliUtterance } from "../../lib/nepaliAnnouncement";
 import { apiClient } from "../../lib/api";
 import { useOutletEvents } from "../../lib/useOutletEvents";
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -85,6 +86,21 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
   // Sound & Speech settings
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [voiceError, setVoiceError] = useState("");
+  const speechTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speechBusy = useRef(false);
+  useEffect(() => {
+    if (!soundEnabled) {
+      if (speechTimer.current) clearTimeout(speechTimer.current);
+      window.speechSynthesis?.cancel();
+      speechBusy.current = false;
+    }
+    return () => {
+      if (speechTimer.current) clearTimeout(speechTimer.current);
+      window.speechSynthesis?.cancel();
+      speechBusy.current = false;
+    };
+  }, [soundEnabled]);
 
   // Real-time clock
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -203,7 +219,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
         osc.frequency.setValueAtTime(note.freq, note.time);
 
         gain.gain.setValueAtTime(0.001, note.time);
-        gain.gain.exponentialRampToValueAtTime(0.18, note.time + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.07, note.time + 0.08);
         gain.gain.exponentialRampToValueAtTime(0.0001, note.time + 0.65);
 
         osc.connect(gain);
@@ -211,52 +227,35 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
         osc.start(note.time);
         osc.stop(note.time + 0.7);
+        if (note === notes[notes.length - 1]) osc.onended = () => { void ctx.close(); };
       });
     } catch {
       // Audio playback restrictions fallback
     }
   };
 
-  // Text-To-Speech announcement using Web Speech Synthesis API
+  // Only use a Nepali voice: an English voice cannot pronounce this call reliably.
   const speakAnnouncement = (announcement: CallingAnnouncement) => {
     if (!soundEnabled) return;
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-
-    try {
-      window.speechSynthesis.cancel(); // Stop any pending speech
-
-      const isDineIn = announcement.fulfillmentType === "DINE_IN" || !!announcement.tableNumber;
-      let text = "";
-
-      if (isDineIn && announcement.tableNumber) {
-        text = `Attention please. Order Token ${announcement.token}, for ${announcement.tableNumber}, is ready for collection at the counter.`;
-      } else {
-        text = `Attention please. Takeaway Order Token ${announcement.token}, is ready for pickup at Counter A.`;
+    speechBusy.current = true;
+    speechTimer.current = setTimeout(() => {
+      speechTimer.current = null;
+      const synth = window.speechSynthesis;
+      const voice = synth && nepaliVoice(synth.getVoices());
+      if (!voice) {
+        speechBusy.current = false;
+        setVoiceError("नेपाली आवाज उपलब्ध छैन। ब्राउजरमा नेपाली आवाज सेटअप गरेर Speaker Test थिच्नुहोस्।");
+        return;
       }
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95;
-      utterance.pitch = 1.05;
-      utterance.volume = 1.0;
-
-      const voices = window.speechSynthesis.getVoices();
-      const preferredVoice =
-        voices.find(
-          (v) =>
-            (v.lang.startsWith("en-US") || v.lang.startsWith("en-GB")) &&
-            v.name.toLowerCase().includes("natural")
-        ) || voices.find((v) => v.lang.startsWith("en"));
-
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-      }
-
-      setTimeout(() => {
-        window.speechSynthesis.speak(utterance);
-      }, 700);
-    } catch {
-      // Speech synthesis error catch
-    }
+      setVoiceError("");
+      const utterance = nepaliUtterance(nepaliPickupText(announcement.token, announcement.tableNumber), voice);
+      utterance.onend = () => { speechBusy.current = false; };
+      utterance.onerror = () => {
+        speechBusy.current = false;
+        setVoiceError("आवाज बजेन। कृपया Speaker Test थिचेर फेरि प्रयास गर्नुहोस्।");
+      };
+      try { synth.speak(utterance); } catch { utterance.onerror?.(new Event("error") as SpeechSynthesisErrorEvent); }
+    }, 1200);
   };
 
   // Helper to format token
@@ -314,7 +313,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
       const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
       setCallProgress(remaining);
 
-      if (elapsed >= duration) {
+      if (elapsed >= duration && !speechBusy.current) {
         setActiveCall(null);
         clearInterval(interval);
       }
@@ -451,6 +450,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
           <CrunchyLogo size="md" className="h-8 sm:h-9 w-auto" />
         </div>
 
+        {voiceError && <p role="status" className="text-sm text-amber-300 max-w-sm">{voiceError}</p>}
         {/* Right: Small Speaker Test Button + Quick Simulators + Fullscreen + Exit */}
         <div className="flex items-center gap-2">
           {/* Subtle Speaker Test Button (User requested: "just to test give somewhere small speaker button for now") */}
@@ -480,7 +480,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
               triggerOrderCall(testOrder);
             }}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-zinc-700/80 text-xs font-bold transition-colors cursor-pointer"
-            title="Small Speaker Test: Plays airport chime & announces token"
+            title="Speaker Test: Gentle chime and Nepali pickup announcement"
           >
             <Volume2 className="w-3.5 h-3.5 text-amber-400" />
             <span className="hidden sm:inline text-[11px]">SPEAKER TEST</span>
@@ -949,7 +949,12 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
             {/* Dismiss button */}
             <button
-              onClick={() => setActiveCall(null)}
+              onClick={() => {
+                if (speechTimer.current) clearTimeout(speechTimer.current);
+                window.speechSynthesis?.cancel();
+                speechBusy.current = false;
+                setActiveCall(null);
+              }}
               className="p-1 text-zinc-500 hover:text-white border border-zinc-800 hover:bg-zinc-800 transition-colors cursor-pointer"
               title="Dismiss announcement"
             >

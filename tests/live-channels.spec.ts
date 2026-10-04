@@ -5,7 +5,7 @@ async function setup(page:Page,menuImages:string[]=[]){
   const outlet={id:1,name:'Live Outlet',branch_code:'LIVE',enable_kiosk:true,enable_qr_ordering:true,enable_dine_in:true,enable_takeaway:true,accepting_orders:true};
   const product={id:'burger',category:'food',name:'Live Burger',description:'Burger',base_price:'200.00',variants:[],modifier_groups:[],images:menuImages.slice(0,1),dietary_tags:[],is_available:true,show_on_kiosk:true,show_on_qr:true,requires_kitchen:true};
   const state:any={orders:[],sockets:[],writes:[],orderReads:[],revision:'0',fail:false};
-  await page.addInitScript(()=>{document.cookie='csrftoken=abcdefghijklmnopqrstuvwx12345678; path=/';(window as any).__speech=[];Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{cancel(){},getVoices(){return [];},speak(u:any){(window as any).__speech.push(u.text);}}});});
+  await page.addInitScript(()=>{document.cookie='csrftoken=abcdefghijklmnopqrstuvwx12345678; path=/';(window as any).__speech=[];Object.defineProperty(window,'SpeechSynthesisUtterance',{configurable:true,value:class {text:string;constructor(text:string){this.text=text;}}});Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{cancel(){},getVoices(){return [{lang:'ne-NP',name:'Nepali Natural'}];},speak(u:any){(window as any).__speech.push(u.text);setTimeout(()=>u.onend?.(),50);}}});});
   await page.routeWebSocket('**/ws/**',socket=>{
     if(socket.url().includes('/display/')){
       state.sockets.push(socket);socket.onMessage(()=>socket.send(JSON.stringify({event_type:'HEARTBEAT',revision:state.revision})));
@@ -38,6 +38,15 @@ async function setup(page:Page,menuImages:string[]=[]){
   return state;
 }
 const emit=(state:any,type='ORDER_TRANSITION')=>{state.revision=String(Number(state.revision)+1);for(const socket of state.sockets)socket.send(JSON.stringify({type:'display_update',event_type:type,event_id:state.revision,aggregate_id:5,order_number:state.orders[0].order_number,status:state.orders[0].status,fulfillment_type:'TAKEAWAY'}));};
+
+test('TV reports a missing Nepali voice without speaking in English',async({page})=>{
+  await setup(page);
+  await page.addInitScript(()=>{window.speechSynthesis.getVoices=()=>[];});
+  await page.goto('/tv?outlet_id=1');
+  await page.locator('#tv-speaker-test-btn').click();
+  await expect(page.getByRole('status').filter({hasText:'नेपाली आवाज उपलब्ध छैन'})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__speech)).toEqual([]);
+});
 
 test('TV keeps the current menu image visible until the next image has loaded',async({page})=>{
   await page.clock.install();
@@ -80,6 +89,7 @@ test('TV receives preparation, ready, call and completion without navigation and
   emit(state,'ORDER_CALL');
   await expect(page.locator('#tv-calling-spotlight-card')).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>(window as any).__speech.length)).toBeGreaterThan(0);
+  expect(await page.evaluate(()=>(window as any).__speech.at(-1))).toContain('कृपया काउन्टरबाट लिनुहोस्। धन्यवाद।');
   await page.getByTitle('Dismiss announcement').click();
   state.orders[0].status='COMPLETED';emit(state);
   await expect(page.getByText('No Orders Waiting')).toBeVisible();
