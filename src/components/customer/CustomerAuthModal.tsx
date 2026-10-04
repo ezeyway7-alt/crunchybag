@@ -16,6 +16,11 @@ interface CustomerAuthModalProps {
 
 type AuthView = "LOGIN" | "SIGNUP_PHONE" | "SIGNUP_OTP" | "SIGNUP_PROFILE" | "OTP_LOGIN_PHONE" | "OTP_LOGIN_OTP" | "RESET_PASSWORD";
 
+const localPhone = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  return (digits.length > 10 && digits.startsWith("977") ? digits.slice(3) : digits).slice(0, 10);
+};
+
 export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   isOpen,
   onClose,
@@ -58,7 +63,12 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     setInfoMessage("");
     try {
       await work();
-    } catch (e) {
+    } catch (e: any) {
+      if (e?.data?.next_action === 'signup') {
+        setAuthView('SIGNUP_PHONE');
+        setInfoMessage(e.data.detail);
+        return;
+      }
       setError(extractErrorMessage(e));
     } finally {
       locked.current = false;
@@ -112,7 +122,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPhone = phone.trim().replace(/\D/g, "");
-    const cleanCred = credential.trim();
+    const cleanCred = credential;
 
     if (!/^(?:977)?9[78]\d{8}$/.test(cleanPhone)) {
       setError("Please enter your 10-digit mobile number.");
@@ -127,32 +137,16 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       // Determine if numeric 4-digit PIN or text password
       const is4Digit = /^\d{4}$/.test(cleanCred);
       const primaryMethod = is4Digit ? "PIN" : "PASSWORD";
-      const fallbackMethod = is4Digit ? "PASSWORD" : "PIN";
 
-      try {
-        const result = await apiClient.post<any>(
-          customerPath("auth/login/"),
-          { phone: cleanPhone, outlet_id:currentOutlet?.id, method: primaryMethod, credential: cleanCred },
-          { skipAuth: true }
-        );
-        finish(result);
-      } catch (err: any) {
-        // Automatically attempt the fallback credential method before showing an error
-        try {
-          const result = await apiClient.post<any>(
-            customerPath("auth/login/"),
-            { phone: cleanPhone, outlet_id:currentOutlet?.id, method: fallbackMethod, credential: cleanCred },
-            { skipAuth: true }
-          );
-          finish(result);
-        } catch {
-          throw err;
-        }
-      }
+      const result = await apiClient.post<any>(
+        customerPath("auth/login/"),
+        { phone: cleanPhone, outlet_id:currentOutlet?.id, method: primaryMethod, credential: cleanCred },
+        { skipAuth: true }
+      );
+      finish(result);
     });
   };
 
-  // Signup Step 1: Request OTP for new number
   // Signup Step 1: Request OTP for new number
   const handleSendSignupOtp = (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,35 +157,23 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     }
 
     void perform(async () => {
-      try {
-        const result = await apiClient.post<any>(
-          customerPath("auth/start/"),
-          { phone: cleanPhone, outlet_id: /^\d+$/.test(String(currentOutlet?.id)) ? currentOutlet.id : undefined },
-          { skipAuth: true }
-        );
+      const result = await apiClient.post<any>(
+        customerPath("auth/start/"),
+        { phone: cleanPhone, outlet_id: /^\d+$/.test(String(currentOutlet?.id)) ? currentOutlet.id : undefined },
+        { skipAuth: true }
+      );
 
-        if (result.exists) {
-          // User already has an account, smoothly switch to login view
-          setAuthView("LOGIN");
-          setInfoMessage("This mobile number is already registered! Please sign in with your MPIN or Password below, or use OTP if you forgot it.");
-          return;
-        }
-
-        setChallenge(result.challenge_id);
-
-        setOtpDigits(["", "", "", ""]);
-        setAuthView("SIGNUP_OTP");
-        setOtpTimer(60);
-        setTimeout(() => inputRefs.current[0]?.focus(), 120);
-      } catch (err: any) {
-        const msg = extractErrorMessage(err).toLowerCase();
-        if (msg.includes("already registered") || msg.includes("already exists") || msg.includes("registered")) {
-          setAuthView("LOGIN");
-          setInfoMessage("This mobile number is already registered! Please sign in with your MPIN or Password below, or use OTP if you forgot it.");
-          return;
-        }
-        throw err;
+      if (result.exists) {
+        setAuthView("LOGIN");
+        setInfoMessage("This mobile number is already registered. Sign in with your MPIN or password, or recover it with SMS.");
+        return;
       }
+
+      setChallenge(result.challenge_id);
+      setOtpDigits(["", "", "", ""]);
+      setAuthView("SIGNUP_OTP");
+      setOtpTimer(result.resend_after || 60);
+      setTimeout(() => inputRefs.current[0]?.focus(), 120);
     });
   };
 
@@ -260,34 +242,35 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         const errMsg = extractErrorMessage(err).toLowerCase();
         // 1. If registration token expired on the backend, auto-request fresh OTP and keep user's profile inputs intact
         if (errMsg.includes("expired")) {
-          setInfoMessage("Verification session timed out. A fresh OTP has been sent to your phone.");
           try {
             const resend = await apiClient.post<any>(
               customerPath("auth/start/"),
               { phone: phone.trim().replace(/\D/g, ""), outlet_id: /^\d+$/.test(String(currentOutlet?.id)) ? currentOutlet.id : undefined },
               { skipAuth: true }
             );
+            if (resend.exists) {
+              setAuthView("LOGIN");
+              setInfoMessage("This mobile number already has an account. Sign in or recover it with SMS.");
+              return;
+            }
+            setInfoMessage("Verification session timed out. A fresh OTP has been requested.");
             setChallenge(resend.challenge_id);
 
             setOtpDigits(["", "", "", ""]);
             setOtpTimer(60);
             setAuthView("SIGNUP_OTP");
             return;
-          } catch {
-            setError("Signup verification expired. Please verify your mobile number again.");
+          } catch (resendError) {
+            setError(extractErrorMessage(resendError));
             setAuthView("SIGNUP_PHONE");
             return;
           }
         }
 
-        // 2. If mobile, username, or email is already registered: smoothly redirect to Login with pre-filled phone and helpful options
-        if (
-          errMsg.includes("already registered") ||
-          errMsg.includes("already exists") ||
-          errMsg.includes("registered")
-        ) {
+        // Only a confirmed phone conflict should move signup back to login.
+        if (err?.data?.code === 'phone_registered') {
           setAuthView("LOGIN");
-          setInfoMessage("This mobile, username, or email is already registered. Please sign in below, or tap 'Verify Recovery Code' if you forgot your PIN.");
+          setInfoMessage("This mobile number already has an account. Sign in or recover your password with SMS.");
           return;
         }
 
@@ -334,8 +317,12 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     if(!/^(?:977)?9[78]\d{8}$/.test(cleanPhone)){setError('Enter a valid Nepal mobile number.');return;}
     void perform(async()=>{
       const result=await apiClient.post<any>(customerPath('auth/recovery-start/'),{phone:cleanPhone,outlet_id:/^\d+$/.test(String(currentOutlet?.id))?currentOutlet.id:undefined},{skipAuth:true});
-      setChallenge(result.challenge_id);setOtpDigits(['','','','']);setAuthView('OTP_LOGIN_OTP');setOtpTimer(result.resend_after || 60);
-      setInfoMessage('SMS code requested. It may take a moment to arrive.');
+      setChallenge(result.challenge_id);setOtpDigits(['','','','']);
+      setAuthView(result.next_action === 'signup' ? 'SIGNUP_OTP' : 'OTP_LOGIN_OTP');
+      setOtpTimer(result.resend_after || 60);
+      setInfoMessage(result.next_action === 'signup'
+        ? 'Verify your mobile number, then set up your web account and MPIN.'
+        : 'SMS code requested. It may take a moment to arrive.');
     });
   };
   const handleVerifyOtpLogin = () => {
@@ -468,7 +455,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   inputMode="numeric"
                   placeholder="98XXXXXXXX"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  onChange={(e) => setPhone(localPhone(e.target.value))}
                   autoComplete="tel"
                   className="flex-1 px-3 py-2.5 bg-transparent text-base sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required
@@ -520,57 +507,49 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               </div>
             </div>
 
-            {/* Submit Sign In Button */}
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="w-full font-bold h-11 rounded-none shadow-none cursor-pointer mt-1"
-            >
-              Sign In
-            </Button>
+            {/* Action Buttons Stack: Sign In, Sign Up, and Forgot Password/MPIN */}
+            <div className="space-y-2 pt-1">
+              {/* 1. Sign In Button */}
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                className="w-full font-bold h-10 rounded-none shadow-none cursor-pointer"
+              >
+                Sign In
+              </Button>
 
-            {/* Quick One-Tap Action: Forgot PIN / Verify Recovery Code */}
-            <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
-              <span className="flex-shrink mx-2 text-[10px] uppercase font-bold tracking-wider text-zinc-400">
-                or
-              </span>
-              <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
-            </div>
+              {/* 2. Sign Up Button */}
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={() => {
+                  setError("");
+                  setInfoMessage("");
+                  setAuthView("SIGNUP_PHONE");
+                }}
+                className="w-full font-bold h-10 rounded-none border border-zinc-300 dark:border-zinc-700 hover:border-amber-500 dark:hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer"
+              >
+                Sign Up
+              </Button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setError("");
-                if (phone.trim().replace(/\D/g, "").length >= 10) {
-                  handleSendOtpLogin();
-                } else {
-                  setAuthView("OTP_LOGIN_PHONE");
-                }
-              }}
-              className="w-full h-11 border border-zinc-300 dark:border-zinc-700 hover:border-amber-500 bg-zinc-100/70 dark:bg-zinc-800/40 hover:bg-amber-500/10 text-zinc-800 dark:text-zinc-200 hover:text-amber-500 dark:hover:text-amber-400 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer rounded-none"
-            >
-              <KeyRound className="w-3.5 h-3.5 text-amber-500" />
-              <span>Forgot password or PIN? Recover with SMS</span>
-            </button>
-
-            {/* Footer: Create Account Switch */}
-            <div className="pt-2 text-center border-t border-zinc-200 dark:border-zinc-800">
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Don&apos;t have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError("");
-                    setInfoMessage("");
-                    setAuthView("SIGNUP_PHONE");
-                  }}
-                  className="text-amber-500 hover:text-amber-400 font-bold hover:underline cursor-pointer"
-                >
-                  Sign Up (Get OTP)
-                </button>
-              </p>
+              {/* 3. Forgot Password / MPIN Button (compact, smaller space) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  if (phone.trim().replace(/\D/g, "").length >= 10) {
+                    handleSendOtpLogin();
+                  } else {
+                    setAuthView("OTP_LOGIN_PHONE");
+                  }
+                }}
+                className="w-full h-9 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-zinc-50/70 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-amber-600 dark:hover:text-amber-400 font-medium text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer rounded-none active:scale-[0.99]"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span>Forgot Password or MPIN? Recover with SMS</span>
+              </button>
             </div>
           </form>
         )}
@@ -594,7 +573,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   inputMode="numeric"
                   placeholder="98XXXXXXXX"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  onChange={(e) => setPhone(localPhone(e.target.value))}
                   autoComplete="tel"
                   className="flex-1 px-3 py-2.5 bg-transparent text-base sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required
@@ -812,7 +791,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   inputMode="numeric"
                   placeholder="98XXXXXXXX"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  onChange={(e) => setPhone(localPhone(e.target.value))}
                   autoComplete="tel"
                   className="flex-1 px-3 py-2.5 bg-transparent text-base sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required

@@ -174,7 +174,7 @@ test('profile page saves multiple addresses with live GPS and checkout reuses th
 
 test('guest signup resumes cart checkout and real tracking without required add-ons',async({page})=>{
   const state=await setup(page);await openCheckout(page);
-  await page.getByRole('button',{name:'Sign Up (Get OTP)',exact:true}).click();
+  await page.getByRole('button',{name:'Sign Up',exact:true}).click();
   await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9841234567');await page.getByRole('button',{name:'Get OTP Verification Code',exact:true}).click();
   for(const [index,digit] of [...'4821'].entries())await page.getByLabel(`Code digit ${index+1}`).fill(digit);
   await page.getByRole('button',{name:'Verify & Continue'}).click();
@@ -194,13 +194,13 @@ test('guest signup resumes cart checkout and real tracking without required add-
 });
 
 test('returning customer can use mobile and PIN or password; favourites persist',async({page})=>{
-  const state=await setup(page);await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();await page.getByRole('button',{name:'Sign in / Sign up',exact:true}).click();
+  const state=await setup(page);await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();
   await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9800000000');await page.getByLabel('Account Password or PIN').fill('1234');
   await page.getByRole('button',{name:'Sign In',exact:true}).click();
   await page.goto('/menu');await page.getByTitle('Save to favorites').first().click();await expect.poll(()=>state.favorites.length).toBe(1);
   await page.reload();await expect(page.getByTitle('Remove favorite').first()).toBeVisible();
   await page.getByRole('button',{name:'User Account Profile'}).click();await page.locator('#menu-logout-btn').click();
-  await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();await page.getByRole('button',{name:'Sign in / Sign up',exact:true}).click();
+  await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();
   await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9800000000');await page.getByLabel('Account Password or PIN').fill('Crisp!River49Ocean');await page.getByRole('button',{name:'Sign In',exact:true}).click();
   expect(state.writes.filter(w=>w.path==='customer/auth/login/').map(w=>w.body.method)).toEqual(['PIN','PASSWORD']);
 });
@@ -295,7 +295,7 @@ test('SMS recovery verifies the code before resetting password and PIN without d
   await page.route('**/api/v1/customer/auth/reset/',route=>{writes.push(route.request().postDataJSON());return route.fulfill({json:{access:'test-access',refresh:'test-refresh',user:state.user,outlet:state.outlet}});});
   await page.goto('/menu');await page.getByRole('button',{name:'User Account Profile'}).click();
   await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();
-  await page.getByRole('button',{name:'Forgot password or PIN? Recover with SMS'}).click();
+  await page.getByRole('button',{name:'Forgot Password or MPIN? Recover with SMS'}).click();
   await page.getByPlaceholder('98XXXXXXXX').last().fill('9841234567');
   await page.getByRole('button',{name:'Send Recovery Code'}).click();
   await expect(page.getByText('Test OTP Code:',{exact:false})).toHaveCount(0);
@@ -312,4 +312,73 @@ test('website traffic records page views without query strings or personal data'
   const visit=state.writes.find(w=>w.path==='customer/traffic/'&&w.body.path==='/menu').body;expect(visit.path).toBe(new URL(page.url()).pathname);expect(JSON.stringify(visit)).not.toContain('private-test');expect(visit).not.toHaveProperty('phone');
   await page.reload();await expect.poll(()=>state.writes.filter(w=>w.path==='customer/traffic/'&&w.body.path==='/menu').length).toBe(2);
   const second=state.writes.filter(w=>w.path==='customer/traffic/'&&w.body.path==='/menu')[1].body;expect(second.visitor_id).toBe(visit.visitor_id);expect(second.session_id).toBe(visit.session_id);expect(second.event_id).not.toBe(visit.event_id);
+});
+
+
+test('guest login moves to signup without a second credential attempt',async({page})=>{
+  await setup(page); await openCheckout(page);
+  let attempts=0;
+  await page.route('**/api/v1/customer/auth/login/',route=>{
+    attempts++;
+    return route.fulfill({status:400,json:{code:'signup_required',next_action:'signup',detail:'Verify your mobile number to create or activate your web account.'}});
+  });
+  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('+977 9841234567');
+  await expect(page.getByLabel('Mobile Phone Number',{exact:true})).toHaveValue('9841234567');
+  await page.getByLabel('Account Password or PIN').fill('9274');
+  await page.getByRole('button',{name:'Sign In',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Get OTP Verification Code',exact:true})).toBeVisible();
+  expect(attempts).toBe(1);
+});
+
+test('guest recovery completes signup instead of returning to the login loop',async({page})=>{
+  const state=await setup(page); await openCheckout(page);
+  await page.route('**/api/v1/customer/auth/recovery-start/',route=>route.fulfill({json:{next_action:'signup',exists:false,challenge_id:'guest-signup',resend_after:60}}));
+  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9841234567');
+  await page.getByRole('button',{name:'Forgot PIN?',exact:true}).click();
+  await expect(page.getByText('Verify Mobile Number',{exact:true})).toBeVisible();
+  for(const [index,digit] of [...'4821'].entries())await page.getByLabel(`Code digit ${index+1}`).fill(digit);
+  await page.getByRole('button',{name:'Verify & Continue'}).click();
+  await page.getByLabel('Full name',{exact:true}).fill('guest_customer');
+  await page.getByLabel('Set Password').fill('Crisp!River49Ocean');
+  await page.getByLabel('New 4-Digit Quick PIN').fill('9274');
+  await page.getByRole('button',{name:'Complete & Continue to Checkout'}).click();
+  await expect(page.getByAltText('Merchant payment QR')).toBeVisible();
+  expect(state.writes.find(w=>w.path==='customer/auth/verify/').body.challenge_id).toBe('guest-signup');
+  expect(state.writes.some(w=>w.path==='customer/auth/recovery-verify/')).toBe(false);
+});
+
+test('signup field conflicts keep profile details and never claim the phone is registered',async({page})=>{
+  await setup(page); await openCheckout(page);
+  await page.getByRole('button',{name:'Sign Up',exact:true}).click();
+  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9841234567');
+  await page.getByRole('button',{name:'Get OTP Verification Code',exact:true}).click();
+  for(const [index,digit] of [...'4821'].entries())await page.getByLabel(`Code digit ${index+1}`).fill(digit);
+  await page.getByRole('button',{name:'Verify & Continue'}).click();
+  await page.getByLabel('Full name',{exact:true}).fill('existing_name');
+  await page.getByLabel('Set Password').fill('Crisp!River49Ocean');
+  await page.getByLabel('New 4-Digit Quick PIN').fill('9274');
+  let attempts=0;
+  await page.route('**/api/v1/customer/auth/register/',route=>{
+    attempts++;
+    return route.fulfill({status:400,json:attempts===1 ? {username:'This username is taken. Please choose another.'} : {email:'This email is already registered. Use another email or leave it blank.'}});
+  });
+  await page.getByRole('button',{name:'Complete & Continue to Checkout'}).click();
+  await expect(page.getByRole('alert')).toContainText('This email is already registered');
+  await expect(page.getByLabel('Full name',{exact:true})).toHaveValue('existing_name');
+  await expect(page.getByText('Customer Sign In',{exact:true})).toHaveCount(0);
+  expect(attempts).toBe(2);
+});
+
+test('password login preserves spaces and sends only one failed request',async({page})=>{
+  await setup(page); await openCheckout(page);
+  const attempts:any[]=[];
+  await page.route('**/api/v1/customer/auth/login/',route=>{
+    attempts.push(route.request().postDataJSON());
+    return route.fulfill({status:403,json:{detail:'Mobile number or credentials are incorrect.'}});
+  });
+  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9841234567');
+  await page.getByLabel('Account Password or PIN').fill('  Crisp!River49Ocean  ');
+  await page.getByRole('button',{name:'Sign In',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('Mobile number or credentials are incorrect.');
+  expect(attempts).toEqual([expect.objectContaining({method:'PASSWORD',credential:'  Crisp!River49Ocean  '})]);
 });

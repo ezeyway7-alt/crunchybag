@@ -10,10 +10,19 @@ export interface DrawerProps {
   description?: React.ReactNode;
   children: React.ReactNode;
   position?: "right" | "bottom";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl";
   className?: string;
   bodyClassName?: string;
   headerClassName?: string;
 }
+
+const sizeClasses: Record<"sm" | "md" | "lg" | "xl" | "2xl", string> = {
+  sm: "sm:max-w-sm",
+  md: "sm:max-w-md md:max-w-lg",
+  lg: "sm:max-w-lg md:max-w-xl",
+  xl: "sm:max-w-xl md:max-w-2xl",
+  "2xl": "sm:max-w-2xl md:max-w-3xl",
+};
 
 export const Drawer: React.FC<DrawerProps> = ({
   isOpen,
@@ -22,6 +31,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   description,
   children,
   position = "right",
+  size = "md",
   className,
   bodyClassName,
   headerClassName,
@@ -80,7 +90,7 @@ export const Drawer: React.FC<DrawerProps> = ({
                 "pointer-events-auto w-screen bg-[#121214] text-zinc-100 shadow-2xl flex flex-col border-zinc-800",
                 isBottom
                   ? "max-h-[85vh] border-t"
-                  : "w-full sm:max-w-md md:max-w-lg border-l h-full",
+                  : cn("w-full border-l h-full", sizeClasses[size]),
                 className
               )}
             >
