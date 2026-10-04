@@ -1,4 +1,4 @@
-import { nepaliPickupText, nepaliVoice, nepaliUtterance } from "../lib/nepaliAnnouncement";
+import { NepaliAudioPlayer } from "../lib/nepaliAudio";
 import { useOutletEvents } from "../lib/useOutletEvents";
 import { usePersistentCart } from './usePersistentCart';
 import { useCustomerAccount, customerRefresh } from "../lib/customerApi";
@@ -1572,38 +1572,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setLastKitchenCall(callData);
 
-    // Play 3-tone acoustic bell chime (C5 -> E5 -> G5)
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        const now = ctx.currentTime;
-        [523.25, 659.25, 783.99].forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.frequency.setValueAtTime(freq, now + idx * 0.12);
-          gain.gain.setValueAtTime(0.16, now + idx * 0.12);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.32);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(now + idx * 0.12);
-          osc.stop(now + idx * 0.12 + 0.32);
-        });
-      }
-    } catch {
-      // AudioContext blocked
-    }
-
-    // Speech Synthesis voice announcement
-    try {
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const voice = nepaliVoice(window.speechSynthesis.getVoices());
-        if (voice) window.speechSynthesis.speak(nepaliUtterance(nepaliPickupText(tokenDisplay, details.tableNumber), voice));
-      }
-    } catch {
-      // SpeechSynthesis blocked
-    }
+    const player = new NepaliAudioPlayer();
+    void player.unlock().then(() => player.play(details.kioskToken || details.orderNumber, details.tableNumber))
+      .catch(() => addToast({title: "Sound unavailable", description: "Check browser audio permission and try again.", type: "info"}))
+      .finally(() => player.dispose());
 
     addToast({
       title: `🔔 Kitchen Call: ${tokenDisplay}`,

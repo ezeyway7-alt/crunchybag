@@ -1,4 +1,4 @@
-import { nepaliPickupText, nepaliVoice, nepaliUtterance } from "../../lib/nepaliAnnouncement";
+import { NepaliAudioPlayer } from "../../lib/nepaliAudio";
 import { apiClient } from "../../lib/api";
 import { useOutletEvents } from "../../lib/useOutletEvents";
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -87,20 +87,23 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   // Sound & Speech settings
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [voiceError, setVoiceError] = useState("");
-  const speechTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioPlayer = useRef<NepaliAudioPlayer | null>(null);
   const speechBusy = useRef(false);
+  const playbackId = useRef(0);
+  const getAudioPlayer = () => audioPlayer.current ||= new NepaliAudioPlayer();
+  const stopAnnouncement = () => {
+    playbackId.current++;
+    audioPlayer.current?.stop();
+    speechBusy.current = false;
+  };
   useEffect(() => {
-    if (!soundEnabled) {
-      if (speechTimer.current) clearTimeout(speechTimer.current);
-      window.speechSynthesis?.cancel();
-      speechBusy.current = false;
-    }
-    return () => {
-      if (speechTimer.current) clearTimeout(speechTimer.current);
-      window.speechSynthesis?.cancel();
-      speechBusy.current = false;
-    };
+    if (!soundEnabled) stopAnnouncement();
   }, [soundEnabled]);
+  useEffect(() => () => {
+    playbackId.current++;
+    audioPlayer.current?.dispose();
+    audioPlayer.current = null;
+  }, []);
 
   // Real-time clock
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -195,67 +198,17 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     return () => clearInterval(interval);
   }, [activeSlideIndex, showcaseProducts.length]);
 
-  // Web Audio API Airport Chime Synthesizer (Authentic 3-tone Airport chime: F4 -> A4 -> C5)
-  const playAirportChime = () => {
-    if (!soundEnabled) return;
-    try {
-      const AudioCtxClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtxClass) return;
-      const ctx = new AudioCtxClass();
-      const now = ctx.currentTime;
-
-      const notes = [
-        { freq: 349.23, time: now },
-        { freq: 440.0, time: now + 0.22 },
-        { freq: 523.25, time: now + 0.44 },
-      ];
-
-      notes.forEach((note) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(note.freq, note.time);
-
-        gain.gain.setValueAtTime(0.001, note.time);
-        gain.gain.exponentialRampToValueAtTime(0.07, note.time + 0.08);
-        gain.gain.exponentialRampToValueAtTime(0.0001, note.time + 0.65);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(note.time);
-        osc.stop(note.time + 0.7);
-        if (note === notes[notes.length - 1]) osc.onended = () => { void ctx.close(); };
-      });
-    } catch {
-      // Audio playback restrictions fallback
-    }
-  };
-
-  // Only use a Nepali voice: an English voice cannot pronounce this call reliably.
+  // Bundled Nepali recordings work even when the browser has no Nepali voice.
   const speakAnnouncement = (announcement: CallingAnnouncement) => {
     if (!soundEnabled) return;
+    const id = ++playbackId.current;
     speechBusy.current = true;
-    speechTimer.current = setTimeout(() => {
-      speechTimer.current = null;
-      const synth = window.speechSynthesis;
-      const voice = synth && nepaliVoice(synth.getVoices());
-      if (!voice) {
-        speechBusy.current = false;
-        setVoiceError("नेपाली आवाज उपलब्ध छैन। ब्राउजरमा नेपाली आवाज सेटअप गरेर Speaker Test थिच्नुहोस्।");
-        return;
-      }
-      setVoiceError("");
-      const utterance = nepaliUtterance(nepaliPickupText(announcement.token, announcement.tableNumber), voice);
-      utterance.onend = () => { speechBusy.current = false; };
-      utterance.onerror = () => {
-        speechBusy.current = false;
-        setVoiceError("आवाज बजेन। कृपया Speaker Test थिचेर फेरि प्रयास गर्नुहोस्।");
-      };
-      try { synth.speak(utterance); } catch { utterance.onerror?.(new Event("error") as SpeechSynthesisErrorEvent); }
-    }, 1200);
+    setVoiceError("");
+    void getAudioPlayer().play(announcement.token, announcement.tableNumber).catch(() => {
+      if (id === playbackId.current) setVoiceError("Sound could not play. Click Speaker Test to enable audio or retry loading it.");
+    }).finally(() => {
+      if (id === playbackId.current) speechBusy.current = false;
+    });
   };
 
   // Helper to format token
@@ -298,7 +251,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   useEffect(()=>{
     if(activeCall || !callQueue.length)return;
     const [next,...rest]=callQueue;setCallQueue(rest);setActiveCall(next);setCallProgress(100);
-    playAirportChime();speakAnnouncement(next);
+    speakAnnouncement(next);
   },[activeCall,callQueue]);
 
   // Auto-dismiss the calling spotlight rectangle over 8 seconds with smooth progress bar
@@ -456,7 +409,17 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
           {/* Subtle Speaker Test Button (User requested: "just to test give somewhere small speaker button for now") */}
           <button
             id="tv-speaker-test-btn"
-            onClick={() => {
+            onClick={async () => {
+              try {
+                await getAudioPlayer().unlock();
+              } catch {
+                setVoiceError("Sound could not start. Check the browser audio permission and try again.");
+                return;
+              }
+              stopAnnouncement();
+              setActiveCall(null);
+              setSoundEnabled(true);
+              setVoiceError("");
               const testOrder: Order = {
                 id: "test-call",
                 orderNumber: "CR-7721",
@@ -477,7 +440,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                 elapsedSeconds: 0,
                 paymentMethod: "CASH_ON_PICKUP",
               };
-              triggerOrderCall(testOrder);
+              setCallQueue(queue => [{id: testOrder.id, orderNumber: testOrder.orderNumber, token: formatTvToken(testOrder), customerName: testOrder.customerName, fulfillmentType: testOrder.fulfillmentType, tableNumber: testOrder.tableNumber, timestamp: Date.now()}, ...queue]);
             }}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-amber-400 border border-zinc-700/80 text-xs font-bold transition-colors cursor-pointer"
             title="Speaker Test: Gentle chime and Nepali pickup announcement"
@@ -488,7 +451,10 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
           {/* Audio toggle */}
           <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
+            onClick={() => {
+              if (!soundEnabled) void getAudioPlayer().unlock().catch(() => setVoiceError("Click Speaker Test to enable sound."));
+              setSoundEnabled(!soundEnabled);
+            }}
             className={`p-1.5 border transition-colors cursor-pointer ${
               soundEnabled
                 ? "bg-amber-500/10 border-amber-500/40 text-amber-400"
@@ -950,9 +916,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
             {/* Dismiss button */}
             <button
               onClick={() => {
-                if (speechTimer.current) clearTimeout(speechTimer.current);
-                window.speechSynthesis?.cancel();
-                speechBusy.current = false;
+                stopAnnouncement();
                 setActiveCall(null);
               }}
               className="p-1 text-zinc-500 hover:text-white border border-zinc-800 hover:bg-zinc-800 transition-colors cursor-pointer"
