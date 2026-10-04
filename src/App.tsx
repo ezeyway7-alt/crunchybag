@@ -273,7 +273,7 @@ const AppContent: React.FC = () => {
   // 11. TABLE-QR mode (scanned table QR code on phone)
   if (activePortal === "table-qr" || isTableOrderMode || currentPath === "/table-qr") {
     return (
-      <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#09090C] text-white antialiased select-none overscroll-none touch-pan-y">
+      <div className="min-h-screen w-full max-w-full bg-[#09090C] text-white antialiased">
         <TableQrPortal
           onClose={() => {
             setIsTableOrderMode(false);

@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
 
+import { useScrollLock } from "../../lib/scrollLock";
+
 export interface DrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,17 +49,8 @@ export const Drawer: React.FC<DrawerProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Lock body scroll
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen]);
+  // Lock body and html scroll cleanly
+  useScrollLock(isOpen);
 
   const isBottom = position === "bottom";
 

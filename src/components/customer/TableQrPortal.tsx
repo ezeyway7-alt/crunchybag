@@ -44,6 +44,7 @@ import { CrunchyLogo } from "../common/CrunchyLogo";
 import { ProductConfiguratorModal } from "./ProductConfiguratorModal";
 import { QrOrderTrackAndReviewModal } from "./QrOrderTrackAndReviewModal";
 import { SkeletonProductGrid } from "../common/Skeleton";
+import { useScrollLock, forceUnlockScroll } from "../../lib/scrollLock";
 
 // Quick Web Audio feedback helper for tactile mobile ordering
 const playMobileSound = (type: "tap" | "add" | "success" | "beep") => {
@@ -137,6 +138,17 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   const [showActiveTabDetails, setShowActiveTabDetails] = useState(false);
   const [diningMode, setDiningMode] = useState<"DINE_IN" | "TAKEAWAY">("DINE_IN");
   const [isTrackReviewOpen, setIsTrackReviewOpen] = useState(false);
+
+  // Guarantee clean scroll unlocking on mount/unmount of table QR portal
+  useEffect(() => {
+    forceUnlockScroll();
+    return () => {
+      forceUnlockScroll();
+    };
+  }, []);
+
+  // Lock background scroll only when an overlay/drawer/modal is actively showing
+  useScrollLock(isConfirmDrawerOpen || isTableSwitcherOpen || (!!placedOrderResult && !isTrackReviewOpen) || isTrackReviewOpen);
 
   const qrToken=new URLSearchParams(window.location.search).get('token') || '';
   const [qrContext,setQrContext]=useState<any>(null);
@@ -295,12 +307,12 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#09090C] text-zinc-100 flex flex-col font-sans pb-28 select-none antialiased overscroll-y-contain touch-manipulation">
+    <div className="min-h-screen w-full max-w-full bg-[#09090C] text-zinc-100 flex flex-col font-sans pb-28 antialiased">
       {(checkoutError || serverQuote.error) && <p role="alert" className="p-3 text-xs text-rose-400 break-words">{checkoutError || serverQuote.error}</p>}
       {/* -------------------------------------------------------------
           TOP BAR: BRAND, TABLE CHIP, DINING MODE, AND EXIT
       ------------------------------------------------------------- */}
-      <header className="sticky top-0 z-40 bg-[#0E0E12]/95 backdrop-blur-md border-b border-zinc-800/80 px-2.5 sm:px-3.5 py-2 sm:py-2.5 shadow-sm w-full max-w-full overflow-hidden">
+      <header className="sticky top-0 z-40 bg-[#0E0E12]/95 backdrop-blur-md border-b border-zinc-800/80 px-2.5 sm:px-3.5 py-2 sm:py-2.5 shadow-sm w-full max-w-full">
         <div className="max-w-md mx-auto flex items-center justify-between gap-1.5 sm:gap-2 w-full min-w-0">
           {/* Brand Logo only (compact on mobile to preserve row space) */}
           <div className="flex items-center shrink-0">
@@ -376,7 +388,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       {/* -------------------------------------------------------------
           BEZEL-LESS SLIM CONTACT & SEARCH BAR (NOT COMPULSORY, OPTIONAL)
       ------------------------------------------------------------- */}
-      <section className="bg-[#0D0D11] border-b border-zinc-800/60 px-2.5 sm:px-3.5 py-2 sm:py-2.5 w-full max-w-full overflow-hidden">
+      <section className="bg-[#0D0D11] border-b border-zinc-800/60 px-2.5 sm:px-3.5 py-2 sm:py-2.5 w-full max-w-full">
         <div className="max-w-md mx-auto space-y-2 w-full min-w-0">
           {/* Optional Contact Number & Customer Name */}
           <div className="grid grid-cols-2 gap-1.5 sm:gap-2 w-full">
@@ -425,7 +437,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
 
           {/* ACTIVE RUNNING TAB ALERT (Shown only when active order tab exists) */}
           {activeRunningOrder && (
-            <div className="bg-amber-950/30 border border-amber-500/40 p-2 text-xs text-zinc-300 w-full overflow-hidden">
+            <div className="bg-amber-950/30 border border-amber-500/40 p-2 text-xs text-zinc-300 w-full">
               <div className="flex items-center justify-between gap-2 min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0 truncate">
                   <Receipt className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -436,13 +448,25 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                     (Rs. {activeRunningOrder.totalAmount})
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowActiveTabDetails(!showActiveTabDetails)}
-                  className="text-[10px] text-amber-400 underline font-bold shrink-0"
-                >
-                  {showActiveTabDetails ? "Hide" : "View Items"}
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsTrackReviewOpen(true);
+                      playMobileSound("tap");
+                    }}
+                    className="text-[10px] text-amber-400 hover:text-amber-300 underline font-bold cursor-pointer"
+                  >
+                    Track Status
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowActiveTabDetails(!showActiveTabDetails)}
+                    className="text-[10px] text-zinc-400 hover:text-white underline font-medium cursor-pointer"
+                  >
+                    {showActiveTabDetails ? "Hide" : "View Items"}
+                  </button>
+                </div>
               </div>
 
               {showActiveTabDetails && (
@@ -468,7 +492,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       {/* -------------------------------------------------------------
           CATEGORY FILTER TRACK (HORIZONTAL SCROLL WITH OVERSCROLL CONTAINMENT)
       ------------------------------------------------------------- */}
-      <div className="sticky top-[45px] sm:top-[49px] z-30 bg-[#09090C]/95 backdrop-blur-md border-b border-zinc-800/80 py-2 px-2.5 sm:px-3.5 w-full max-w-full overflow-hidden">
+      <div className="sticky top-[45px] sm:top-[49px] z-30 bg-[#09090C]/95 backdrop-blur-md border-b border-zinc-800/80 py-2 px-2.5 sm:px-3.5 w-full max-w-full">
         <div className="max-w-md mx-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           <button
             onClick={() => handleCategorySelect("all")}
@@ -514,7 +538,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       {/* -------------------------------------------------------------
           MENU ITEMS LIST / GRID
       ------------------------------------------------------------- */}
-      <main className="max-w-md mx-auto px-2.5 sm:px-3.5 py-3 w-full flex-1 space-y-2 sm:space-y-2.5 overflow-hidden">
+      <main className="max-w-md mx-auto px-2.5 sm:px-3.5 py-3 w-full flex-1 space-y-2 sm:space-y-2.5">
         {isLoadingSkeleton || isCategoryLoading ? (
           <SkeletonProductGrid count={6} />
         ) : (
@@ -675,7 +699,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       {/* -------------------------------------------------------------
           SUCCESS & KIOSK PRINT TOKEN MODAL
       ------------------------------------------------------------- */}
-      {placedOrderResult && (
+      {placedOrderResult && !isTrackReviewOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-[#121217] border border-amber-500/60 max-w-sm w-full max-h-[90vh] p-3 text-center space-y-3 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto my-auto">
             <div className="w-12 h-12 bg-amber-500 text-black mx-auto flex items-center justify-center font-black">
@@ -1031,7 +1055,10 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       {/* Scanned QR Slip Order Tracker & Rate/Review Modal */}
       <QrOrderTrackAndReviewModal
         isOpen={isTrackReviewOpen}
-        onClose={() => setIsTrackReviewOpen(false)}
+        onClose={() => {
+          setIsTrackReviewOpen(false);
+          setPlacedOrderResult(null);
+        }}
         initialOrder={placedOrderResult || activeRunningOrder}
       />
     </div>

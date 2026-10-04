@@ -25,6 +25,7 @@ import {
 import { Order, OrderStatus } from "../../types";
 import { formatNPR, getElapsedString } from "../../lib/utils";
 import { useApp } from "../../context/AppContext";
+import { useScrollLock } from "../../lib/scrollLock";
 
 interface QrOrderTrackAndReviewModalProps {
   isOpen: boolean;
@@ -80,6 +81,8 @@ export const QrOrderTrackAndReviewModal: React.FC<QrOrderTrackAndReviewModalProp
       setIsReviewSubmitted(false);
     }
   }, [isOpen, initialOrder, orders]);
+
+  useScrollLock(isOpen);
 
   if (!isOpen) return null;
 
@@ -140,7 +143,7 @@ export const QrOrderTrackAndReviewModal: React.FC<QrOrderTrackAndReviewModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-xs overflow-y-auto overscroll-contain touch-pan-y">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-xs overflow-y-auto">
       <div className="relative w-full max-w-lg bg-[#0E1015] border border-zinc-800 shadow-2xl overflow-hidden my-auto flex flex-col max-w-full">
         
         {/* ============================================================ */}
@@ -184,7 +187,7 @@ export const QrOrderTrackAndReviewModal: React.FC<QrOrderTrackAndReviewModalProp
         </form>
 
         {/* Modal Main Body */}
-        <div className="p-4 sm:p-5 max-h-[75vh] overflow-y-auto overflow-x-hidden space-y-4 overscroll-contain touch-pan-y">
+        <div className="p-4 sm:p-5 max-h-[75vh] overflow-y-auto space-y-4">
           
           {currentOrder ? (
             <>

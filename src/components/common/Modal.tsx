@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
 
+import { useScrollLock } from "../../lib/scrollLock";
+
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -41,19 +43,8 @@ export const Modal: React.FC<ModalProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Lock body and html scroll to prevent background scrolling
-  useEffect(() => {
-    if (isOpen) {
-      const prevBodyOverflow = document.body.style.overflow;
-      const prevHtmlOverflow = document.documentElement.style.overflow;
-      document.body.style.overflow = "hidden";
-      document.documentElement.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = prevBodyOverflow;
-        document.documentElement.style.overflow = prevHtmlOverflow;
-      };
-    }
-  }, [isOpen]);
+  // Lock body and html scroll cleanly without leaving stuck overflow:hidden
+  useScrollLock(isOpen);
 
   const maxWidthClasses = {
     sm: "max-w-sm",
