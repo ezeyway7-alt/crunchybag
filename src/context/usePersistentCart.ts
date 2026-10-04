@@ -114,7 +114,7 @@ function rebase(remote: CartLineItem[], base: CartLineItem[], local: CartLineIte
 export function usePersistentCart(outletId: string) {
   const { authUser, isLoading } = useAuth();
   const outlet = normalizeOutletId(outletId);
-  const user = authUser?.role === "CUSTOMER" ? String(authUser.id) : "guest";
+  const user = authUser && authUser.is_active !== false ? String(authUser.id) : "guest";
   const scope = `${user}:${outlet}`;
   const [, redraw] = useState(0);
   const [status, setStatus] = useState({ scope, busy: user !== "guest", error: "" });

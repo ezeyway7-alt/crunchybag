@@ -23,13 +23,13 @@ export function CustomerProfilePage() {
     setPoint(row ? addressPoint(row) : undefined);setDefault(row?.is_default || false);setMessage('');
   };
   useEffect(() => {
-    if (!authUser || authUser.role !== 'CUSTOMER') {
+    if (!authUser || authUser.is_active === false) {
       window.dispatchEvent(new Event('customer:login'));
       setCustomerActiveTab('menu');
     }
   }, [authUser]);
 
-  if (authUser?.role !== 'CUSTOMER') {
+  if (!authUser || authUser.is_active === false) {
     return (
       <main className="max-w-md mx-auto p-6 my-10 bg-[#121214] border border-zinc-800 text-center space-y-4 shadow-xl text-zinc-100">
         <h1 className="text-lg font-bold text-white uppercase tracking-tight">Customer Profile</h1>

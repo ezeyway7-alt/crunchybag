@@ -153,7 +153,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const handleSubmit = async (e:React.FormEvent) => {
     e.preventDefault();setTouched(true);if(lock.current)return;
     if(nameError || addressError || tableError || cartSyncing || cartSyncError)return;
-    if(!isAuthenticated||authUser?.role!=='CUSTOMER'){setError('Sign in before placing your order.');return;}
+    if(!isAuthenticated||!authUser||authUser.is_active===false){setError('Sign in before placing your order.');return;}
     if(!quote||!proof||!meta?.qr_url){setError('Scan the payment QR and upload your receipt before placing the order.');return;}
     if(selectedFulfillment==='DELIVERY'&&!deliveryAddress.trim()){setError('Enter your delivery address.');return;}
     lock.current=true;setIsSubmitting(true);setError(null);

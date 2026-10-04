@@ -8,7 +8,7 @@ export const addressPoint = (row: SavedAddress): DeliveryPoint | undefined => ro
   ? {lat: Number(row.latitude), lng: Number(row.longitude), landmark: row.landmark} : undefined;
 export function useCustomerAddresses() {
   const {authUser} = useAuth();
-  const user = authUser?.role === 'CUSTOMER' ? authUser.id : null;
+  const user = authUser && authUser.is_active !== false ? authUser.id : null;
   const [state, setState] = useState<{user: unknown; rows: SavedAddress[]}>({user: null, rows: []});
   const [error, setError] = useState('');
   const [revision, refresh] = useState(0);

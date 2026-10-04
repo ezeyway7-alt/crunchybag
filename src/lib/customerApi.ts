@@ -23,7 +23,7 @@ export function customerOrder(row: any): Order {
 const emptyProfile = {name:'',phone:'',email:'',address:'',points:0,tier:'',memberSince:''};
 export function useCustomerAccount() {
   const {authUser, isLoading} = useAuth();
-  const enabled = !isLoading && authUser?.role === 'CUSTOMER';
+  const enabled = !isLoading && !!authUser && authUser.is_active !== false;
   const scope = enabled ? String(authUser.id) : 'guest';
   const [state,setState] = useState<{scope:string; orders:Order[]; favorites:string[]; profile:typeof emptyProfile}>({scope:'',orders:[],favorites:[],profile:emptyProfile});
   const [error,setError] = useState('');

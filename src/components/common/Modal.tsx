@@ -41,16 +41,18 @@ export const Modal: React.FC<ModalProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Lock body scroll
+  // Lock body and html scroll to prevent background scrolling
   useEffect(() => {
     if (isOpen) {
+      const prevBodyOverflow = document.body.style.overflow;
+      const prevHtmlOverflow = document.documentElement.style.overflow;
       document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
+      document.documentElement.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prevBodyOverflow;
+        document.documentElement.style.overflow = prevHtmlOverflow;
+      };
     }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
   }, [isOpen]);
 
   const maxWidthClasses = {
@@ -69,7 +71,7 @@ export const Modal: React.FC<ModalProps> = ({
       {isOpen && (
         <div
           className={cn(
-            "fixed inset-0 z-50 flex justify-center p-2.5 sm:p-6 overflow-y-auto overflow-x-hidden",
+            "fixed inset-0 z-50 flex justify-center p-2.5 sm:p-6 overflow-y-auto overflow-x-hidden overscroll-contain",
             position === "top" ? "items-start pt-8 sm:pt-20" : "items-center"
           )}
         >
@@ -90,7 +92,7 @@ export const Modal: React.FC<ModalProps> = ({
             exit={{ opacity: 0, scale: 0.96, y: position === "top" ? -10 : 15 }}
             transition={{ type: "spring", damping: 26, stiffness: 320 }}
             className={cn(
-              "relative w-full max-w-full bg-[#121214] border border-white/15 rounded-none shadow-2xl overflow-hidden z-10 text-zinc-100",
+              "relative w-full max-w-full bg-[#121214] border border-white/15 rounded-none shadow-2xl overflow-hidden z-10 text-zinc-100 flex flex-col",
               position !== "top" && "my-auto",
               maxWidthClasses[maxWidth],
               className
@@ -99,7 +101,7 @@ export const Modal: React.FC<ModalProps> = ({
             {(title || showCloseButton) && (
               <div
                 className={cn(
-                  "flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-2",
+                  "flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-2 shrink-0",
                   headerClassName
                 )}
               >

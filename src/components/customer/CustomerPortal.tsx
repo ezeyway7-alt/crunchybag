@@ -218,15 +218,15 @@ export const CustomerPortal: React.FC = () => {
   const [trackedOrderId, setTrackedOrderId] = useState<string | undefined>(undefined);
 
   const openCheckout = () => {
-    if (!isAuthenticated || authUser?.role !== 'CUSTOMER') {sessionStorage.setItem('customer:return-to-checkout','yes');setResumeCheckout(true);setIsAuthOpen(true);}
+    if (!isAuthenticated || !authUser || authUser.is_active === false) {sessionStorage.setItem('customer:return-to-checkout','yes');setResumeCheckout(true);setIsAuthOpen(true);}
     else {sessionStorage.setItem('customer:return-to-checkout','yes');setResumeCheckout(true);}
   };
   useEffect(() => {
-    if (resumeCheckout && authUser?.role === 'CUSTOMER' && !cartSyncing && !cartSyncError) {
+    if (resumeCheckout && authUser && authUser.is_active !== false && !cartSyncing && !cartSyncError) {
       sessionStorage.removeItem('customer:return-to-checkout');
       setResumeCheckout(false); setIsAuthOpen(false); setIsCheckoutOpen(true);
     }
-  }, [resumeCheckout, authUser?.id, authUser?.role, cartSyncing, cartSyncError]);
+  }, [resumeCheckout, authUser?.id, authUser?.is_active, cartSyncing, cartSyncError]);
   useEffect(() => { const open = () => setIsAuthOpen(true); window.addEventListener('customer:login',open); return () => window.removeEventListener('customer:login',open); },[]);
   // Receipt & QR Slip Review Modals
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
@@ -591,7 +591,7 @@ export const CustomerPortal: React.FC = () => {
       />
 
       {/* Customer Profile Modal with Order History & 1-Click Reorder */}
-      <Modal isOpen={resumeCheckout && authUser?.role === 'CUSTOMER' && !isAuthOpen} onClose={()=>{setResumeCheckout(false);sessionStorage.removeItem('customer:return-to-checkout');}} title="Preparing checkout" maxWidth="sm">
+      <Modal isOpen={resumeCheckout && authUser && authUser.is_active !== false && !isAuthOpen} onClose={()=>{setResumeCheckout(false);sessionStorage.removeItem('customer:return-to-checkout');}} title="Preparing checkout" maxWidth="sm">
         {cartSyncError ? <div role="alert" className="space-y-3 text-sm"><p>Your items are saved on this device. We couldn’t finish restoring your cart.</p><Button onClick={()=>void retryCartSync()}>Try again</Button></div> : <p role="status" className="text-sm text-zinc-400">Restoring your cart…</p>}
       </Modal>
 

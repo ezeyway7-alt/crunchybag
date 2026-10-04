@@ -157,12 +157,12 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
       onClose={onClose}
       maxWidth="sm"
       showCloseButton={false}
-      className="w-full max-w-[460px] sm:max-w-[520px] h-[85vh] sm:h-auto sm:max-h-[640px] min-h-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none"
-      contentClassName="p-0 h-full flex flex-col min-h-0"
+      className="w-full max-w-[460px] sm:max-w-[520px] max-h-[92dvh] sm:max-h-[85vh] flex flex-col min-h-0 border border-zinc-300 dark:border-zinc-700 shadow-2xl overflow-hidden rounded-none my-auto"
+      contentClassName="p-0 flex-1 min-h-0 flex flex-col overflow-hidden"
     >
-      <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#121214] text-zinc-900 dark:text-zinc-100 overflow-hidden w-full">
+      <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-[#121214] text-zinc-900 dark:text-zinc-100 overflow-hidden w-full">
         {/* Top Image Showcase (Proper Food Dimensions) */}
-        <div className="relative w-full h-36 sm:h-44 bg-zinc-950 shrink-0 overflow-hidden flex flex-col justify-between border-b border-zinc-200 dark:border-zinc-800">
+        <div className="relative w-full h-32 sm:h-40 bg-zinc-950 shrink-0 overflow-hidden flex flex-col justify-between border-b border-zinc-200 dark:border-zinc-800">
           <img
             src={product.images[activeImageIndex] || product.images[0]}
             alt={product.name}
@@ -221,7 +221,7 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
         </div>
 
         {/* Customization & Action Column */}
-        <div className="flex-1 min-h-0 flex flex-col h-full bg-white dark:bg-[#121214] overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-[#121214] overflow-hidden">
           {/* Header with Title, Price, Description */}
           <div className="px-3 py-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0 bg-zinc-50/80 dark:bg-zinc-900/60 w-full overflow-hidden">
             <div className="min-w-0 flex-1">
@@ -240,7 +240,7 @@ export const ProductConfiguratorModal: React.FC<ProductConfiguratorModalProps> =
           </div>
 
           {/* Scrollable Customization Body */}
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2.5 sm:p-3.5 space-y-2.5 text-xs">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain overflow-x-hidden p-2.5 sm:p-3.5 space-y-2.5 text-xs touch-pan-y">
             {/* Variant Selector (e.g. Regular vs Large) */}
             {product.variants.length > 1 && (
               <div className="space-y-1.5">

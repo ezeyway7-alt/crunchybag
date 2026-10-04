@@ -1,11 +1,11 @@
 import {receiptFixture} from "./receiptFixture";
 import {test,expect,Page} from '@playwright/test';
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0x8AAAAASUVORK5CYII=';
-async function setup(page:Page, signedIn=false) {
+async function setup(page:Page, signedIn=false, role='CUSTOMER') {
   // External font availability must not hold up storefront navigation in tests.
   await page.route('https://fonts.googleapis.com/**', route => route.abort());
   page.on('pageerror',e=>console.log('BROWSER ERROR',e.stack));
-  const user={id:91,username:'web_customer',phone_number:'+9779841234567',email:'',role:'CUSTOMER',is_active:true};
+  const user={id:91,username:'web_customer',phone_number:'+9779841234567',email:'',role,is_active:true};
   const outlet={id:1,name:'Web Outlet',branch_code:'WEB',enable_delivery:true,enable_takeaway:true,accepting_orders:true};
   const product={id:'burger',category:'food',name:'Web Burger',description:'Burger',base_price:'200.00',variants:[],modifier_groups:[],images:[`data:image/png;base64,${png}`],dietary_tags:[],is_available:true,is_web_visible:true,is_delivery_eligible:true,requires_kitchen:true};
   const combo={...product,id:'combo',name:'Web Combo',base_price:'350.00',is_combo_package:true,combo_discount_type:'fixed_price',combo_discount_value:'350.00',combo_items:[{product_id:'burger',product_name:'Web Burger',quantity:2,unit_price:'200.00'}]};
@@ -381,4 +381,37 @@ test('password login preserves spaces and sends only one failed request',async({
   await page.getByRole('button',{name:'Sign In',exact:true}).click();
   await expect(page.getByRole('alert')).toContainText('Mobile number or credentials are incorrect.');
   expect(attempts).toEqual([expect.objectContaining({method:'PASSWORD',credential:'  Crisp!River49Ocean  '})]);
+});
+
+
+test('staff can sign in on storefront and place a personal order without changing role',async({page})=>{
+  const state=await setup(page,false,'CASHIER');
+  await openCheckout(page);
+  await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9841234567');
+  await page.getByLabel('Account Password or PIN').fill('Staff-password99');
+  await page.getByRole('button',{name:'Sign In',exact:true}).click();
+  await expect(page.getByAltText('Merchant payment QR')).toBeVisible();
+  await receipt(page);
+  await page.getByRole('button',{name:/Submit Receipt & Place Order/}).click();
+  await expect.poll(()=>state.created).toBe(1);
+  await expect(page.getByText('WEB-REAL-7',{exact:false}).first()).toBeVisible();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('crunchy_auth_user')!).role)).toBe('CASHIER');
+  expect(state.writes.filter(w=>w.path==='customer/auth/login/').map(w=>w.body.method)).toEqual(['PASSWORD']);
+  await page.goto('/profile');
+  await expect(page.getByRole('heading',{name:'My Profile',exact:true})).toBeVisible();
+  await expect(page.getByText('Customer Sign In',{exact:true})).toHaveCount(0);
+  await expect.poll(()=>state.calls.includes('GET customer/addresses/')).toBe(true);
+});
+
+test('already signed-in staff can restore their cart and checkout without signing in again',async({page})=>{
+  const state=await setup(page,true,'RESTAURANT_OWNER');
+  await expect.poll(()=>state.calls.includes('GET customer/cart/')).toBe(true);
+  await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();
+  await expect.poll(()=>state.cart.items.length).toBe(1);
+  await page.reload();
+  await page.getByRole('button',{name:'Shopping Cart',exact:true}).click();
+  await page.locator('#cart-checkout-btn').click();
+  await expect(page.getByAltText('Merchant payment QR')).toBeVisible();
+  await expect(page.getByText('Customer Sign In',{exact:true})).toHaveCount(0);
+  expect(state.writes.filter(w=>w.path==='customer/auth/login/')).toHaveLength(0);
 });
