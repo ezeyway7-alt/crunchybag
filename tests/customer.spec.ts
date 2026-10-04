@@ -415,3 +415,27 @@ test('already signed-in staff can restore their cart and checkout without signin
   await expect(page.getByText('Customer Sign In',{exact:true})).toHaveCount(0);
   expect(state.writes.filter(w=>w.path==='customer/auth/login/')).toHaveLength(0);
 });
+
+
+test('customer order tracking updates over websocket and resyncs after reconnect without reload', async ({page}) => {
+  const state = await setup(page, true);
+  await openCheckout(page);
+  await receipt(page);
+  await page.getByRole('button', {name: /Submit Receipt & Place Order/}).click();
+  await expect.poll(() => state.created).toBe(1);
+  await expect(page).toHaveURL(/\/orders/);
+  await expect(page.getByRole('heading', {name: 'Order #WEB-REAL-7'})).toBeVisible();
+  let navigations = 0;
+  page.on('framenavigated', frame => {if (frame === page.mainFrame()) navigations++;});
+  state.orders[0].status = 'PREPARING';
+  state.orders[0].version++;
+  state.sockets.at(-1).send(JSON.stringify({type: 'orders_changed'}));
+  await expect(page.getByText('In kitchen', {exact: true}).first()).toBeVisible();
+  const connections = state.sockets.length;
+  state.sockets.at(-1).close({code: 4001, reason: 'Renew connection'});
+  state.orders[0].status = 'READY';
+  state.orders[0].version++;
+  await expect.poll(() => state.sockets.length).toBeGreaterThan(connections);
+  await expect(page.getByTestId('tracking-step-READY')).toHaveAttribute('aria-current', 'step');
+  expect(navigations).toBe(0);
+});

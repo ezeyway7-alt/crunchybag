@@ -40,15 +40,15 @@ export function useCustomerAccount() {
   },[enabled,scope,revision]);
   useEffect(() => {
     if (!enabled) return;
-    let stopped=false, socket:WebSocket, retry:any, debounce:any, attempts=0, connected=false, version:string|undefined, opened=0, heard=Date.now();
+    let stopped=false, socket:WebSocket, retry:any, debounce:any, attempts=0, version:string|undefined, opened=0, heard=Date.now();
     const controller = new AbortController();
     const refresh=()=>{clearTimeout(debounce);debounce=setTimeout(customerRefresh,200);};
     const reconnect=()=>{if(!stopped)retry=setTimeout(connect,Math.min(60000,2000*2**Math.min(attempts++,5)));};
     const connect=async()=>{try{
       const ticket=await apiClient.post<any>(customerPath('socket-ticket/'),{}, {signal:controller.signal}); if(stopped)return;
-      const url=new URL(DEFAULT_API_BASE,window.location.origin);url.protocol=url.protocol==='https:'?'wss:':'ws:';url.pathname=ticket.path;url.search=new URLSearchParams({ticket:ticket.ticket}).toString();
+      const url=new URL((import.meta as any).env.VITE_POS_WS_ORIGIN || DEFAULT_API_BASE,window.location.origin);url.protocol=['https:','wss:'].includes(url.protocol)?'wss:':'ws:';url.pathname=ticket.path;url.search=new URLSearchParams({ticket:ticket.ticket}).toString();
       socket=new WebSocket(url);
-      socket.onopen=()=>{opened=heard=Date.now();if(connected)refresh();connected=true;socket.send(JSON.stringify({type:'ping'}));};
+      socket.onopen=()=>{opened=heard=Date.now();refresh();socket.send(JSON.stringify({type:'ping'}));};
       socket.onmessage=e=>{try{const message=JSON.parse(e.data);heard=Date.now();if(heard-opened>30000)attempts=0;
         if(message.type==='orders_changed')refresh();
         if(message.type==='heartbeat'){if(version!==undefined&&version!==message.revision)refresh();version=message.revision;}
