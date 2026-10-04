@@ -61,11 +61,9 @@ import {
   INITIAL_EMPLOYEES,
   INITIAL_INVENTORY,
   INITIAL_PURCHASES,
-  INITIAL_DAYBOOK_EXPENSES,
   INITIAL_STOCK_AUDITS,
   INITIAL_STOCK_MOVEMENTS,
   INITIAL_PARTIES,
-  INITIAL_DAYBOOK_ENTRIES,
 } from "../mock/adminData";
 import { authStorage } from "../lib/authStorage";
 import { branchApi, normalizeOutletId, apiClient } from "../lib/api";
@@ -630,7 +628,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return INITIAL_PURCHASES;
   });
-  const [daybookExpenses, setDaybookExpenses] = useState<DaybookExpense[]>(INITIAL_DAYBOOK_EXPENSES);
+  const [daybookExpenses, setDaybookExpenses] = useState<DaybookExpense[]>([]);
   const [parties, setParties] = useState<Party[]>(INITIAL_PARTIES);
   const [customPartyTypes, setCustomPartyTypes] = useState<string[]>([
     "STAFF",
@@ -638,8 +636,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     "CUSTOMER",
     "OTHER",
   ]);
-  const [daybookAccountEntries, setDaybookAccountEntries] = useState<DaybookAccountEntry[]>(INITIAL_DAYBOOK_ENTRIES);
-  const [openingBalanceSetting, setOpeningBalanceSetting] = useState<number>(5000);
+  const [daybookAccountEntries, setDaybookAccountEntries] = useState<DaybookAccountEntry[]>([]);
+  const [openingBalanceSetting, setOpeningBalanceSetting] = useState<number>(0);
   const [loyaltyRecords, setLoyaltyRecords] = useState<CustomerLoyaltyRecord[]>([]);
   const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>({revisitOfferEnabled:false, revisitDiscountPercent:0, qualifyingDaysWindow:0, pointsPerHundredNpr:0, visitRules:[]});
   const [appliedLoyaltyDiscounts, setAppliedLoyaltyDiscounts] = useState<AppliedLoyaltyDiscount[]>([]);

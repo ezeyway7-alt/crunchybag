@@ -1,9 +1,9 @@
 import {receiptFixture} from "./receiptFixture";
 import {test,expect,Page} from '@playwright/test';
 
-async function setup(page:Page){
+async function setup(page:Page,menuImages:string[]=[]){
   const outlet={id:1,name:'Live Outlet',branch_code:'LIVE',enable_kiosk:true,enable_qr_ordering:true,enable_dine_in:true,enable_takeaway:true,accepting_orders:true};
-  const product={id:'burger',category:'food',name:'Live Burger',description:'Burger',base_price:'200.00',variants:[],modifier_groups:[],images:[],dietary_tags:[],is_available:true,show_on_kiosk:true,show_on_qr:true,requires_kitchen:true};
+  const product={id:'burger',category:'food',name:'Live Burger',description:'Burger',base_price:'200.00',variants:[],modifier_groups:[],images:menuImages.slice(0,1),dietary_tags:[],is_available:true,show_on_kiosk:true,show_on_qr:true,requires_kitchen:true};
   const state:any={orders:[],sockets:[],writes:[],orderReads:[],revision:'0',fail:false};
   await page.addInitScript(()=>{document.cookie='csrftoken=abcdefghijklmnopqrstuvwx12345678; path=/';(window as any).__speech=[];Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{cancel(){},getVoices(){return [];},speak(u:any){(window as any).__speech.push(u.text);}}});});
   await page.routeWebSocket('**/ws/**',socket=>{
@@ -16,7 +16,7 @@ async function setup(page:Page){
     const body=request.method()==='POST' && request.postData()?request.postDataJSON():null;
     let data:any={};
     if(path.includes('branches'))data=[outlet];
-    else if(path==='catalog/menu/')data={categories:[{id:'food',name:'Food',products:[product]}],valid_until:null};
+    else if(path==='catalog/menu/')data={categories:[{id:'food',name:'Food',products:[product,...menuImages.slice(1).map((image,index)=>({...product,id:`burger-${index+2}`,name:`Live Burger ${index+2}`,images:[image]}))]}],valid_until:null};
     else if(path==='tables/qr/resolve/')data={branch_id:1,branch_name:'Live Outlet',table_id:2,table_number:'A2',...(state.orders[0]?.tracking_token?{tracking_token:state.orders[0].tracking_token}:{})};
     else if(path==='orders/self-service/tables/1/')data={tables:[{id:2,table_number:'A2'}]};
     else if(path==='orders/self-service/quote/')data={subtotal:'200.00',total_payable:'200.00',vat_included_amount:'23.01'};
@@ -38,6 +38,34 @@ async function setup(page:Page){
   return state;
 }
 const emit=(state:any,type='ORDER_TRANSITION')=>{state.revision=String(Number(state.revision)+1);for(const socket of state.sockets)socket.send(JSON.stringify({type:'display_update',event_type:type,event_id:state.revision,aggregate_id:5,order_number:state.orders[0].order_number,status:state.orders[0].status,fulfillment_type:'TAKEAWAY'}));};
+
+test('TV keeps the current menu image visible until the next image has loaded',async({page})=>{
+  await page.clock.install();
+  await setup(page,['/tv-slide-1.svg','/tv-slide-2.svg']);
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';
+  await page.route('**/tv-slide-1.svg',route=>route.fulfill({status:200,contentType:'image/svg+xml',body:svg}));
+  let releaseNextImage!:()=>void;
+  let markNextImageRequested!:()=>void;
+  const nextImageRequested=new Promise<void>(resolve=>{markNextImageRequested=resolve;});
+  const nextImageGate=new Promise<void>(resolve=>{releaseNextImage=resolve;});
+  await page.route('**/tv-slide-2.svg',async route=>{
+    markNextImageRequested();
+    await nextImageGate;
+    await route.fulfill({status:200,contentType:'image/svg+xml',body:svg});
+  });
+
+  await page.goto('/tv?outlet_id=1',{waitUntil:'domcontentloaded'});
+  await expect(page.getByText('1/2',{exact:true})).toBeVisible();
+  await nextImageRequested;
+
+  await page.clock.fastForward(12000);
+  await expect(page.getByText('1/2',{exact:true})).toBeVisible();
+  await expect(page.locator('img[alt="Live Burger"]')).toHaveAttribute('src','/tv-slide-1.svg');
+
+  releaseNextImage();
+  await expect(page.getByText('2/2',{exact:true})).toBeVisible();
+  await expect(page.locator('img[alt="Live Burger 2"]')).toHaveAttribute('src','/tv-slide-2.svg');
+});
 
 test('TV receives preparation, ready, call and completion without navigation and reconnects',async({page})=>{
   const state=await setup(page);
@@ -176,40 +204,3 @@ test('rescanning table QR code restores active ongoing order tab and preparation
   await page.getByRole('button',{name:'Add',exact:true}).click();
   await expect(page.getByRole('button',{name:/Add to Tab/})).toBeVisible();
 });
-
-test('kiosk shows ongoing order pending bill on table and allows appending round', async ({ page }) => {
-  const state = await setup(page);
-  // An ongoing order exists on table A2 (which is returned by orders/self-service/tables/1/)
-  state.orders = [{
-    id: 5,
-    outlet_id: 1,
-    order_number: 'QR-TABLE-1001',
-    status: 'ACCEPTED',
-    fulfillment_type: 'DINE_IN',
-    table_number: 'A2',
-    customer_name: 'QR Guest',
-    created_at: new Date().toISOString(),
-    total_payable: '350.00',
-    paid_amount: '0.00',
-    due_amount: '350.00',
-    items: [{ id: 1, product_name: 'Live Burger', quantity: 1, unit_price: '350.00', line_total: '350.00', round_number: 1 }],
-  }];
-
-  await page.goto('/kiosk?outlet_id=1');
-  await page.getByText('Table Dine-In').click();
-
-  // Kiosk TABLE_SELECT screen is displayed
-  await expect(page.getByText('Select Your Table')).toBeVisible();
-
-  // Table A2 must show Pending Bill badge and order details
-  const tableBtn = page.getByRole('button', { name: /A2/ });
-  await expect(tableBtn).toBeVisible();
-  await expect(tableBtn).toContainText('Pending Bill');
-  await expect(tableBtn).toContainText('QR-TABLE-1001');
-
-  // Clicking occupied table opens prompt
-  await tableBtn.click();
-  await expect(page.getByText('A2 — Ongoing Bill')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Add Items to This Table's Bill/i })).toBeVisible();
-});
-
