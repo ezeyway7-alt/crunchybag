@@ -62,7 +62,7 @@ import {
 import { usePosMenu, usePosQuote, usePosOrderFeed, usePosReceipt } from "../../lib/posWorkspace";
 import { posStatistics } from "../../lib/posLegacy";
 import { PosTableManager } from "./PosTableManager";
-import { formatNPR, formatTimer } from "../../lib/utils";
+import { formatNPR, formatTimer, isSameTable } from "../../lib/utils";
 import { Badge } from "../common/Badge";
 import { Drawer } from "../common/Drawer";
 import { Modal } from "../common/Modal";
@@ -197,7 +197,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const loyaltyOffer: any = null;
   const lines: PosLine[] = selectedItems.map(item => ({ product_id: String(item.product.id), variant_id: item.variant.id || null, quantity: item.quantity, modifier_option_ids: item.modifiers, ...(item.comboSelections ? { combo_selections: item.comboSelections } : {}) }));
   const quote = usePosQuote(posSession, 'quote/', selectedItems.length && (posMode !== 'ADD_TO_ONGOING' || targetOngoingOrder) ? {
-    items: lines,
+    items: lines, customer_phone: customerPhone,
     ...(posMode === 'ADD_TO_ONGOING' ? { order_id: backendOrder(targetOngoingOrder)?.id } : { discount_amount: String(orderDiscountAmount), payment_method: isSplitMode ? 'SPLIT' : toPosMethod(paymentMethod) }),
   } : null);
   const orderSubtotal = quote.quote?.items?.reduce((sum, line) => sum + Number(line.line_total), 0) ?? selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -263,8 +263,9 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     if (isSplitMode && Math.abs(posSplits.reduce((sum,s) => sum+s.amount,0)-orderTotal) > 0.01) {
       addToast({ title: 'Split tenders unbalanced', description: 'Allocated amounts must equal the quoted total.', type: 'warning' }); return;
     }
-    const table = posSession.meta?.tables.find(t => t.table_number === tableNumber);
-    if (fulfillmentType === 'DINE_IN' && (!table || table.active_order_id)) { addToast({ title: 'Select an available table', type: 'warning' }); return; }
+    const table = posSession.meta?.tables.find(t => isSameTable(t.table_number, tableNumber));
+    const tableHasActiveOrder = Boolean(table?.active_order_id) || Boolean(orders.find(o => isSameTable(o.tableNumber, tableNumber) && !['COMPLETED', 'CANCELLED'].includes(o.status) && !((o.isBilled && o.paymentStatus === 'PAID') || (o as any)._posOrder?.settlement === 'PAID')));
+    if (fulfillmentType === 'DINE_IN' && (!table || tableHasActiveOrder)) { addToast({ title: 'Select an available table', type: 'warning' }); return; }
     const tenders = isSplitMode ? posSplits.filter(s => s.amount > 0).map(s => ({ method: toPosMethod(s.method), amount: String(s.amount), reference: '' }))
       : (paymentStatus === 'PAID' || paymentMethod === 'CREDIT') && orderTotal > 0 ? [{ method: toPosMethod(paymentMethod), amount: String(orderTotal), reference: '' }] : [];
     const result = await posCommand.run('', { items: lines, expected_total: quote.quote!.total_payable, fulfillment_type: fulfillmentType,
@@ -917,7 +918,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                           className="w-full h-8 px-2 text-xs bg-zinc-900 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-amber-500 font-mono font-bold"
                         >
                           <option value="">Select a table</option>
-                          {posSession.meta?.tables.filter(t => !t.active_order_id).map(t => <option key={t.id} value={t.table_number}>{t.section} / {t.table_number}</option>)}
+                          {posSession.meta?.tables.filter(t => !t.active_order_id && !orders.some(o => isSameTable(o.tableNumber, t.table_number) && !['COMPLETED', 'CANCELLED'].includes(o.status) && !((o.isBilled && o.paymentStatus === 'PAID') || (o as any)._posOrder?.settlement === 'PAID'))).map(t => <option key={t.id} value={t.table_number}>{t.section} / {t.table_number}</option>)}
                         </select>
                       </div>
                     )}
@@ -974,8 +975,9 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                     ) : (
                       <div className="text-[10px] text-zinc-400 pt-0.5 border-t border-zinc-800 flex items-center justify-between">
                         <span>Current bill {formatNPR(orderSubtotal)} has no matching rule for Visit #{loyaltyInfo.visitCount + 1}.</span>
-                        {orderDiscountAmount > 0 && (
-                          <span className="text-emerald-400 font-bold font-mono">Manual Disc: -{formatNPR(orderDiscountAmount)}</span>
+                        {quote.quote?.loyalty && <p role="status" className="text-xs text-emerald-600">Loyalty {quote.quote.loyalty.name}: {quote.quote.loyalty.percent}% applied automatically</p>}
+                {Number(quote.quote?.discount_amount || 0) > 0 && (
+                          <span className="text-emerald-400 font-bold font-mono">Manual Disc: -{formatNPR(Number(quote.quote?.discount_amount || 0))}</span>
                         )}
                       </div>
                     )}
@@ -1277,10 +1279,11 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                   </span>
                 </div>
 
-                {orderDiscountAmount > 0 && (
+                {quote.quote?.loyalty && <p role="status" className="text-xs text-emerald-600">Loyalty {quote.quote.loyalty.name}: {quote.quote.loyalty.percent}% applied automatically</p>}
+                {Number(quote.quote?.discount_amount || 0) > 0 && (
                   <div className="flex items-center justify-between text-xs text-amber-600 dark:text-amber-400">
                     <span>Discount Deducted:</span>
-                    <span className="font-mono font-bold">-{formatNPR(orderDiscountAmount)}</span>
+                    <span className="font-mono font-bold">-{formatNPR(Number(quote.quote?.discount_amount || 0))}</span>
                   </div>
                 )}
 

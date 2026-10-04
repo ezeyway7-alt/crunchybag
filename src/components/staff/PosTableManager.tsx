@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { apiClient } from "../../lib/api";
 import { PosSession, usePosCommand, posPath } from "../../lib/posApi";
 import { useApp } from "../../context/AppContext";
+import { isSameTable } from "../../lib/utils";
 import {
   X,
   Plus,
@@ -38,7 +39,7 @@ interface TableItem {
 }
 
 export function PosTableManager({ session, onClose }: PosTableManagerProps) {
-  const { addToast } = useApp();
+  const { addToast, orders } = useApp();
   const command = usePosCommand(session);
 
   const groups = session.meta?.table_groups || [];
@@ -748,7 +749,7 @@ export function PosTableManager({ session, onClose }: PosTableManagerProps) {
           ) : (
             filteredTables.map((table) => {
               const isEditing = editingTableId === table.id;
-              const isOccupied = Boolean(table.active_order_id);
+              const isOccupied = Boolean(table.active_order_id) || Boolean(orders.find(o => isSameTable(o.tableNumber, table.table_number) && !['COMPLETED', 'CANCELLED'].includes(o.status) && !((o.isBilled && o.paymentStatus === 'PAID') || (o as any)._posOrder?.settlement === 'PAID')));
 
               return (
                 <div

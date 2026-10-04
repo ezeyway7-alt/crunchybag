@@ -5,6 +5,8 @@ import { Category, Product } from "../types";
 import { PosOrder, PosSession, posError, posPath } from "./posApi";
 
 export interface PosQuote {
+  manual_discount_amount?: string;
+  loyalty?: {name:string;percent:string;amount:string}|null;
   subtotal: string;
   discount_amount: string;
   service_charge_amount: string;

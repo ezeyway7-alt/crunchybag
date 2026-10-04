@@ -4,7 +4,8 @@ import {useOrderReceipt} from "../../lib/orderReceipt";
 import {printReceiptDocument} from "../../lib/receiptPrinting";
 import {apiClient} from "../../lib/api";
 import {submitSelfService, useSelfServiceOrder, useSelfServiceQuote} from "../../lib/selfService";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import {useOutletEvents} from "../../lib/useOutletEvents";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Sparkles,
   Flame,
@@ -49,7 +50,7 @@ import {
 import { useApp } from "../../context/AppContext";
 import { Product, ProductVariant, SelectedModifier, FulfillmentType, PaymentMethod, Category, Order } from "../../types";
 import { CrunchyLogo } from "../common/CrunchyLogo";
-import { formatNPR } from "../../lib/utils";
+import { formatNPR, isSameTable } from "../../lib/utils";
 import { ComboPackageModal, ComboPackageDefinition } from "../customer/ComboPackageModal";
 import { SkeletonProductGrid } from "../common/Skeleton";
 import { comboDefinitions } from "../../lib/catalogApi";
@@ -178,88 +179,211 @@ export const KioskPortal: React.FC = () => {
   ];
   const displayTables = tables.length > 0 ? tables : DEFAULT_TABLES;
 
+  const [displayOrders, setDisplayOrders] = useState<Order[]>([]);
+
+  // Function to refresh both tables and active display orders
+  const refreshKioskTablesAndOrders = useCallback(async () => {
+    if (!currentOutlet?.id) return;
+    try {
+      // 1. Fetch tables
+      const tableData = await apiClient
+        .get<any>(`/orders/self-service/tables/${currentOutlet.id}/`, { skipAuth: true })
+        .catch(() => null);
+
+      if (tableData?.tables && Array.isArray(tableData.tables) && tableData.tables.length > 0) {
+        setTables(tableData.tables);
+      }
+
+      // 2. Fetch live active tickets from public display endpoint
+      const displayData = await apiClient
+        .get<any>(`/orders/display/${currentOutlet.id}/`, { skipAuth: true })
+        .catch(() => null);
+
+      if (displayData?.tickets && Array.isArray(displayData.tickets)) {
+        const mapped: Order[] = displayData.tickets.map((t: any) => {
+          const rounds = t.rounds || [{ number: 1, status: t.status, created_at: t.created_at }];
+          return {
+            id: String(t.id),
+            orderNumber: String(t.order_number || t.id),
+            kioskToken: t.tracking_token || String(t.order_number || ""),
+            status: (t.status === "ACCEPTED" ? "CONFIRMED" : t.status === "PREPARING" ? "PROCESSING" : t.status) as any,
+            fulfillmentType: (t.fulfillment_type || "DINE_IN") as any,
+            tableNumber: t.table_number,
+            createdAt: t.created_at || new Date().toISOString(),
+            customerName: t.customer_name || "Guest",
+            customerPhone: t.customer_phone || "",
+            outletId: String(currentOutlet.id),
+            totalAmount: Number(t.total_payable || t.total_amount || t.subtotal || 0),
+            subtotal: Number(t.subtotal || t.total_payable || 0),
+            items: t.items || [],
+            roundsCount: rounds.length,
+            isBilled: Boolean(t.is_billed),
+            paymentStatus: (t.paid_amount >= t.total_payable && Number(t.total_payable) > 0 ? "PAID" : "PENDING") as any,
+            _posOrder: t,
+          };
+        });
+        setDisplayOrders(mapped);
+      }
+    } catch {
+      // Ignore background sync errors
+    }
+  }, [currentOutlet.id]);
+
+  // Initial mount & outlet change sync
+  useEffect(() => {
+    void refreshKioskTablesAndOrders();
+  }, [refreshKioskTablesAndOrders]);
+
+  // Real-time WebSocket outlet events for kiosk
+  useOutletEvents(String(currentOutlet.id), true, () => {
+    void refreshKioskTablesAndOrders();
+  });
+
+  // Fast-polling interval while customer is actively on TABLE_SELECT screen
+  useEffect(() => {
+    if (step === "TABLE_SELECT") {
+      void refreshKioskTablesAndOrders();
+      const interval = setInterval(() => {
+        void refreshKioskTablesAndOrders();
+      }, 3500);
+      return () => clearInterval(interval);
+    }
+  }, [step, refreshKioskTablesAndOrders]);
+
+  // Window cross-tab / storage sync event listener
+  useEffect(() => {
+    const handleSync = () => {
+      void refreshKioskTablesAndOrders();
+    };
+    window.addEventListener("self-service:refresh", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("self-service:refresh", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, [refreshKioskTablesAndOrders]);
+
+  // Unified list of all active orders (combining context orders and kiosk display orders)
+  const allActiveOrders = useMemo(() => {
+    const list = [...orders];
+    for (const d of displayOrders) {
+      const exists = list.some(
+        (o) =>
+          o.id === d.id ||
+          o.orderNumber === d.orderNumber ||
+          ((o as any)._posOrder?.id && (d as any)._posOrder?.id && (o as any)._posOrder?.id === (d as any)._posOrder?.id)
+      );
+      if (!exists) {
+        list.push(d);
+      }
+    }
+    return list;
+  }, [orders, displayOrders]);
+
   // Helper: Detect if a table currently has an active ongoing pending bill
   const getOngoingOrderForTable = useCallback(
     (tableStr: string): Order | null => {
       if (!tableStr) return null;
-      const digits = tableStr.replace(/\D/g, "");
-      const clean = tableStr.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 
-      // 1. Check if table has active_order_id from backend tables endpoint
-      const tableObj = displayTables.find(
-        (t) =>
-          t.table_number.toLowerCase() === tableStr.toLowerCase() ||
-          t.table_number.replace(/\D/g, "") === digits
-      );
-      if (tableObj && (tableObj as any).active_order_id) {
-        const activeId = (tableObj as any).active_order_id;
-        const backendMatch = orders.find(
-          (o) =>
-            (o as any)._posOrder?.id === activeId ||
-            o.id === String(activeId) ||
-            o.orderNumber === String(activeId)
-        );
-        if (backendMatch && backendMatch.status !== "COMPLETED" && backendMatch.status !== "CANCELLED") {
-          const isSettled =
-            (backendMatch.isBilled && backendMatch.paymentStatus === "PAID") ||
-            (backendMatch as any)._posOrder?.settlement === "PAID";
-          if (!isSettled) return backendMatch;
+      // 1. Check in all available active orders (merged from orders and displayOrders)
+      const activeOrder = allActiveOrders.find((o) => {
+        if (o.status === "COMPLETED" || o.status === "CANCELLED") return false;
+        // Settled / paid orders do not count as pending bills
+        const isSettled =
+          (o.isBilled && o.paymentStatus === "PAID") ||
+          (o as any)._posOrder?.settlement === "PAID" ||
+          (Number((o as any)._posOrder?.due_amount || 0) <= 0 && (o as any)._posOrder?.settlement === "PAID");
+        if (isSettled) return false;
+
+        if (!o.tableNumber) return false;
+        return isSameTable(o.tableNumber, tableStr);
+      });
+
+      if (activeOrder) return activeOrder;
+
+      // 2. Check if table has active_order_id, active_order, or is_occupied from backend tables endpoint
+      const tableObj = displayTables.find((t) => isSameTable(t.table_number, tableStr));
+      if (tableObj) {
+        const activeObj = (tableObj as any).active_order;
+        const activeId = (tableObj as any).active_order_id || activeObj?.id || activeObj?.order_number;
+        const isOccupied = (tableObj as any).is_occupied || Boolean(activeId) || Boolean(activeObj);
+
+        if (isOccupied) {
+          // Try finding matching order by ID in allActiveOrders
+          if (activeId) {
+            const matchById = allActiveOrders.find(
+              (o) =>
+                (o as any)._posOrder?.id === activeId ||
+                o.id === String(activeId) ||
+                o.orderNumber === String(activeId)
+            );
+            if (matchById) {
+              const isSettled =
+                (matchById.isBilled && matchById.paymentStatus === "PAID") ||
+                (matchById as any)._posOrder?.settlement === "PAID";
+              if (!isSettled) return matchById;
+            }
+          }
+
+          // If backend provided an active_order object:
+          if (activeObj) {
+            const isSettled =
+              (activeObj.is_billed && activeObj.payment_status === "PAID") ||
+              activeObj.settlement === "PAID" ||
+              activeObj.status === "COMPLETED" ||
+              activeObj.status === "CANCELLED";
+            if (!isSettled) {
+              return {
+                id: String(activeObj.id || activeId || `tbl-${tableObj.id}`),
+                orderNumber: String(activeObj.order_number || activeId || `TBL-${tableObj.id}`),
+                kioskToken: activeObj.tracking_token || String(activeObj.order_number || ""),
+                status: (activeObj.status || "CONFIRMED") as any,
+                fulfillmentType: "DINE_IN",
+                tableNumber: tableObj.table_number,
+                createdAt: activeObj.created_at || new Date().toISOString(),
+                customerName: activeObj.customer_name || "Guest",
+                customerPhone: activeObj.customer_phone || "",
+                outletId: String(currentOutlet.id),
+                totalAmount: Number(activeObj.total_payable || activeObj.total_amount || 0),
+                subtotal: Number(activeObj.subtotal || activeObj.total_payable || 0),
+                items: activeObj.items || [],
+                roundsCount: activeObj.rounds?.length || 1,
+              } as Order;
+            }
+          }
+
+          // If only active_order_id or is_occupied is known:
+          return {
+            id: String(activeId || `table-${tableObj.id}`),
+            orderNumber: String(activeId || `${tableObj.table_number}`),
+            kioskToken: String(activeId || ""),
+            status: "CONFIRMED" as any,
+            fulfillmentType: "DINE_IN",
+            tableNumber: tableObj.table_number,
+            createdAt: new Date().toISOString(),
+            customerName: "Guest",
+            customerPhone: "",
+            outletId: String(currentOutlet.id),
+            totalAmount: 0,
+            subtotal: 0,
+            items: [],
+            roundsCount: 1,
+          } as Order;
         }
       }
 
-      // 2. Check active orders in state
-      return (
-        orders.find((o) => {
-          if (o.status === "COMPLETED" || o.status === "CANCELLED") return false;
-          // Settled / paid orders do not count as pending bills
-          const isSettled =
-            (o.isBilled && o.paymentStatus === "PAID") ||
-            (o as any)._posOrder?.settlement === "PAID" ||
-            (Number((o as any)._posOrder?.due_amount || 0) <= 0 && (o as any)._posOrder?.settlement === "PAID");
-          if (isSettled) return false;
-
-          if (!o.tableNumber) return false;
-          const oDigits = o.tableNumber.replace(/\D/g, "");
-          if (digits && oDigits && digits === oDigits) return true;
-
-          const oClean = o.tableNumber.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-          if (oClean === clean) return true;
-
-          return false;
-        }) || null
-      );
+      return null;
     },
-    [displayTables, orders]
+    [allActiveOrders, displayTables, currentOutlet.id]
   );
-
-  useEffect(() => {
-    let alive = true;
-    apiClient
-      .get<any>(`/orders/self-service/tables/${currentOutlet.id}/`, { skipAuth: true })
-      .then((data) => {
-        if (alive && data?.tables && Array.isArray(data.tables) && data.tables.length > 0) {
-          setTables(data.tables);
-        }
-      })
-      .catch(() => {
-        if (alive) setOrderError("Unable to load tables.");
-      });
-    return () => {
-      alive = false;
-    };
-  }, [currentOutlet.id]);
 
   const checkoutBody = {
     branch_id: Number(currentOutlet.id),
     order_source: "KIOSK",
     fulfillment_type: fulfillment,
     table_id:
-      fulfillment === "DINE_IN"
-        ? (displayTables.find(
-            (t) =>
-              t.table_number.toLowerCase() === tableNumber.toLowerCase() ||
-              t.table_number.replace(/\D/g, "") === tableNumber.replace(/\D/g, "")
-          )?.id ?? (displayTables[0]?.id || 1))
+      fulfillment === "DINE_IN" && tableNumber
+        ? (displayTables.find((t) => isSameTable(t.table_number, tableNumber))?.id ?? (displayTables[0]?.id || 1))
         : null,
     customer_name: guestName.trim(),
     customer_phone: guestPhone.trim(),
@@ -1106,10 +1230,7 @@ export const KioskPortal: React.FC = () => {
             {displayTables.map((t) => {
               const ongoingOrder = getOngoingOrderForTable(t.table_number);
               const isOccupiedWithBill = !!ongoingOrder;
-              const isSelected =
-                tableNumber === t.table_number ||
-                tableNumber === t.table_number.replace(/\D/g, "") ||
-                (tableNumber && t.table_number.toLowerCase() === tableNumber.toLowerCase());
+              const isSelected = isSameTable(tableNumber, t.table_number);
 
               if (isOccupiedWithBill) {
                 return (
@@ -2038,7 +2159,7 @@ export const KioskPortal: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm font-black text-white pt-1.5 border-t border-zinc-800/80">
                 <span>Total</span>
-                <span className="font-mono text-amber-400">{formatNPR(totalPayable)}</span>
+                <span className="font-mono text-amber-400">{formatNPR(totalPayable)}{serverQuote.quote?.loyalty && <small className="block text-emerald-400">Loyalty {serverQuote.quote.loyalty.percent}% applied</small>}</span>
               </div>
             </div>
 

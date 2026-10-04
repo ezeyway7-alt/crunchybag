@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { Order } from "../../types";
-import { formatNPR } from "../../lib/utils";
+import { formatNPR, isSameTable } from "../../lib/utils";
 
 interface Props {
   posMeta?: any;
@@ -38,10 +38,21 @@ export const StaffTableGrid: React.FC<Props> = ({
   const allTables: string[] = (posMeta?.tables || []).map((t: any) => t.table_number);
   const tableOrderMap: Record<string, Order> = {};
   (posMeta?.tables || []).forEach((table: any) => {
-    const order = orders.find((o) => (o as any)._posOrder?.id === table.active_order_id);
+    const order = orders.find((o) => {
+      if (o.status === "COMPLETED" || o.status === "CANCELLED") return false;
+      const isSettled =
+        (o.isBilled && o.paymentStatus === "PAID") ||
+        (o as any)._posOrder?.settlement === "PAID";
+      if (isSettled) return false;
+
+      if (table.active_order_id && ((o as any)._posOrder?.id === table.active_order_id || o.id === String(table.active_order_id) || o.orderNumber === String(table.active_order_id))) {
+        return true;
+      }
+      return isSameTable(o.tableNumber, table.table_number);
+    });
     if (order) tableOrderMap[table.table_number] = order;
   });
-  const occupiedCount = (posMeta?.tables || []).filter((t: any) => t.active_order_id).length;
+  const occupiedCount = (posMeta?.tables || []).filter((t: any) => Boolean(t.active_order_id || tableOrderMap[t.table_number])).length;
   const vacantCount = allTables.length - occupiedCount;
   const totalOnTables = Object.values(tableOrderMap).reduce((sum, o) => sum + o.totalAmount, 0);
 
@@ -94,7 +105,7 @@ export const StaffTableGrid: React.FC<Props> = ({
         {allTables.map((tableId) => {
           const activeOrder = tableOrderMap[tableId];
           const table = posMeta?.tables.find((t: any) => t.table_number === tableId);
-          const isOccupied = !!table?.active_order_id;
+          const isOccupied = Boolean(table?.active_order_id || activeOrder);
           const isBillRequested = isOccupied && activeOrder?.notes?.toLowerCase().includes("bill");
 
           if (!isOccupied) {

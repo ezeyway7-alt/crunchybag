@@ -62,6 +62,8 @@ export interface PosItem {
   }[];
 }
 export interface PosOrder {
+  manual_discount_amount?: string;
+  loyalty?: {name:string;percent:string;amount:string}|null;
   rounds?:PreparationRound[];
   can_append?:boolean;
   partial_ready?:boolean;

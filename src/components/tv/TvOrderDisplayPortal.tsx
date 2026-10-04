@@ -117,17 +117,67 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   const showcaseProducts = useMemo(() => {
     return products.filter((p) => p.isAvailable && p.images && p.images.length > 0);
   }, [products]);
+  const slideImageLoads = useRef(new Map<string, Promise<boolean>>());
+  const slideRequestId = useRef(0);
 
-  // Sliding menu ad carousel timer (auto-slides every 5.5 seconds)
+  const preloadSlide = (index: number) => {
+    const product = showcaseProducts[index];
+    const src = product?.images[0];
+    if (!src) return Promise.resolve(false);
+
+    const cached = slideImageLoads.current.get(src);
+    if (cached) return cached;
+
+    let load: Promise<boolean>;
+    load = new Promise((resolve) => {
+      const image = new Image();
+      image.decoding = "async";
+      const finishLoading = () => {
+        void image.decode().then(
+          () => resolve(true),
+          () => resolve(image.naturalWidth > 0),
+        );
+      };
+      image.onload = finishLoading;
+      image.onerror = () => resolve(false);
+      image.src = src;
+      if (image.complete && image.naturalWidth > 0) finishLoading();
+    });
+    slideImageLoads.current.set(src, load);
+    void load.then((loaded) => {
+      if (!loaded && slideImageLoads.current.get(src) === load) {
+        slideImageLoads.current.delete(src);
+      }
+    });
+    return load;
+  };
+
+  const requestSlide = (index: number) => {
+    if (!showcaseProducts.length) return;
+    const targetIndex = ((index % showcaseProducts.length) + showcaseProducts.length) % showcaseProducts.length;
+    const requestId = ++slideRequestId.current;
+    void preloadSlide(targetIndex).then((loaded) => {
+      if (loaded && requestId === slideRequestId.current) {
+        setActiveSlideIndex(targetIndex);
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (showcaseProducts.length <= 1) return;
+    void preloadSlide((activeSlideIndex + 1) % showcaseProducts.length);
+  }, [activeSlideIndex, showcaseProducts.length]);
+
+  // Keep each menu image on screen longer and only switch after the next image is decoded.
   useEffect(() => {
     if (showcaseProducts.length <= 1) return;
 
     const interval = setInterval(() => {
-      setActiveSlideIndex((prev) => (prev + 1) % showcaseProducts.length);
-    }, 5500);
+      requestSlide((activeSlideIndex + 1) % showcaseProducts.length);
+    }, 12000);
 
     return () => clearInterval(interval);
-  }, [showcaseProducts.length]);
+  }, [activeSlideIndex, showcaseProducts.length]);
 
   // Web Audio API Airport Chime Synthesizer (Authentic 3-tone Airport chime: F4 -> A4 -> C5)
   const playAirportChime = () => {
@@ -771,20 +821,14 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                     {activeSlideIndex + 1}/{showcaseProducts.length || 1}
                   </span>
                   <button
-                    onClick={() =>
-                      setActiveSlideIndex(
-                        (prev) => (prev - 1 + showcaseProducts.length) % showcaseProducts.length
-                      )
-                    }
+                    onClick={() => requestSlide(activeSlideIndex - 1)}
                     className="p-1 bg-black/70 hover:bg-black text-zinc-300 hover:text-white border border-white/10 backdrop-blur-sm transition-colors cursor-pointer"
                     title="Previous slide"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() =>
-                      setActiveSlideIndex((prev) => (prev + 1) % showcaseProducts.length)
-                    }
+                    onClick={() => requestSlide(activeSlideIndex + 1)}
                     className="p-1 bg-black/70 hover:bg-black text-zinc-300 hover:text-white border border-white/10 backdrop-blur-sm transition-colors cursor-pointer"
                     title="Next slide"
                   >

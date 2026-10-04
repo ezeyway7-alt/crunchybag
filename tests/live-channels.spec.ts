@@ -176,3 +176,40 @@ test('rescanning table QR code restores active ongoing order tab and preparation
   await page.getByRole('button',{name:'Add',exact:true}).click();
   await expect(page.getByRole('button',{name:/Add to Tab/})).toBeVisible();
 });
+
+test('kiosk shows ongoing order pending bill on table and allows appending round', async ({ page }) => {
+  const state = await setup(page);
+  // An ongoing order exists on table A2 (which is returned by orders/self-service/tables/1/)
+  state.orders = [{
+    id: 5,
+    outlet_id: 1,
+    order_number: 'QR-TABLE-1001',
+    status: 'ACCEPTED',
+    fulfillment_type: 'DINE_IN',
+    table_number: 'A2',
+    customer_name: 'QR Guest',
+    created_at: new Date().toISOString(),
+    total_payable: '350.00',
+    paid_amount: '0.00',
+    due_amount: '350.00',
+    items: [{ id: 1, product_name: 'Live Burger', quantity: 1, unit_price: '350.00', line_total: '350.00', round_number: 1 }],
+  }];
+
+  await page.goto('/kiosk?outlet_id=1');
+  await page.getByText('Table Dine-In').click();
+
+  // Kiosk TABLE_SELECT screen is displayed
+  await expect(page.getByText('Select Your Table')).toBeVisible();
+
+  // Table A2 must show Pending Bill badge and order details
+  const tableBtn = page.getByRole('button', { name: /A2/ });
+  await expect(tableBtn).toBeVisible();
+  await expect(tableBtn).toContainText('Pending Bill');
+  await expect(tableBtn).toContainText('QR-TABLE-1001');
+
+  // Clicking occupied table opens prompt
+  await tableBtn.click();
+  await expect(page.getByText('A2 — Ongoing Bill')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Add Items to This Table's Bill/i })).toBeVisible();
+});
+

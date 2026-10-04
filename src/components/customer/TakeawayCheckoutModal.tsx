@@ -483,6 +483,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   (VAT incl.)
                 </span>
               </div>
+              {quote?.loyalty && <p role="status" className="text-xs text-emerald-600">Loyalty {quote.loyalty.percent}%: -{formatNPR(Number(quote.discount_amount))}</p>}
               <div className="flex items-baseline gap-1.5">
                 <span className="text-[10px] uppercase font-bold text-zinc-400">Payable:</span>
                 <span className="font-mono text-amber-600 dark:text-amber-400 text-sm sm:text-base font-black">

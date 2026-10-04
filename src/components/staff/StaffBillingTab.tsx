@@ -118,7 +118,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   // Only a real order/version change resets settlement fields; context rerenders do not.
   useEffect(() => {
     const order = backendOrder(activeOrder); if (!order) return;
-    setDiscountAmount(Number(order.discount_amount)); setDiscountReason(order.discount_reason || '');
+    setDiscountAmount(Number(order.manual_discount_amount ?? order.discount_amount)); setDiscountReason(order.discount_reason || '');
     setCustomerName(order.customer_name); setCustomerPhone(order.customer_phone);
     setSplits([{ method: fromPosMethod(posSession.meta?.payment_methods.find(m => m !== 'CREDIT') || 'CASH'), amount: Number(order.due_amount) }]);
     setCashTendered('');
@@ -142,8 +142,12 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   const billSubtotal = activeOrder?.subtotal || 0;
   const effectiveDiscount = Number(discountAmount) || 0;
   const backend = backendOrder(activeOrder);
-  const quote = usePosQuote(posSession, `${backend?.id}/billing-quote/`, backend && backend.status !== 'CANCELLED' && posSession.meta?.permissions.billing ? { version: backend.version, discount_amount: String(effectiveDiscount) } : null);
+  const quote = usePosQuote(posSession, `${backend?.id}/billing-quote/`, backend && backend.status !== 'CANCELLED' && posSession.meta?.permissions.billing ? { version: backend.version, discount_amount: String(effectiveDiscount), customer_phone: customerPhone } : null);
   const netPayable = Number(quote.quote?.due_amount ?? backend?.due_amount ?? 0);
+  useEffect(() => {
+    if (!quote.quote) return;
+    setSplits(previous => previous.length === 1 ? [{...previous[0], amount: netPayable}] : previous);
+  }, [quote.quote?.due_amount]);
   const receiptState=useOrderReceipt(invoiceOrder,'', 'BILL');
   const receipt=receiptState.receipt;
   const receiptPreview = receipt?.snapshot ? posOrderToOrder(receipt.snapshot, currentOutlet.name) : invoiceOrder;
@@ -152,7 +156,9 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   const previewInvoice = async (order: Order) => {
     const source = backendOrder(order); if (!source) return;
     if (source.receipts.some(r => r.kind === 'BILL')) { setInvoiceOrder(order); return; }
-    const result = await posCommand.run(`${source.id}/bill/`, { version: source.version });
+    const current = source.id === backend?.id;
+    if (current && !quote.quote) return;
+    const result = await posCommand.run(`${source.id}/bill/`, { version: source.version, ...(current ? {customer_name:customerName, customer_phone:customerPhone, discount_amount:String(effectiveDiscount), discount_reason:discountReason} : {}) });
     if (result) setInvoiceOrder(posOrderToOrder(result,currentOutlet.name));
   };
   const totalSplitsAllocated = Number(
@@ -652,11 +658,12 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
                     {formatNPR(billSubtotal)}
                   </span>
                 </div>
-                {effectiveDiscount > 0 && (
+                {quote.quote?.loyalty && <p role="status" className="text-xs text-emerald-500">Loyalty {quote.quote.loyalty.name}: {quote.quote.loyalty.percent}% applied automatically</p>}
+                {Number(quote.quote?.discount_amount || 0) > 0 && (
                   <div className="flex justify-between text-rose-400">
                     <span>Discount:</span>
                     <span className="font-mono font-bold">
-                      -{formatNPR(effectiveDiscount)}
+                      -{formatNPR(Number(quote.quote?.discount_amount || 0))}
                     </span>
                   </div>
                 )}

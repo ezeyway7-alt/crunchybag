@@ -122,3 +122,32 @@ export function getElapsedString(seconds: number): string {
   return `${hours}h ago`;
 }
 
+/**
+ * Compares two table identifiers flexibly across different naming formats:
+ * e.g. "Table 1" vs "Table 01" vs "T-01" vs "T-1" vs "1"
+ */
+export function isSameTable(tableA?: string | null, tableB?: string | null): boolean {
+  if (!tableA || !tableB) return false;
+  const rawA = String(tableA).trim();
+  const rawB = String(tableB).trim();
+  if (!rawA || !rawB) return false;
+  if (rawA.toLowerCase() === rawB.toLowerCase()) return true;
+
+  const cleanA = rawA.replace(/[\s\-_]/g, "").toLowerCase();
+  const cleanB = rawB.replace(/[\s\-_]/g, "").toLowerCase();
+  if (cleanA === cleanB) return true;
+
+  const digitsA = rawA.replace(/\D/g, "");
+  const digitsB = rawB.replace(/\D/g, "");
+  if (digitsA && digitsB && parseInt(digitsA, 10) === parseInt(digitsB, 10)) {
+    const prefixA = rawA.replace(/[\d\s\-_]/g, "").toLowerCase();
+    const prefixB = rawB.replace(/[\d\s\-_]/g, "").toLowerCase();
+    const tablePrefixes = ["t", "table", "tbl", ""];
+    if (prefixA === prefixB || (tablePrefixes.includes(prefixA) && tablePrefixes.includes(prefixB))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+

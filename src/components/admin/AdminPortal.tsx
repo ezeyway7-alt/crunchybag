@@ -279,7 +279,7 @@ export const AdminPortal: React.FC = () => {
       id: "loyalty",
       label: "Loyalty & Khata",
       icon: Sparkles,
-      badge: safeLoyaltyRecords.length > 0 ? safeLoyaltyRecords.length : undefined,
+
     },
     {
       id: "employees",

@@ -58,13 +58,10 @@ import {
 } from "../mock/data";
 import {
   INITIAL_ORG_SETTINGS,
-  INITIAL_LOYALTY_SETTINGS,
   INITIAL_EMPLOYEES,
   INITIAL_INVENTORY,
   INITIAL_PURCHASES,
   INITIAL_DAYBOOK_EXPENSES,
-  INITIAL_LOYALTY_RECORDS,
-  INITIAL_APPLIED_LOYALTY_DISCOUNTS,
   INITIAL_STOCK_AUDITS,
   INITIAL_STOCK_MOVEMENTS,
   INITIAL_PARTIES,
@@ -73,6 +70,7 @@ import {
 import { authStorage } from "../lib/authStorage";
 import { branchApi, normalizeOutletId, apiClient } from "../lib/api";
 import { posOrderToOrder } from "../lib/posApi";
+import { isSameTable } from "../lib/utils";
 
 export interface ToastItem {
   id: string;
@@ -642,9 +640,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ]);
   const [daybookAccountEntries, setDaybookAccountEntries] = useState<DaybookAccountEntry[]>(INITIAL_DAYBOOK_ENTRIES);
   const [openingBalanceSetting, setOpeningBalanceSetting] = useState<number>(5000);
-  const [loyaltyRecords, setLoyaltyRecords] = useState<CustomerLoyaltyRecord[]>(INITIAL_LOYALTY_RECORDS);
-  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(INITIAL_LOYALTY_SETTINGS);
-  const [appliedLoyaltyDiscounts, setAppliedLoyaltyDiscounts] = useState<AppliedLoyaltyDiscount[]>(INITIAL_APPLIED_LOYALTY_DISCOUNTS);
+  const [loyaltyRecords, setLoyaltyRecords] = useState<CustomerLoyaltyRecord[]>([]);
+  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>({revisitOfferEnabled:false, revisitDiscountPercent:0, qualifyingDaysWindow:0, pointsPerHundredNpr:0, visitRules:[]});
+  const [appliedLoyaltyDiscounts, setAppliedLoyaltyDiscounts] = useState<AppliedLoyaltyDiscount[]>([]);
   const [orgSettings, setOrgSettings] = useState<OrganizationSettings>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -824,7 +822,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => { if(customerAccount.error) addToast({title:'Customer request failed',description:customerAccount.error,type:'error'}); }, [customerAccount.error]);
 
-  const staffOrdersEnabled = ['admin','staff','kitchen'].includes(activePortal) && !!authStorage.getAccessToken();
+  const staffOrdersEnabled = ['admin','staff','kitchen','kiosk'].includes(activePortal) && !!authStorage.getAccessToken();
   const orderScopeRef = React.useRef('');
   const orderLoadRef = React.useRef(0);
   orderScopeRef.current = staffOrdersEnabled ? String(currentOutlet.id) : '';
@@ -841,7 +839,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (orderScopeRef.current === scope && sequence === orderLoadRef.current) setOrders(remote.map(po=>posOrderToOrder(po,currentOutlet.name)));
     } catch (error) { console.warn('Unable to sync live staff orders', error); }
   }, [staffOrdersEnabled,currentOutlet.id,currentOutlet.name]);
-  useEffect(()=>{setOrders([]);void fetchActiveOrders();},[fetchActiveOrders]);
+  useEffect(()=>{
+    if (staffOrdersEnabled) {
+      void fetchActiveOrders();
+    }
+  },[fetchActiveOrders, staffOrdersEnabled]);
   useOutletEvents(String(currentOutlet.id),staffOrdersEnabled,()=>void fetchActiveOrders());
 
   const removeToast = (id: string) => {
@@ -1140,10 +1142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return (
       orders.find((o) => {
         if (o.status === "CANCELLED" || o.status === "COMPLETED") return false;
-        if (cleanTable && o.tableNumber) {
-          const orderTableClean = o.tableNumber.replace(/\s+/g, "").toLowerCase();
-          if (orderTableClean === cleanTable) return true;
-        }
+        if (targetTable && o.tableNumber && isSameTable(o.tableNumber, targetTable)) return true;
         if (cleanPhone && cleanPhone.length >= 7 && o.customerPhone) {
           const orderPhoneClean = o.customerPhone.replace(/\D/g, "");
           if (orderPhoneClean.includes(cleanPhone) || cleanPhone.includes(orderPhoneClean)) return true;
