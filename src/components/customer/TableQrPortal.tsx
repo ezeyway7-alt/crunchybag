@@ -225,23 +225,6 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
     return()=>{alive=false;};
   },[qrToken]);
 
-  // Probe backend for existing ongoing order on table QR rescan if trackingToken is empty
-  useEffect(() => {
-    if (trackingToken || !qrToken) return;
-    let alive = true;
-    apiClient.get<any>(`/orders/self-service/order/?token=${encodeURIComponent(qrToken)}`, { skipAuth: true })
-      .then(data => {
-        if (!alive || !data) return;
-        const status = data.status || '';
-        if (['COMPLETED', 'CANCELLED'].includes(status)) return;
-        const token = data.tracking_token || qrToken;
-        setTrackingToken(token);
-        saveStoredToken(token, qrToken, data.outlet_id || qrContext?.branch_id || currentOutlet.id, data.table_number || tableNumber || qrContext?.table_number);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [qrToken, trackingToken, qrContext?.branch_id, currentOutlet.id, tableNumber, qrContext?.table_number]);
-
   const liveOrder=useSelfServiceOrder(String(qrContext?.branch_id || currentOutlet.id),currentOutlet.name,trackingToken);
   const tableReceipt=useOrderReceipt(placedOrderResult,placedOrderResult?trackingToken:'');
 

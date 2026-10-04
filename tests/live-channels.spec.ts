@@ -4,7 +4,7 @@ import {test,expect,Page} from '@playwright/test';
 async function setup(page:Page){
   const outlet={id:1,name:'Live Outlet',branch_code:'LIVE',enable_kiosk:true,enable_qr_ordering:true,enable_dine_in:true,enable_takeaway:true,accepting_orders:true};
   const product={id:'burger',category:'food',name:'Live Burger',description:'Burger',base_price:'200.00',variants:[],modifier_groups:[],images:[],dietary_tags:[],is_available:true,show_on_kiosk:true,show_on_qr:true,requires_kitchen:true};
-  const state:any={orders:[],sockets:[],writes:[],revision:'0',fail:false};
+  const state:any={orders:[],sockets:[],writes:[],orderReads:[],revision:'0',fail:false};
   await page.addInitScript(()=>{document.cookie='csrftoken=abcdefghijklmnopqrstuvwx12345678; path=/';(window as any).__speech=[];Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{cancel(){},getVoices(){return [];},speak(u:any){(window as any).__speech.push(u.text);}}});});
   await page.routeWebSocket('**/ws/**',socket=>{
     if(socket.url().includes('/display/')){
@@ -17,7 +17,7 @@ async function setup(page:Page){
     let data:any={};
     if(path.includes('branches'))data=[outlet];
     else if(path==='catalog/menu/')data={categories:[{id:'food',name:'Food',products:[product]}],valid_until:null};
-    else if(path==='tables/qr/resolve/')data={branch_id:1,branch_name:'Live Outlet',table_id:2,table_number:'A2'};
+    else if(path==='tables/qr/resolve/')data={branch_id:1,branch_name:'Live Outlet',table_id:2,table_number:'A2',...(state.orders[0]?.tracking_token?{tracking_token:state.orders[0].tracking_token}:{})};
     else if(path==='orders/self-service/tables/1/')data={tables:[{id:2,table_number:'A2'}]};
     else if(path==='orders/self-service/quote/')data={subtotal:'200.00',total_payable:'200.00',vat_included_amount:'23.01'};
     else if(path==='orders/self-service/checkout/'){
@@ -25,7 +25,11 @@ async function setup(page:Page){
       data=state.orders[0] || {id:5,outlet_id:1,order_number:'KIOSK-1-00000005',version:1,status:'ACCEPTED',fulfillment_type:body.fulfillment_type,order_source:body.order_source,table_number:body.order_source==='TABLE_QR'?'A2':null,customer_name:body.customer_name,customer_phone:body.customer_phone,created_at:new Date().toISOString(),subtotal:'200.00',total_payable:'200.00',paid_amount:'0.00',due_amount:'200.00',discount_amount:'0',credit_amount:'0',refunded_amount:'0',payment_method:'CASH',items:[{id:1,product_name:'Live Burger',quantity:1,unit_price:'200.00',line_total:'200.00',modifiers:[],round_number:1,requires_kitchen:true}],payments:[],receipts:[],tracking_token:'signed-order'};
       state.orders=[data];
       if(state.fail){state.fail=false;await route.abort('failed');return;}
-    }else if(path==='orders/self-service/order/')data=state.orders[0];
+    }else if(path==='orders/self-service/order/'){
+      const token=url.searchParams.get('token');
+      state.orderReads.push(token);
+      data=token===state.orders[0]?.tracking_token?state.orders[0]:null;
+    }
     else if(path==='orders/self-service/receipt/')data=receiptFixture(state.orders[0]);
     else if(path==='orders/tracking/')data={order_number:state.orders[0].order_number,outlet_id:1,outlet_name:'Saved Branch',status:state.orders[0].status,fulfillment_type:state.orders[0].fulfillment_type,history:[]};
     else if(path==='orders/display/1/')data={tickets:state.orders,revision:state.revision};
@@ -163,6 +167,7 @@ test('rescanning table QR code restores active ongoing order tab and preparation
   await expect(page.getByText('Active Tab #KIOSK-1-00000005')).toBeVisible();
   await expect(page.getByRole('region',{name:'Preparation rounds'})).toBeVisible();
   await expect(page.getByText('Ongoing Tab #KIOSK-1-00000005')).toBeVisible();
+  expect(state.orderReads).not.toContain('signed-table');
 
   await page.getByRole('button',{name:'View Items'}).click();
   await expect(page.getByText('1x Live Burger (Standard) [R1]')).toBeVisible();
@@ -171,4 +176,3 @@ test('rescanning table QR code restores active ongoing order tab and preparation
   await page.getByRole('button',{name:'Add',exact:true}).click();
   await expect(page.getByRole('button',{name:/Add to Tab/})).toBeVisible();
 });
-

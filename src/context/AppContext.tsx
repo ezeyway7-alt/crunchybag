@@ -764,7 +764,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Customer Navigation, Favorites & Search
   const customerAccount = useCustomerAccount();
-  const pageFromPath = () => window.location.pathname === '/profile' ? 'profile' : window.location.pathname === '/orders' ? 'orders' : 'menu';
+  const pageFromPath = () => {
+    const path = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
+    return path === '/profile' ? 'profile' : path === '/orders' ? 'orders' : 'menu';
+  };
   const [customerActiveTab, setCustomerPage] = useState<'menu' | 'orders' | 'profile'>(pageFromPath);
   const setCustomerActiveTab = (tab: 'menu' | 'orders' | 'profile') => {
     window.history.pushState(null, '', `/${tab}`);

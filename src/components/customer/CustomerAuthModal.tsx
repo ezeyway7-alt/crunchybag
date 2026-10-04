@@ -86,7 +86,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     // If currently on /profile, immediately return to /menu unless returning to checkout
     if (typeof window !== "undefined") {
       const returnToCheckout = sessionStorage.getItem("customer:return-to-checkout") === "yes";
-      if (!returnToCheckout && (window.location.pathname === "/profile" || window.location.pathname === "/orders")) {
+      const path = window.location.pathname.toLowerCase().replace(/\/+$/, "");
+      if (!returnToCheckout && (path === "/profile" || path === "/orders")) {
         window.history.pushState(null, "", "/menu");
         window.dispatchEvent(new PopStateEvent("popstate"));
       }

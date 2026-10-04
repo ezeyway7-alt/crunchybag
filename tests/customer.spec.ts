@@ -484,8 +484,8 @@ test('customer orders view opens full orders list first and shows tracking detai
   };
   state.orders = [orderA, orderB];
 
-  // Navigate to /orders
-  await page.goto('/orders');
+  // Production canonicalizes the customer route with a trailing slash.
+  await page.goto('/orders/');
 
   // Verify full orders list is displayed first
   await expect(page.getByRole('heading', {name: 'My Orders'})).toBeVisible();
@@ -516,4 +516,3 @@ test('customer orders view opens full orders list first and shows tracking detai
   await page.getByRole('button', {name: 'View order ORD-B202'}).click();
   await expect(page.getByRole('heading', {name: 'Order #ORD-B202'})).toBeVisible();
 });
-
