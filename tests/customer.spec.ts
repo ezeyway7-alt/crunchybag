@@ -439,3 +439,81 @@ test('customer order tracking updates over websocket and resyncs after reconnect
   await expect(page.getByTestId('tracking-step-READY')).toHaveAttribute('aria-current', 'step');
   expect(navigations).toBe(0);
 });
+
+test('customer orders view opens full orders list first and shows tracking detail only on drill down', async ({page}) => {
+  const state = await setup(page, true);
+  const orderA = {
+    id: 101,
+    outlet_id: 1,
+    outlet_name: 'Web Outlet',
+    order_number: 'ORD-A101',
+    request_key: 'req-101',
+    version: 1,
+    status: 'PROCESSING',
+    fulfillment_type: 'DELIVERY',
+    order_source: 'WEBSITE',
+    customer_name: 'Web Customer',
+    customer_phone: '+9779841234567',
+    notes: 'Please ring the bell',
+    delivery_address: 'House 12, Test Street',
+    created_at: new Date().toISOString(),
+    subtotal: '400.00',
+    total_payable: '400.00',
+    paid_amount: '400.00',
+    due_amount: '0.00',
+    credit_amount: '0.00',
+    refunded_amount: '0.00',
+    discount_amount: '0.00',
+    vat_included_amount: '0.00',
+    payment_method: 'ESEWA',
+    settlement: 'PAID',
+    payment_review: 'ACCEPTED',
+    receipts: [{id: 101, kind: 'TOKEN', number: 'TOKEN-101'}],
+    payments: [],
+    reorder_items: [],
+    items: [{id: 1, product_id: 'burger', product_name: 'Web Burger', variant_name: '', quantity: 2, unit_price: '200', line_total: '400.00', round_number: 1, requires_kitchen: true, is_voided: false, modifiers: [], combo_components: []}],
+  };
+  const orderB = {
+    ...orderA,
+    id: 202,
+    order_number: 'ORD-B202',
+    status: 'COMPLETED',
+    fulfillment_type: 'TAKEAWAY',
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+    items: [{id: 2, product_id: 'combo', product_name: 'Web Combo', variant_name: '', quantity: 1, unit_price: '350', line_total: '350.00', round_number: 1, requires_kitchen: true, is_voided: false, modifiers: [], combo_components: []}],
+  };
+  state.orders = [orderA, orderB];
+
+  // Navigate to /orders
+  await page.goto('/orders');
+
+  // Verify full orders list is displayed first
+  await expect(page.getByRole('heading', {name: 'My Orders'})).toBeVisible();
+  await expect(page.getByText('#ORD-A101')).toBeVisible();
+  await expect(page.getByText('#ORD-B202')).toBeVisible();
+
+  // Detail view headings should NOT be present yet
+  await expect(page.getByRole('heading', {name: 'Order #ORD-A101'})).toHaveCount(0);
+  await expect(page.getByRole('heading', {name: 'Order #ORD-B202'})).toHaveCount(0);
+
+  // Drill down into ORD-A101
+  await page.getByRole('button', {name: 'View order ORD-A101'}).click();
+
+  // Detail view should now be shown
+  await expect(page.getByRole('heading', {name: 'Order #ORD-A101'})).toBeVisible();
+  await expect(page.getByRole('button', {name: /Back to all orders/i})).toBeVisible();
+
+  // Click back to return to the orders list
+  await page.getByRole('button', {name: /Back to all orders/i}).click();
+
+  // Orders list should be visible again
+  await expect(page.getByRole('heading', {name: 'My Orders'})).toBeVisible();
+  await expect(page.getByText('#ORD-A101')).toBeVisible();
+  await expect(page.getByText('#ORD-B202')).toBeVisible();
+  await expect(page.getByRole('heading', {name: 'Order #ORD-A101'})).toHaveCount(0);
+
+  // Drill down into ORD-B202
+  await page.getByRole('button', {name: 'View order ORD-B202'}).click();
+  await expect(page.getByRole('heading', {name: 'Order #ORD-B202'})).toBeVisible();
+});
+

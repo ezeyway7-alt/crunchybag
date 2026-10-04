@@ -62,7 +62,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
       <Drawer
         isOpen={isCartDrawerOpen}
         onClose={() => setIsCartDrawerOpen(false)}
-        size="lg"
+        size="xl"
         headerClassName="px-3 py-1.5 sm:py-2 border-b border-zinc-200 dark:border-zinc-800"
         bodyClassName="p-0 flex flex-col h-full overflow-hidden"
         title={

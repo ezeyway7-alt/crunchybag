@@ -228,6 +228,11 @@ export const CustomerPortal: React.FC = () => {
     }
   }, [resumeCheckout, authUser?.id, authUser?.is_active, cartSyncing, cartSyncError]);
   useEffect(() => { const open = () => setIsAuthOpen(true); window.addEventListener('customer:login',open); return () => window.removeEventListener('customer:login',open); },[]);
+  useEffect(() => {
+    if (customerActiveTab !== "orders") {
+      setTrackedOrderId(undefined);
+    }
+  }, [customerActiveTab]);
   // Receipt & QR Slip Review Modals
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isQrReviewModalOpen, setIsQrReviewModalOpen] = useState(false);
@@ -543,6 +548,7 @@ export const CustomerPortal: React.FC = () => {
         <LiveOrderTracker
           initialOrderId={trackedOrderId}
           onExploreMenu={() => setCustomerActiveTab("menu")}
+          onResetInitialOrder={() => setTrackedOrderId(undefined)}
         />
       )}
 
