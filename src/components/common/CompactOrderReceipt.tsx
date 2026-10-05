@@ -30,10 +30,10 @@ export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})
       <div style={{fontSize:9,color:'#444'}}>{new Date(receipt.created_at).toLocaleString('en-GB',{timeZone:'Asia/Kathmandu',dateStyle:'short',timeStyle:'short'})}</div>
     </div>
     {(s.customer_name || s.customer_phone) && <div style={rule}>{s.customer_name}{s.customer_phone && <div style={{fontSize:10}}>{s.customer_phone}</div>}</div>}
-    <div style={{...rule,display:'grid',gridTemplateColumns:'minmax(0,1fr) 24px 52px 58px',columnGap:4}}>
-      <strong>Item</strong><strong style={{textAlign:'center'}}>Qty</strong><strong style={{textAlign:'right'}}>P/U</strong><strong style={{textAlign:'right'}}>Amount</strong>
+    <div style={{...rule,display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',columnGap:4}}>
+      <strong>Item</strong><strong style={{textAlign:'center'}}>Qty</strong><strong style={{textAlign:'right'}}>Amount</strong>
       {(s.items || []).filter((item:any)=>!item.is_voided).map((item:any,index:number)=><div key={item.id || index} style={{gridColumn:'1 / -1',padding:'3px 0',breakInside:'avoid'}}>
-        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 24px 52px 58px',gap:4}}><strong>{item.product_name}</strong><span style={{textAlign:'center'}}>{item.quantity}</span><span style={{textAlign:'right'}}>{amount(item.unit_price)}</span><span style={{textAlign:'right'}}>{amount(item.line_total)}</span></div>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',gap:4}}><strong>{item.product_name}</strong><span style={{textAlign:'center'}}>{item.quantity}</span><span style={{textAlign:'right'}}>{amount(item.line_total)}</span></div>
         {item.variant_name && <div style={{fontSize:10,color:'#444'}}>{item.variant_name}</div>}
         {(item.modifiers || []).length>0 && <div style={{fontSize:10,color:'#444'}}>{item.modifiers.map((m:any)=>m.name || m.option_name).join(', ')}</div>}
         {(item.combo_components || []).map((part:any,i:number)=><div key={i} style={{fontSize:10,paddingLeft:8}}>{part.quantity * item.quantity} x {part.product_name}{part.variant_name?` (${part.variant_name})`:''}{part.modifiers?.length?` - ${part.modifiers.map((m:any)=>m.name).join(', ')}`:''}</div>)}
