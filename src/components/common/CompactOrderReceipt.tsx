@@ -2,33 +2,38 @@ import React from 'react';
 
 export interface ReceiptDocument {
   number:string;kind:string;created_at:string;snapshot:any;
-  tracking_url?:string;tracking_qr?:string;
+  tracking_url?:string;tracking_qr?:string;website_url?:string;website_qr?:string;
 }
 const line:React.CSSProperties={display:'flex',justifyContent:'space-between',gap:8};
 const rule:React.CSSProperties={borderTop:'1px dashed #aaa',paddingTop:6,marginTop:6};
 export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})=>{
   const s=receipt.snapshot, seller=s.seller || {};
+  const logo=seller.logo || '/crunchy_logo.png';
+  const website=receipt.website_url || seller.website || 'https://crunchybag.com';
   const amount=(value:any)=>Number(value || 0).toLocaleString('en-NP',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const rows=[['Subtotal',s.subtotal],['Discount',s.discount_amount],['Service charge',s.service_charge_amount],['Rounding savings',s.cash_round_down_savings],['VAT included',s.vat_included_amount]];
-  return <article aria-label="Order receipt" data-receipt-format="compact-v1" style={{width:'100%',maxWidth:'76mm',boxSizing:'border-box',margin:'0 auto',padding:'3mm',background:'#fafaf8',color:'#111',fontFamily:'ui-monospace,monospace',fontSize:11,lineHeight:1.35,overflowWrap:'anywhere',colorScheme:'light'}}>
-    <header style={{textAlign:'center'}}>
-      <h2 style={{fontSize:15,fontWeight:800,margin:0}}>{seller.name}</h2>
-      {seller.outlet && <div>{seller.outlet}</div>}
+  const rows=[['Subtotal',s.subtotal],['Discount',s.discount_amount],['Service charge',s.service_charge_amount],['Rounding savings',s.cash_round_down_savings]];
+  return <article aria-label="Order receipt" data-receipt-format="compact-v1" style={{width:'100%',maxWidth:'76mm',boxSizing:'border-box',margin:'0 auto',position:'relative',isolation:'isolate',padding:'2mm',background:'#fff',color:'#111',fontFamily:'ui-monospace,monospace',fontSize:11,lineHeight:1.35,overflowWrap:'anywhere',colorScheme:'light'}}>
+    <img src={logo} alt="" aria-hidden="true" style={{position:'absolute',top:'35%',left:'20%',width:'60%',opacity:0.06,zIndex:-1,filter:'grayscale(1)',pointerEvents:'none'}}/>
+    <header style={{textAlign:'center',display:'flex',alignItems:'center',gap:8}}>
+      <img src={logo} alt="Restaurant logo" width={48} height={48} style={{objectFit:'contain',flexShrink:0,filter:'brightness(0)'}}/>
+      <div style={{flex:1}}>
+      <h2 style={{fontSize:19,fontWeight:800,margin:0}}>{seller.name}</h2>
       {seller.address && <div style={{fontSize:10}}>{seller.address}</div>}
       {seller.phone && <div style={{fontSize:10}}>Tel: {seller.phone}</div>}
-      {seller.pan && <div style={{fontSize:10}}>PAN/VAT: {seller.pan}</div>}
+      </div>
     </header>
     <div style={{...rule,textAlign:'center'}}>
-      <div style={{fontSize:9,textTransform:'uppercase'}}>{receipt.kind==='TOKEN'?'Order token':receipt.kind==='REFUND'?'Refund receipt':seller.pan?'Tax invoice':'Bill'}</div>
+      <div style={{fontSize:9,textTransform:'uppercase'}}>{receipt.kind==='TOKEN'?'Order token':receipt.kind==='REFUND'?'Refund receipt':'Bill'}</div>
       <div data-testid="receipt-order-number" style={{fontSize:23,fontWeight:900,lineHeight:1.2,margin:'2px 0'}}>{s.order_number}</div>
       <div style={{fontSize:10}}>{s.fulfillment_type?.replace(/_/g,' ')}{s.table_number?` | ${s.table_number}`:''}</div>
       <div style={{fontSize:9,color:'#444'}}>Ref: {receipt.number}</div>
       <div style={{fontSize:9,color:'#444'}}>{new Date(receipt.created_at).toLocaleString('en-GB',{timeZone:'Asia/Kathmandu',dateStyle:'short',timeStyle:'short'})}</div>
     </div>
     {(s.customer_name || s.customer_phone) && <div style={rule}>{s.customer_name}{s.customer_phone && <div style={{fontSize:10}}>{s.customer_phone}</div>}</div>}
-    <div style={rule}>
-      {(s.items || []).filter((item:any)=>!item.is_voided).map((item:any,index:number)=><div key={item.id || index} style={{padding:'3px 0',breakInside:'avoid'}}>
-        <div style={line}><strong style={{flex:1}}>{item.quantity} x {item.product_name}</strong><span style={{whiteSpace:'nowrap'}}>{amount(item.line_total)}</span></div>
+    <div style={{...rule,display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',columnGap:6}}>
+      <strong>Item</strong><strong style={{textAlign:'center'}}>Qty</strong><strong style={{textAlign:'right'}}>Price</strong>
+      {(s.items || []).filter((item:any)=>!item.is_voided).map((item:any,index:number)=><div key={item.id || index} style={{gridColumn:'1 / -1',padding:'3px 0',breakInside:'avoid'}}>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',gap:6}}><strong>{item.product_name}</strong><span style={{textAlign:'center'}}>{item.quantity}</span><span style={{textAlign:'right'}}>{amount(item.line_total)}</span></div>
         {item.variant_name && <div style={{fontSize:10,color:'#444'}}>{item.variant_name}</div>}
         {(item.modifiers || []).length>0 && <div style={{fontSize:10,color:'#444'}}>{item.modifiers.map((m:any)=>m.name || m.option_name).join(', ')}</div>}
         {(item.combo_components || []).map((part:any,i:number)=><div key={i} style={{fontSize:10,paddingLeft:8}}>{part.quantity * item.quantity} x {part.product_name}{part.variant_name?` (${part.variant_name})`:''}{part.modifiers?.length?` - ${part.modifiers.map((m:any)=>m.name).join(', ')}`:''}</div>)}
@@ -47,9 +52,14 @@ export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})
       {s.payment_review==='PENDING' && <div style={{fontSize:10}}>Payment verification pending</div>}
     </div>
     {s.notes && <div style={{...rule,fontSize:10}}>Note: {s.notes}</div>}
-    {receipt.tracking_qr && receipt.tracking_url && <footer style={{...rule,display:'flex',alignItems:'center',justifyContent:'center',gap:8,breakInside:'avoid'}}>
-      <a href={receipt.tracking_url} target="_blank" rel="noopener noreferrer" aria-label="Track this order"><img src={receipt.tracking_qr} alt="Scan to track this order" width={104} height={104} style={{display:'block',width:'28mm',height:'28mm',background:'#fff'}} /></a>
-      <div style={{fontSize:10,maxWidth:100}}>Scan to track<br/><strong>{s.order_number}</strong><br/><span>Thank you!</span></div>
-    </footer>}
+    <footer style={{...rule,textAlign:'center',breakInside:'avoid'}}>
+      <div style={{display:'flex',justifyContent:'center',gap:'5mm'}}>
+        {receipt.tracking_qr && receipt.tracking_url && <a href={receipt.tracking_url} target="_blank" rel="noopener noreferrer" aria-label="Track this order" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.tracking_qr} alt="Scan to track this order" style={{display:'block',width:'28mm',height:'28mm',background:'#fff'}}/><span style={{fontSize:9}}>Track order</span></a>}
+        {receipt.website_qr && <a href={website} target="_blank" rel="noopener noreferrer" aria-label="Visit our website" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.website_qr} alt="Scan to visit our website" style={{display:'block',width:'28mm',height:'28mm',background:'#fff'}}/><span style={{fontSize:9}}>Order online</span></a>}
+      </div>
+      <div style={{fontWeight:700,fontSize:11,marginTop:2}}>{website.replace(/^https?:\/\//,'').replace(/\/$/,'')}</div>
+      <div style={{fontSize:9}}>24-hour delivery within Kathmandu</div>
+      <div style={{fontSize:9}}>Thank you! Visit again.</div>
+    </footer>
   </article>;
 };

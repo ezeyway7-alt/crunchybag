@@ -55,6 +55,7 @@ import { formatNPR, formatTimer } from "../../lib/utils";
 import { Badge } from "../common/Badge";
 import { Drawer } from "../common/Drawer";
 import { Modal } from "../common/Modal";
+import { printReceiptDocument } from "../../lib/receiptPrinting";
 import { useOrderReceipt } from "../../lib/orderReceipt";
 import { CompactOrderReceipt } from "../common/CompactOrderReceipt";
 import {
@@ -191,9 +192,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
   // Receipt Slip Preview Hook
   const receiptState = useOrderReceipt(printSlipOrder, "", "TOKEN");
   const receipt = receiptState.receipt;
-  const receiptPreview = receipt?.snapshot
-    ? posOrderToOrder(receipt.snapshot, currentOutlet?.name || "Crunchy Bag")
-    : printSlipOrder;
+
 
   // Filter Orders
   const filteredOrders = useMemo(() => {
@@ -1301,7 +1300,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
           maxWidth="md"
         >
           <div className="p-4 space-y-4">
-            {receiptPreview && <CompactOrderReceipt order={receiptPreview} />}
+            {receipt ? <CompactOrderReceipt receipt={receipt} /> : <p role="status">{receiptState.error || "Loading saved receipt..."}</p>}
             <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
               <button
                 type="button"
@@ -1312,7 +1311,8 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
+                disabled={!receipt}
+                onClick={() => receipt && printReceiptDocument(receipt).catch(error => alert(error.message))}
                 className="px-4 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black rounded-none flex items-center gap-1.5 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />

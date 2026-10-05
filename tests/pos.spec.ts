@@ -424,7 +424,7 @@ test('original table cards create real orders, append rounds, and settle only th
   await page.getByRole('button', { name: 'Confirm Settlement & Print Tax Invoice', exact: true }).click();
   await expect.poll(() => state.orders[0].paid_amount).toBe('100.00');
   await expect(page.getByText('Registered seller', { exact: true })).toBeVisible();
-  await expect(page.getByText('PAN/VAT: 123456789')).toBeVisible();
+  await expect(page.getByText('PAN/VAT: 123456789')).toHaveCount(0);
   await page.getByRole('button', { name: 'Close dialog' }).click();
   await expect(page.getByLabel('Amount applied')).toHaveValue('340');
   await page.getByLabel('Amount applied').fill('140');
@@ -506,7 +506,9 @@ test('staff token and settled bill use the same saved compact receipt and tracki
   await expect(page.getByLabel('Amount applied')).toHaveValue('220');
   await page.getByRole('button',{name:'Confirm Settlement & Print Tax Invoice',exact:true}).click();
   await expect(paper).toHaveAttribute('data-receipt-format','compact-v1');
-  await expect(paper).toContainText('Tax invoice');await expect(paper).toContainText('PAN/VAT: 123456789');
+  await expect(paper).toContainText('Bill');await expect(paper).not.toContainText('VAT');
+  await expect(paper.getByRole('img',{name:'Scan to visit our website'})).toBeVisible();
+  await expect(paper).toContainText('24-hour delivery within Kathmandu');
   await expect(paper.getByRole('link',{name:'Track this order'})).toHaveAttribute('href',tracking!);
   await expect.poll(()=>state.orders[0].paid_amount).toBe('220.00');
   await page.screenshot({path:test.info().outputPath('compact-staff-bill.png'),fullPage:true});
