@@ -42,6 +42,7 @@ import {
   MapPin,
   Share2,
   Navigation,
+  Loader2,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import {
@@ -114,7 +115,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>("TAKEAWAY");
   const [tableNumber, setTableNumber] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH_ON_PICKUP");
-  const [paymentStatus, setPaymentStatus] = useState<"PAID" | "UNPAID">("PAID");
+  const [paymentStatus, setPaymentStatus] = useState<"PAID" | "UNPAID">("UNPAID");
   const [isSplitMode, setIsSplitMode] = useState(false);
   const [posSplits, setPosSplits] = useState<{ method: PaymentMethod; amount: number }[]>([
     { method: "CASH_ON_PICKUP", amount: 0 },
@@ -154,6 +155,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const [tableSearchQuery, setTableSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [updatingOrderIds, setUpdatingOrderIds] = useState<Record<string, boolean>>({});
 
   const backendOngoingQuery = usePosOrderFeed(posSession, { open_tabs: true });
   const registerQuery = usePosOrderFeed(posSession, { ...(startDate ? { start_date: startDate } : {}), ...(endDate ? { end_date: endDate } : {}) });
@@ -275,6 +277,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     if (!result) return;
     setSelectedItems([]); setCustomerName(''); setCustomerPhone(''); setOrderNotes(''); setOrderDiscountAmount(0); setDiscountReason('');
     setDeliveryAddress(''); setTableNumber(''); setIsSplitMode(false); setPosSplits([{ method: 'CASH_ON_PICKUP', amount: 0 }, { method: 'CREDIT', amount: 0 }]);
+    setPaymentStatus("UNPAID");
     setPrintSlipOrder(posOrderToOrder(result, currentOutlet.name));
     addToast({ title: 'Order placed', description: result.order_number, type: 'success' });
   };
@@ -392,7 +395,18 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const handleQuickBumpStatus = async (row: Order) => {
     const order = backendOrder(row); if (!order) return;
     const next = { PENDING: 'ACCEPTED', ACCEPTED: 'PREPARING', PREPARING: 'READY', READY: order.fulfillment_type === 'DELIVERY' ? 'OUT_FOR_DELIVERY' : 'COMPLETED', OUT_FOR_DELIVERY: 'COMPLETED' }[order.status];
-    if (next) await posCommand.run(`${order.id}/transition/`, { version: order.version, status: next });
+    if (next) {
+      setUpdatingOrderIds(prev => ({ ...prev, [row.id]: true }));
+      try {
+        await posCommand.run(`${order.id}/transition/`, { version: order.version, status: next });
+      } finally {
+        setUpdatingOrderIds(prev => {
+          const nextMap = { ...prev };
+          delete nextMap[row.id];
+          return nextMap;
+        });
+      }
+    }
   };
 
   return (
@@ -418,6 +432,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
               onClick={() => {
                 setPosMode("NEW_ORDER");
                 setSelectedItems([]);
+                setPaymentStatus("UNPAID");
               }}
               className={`px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer border ${
                 posMode === "NEW_ORDER"
@@ -1836,7 +1851,8 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                             <button
                               type="button"
                               onClick={() => handleQuickBumpStatus(order)}
-                              className={`px-2.5 py-1 text-xs font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors ${
+                              disabled={updatingOrderIds[order.id] || posCommand.busy}
+                              className={`px-2.5 py-1 text-xs font-black uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-75 disabled:cursor-wait ${
                                 isConfirmed
                                   ? "bg-amber-500 hover:bg-amber-400 text-black"
                                   : isProcessing
@@ -1844,24 +1860,18 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                                   : "bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700"
                               }`}
                             >
-                              {isConfirmed && (
-                                <>
-                                  <Flame className="w-3 h-3" />
-                                  <span>Cook</span>
-                                </>
-                              )}
-                              {isProcessing && (
-                                <>
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>Ready</span>
-                                </>
-                              )}
-                              {isReady && (
-                                <>
-                                  <Package className="w-3 h-3 text-emerald-400" />
-                                  <span>Hand Over</span>
-                                </>
-                              )}
+                              {updatingOrderIds[order.id] ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : isConfirmed ? (
+                                <Flame className="w-3 h-3" />
+                              ) : isProcessing ? (
+                                <CheckCircle2 className="w-3 h-3" />
+                              ) : isReady ? (
+                                <Package className="w-3 h-3 text-emerald-400" />
+                              ) : null}
+                              <span>
+                                {isConfirmed ? "Cook" : isProcessing ? "Ready" : "Hand Over"}
+                              </span>
                             </button>
                           )}
 
@@ -1873,11 +1883,20 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                               const status = ({ CONFIRMED: 'ACCEPTED', PROCESSING: 'PREPARING' } as Record<string,string>)[e.target.value] || e.target.value;
                               const reason = status === 'CANCELLED' ? window.prompt('Reason for cancellation') : '';
                               if (status === 'CANCELLED' && !reason?.trim()) return;
-                              const result = await posCommand.run(`${source.id}/transition/`, { version: source.version, status, reason });
-                              if (result) addToast({ title: 'Status updated', description: result.order_number, type: 'success' });
+                              setUpdatingOrderIds(prev => ({ ...prev, [order.id]: true }));
+                              try {
+                                const result = await posCommand.run(`${source.id}/transition/`, { version: source.version, status, reason });
+                                if (result) addToast({ title: 'Status updated', description: result.order_number, type: 'success' });
+                              } finally {
+                                setUpdatingOrderIds(prev => {
+                                  const nextMap = { ...prev };
+                                  delete nextMap[order.id];
+                                  return nextMap;
+                                });
+                              }
                             }}
-                            disabled={posCommand.busy || posCommand.hasPending}
-                            className="h-7 px-1.5 text-[11px] font-bold bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
+                            disabled={updatingOrderIds[order.id] || posCommand.busy || posCommand.hasPending}
+                            className="h-7 px-1.5 text-[11px] font-bold bg-zinc-100 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer disabled:opacity-50"
                           >
                             <option value="CONFIRMED">Confirmed</option>
                             <option value="PROCESSING">In Kitchen</option>

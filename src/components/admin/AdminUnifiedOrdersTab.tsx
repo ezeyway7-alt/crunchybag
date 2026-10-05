@@ -31,6 +31,7 @@ import {
   UtensilsCrossed,
   Layers,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import {
@@ -95,6 +96,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
   const [tableSearchQuery, setTableSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [updatingOrderIds, setUpdatingOrderIds] = useState<Record<string, boolean>>({});
 
   // Modals & Drawers
   const [selectedOrderForDrawer, setSelectedOrderForDrawer] = useState<Order | null>(null);
@@ -279,6 +281,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
     };
     const next = nextMap[order.status];
     if (next) {
+      setUpdatingOrderIds(prev => ({ ...prev, [row.id]: true }));
       try {
         const result = await posCommand.run(`${order.id}/transition/`, {
           version: order.version,
@@ -297,6 +300,12 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
           description: err?.message || "Could not transition order status",
           type: "error",
         });
+      } finally {
+        setUpdatingOrderIds(prev => {
+          const nextMap = { ...prev };
+          delete nextMap[row.id];
+          return nextMap;
+        });
       }
     }
   };
@@ -305,6 +314,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
   const handleTransitionStatus = async (row: Order, targetStatus: string) => {
     const order = backendOrder(row);
     if (!order) return;
+    setUpdatingOrderIds(prev => ({ ...prev, [row.id]: true }));
     try {
       const result = await posCommand.run(`${order.id}/transition/`, {
         version: order.version,
@@ -322,6 +332,12 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
         title: "Transition Failed",
         description: err?.message || "Could not update status",
         type: "error",
+      });
+    } finally {
+      setUpdatingOrderIds(prev => {
+        const nextMap = { ...prev };
+        delete nextMap[row.id];
+        return nextMap;
       });
     }
   };
@@ -958,7 +974,8 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                           <button
                             type="button"
                             onClick={() => handleQuickBumpStatus(order)}
-                            className={`px-2.5 py-1 text-xs font-black uppercase tracking-wider rounded-none flex items-center gap-1 cursor-pointer transition-colors ${
+                            disabled={updatingOrderIds[order.id] || posCommand.busy}
+                            className={`px-2.5 py-1 text-xs font-black uppercase tracking-wider rounded-none flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-75 disabled:cursor-wait ${
                               isConfirmed
                                 ? "bg-amber-500 hover:bg-amber-400 text-black shadow-xs"
                                 : isProcessing
@@ -967,26 +984,26 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                             }`}
                             title="Step forward to next order milestone"
                           >
-                            {isConfirmed && (
-                              <>
-                                <Flame className="w-3 h-3" />
-                                <span>Cook</span>
-                              </>
-                            )}
-                            {isProcessing && (
-                              <>
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>Ready</span>
-                              </>
-                            )}
-                            {isReady && (
-                              <>
-                                <Package className="w-3 h-3 text-emerald-400" />
-                                <span>
-                                  {order.fulfillmentType === "DELIVERY" ? "Dispatch" : "Hand Over"}
-                                </span>
-                              </>
-                            )}
+                            {updatingOrderIds[order.id] ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : isConfirmed ? (
+                              <Flame className="w-3 h-3" />
+                            ) : isProcessing ? (
+                              <CheckCircle2 className="w-3 h-3" />
+                            ) : isReady ? (
+                              <Package className="w-3 h-3 text-emerald-400" />
+                            ) : null}
+                            <span>
+                              {isConfirmed
+                                ? "Cook"
+                                : isProcessing
+                                ? "Ready"
+                                : isReady
+                                ? order.fulfillmentType === "DELIVERY"
+                                  ? "Dispatch"
+                                  : "Hand Over"
+                                : "Update"}
+                            </span>
                           </button>
                         )}
 
@@ -1000,7 +1017,8 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
                               : order.status
                           }
                           onChange={(e) => handleTransitionStatus(order, e.target.value)}
-                          className="h-7 px-1.5 text-[10px] font-bold bg-zinc-900 border border-zinc-700 rounded-none text-zinc-300 focus:outline-none focus:border-amber-500 cursor-pointer"
+                          disabled={updatingOrderIds[order.id] || posCommand.busy || posCommand.hasPending}
+                          className="h-7 px-1.5 text-[10px] font-bold bg-zinc-900 border border-zinc-700 rounded-none text-zinc-300 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-50"
                           title="Override Order Lifecycle Status"
                         >
                           <option value="PENDING">PENDING</option>
