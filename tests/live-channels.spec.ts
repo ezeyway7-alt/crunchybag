@@ -1,11 +1,11 @@
 import {receiptFixture} from "./receiptFixture";
-import {pickupClips} from '../src/lib/nepaliAudio';
+import {readFileSync} from 'node:fs';
 import {test,expect,Page} from '@playwright/test';
 
 async function setup(page:Page,menuImages:string[]=[]){
   const outlet={id:1,name:'Live Outlet',branch_code:'LIVE',enable_kiosk:true,enable_qr_ordering:true,enable_dine_in:true,enable_takeaway:true,accepting_orders:true};
   const product={id:'burger',category:'food',name:'Live Burger',description:'Burger',base_price:'200.00',variants:[],modifier_groups:[],images:menuImages.slice(0,1),dietary_tags:[],is_available:true,show_on_kiosk:true,show_on_qr:true,requires_kitchen:true};
-  const state:any={orders:[],sockets:[],writes:[],orderReads:[],revision:'0',fail:false};
+  const state:any={orders:[],sockets:[],writes:[],orderReads:[],audioRequests:[],audioPending:0,revision:'0',fail:false};
   await page.addInitScript(()=>{
     document.cookie='csrftoken=abcdefghijklmnopqrstuvwx12345678; path=/';
     // Exercise actual MP3 decoding/playback with no installed browser voices.
@@ -28,6 +28,11 @@ async function setup(page:Page,menuImages:string[]=[]){
   await page.route('**/api/v1/**',async route=>{
     const request=route.request(),url=new URL(request.url()),path=url.pathname.replace('/api/v1/','');
     const body=request.method()==='POST' && request.postData()?request.postDataJSON():null;
+    if(path==='orders/display/1/announcement/'){
+      state.audioRequests.push({token:url.searchParams.get('token'),round:url.searchParams.get('round'),part:url.searchParams.get('part')});
+      if(state.audioPending>0){state.audioPending--;await route.fulfill({status:202,json:{state:'pending'}});return;}
+      await route.fulfill({contentType:'audio/mpeg',body:readFileSync('public/audio/nepali-hybrid-v1/token-sample.mp3')});return;
+    }
     let data:any={};
     if(path.includes('branches'))data=[outlet];
     else if(path==='catalog/menu/')data={categories:[{id:'food',name:'Food',products:[product,...menuImages.slice(1).map((image,index)=>({...product,id:`burger-${index+2}`,name:`Live Burger ${index+2}`,images:[image]}))]}],valid_until:null};
@@ -53,43 +58,32 @@ async function setup(page:Page,menuImages:string[]=[]){
 }
 const emit=(state:any,type='ORDER_TRANSITION')=>{state.revision=String(Number(state.revision)+1);for(const socket of state.sockets)socket.send(JSON.stringify({type:'display_update',event_type:type,event_id:state.revision,aggregate_id:5,order_number:state.orders[0].order_number,status:state.orders[0].status,fulfillment_type:'TAKEAWAY'}));};
 
-test('TV plays bundled Nepali audio without any browser voices and stops on mute',async({page})=>{
+test('TV plays recorded opening, generated token and recorded ending in order and stops on mute',async({page})=>{
   await setup(page);
   await page.goto('/tv?outlet_id=1');
   await page.locator('#tv-speaker-test-btn').click();
-  await expect.poll(()=>page.evaluate(()=>(window as any).__audio.length)).toBeGreaterThan(0);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__audio.length)).toBe(3);
   const audio=await page.evaluate(()=>(window as any).__audio);
-  expect(audio.every((clip:any)=>clip.decodedDuration>0 && clip.state==='running')).toBe(true);
-  expect(audio.at(-1).decodedDuration).toBeGreaterThan(4);
-  for(let i=1;i<audio.length;i++)expect(audio[i].when).toBeGreaterThanOrEqual(audio[i-1].when+audio[i-1].duration);
+  expect(audio.every((clip:any)=>clip.state==='running' && clip.duration>0)).toBe(true);
+  expect(audio[2].decodedDuration).toBeGreaterThan(audio[0].decodedDuration);
+  for(let i=1;i<audio.length;i++){
+    expect(audio[i].when-audio[i-1].when-audio[i-1].duration).toBeCloseTo(0.09,3);
+  }
   await page.getByTitle('Audio Active',{exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__audioStops)).toBeGreaterThan(0);
-  // All shipped clips must decode, including letters absent from the speaker test.
-  const clips=await page.evaluate(async()=>{
-    const context=new AudioContext();
-    try {
-      const manifest=await (await fetch('/audio/nepali-v1/manifest.json')).json();
-      return await Promise.all(Object.keys(manifest.phrases).map(async key=>{
-        const response=await fetch(`/audio/nepali-v1/${key}.mp3`);
-        const buffer=await context.decodeAudioData(await response.arrayBuffer());
-        return buffer.duration;
-      }));
-    } finally {await context.close();}
-  });
-  expect(clips).toHaveLength(43);
-  expect(clips.every(duration=>duration>0.1)).toBe(true);
 });
 
 test('TV retries a failed audio download from Speaker Test',async({page})=>{
   await setup(page);
-  await page.route('**/audio/nepali-v1/ready.mp3',route=>route.fulfill({status:503,body:'Unavailable'}));
+  await page.route('**/audio/nepali-hybrid-v1/token-sample.mp3',route=>route.fulfill({status:503,body:'Unavailable'}));
   await page.goto('/tv?outlet_id=1');
   await page.locator('#tv-speaker-test-btn').click();
-  await expect(page.getByRole('status').filter({hasText:'Sound could not play'})).toBeVisible();
-  await page.unroute('**/audio/nepali-v1/ready.mp3');
+  await expect(page.getByRole('status').filter({hasText:'Nepali announcement is unavailable'})).toBeVisible();
+  expect(await page.evaluate(()=>(window as any).__audio)).toEqual([]);
+  await page.unroute('**/audio/nepali-hybrid-v1/token-sample.mp3');
   await page.locator('#tv-speaker-test-btn').click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__audio.length)).toBeGreaterThan(0);
-  await expect(page.getByRole('status').filter({hasText:'Sound could not play'})).toHaveCount(0);
+  await expect(page.getByRole('status').filter({hasText:'Nepali announcement is unavailable'})).toHaveCount(0);
 });
 
 test('TV keeps the current menu image visible until the next image has loaded',async({page})=>{
@@ -130,6 +124,7 @@ test('TV receives preparation, ready, call and completion without navigation and
   await page.getByTitle('Dismiss announcement').click();
   await page.evaluate(()=>(window as any).__audio=[]);
   let navigations=0;page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++;});
+  state.audioPending=1;
   state.orders[0].status='PREPARING';emit(state);
   state.orders[0].status='READY';emit(state);
   await expect(page.locator('#tv-calling-spotlight-card')).toContainText('KIOSK-1-00000005');
@@ -209,8 +204,8 @@ test('TV shows ready and cooking rounds of the same order and calls the requeste
   await page.evaluate(()=>(window as any).__audio=[]);
   state.orders[0].rounds[0].status='SERVED';state.orders[0].rounds[1].status='READY';emit(state);
   await expect(page.locator('#tv-calling-spotlight-card')).toContainText('POS-12 / R2');
-  await expect.poll(()=>page.evaluate(()=>(window as any).__audio.length)).toBe(9);
-  expect(pickupClips('POS-12 / R2')).toEqual(['token','letter-P','letter-O','letter-S','digit-1','digit-2','round','digit-2','ready']);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__audio.length)).toBe(3);
+  expect(state.audioRequests.at(-1)).toEqual({token:'POS-12',round:'2',part:'token'});
 });
 
 

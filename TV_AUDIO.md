@@ -1,35 +1,49 @@
 # Nepali TV announcements
 
-The TV plays bundled MP3 recordings from `public/audio/nepali-v1`. It does not
-use browser speech voices or contact a speech provider while announcing orders.
-Click **Speaker Test** once after opening the TV to allow browser audio. The
-same button also enables sound when muted. Keep the TV/device volume audible.
+Calls play three clips in sequence: the uploaded Kamala opening, one generated
+pickup identifier, and the uploaded Kamala ending. Only the middle is synthesized
+using the existing no-key Edge Nepali female voice. Its tone may differ from Kamala.
+No ElevenLabs API is used. Customer names, phones, payments and addresses are not
+sent to the speech service.
 
-The voice says the token (letters and individual digits), optional table and
-round, followed by:
+## Audio files
 
-> तपाईंको अर्डर तयार छ। कृपया काउन्टरबाट लिनुहोस्। धन्यवाद।
+`public/audio/nepali-hybrid-v1/opening.mp3` and `ending.mp3` are unchanged copies of
+the two user recordings in `public/`. The short recording says the opening; the
+long recording supplies the closing message. Original uploads are preserved.
+`token-sample.mp3` supplies POS-21 for Speaker Test. Regenerate only this middle
+sample with `python scripts/generate-nepali-token-preview.py` (edge-tts==7.2.8).
+The uploaded Kamala clips are never regenerated or replaced by this script.
 
-Unsupported custom table names are omitted from speech; the order token remains
-the identifier. The quiet chime and all voice fragments share a single audio
-context. Queued announcements wait for playback to finish. Mute, dismiss and
-leaving the TV stop playback. Failed downloads can be retried with Speaker Test.
+The player decodes all three files before playing the quiet chime. It removes only
+outer silence, adjusts loudness with a gain limit, adds short fades to avoid clicks,
+and schedules 90 ms between clips. It never speaks the opening without a loaded
+middle and ending. Mute, dismiss and leaving the TV cancel all remaining playback
+and downloads. Queued announcements wait for the complete closing clip.
 
-## Build and deploy
+## Real order calls
 
-Run the normal `npm run build` and deploy the complete `dist` directory,
-including `dist/audio/nepali-v1`. No backend change, API key, browser language
-pack or runtime speech service is required. The web server must serve `.mp3`
-files as audio rather than rewriting their paths to the SPA HTML page.
+`GET /api/v1/orders/display/<outlet>/announcement/?token=POS-21&round=1&part=token`
+requests just the identifier. Prefixes are preserved and numbers are read as whole
+numbers. Round numbers above one are included; table names remain on screen rather
+than extending the spoken token. The default `part=full` remains for old clients.
+Only a real active order and round belonging to that outlet can generate audio.
 
-## Regenerate recordings (only when changing the voice/text)
+Celery prewarms the identifier while cooking. Files are cached by text and voice.
+On a miss, the endpoint queues a deduplicated job and returns 202. The player checks
+only the pending audio request for at most 35 seconds; orders still use WebSockets.
+The worker retries failures with exponential backoff and logs terminal failures.
+The new token URL and shorter text keep old full announcements out of this sequence.
 
-Install `edge-tts==7.2.8` in a development Python environment, then run
-`python scripts/generate-nepali-audio.py`. Existing recordings are preserved;
-remove only the specific clips you intend to regenerate first.
+## Deploy and test
 
-The manifest records the text and generation settings. These assets use
-`ne-NP-HemkalaNeural` at `-8%` speed, listed in Microsoft's
-[Nepali voice documentation](https://learn.microsoft.com/azure/ai-services/speech-service/language-support?tabs=tts).
-The generator uses [edge-tts](https://github.com/rany2/edge-tts) for one-time
-generation of fixed phrases, letters and digits; it never submits customer data.
+1. Deploy the backend changes and restart Django/Daphne, Celery worker and beat.
+2. Keep Redis and persistent media storage shared between web and worker processes.
+3. Run `npm run build` and deploy all of `dist`, including `audio/nepali-hybrid-v1`.
+4. Open the TV and click Speaker Test once to enable browser audio.
+5. Call a ready order and check the opening, correct token and closing.
+
+`TV_NEPALI_VOICE=ne-NP-HemkalaNeural` controls only the generated middle. New tokens
+need worker internet access; cached tokens are reused. No API key or paid speech
+API is configured. Edge TTS is not an official Azure API integration with an SLA.
+Legacy v1/v2 recordings remain on disk but are not used by the TV player.

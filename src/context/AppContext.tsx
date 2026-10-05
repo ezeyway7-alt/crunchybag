@@ -1,4 +1,4 @@
-import { NepaliAudioPlayer } from "../lib/nepaliAudio";
+import { NepaliAudioPlayer, announcementAudioUrl } from "../lib/nepaliAudio";
 import { useOutletEvents } from "../lib/useOutletEvents";
 import { usePersistentCart } from './usePersistentCart';
 import { useCustomerAccount, customerRefresh } from "../lib/customerApi";
@@ -1573,7 +1573,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLastKitchenCall(callData);
 
     const player = new NepaliAudioPlayer();
-    void player.unlock().then(() => player.play(details.kioskToken || details.orderNumber, details.tableNumber))
+    void player.unlock().then(() => player.play(announcementAudioUrl(String(currentOutlet.id), details.orderNumber)))
       .catch(() => addToast({title: "Sound unavailable", description: "Check browser audio permission and try again.", type: "info"}))
       .finally(() => player.dispose());
 

@@ -1,4 +1,4 @@
-import { NepaliAudioPlayer } from "../../lib/nepaliAudio";
+import { NepaliAudioPlayer, announcementAudioUrl, NEPALI_VOICE_SAMPLE } from "../../lib/nepaliAudio";
 import { apiClient } from "../../lib/api";
 import { useOutletEvents } from "../../lib/useOutletEvents";
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -198,14 +198,14 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     return () => clearInterval(interval);
   }, [activeSlideIndex, showcaseProducts.length]);
 
-  // Bundled Nepali recordings work even when the browser has no Nepali voice.
+  // Recorded Kamala opening and ending surround one generated token recording.
   const speakAnnouncement = (announcement: CallingAnnouncement) => {
     if (!soundEnabled) return;
     const id = ++playbackId.current;
     speechBusy.current = true;
     setVoiceError("");
-    void getAudioPlayer().play(announcement.token, announcement.tableNumber).catch(() => {
-      if (id === playbackId.current) setVoiceError("Sound could not play. Click Speaker Test to enable audio or retry loading it.");
+    void getAudioPlayer().play(announcement.id === "test-call" ? NEPALI_VOICE_SAMPLE : announcementAudioUrl(effectiveOutletId, announcement.token)).catch((error) => {
+      if (id === playbackId.current) setVoiceError(error instanceof Error && error.name !== "AbortError" ? error.message : "Audio could not load. Please try the call again.");
     }).finally(() => {
       if (id === playbackId.current) speechBusy.current = false;
     });
@@ -422,14 +422,14 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
               setVoiceError("");
               const testOrder: Order = {
                 id: "test-call",
-                orderNumber: "CR-7721",
+                orderNumber: "POS-21",
                 outletId: currentOutlet.id,
                 outletName: currentOutlet.name,
                 customerName: "Table Guest",
                 customerPhone: "+977 9800-000000",
                 fulfillmentType: "DINE_IN",
-                tableNumber: "Table 04",
-                kioskToken: "TK-7721",
+                tableNumber: undefined,
+                kioskToken: "POS-21",
                 status: "READY",
                 items: [],
                 subtotal: 0,
