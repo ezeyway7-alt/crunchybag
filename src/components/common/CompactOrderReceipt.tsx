@@ -8,19 +8,19 @@ const line:React.CSSProperties={display:'flex',justifyContent:'space-between',ga
 const rule:React.CSSProperties={borderTop:'1px dashed #aaa',paddingTop:6,marginTop:6};
 export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})=>{
   const s=receipt.snapshot, seller=s.seller || {};
-  const logo=seller.logo || '/crunchy_logo.png';
+  const logo='/bill_logo.jpg';
   const website=receipt.website_url || seller.website || 'https://crunchybag.com';
   const amount=(value:any)=>Number(value || 0).toLocaleString('en-NP',{minimumFractionDigits:2,maximumFractionDigits:2});
   const rows=[['Subtotal',s.subtotal],['Discount',s.discount_amount],['Service charge',s.service_charge_amount],['Rounding savings',s.cash_round_down_savings]];
   return <article aria-label="Order receipt" data-receipt-format="compact-v1" style={{width:'100%',maxWidth:'76mm',boxSizing:'border-box',margin:'0 auto',position:'relative',isolation:'isolate',padding:'2mm',background:'#fff',color:'#111',fontFamily:'ui-monospace,monospace',fontSize:11,lineHeight:1.35,overflowWrap:'anywhere',colorScheme:'light'}}>
-    <img src={logo} alt="" aria-hidden="true" style={{position:'absolute',top:'35%',left:'20%',width:'60%',opacity:0.06,zIndex:-1,filter:'grayscale(1)',pointerEvents:'none'}}/>
     <header style={{textAlign:'center',display:'flex',alignItems:'center',gap:8}}>
-      <img src={logo} alt="Restaurant logo" width={48} height={48} style={{objectFit:'contain',flexShrink:0,filter:'brightness(0)'}}/>
-      <div style={{flex:1}}>
+      <img src={logo} alt="Restaurant logo" width={48} height={48} style={{objectFit:'contain',flexShrink:0}}/>
+      <div style={{flex:1,minWidth:0}}>
       <h2 style={{fontSize:19,fontWeight:800,margin:0}}>{seller.name}</h2>
       {seller.address && <div style={{fontSize:10}}>{seller.address}</div>}
       {seller.phone && <div style={{fontSize:10}}>Tel: {seller.phone}</div>}
       </div>
+        {receipt.website_qr && <a href={website} target="_blank" rel="noopener noreferrer" aria-label="Visit our website" style={{color:'inherit',textDecoration:'none',flexShrink:0}}><img src={receipt.website_qr} alt="Scan to visit our website" style={{display:'block',width:'24mm',height:'24mm',background:'#fff'}}/><span style={{fontSize:9}}>Order online</span></a>}
     </header>
     <div style={{...rule,textAlign:'center'}}>
       <div style={{fontSize:9,textTransform:'uppercase'}}>{receipt.kind==='TOKEN'?'Order token':receipt.kind==='REFUND'?'Refund receipt':'Bill'}</div>
@@ -55,7 +55,6 @@ export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})
     <footer style={{...rule,textAlign:'center',breakInside:'avoid'}}>
       <div style={{display:'flex',justifyContent:'center',gap:'5mm'}}>
         {receipt.tracking_qr && receipt.tracking_url && <a href={receipt.tracking_url} target="_blank" rel="noopener noreferrer" aria-label="Track this order" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.tracking_qr} alt="Scan to track this order" style={{display:'block',width:'28mm',height:'28mm',background:'#fff'}}/><span style={{fontSize:9}}>Track order</span></a>}
-        {receipt.website_qr && <a href={website} target="_blank" rel="noopener noreferrer" aria-label="Visit our website" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.website_qr} alt="Scan to visit our website" style={{display:'block',width:'28mm',height:'28mm',background:'#fff'}}/><span style={{fontSize:9}}>Order online</span></a>}
       </div>
       <div style={{fontWeight:700,fontSize:11,marginTop:2}}>{website.replace(/^https?:\/\//,'').replace(/\/$/,'')}</div>
       <div style={{fontSize:9}}>24-hour delivery within Kathmandu</div>
