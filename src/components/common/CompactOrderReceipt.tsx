@@ -13,14 +13,14 @@ export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})
   const amount=(value:any)=>Number(value || 0).toLocaleString('en-NP',{minimumFractionDigits:2,maximumFractionDigits:2});
   const rows=[['Subtotal',s.subtotal],['Discount',s.discount_amount],['Service charge',s.service_charge_amount],['Rounding savings',s.cash_round_down_savings]];
   return <article aria-label="Order receipt" data-receipt-format="compact-v1" style={{width:'100%',maxWidth:'76mm',boxSizing:'border-box',margin:'0 auto',position:'relative',isolation:'isolate',padding:'2mm',background:'#fff',color:'#111',fontFamily:'ui-monospace,monospace',fontSize:11,lineHeight:1.35,overflowWrap:'anywhere',colorScheme:'light'}}>
-    <header style={{textAlign:'center',display:'flex',alignItems:'center',gap:8}}>
-      <img src={logo} alt="Restaurant logo" width={48} height={48} style={{objectFit:'contain',flexShrink:0}}/>
+    <header style={{textAlign:'center',display:'grid',gridTemplateColumns:receipt.website_qr?'20mm minmax(0,1fr) 20mm':'20mm minmax(0,1fr)',alignItems:'center',gap:4}}>
+      <img src={logo} alt="Restaurant logo" width={76} height={76} style={{width:'20mm',height:'20mm',objectFit:'contain'}}/>
       <div style={{flex:1,minWidth:0}}>
-      <h2 style={{fontSize:19,fontWeight:800,margin:0}}>{seller.name}</h2>
+      <h2 style={{fontSize:17,fontWeight:800,margin:0}}>{seller.name}</h2>
       {seller.address && <div style={{fontSize:10}}>{seller.address}</div>}
       {seller.phone && <div style={{fontSize:10}}>Tel: {seller.phone}</div>}
       </div>
-        {receipt.website_qr && <a href={website} target="_blank" rel="noopener noreferrer" aria-label="Visit our website" style={{color:'inherit',textDecoration:'none',flexShrink:0}}><img src={receipt.website_qr} alt="Scan to visit our website" style={{display:'block',width:'24mm',height:'24mm',background:'#fff'}}/><span style={{fontSize:9}}>Order online</span></a>}
+        {receipt.website_qr && <a href={website} target="_blank" rel="noopener noreferrer" aria-label="Visit our website" style={{color:'inherit',textDecoration:'none',flexShrink:0}}><img src={receipt.website_qr} alt="Scan to visit our website" style={{display:'block',width:'20mm',height:'20mm',background:'#fff'}}/><span style={{fontSize:9}}>Order online</span></a>}
     </header>
     <div style={{...rule,textAlign:'center'}}>
       <div style={{fontSize:9,textTransform:'uppercase'}}>{receipt.kind==='TOKEN'?'Order token':receipt.kind==='REFUND'?'Refund receipt':'Bill'}</div>
@@ -30,10 +30,10 @@ export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})
       <div style={{fontSize:9,color:'#444'}}>{new Date(receipt.created_at).toLocaleString('en-GB',{timeZone:'Asia/Kathmandu',dateStyle:'short',timeStyle:'short'})}</div>
     </div>
     {(s.customer_name || s.customer_phone) && <div style={rule}>{s.customer_name}{s.customer_phone && <div style={{fontSize:10}}>{s.customer_phone}</div>}</div>}
-    <div style={{...rule,display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',columnGap:6}}>
-      <strong>Item</strong><strong style={{textAlign:'center'}}>Qty</strong><strong style={{textAlign:'right'}}>Price</strong>
+    <div style={{...rule,display:'grid',gridTemplateColumns:'minmax(0,1fr) 24px 52px 58px',columnGap:4}}>
+      <strong>Item</strong><strong style={{textAlign:'center'}}>Qty</strong><strong style={{textAlign:'right'}}>P/U</strong><strong style={{textAlign:'right'}}>Amount</strong>
       {(s.items || []).filter((item:any)=>!item.is_voided).map((item:any,index:number)=><div key={item.id || index} style={{gridColumn:'1 / -1',padding:'3px 0',breakInside:'avoid'}}>
-        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',gap:6}}><strong>{item.product_name}</strong><span style={{textAlign:'center'}}>{item.quantity}</span><span style={{textAlign:'right'}}>{amount(item.line_total)}</span></div>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 24px 52px 58px',gap:4}}><strong>{item.product_name}</strong><span style={{textAlign:'center'}}>{item.quantity}</span><span style={{textAlign:'right'}}>{amount(item.unit_price)}</span><span style={{textAlign:'right'}}>{amount(item.line_total)}</span></div>
         {item.variant_name && <div style={{fontSize:10,color:'#444'}}>{item.variant_name}</div>}
         {(item.modifiers || []).length>0 && <div style={{fontSize:10,color:'#444'}}>{item.modifiers.map((m:any)=>m.name || m.option_name).join(', ')}</div>}
         {(item.combo_components || []).map((part:any,i:number)=><div key={i} style={{fontSize:10,paddingLeft:8}}>{part.quantity * item.quantity} x {part.product_name}{part.variant_name?` (${part.variant_name})`:''}{part.modifiers?.length?` - ${part.modifiers.map((m:any)=>m.name).join(', ')}`:''}</div>)}
@@ -52,13 +52,15 @@ export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})
       {s.payment_review==='PENDING' && <div style={{fontSize:10}}>Payment verification pending</div>}
     </div>
     {s.notes && <div style={{...rule,fontSize:10}}>Note: {s.notes}</div>}
-    <footer style={{...rule,textAlign:'center',breakInside:'avoid'}}>
+    <footer style={{...rule,textAlign:'center',breakInside:'avoid',display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',alignItems:'center',gap:6}}>
       <div style={{display:'flex',justifyContent:'center',gap:'5mm'}}>
         {receipt.tracking_qr && receipt.tracking_url && <a href={receipt.tracking_url} target="_blank" rel="noopener noreferrer" aria-label="Track this order" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.tracking_qr} alt="Scan to track this order" style={{display:'block',width:'28mm',height:'28mm',background:'#fff'}}/><span style={{fontSize:9}}>Track order</span></a>}
       </div>
+      <div style={{minWidth:0}}>
       <div style={{fontWeight:700,fontSize:11,marginTop:2}}>{website.replace(/^https?:\/\//,'').replace(/\/$/,'')}</div>
-      <div style={{fontSize:9}}>24-hour delivery within Kathmandu</div>
+      <div style={{fontSize:10,margin:'5px 0'}}>24-hour delivery<br/>within Kathmandu</div>
       <div style={{fontSize:9}}>Thank you! Visit again.</div>
+      </div>
     </footer>
   </article>;
 };
