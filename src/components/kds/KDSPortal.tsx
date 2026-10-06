@@ -245,6 +245,12 @@ export const KDSPortal: React.FC = () => {
               })
               .filter(Boolean);
 
+            for (const part of i.combo_components || []) {
+              if (part.requires_kitchen === false) continue;
+              const choices = (part.modifiers || []).map((m: any) => m.name).join(', ');
+              modifiersList.push(`${part.quantity * (i.quantity || 1)} x ${part.product_name}${part.variant_name ? ` (${part.variant_name})` : ''}${choices ? ` - ${choices}` : ''}`);
+            }
+
             if (i.item_notes && i.item_notes.trim()) {
               modifiersList.push(`Note: ${i.item_notes.trim()}`);
             }

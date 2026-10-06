@@ -32,6 +32,7 @@ export interface ComboPackageDefinition {
   basePrice: number;
   originalPrice: number;
   includedProductIds: string[];
+  comboProducts?: Product[];
   comboItems?: { productId: string; productName?: string; quantity: number; unitPrice?: number }[];
 }
 
@@ -83,6 +84,9 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
   const products = productsOverride || contextProducts;
   const [isQuoting, setIsQuoting] = useState(false);
 
+  const componentProducts = [...(combo?.comboProducts || []), ...products];
+  const missingComponents = !!combo && combo.includedProductIds.some(id => !componentProducts.some(p => p.id === id));
+
   // Selected items in the combo
   const [items, setItems] = useState<ComboItemConfig[]>([]);
   const [inspectProduct, setInspectProduct] = useState<Product | null>(null);
@@ -114,7 +118,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
       }
 
       initialItems = Array.from(mergedMap.values()).map((ci, idx) => {
-        const prod = products.find((p) => p.id === ci.productId);
+        const prod = componentProducts.find((p) => p.id === ci.productId);
         if (!prod) return null;
 
         const defaultVariant = prod.variants.find((v) => v.isDefault) || prod.variants[0];
@@ -154,7 +158,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
       }
 
       initialItems = Array.from(countMap.entries()).map(([pid, qty], idx) => {
-        const prod = products.find((p) => p.id === pid);
+        const prod = componentProducts.find((p) => p.id === pid);
         if (!prod) return null;
 
         const defaultVariant = prod.variants.find((v) => v.isDefault) || prod.variants[0];
@@ -207,7 +211,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
       }
 
       setItems(Array.from(mergedSelections.values()).flatMap((line, index) => {
-        const product = products.find((p) => p.id === line.product_id);
+        const product = componentProducts.find((p) => p.id === line.product_id);
         if (!product) return [];
         const selectedVariant = product.variants.find((v) => v.id === line.variant_id) || product.variants.find((v) => v.isDefault) || product.variants[0];
         const selectedModifiers = product.modifierGroups.flatMap((g) =>
@@ -250,14 +254,14 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
   const [livePrice,setLivePrice] = useState<{key:string;price:number}|null>(null);
   const [priceError,setPriceError] = useState('');
   useEffect(()=>{
-    if(!isOpen||!combo||!activeItems.length)return;
+    if(!isOpen||!combo||!activeItems.length||missingComponents)return;
     const controller=new AbortController();let live=true;
     const timer=setTimeout(()=>apiClient.post<any>(catalogPath('quote/',currentOutlet.id),JSON.parse(quoteBody),{signal:controller.signal})
       .then(result=>{if(live){setLivePrice({key:quoteBody,price:Number(result.items[0].unit_price)});setPriceError('');}})
       .catch(()=>{if(live)setPriceError('Check required choices and availability.');}),250);
     return()=>{live=false;clearTimeout(timer);controller.abort();};
   },[isOpen,currentOutlet.id,quoteBody]);
-  const priceReady = livePrice?.key===quoteBody;
+  const priceReady = !missingComponents && livePrice?.key===quoteBody;
   const comboTotalPrice = priceReady ? livePrice.price : combo?.basePrice || 0;
   const totalSavings = Math.max(0,(combo?.originalPrice || comboTotalPrice)-comboTotalPrice);
   const totalItemCount = activeItems.reduce((sum,item)=>sum+item.quantity,0);
@@ -475,6 +479,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
         contentClassName="p-0"
       >
         <div className="flex flex-col max-h-[88vh] overflow-hidden">
+          {(missingComponents || priceError) && <p role="alert" className="p-3 text-sm text-red-600">{missingComponents ? 'This package could not load all included items. Please reopen it shortly.' : priceError}</p>}
           {/* ALWAYS VISIBLE TOP BAR: Title, Live Total Price, "+ Add Item" & "Add to Cart" */}
           <div className="sticky top-0 z-30 bg-white dark:bg-[#151518] px-3 sm:px-4 py-2.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 shadow-xs">
             {/* Left: Clean Combo Title & Dynamic Package Price */}
@@ -527,7 +532,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
               <button
                 type="button"
                 onClick={handleAddToCart}
-                disabled={isQuoting || activeItems.length === 0}
+                disabled={isQuoting || !priceReady || activeItems.length === 0}
                 className="h-8 sm:h-8.5 px-3 sm:px-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wide cursor-pointer transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 border border-amber-600"
               >
                 <ShoppingBag className="w-3.5 h-3.5 stroke-[2.5]" />

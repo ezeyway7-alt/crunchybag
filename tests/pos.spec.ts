@@ -49,6 +49,7 @@ async function setup(page: Page) {
     revision: "initial",
     menuRevision: 0,
     failCreate: false,
+    canDelete: true,
     loseCreateResponse: false,
     savedResponses: {},
     receipts: {},
@@ -132,6 +133,7 @@ async function setup(page: Page) {
           kitchen: true,
           discount: true,
           refund: true,
+          delete_order: state.canDelete,
         },
         fulfillment_modes: ["TAKEAWAY", "DINE_IN"],
         payment_methods: ["CASH", "CARD", "CREDIT"],
@@ -573,4 +575,37 @@ test('kitchen hands over a ready round while the next round keeps its own timer 
   await page.getByRole('button',{name:'HAND OVER ROUND',exact:true}).click();
   await expect.poll(()=>order.status).toBe('COMPLETED');
   expect(state.writes.filter((w:any)=>w.path.endsWith('/round/')).map((w:any)=>w.body.round_number)).toEqual([1,2,2]);
+});
+
+
+test('admin deletion requires typed confirmation and removes the order from the register',async({page})=>{
+  const state=await setup(page);await addBurger(page);await fireOrder(page).click();
+  await page.getByRole('button',{name:'Close dialog'}).click();
+  const order=state.orders[0];
+  await page.route('**/api/v1/orders/pos/*/delete/**',async route=>{
+    const request=route.request(),body=request.postDataJSON();
+    expect(request.headers()['idempotency-key']).toBeTruthy();
+    expect(body).toEqual({version:order.version,confirmation:order.order_number,restore_stock:false});
+    state.orders=[];
+    await route.fulfill({json:{deleted:true,order_id:order.id}});
+  });
+  await page.goto('/admin?tab=overview');
+  await page.getByTitle('View complete order details & item audit').first().click();
+  await page.getByRole('button',{name:'Delete order permanently',exact:true}).click();
+  const confirm=page.getByRole('button',{name:'Delete order and billing',exact:true});
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel('Order number to confirm deletion').fill('wrong');await expect(confirm).toBeDisabled();
+  await page.getByLabel('Order number to confirm deletion').fill(order.order_number);
+  await expect(confirm).toBeEnabled();await confirm.click();
+  await expect(page.getByLabel('Order number to confirm deletion')).toHaveCount(0);
+  await expect.poll(()=>state.orders.length).toBe(0);
+  await expect(page.getByTitle('View complete order details & item audit')).toHaveCount(0);
+});
+
+test('order deletion button is absent without backend permission',async({page})=>{
+  const state=await setup(page);await addBurger(page);await fireOrder(page).click();
+  await page.getByRole('button',{name:'Close dialog'}).click();state.canDelete=false;
+  await page.goto('/admin?tab=overview');
+  await page.getByTitle('View complete order details & item audit').first().click();
+  await expect(page.getByRole('button',{name:'Delete order permanently',exact:true})).toHaveCount(0);
 });

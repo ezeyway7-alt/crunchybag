@@ -104,6 +104,26 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
   const [printSlipOrder, setPrintSlipOrder] = useState<Order | null>(null);
   const [dispatchOrder, setDispatchOrder] = useState<Order | null>(null);
   const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState<PosOrder | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [restoreDeletedStock, setRestoreDeletedStock] = useState(false);
+  const deleteCommand = usePosCommand(posSession, "delete");
+  const closeDeletion = () => {
+    if (deleteCommand.busy || deleteCommand.hasPending) return;
+    setDeletingOrder(null);
+    deleteCommand.setError('');
+  };
+  const finishDeletion = () => {
+    setDeletingOrder(null);
+    setSelectedOrderForDrawer(null);
+    setPrintSlipOrder(null);
+    setDispatchOrder(null);
+    addToast({title:'Order permanently deleted',description:'The order and its linked billing records were removed.',type:'success'});
+  };
+  useEffect(() => {
+    setDeletingOrder(null);
+    setDeleteConfirmation('');
+  }, [posSession.outlet]);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
 
@@ -1252,6 +1272,12 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
               </div>
             </div>
 
+            {posSession.meta?.permissions.delete_order && backendOrder(selectedOrderForDrawer) && <button
+              type="button" className="px-3 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-600 disabled:opacity-50"
+              disabled={posCommand.busy || posCommand.hasPending}
+              onClick={() => {setDeletingOrder(backendOrder(selectedOrderForDrawer)!);setDeleteConfirmation('');setRestoreDeletedStock(false);deleteCommand.setError('');}}
+            >Delete order permanently</button>}
+
             {/* Action Buttons in Drawer */}
             <div className="pt-2 flex items-center justify-between gap-2 border-t border-zinc-800">
               <button
@@ -1290,6 +1316,33 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
           </div>
         </Drawer>
       )}
+
+      {deletingOrder && <Modal isOpen onClose={closeDeletion} title={`Delete order ${deletingOrder.order_number}?`} maxWidth="md">
+        <div className="p-4 space-y-4 text-sm">
+          <p>This permanently deletes this order, bills, receipts, payments, linked daybook entries, credit and loyalty purchases. This cannot be undone and does not refund a bank or wallet payment.</p>
+          <label className="flex gap-2 items-start"><input type="checkbox" checked={restoreDeletedStock}
+            disabled={deleteCommand.busy || deleteCommand.hasPending} onChange={e=>setRestoreDeletedStock(e.target.checked)}/>
+            Return deducted stock (for a test or duplicate order). Leave unchecked if the food was used.</label>
+          <label className="block">Type {deletingOrder.order_number} to confirm
+            <input aria-label="Order number to confirm deletion" autoComplete="off" value={deleteConfirmation}
+              disabled={deleteCommand.busy || deleteCommand.hasPending} onChange={e=>setDeleteConfirmation(e.target.value)}
+              className="mt-2 w-full border border-zinc-600 bg-zinc-900 text-white p-2"/>
+          </label>
+          {deleteCommand.error && <p role="alert" className="text-rose-400">{deleteCommand.error}</p>}
+          {deleteCommand.hasPending && <button type="button" disabled={deleteCommand.busy} className="underline" onClick={async()=>{
+            const result=await deleteCommand.recover();if(result)finishDeletion();
+          }}>Check deletion result</button>}
+          <div className="flex justify-end gap-3">
+            <button type="button" disabled={deleteCommand.busy || deleteCommand.hasPending} onClick={closeDeletion}>Keep order</button>
+            <button type="button" disabled={deleteCommand.busy || deleteCommand.hasPending || deleteConfirmation!==deletingOrder.order_number}
+              className="px-3 py-2 bg-red-700 text-white font-bold disabled:opacity-40" onClick={async()=>{
+                const result=await deleteCommand.run<{deleted:boolean}>(`${deletingOrder.id}/delete/`, {
+                  version:deletingOrder.version,confirmation:deleteConfirmation,restore_stock:restoreDeletedStock});
+                if(result?.deleted)finishDeletion();
+              }}>{deleteCommand.busy?'Deleting...':'Delete order and billing'}</button>
+          </div>
+        </div>
+      </Modal>}
 
       {/* 2. RECEIPT & TOKEN SLIP MODAL */}
       {printSlipOrder && (

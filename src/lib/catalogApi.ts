@@ -26,6 +26,7 @@ export function fromProduct(row: any): Product {
     isComboPackage: row.is_combo_package, comboDiscountType: row.combo_discount_type,
     comboDiscountValue: row.combo_discount_value == null ? undefined : Number(row.combo_discount_value),
     comboOriginalPrice: row.combo_original_price == null ? undefined : Number(row.combo_original_price),
+    comboProducts: (row.combo_products || []).map(fromProduct),
     comboItems: (row.combo_items || []).map((r: any) => ({ productId: String(r.product_id), productName: r.product_name, quantity: r.quantity, unitPrice: Number(r.unit_price) })),
     variants: row.variants?.length ? row.variants.map((v: any) => ({ id: String(v.id), name: v.name, price: Number(v.price), isDefault: v.is_default })) : [{ id: '', name: 'Standard', price: Number(row.base_price), isDefault: true }],
     modifierGroups: (row.modifier_groups || []).map((g: any) => ({ id: String(g.id), name: g.name, minSelections: g.min_selections, maxSelections: g.max_selections, required: g.required, options: (g.options || []).map((o: any) => ({ id: String(o.id), name: o.name, priceDelta: Number(o.price_delta || 0), isDefault: !!o.is_default })) })),
@@ -124,5 +125,6 @@ export function comboDefinitions(products: Product[]) {
     image: p.images[p.mainImageIndex || 0] || '', basePrice: p.basePrice, originalPrice: p.comboOriginalPrice ?? p.basePrice,
     includedProductIds: (p.comboItems || []).flatMap(item => Array(item.quantity).fill(item.productId)),
     comboItems: p.comboItems || [],
+    comboProducts: p.comboProducts || [],
   }));
 }

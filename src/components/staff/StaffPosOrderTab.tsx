@@ -168,7 +168,12 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const receipt=receiptState.receipt;
   const receiptPreview = receipt?.snapshot ? posOrderToOrder(receipt.snapshot, currentOutlet.name) : printSlipOrder;
   useEffect(() => {
-    setSelectedOrderForDrawer(previous => previous ? findOrder(previous.id) || previous : null);
+    setSelectedOrderForDrawer(previous => {
+      if (!previous) return null;
+      const latest = [...orders, ...ongoingOrders].filter(o => o.id === previous.id)
+        .sort((a, b) => (backendOrder(b)?.version || 0) - (backendOrder(a)?.version || 0))[0];
+      return latest && (backendOrder(latest)?.version || 0) >= (backendOrder(previous)?.version || 0) ? latest : previous;
+    });
   }, [orders, ongoingOrders]);
   useEffect(() => {
     const message = posSession.error || posCommand.error || menu.error || registerQuery.error || backendOngoingQuery.error;

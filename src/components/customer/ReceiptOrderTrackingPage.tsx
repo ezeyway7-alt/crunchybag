@@ -1,6 +1,6 @@
 import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
 import React,{useEffect,useRef,useState} from 'react';
-import {apiClient} from '../../lib/api';
+import {apiClient,ApiError} from '../../lib/api';
 import {useOutletEvents} from '../../lib/useOutletEvents';
 import {CrunchyLogo} from '../common/CrunchyLogo';
 
@@ -14,7 +14,7 @@ export const ReceiptOrderTrackingPage:React.FC=()=>{
     try{const row=await apiClient.get<any>(`/orders/tracking/?token=${encodeURIComponent(token)}`,{skipAuth:true});
       if(!row.order_number || !row.outlet_id)throw new Error('Order tracking is unavailable.');
       if(seq===sequence.current){setOrder(row);setError('');}
-    }catch(error:any){if(seq===sequence.current)setError(error.message || 'Unable to load this order.');}
+    }catch(error:any){if(seq===sequence.current){if(error instanceof ApiError && error.status===404)setOrder(null);setError(error.message || 'Unable to load this order.');}}
   };
   useEffect(()=>{setOrder(null);void refresh();return()=>{sequence.current++;};},[token]);
   const live=useOutletEvents(String(order?.outlet_id || ''),!!order?.outlet_id,()=>void refresh());

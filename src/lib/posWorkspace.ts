@@ -180,6 +180,17 @@ export function usePosOrderFeed(session: PosSession, filters: Record<string, str
     }, 150);
     return () => { live = false; clearTimeout(timer); abort.abort(); };
   }, [session.enabled, !!session.meta, scope, session.revision]);
+  useEffect(() => {
+    const changed = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      const order = detail?.order as PosOrder | undefined;
+      if (String(detail?.outlet) !== String(session.outlet) || !order?.id || !Array.isArray(order.items)) return;
+      setState(previous => ({ ...previous, results: previous.results.map(old =>
+        old.id === order.id && order.version >= old.version ? order : old) }));
+    };
+    window.addEventListener('pos:order-changed', changed);
+    return () => window.removeEventListener('pos:order-changed', changed);
+  }, [session.outlet]);
   return state.scope === scope ? state : { results: [], error: '', loading: session.enabled };
 }
 

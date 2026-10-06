@@ -264,6 +264,13 @@ export function usePosSession() {
   const [error, setError] = useState("");
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
   useEffect(() => {
+    const changed = (event: Event) => {
+      if (String((event as CustomEvent).detail?.outlet) === String(outlet)) refresh();
+    };
+    window.addEventListener('pos:order-changed', changed);
+    return () => window.removeEventListener('pos:order-changed', changed);
+  }, [outlet, refresh]);
+  useEffect(() => {
     setMeta(null);
     setError("");
     if (!enabled) {
@@ -494,12 +501,12 @@ export function usePosOrders(
   ]);
   return { data, error, loading };
 }
-export function usePosCommand(session: PosSession) {
+export function usePosCommand(session: PosSession, namespace = "") {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [hasPending, setHasPending] = useState(false);
   const { authUser } = useAuth();
-  const storageKey = `pos-pending:${authUser?.id}:${session.outlet}`;
+  const storageKey = `pos-pending:${authUser?.id}:${session.outlet}${namespace ? `:${namespace}` : ""}`;
   type Pending = {
     signature: string;
     key: string;
@@ -518,10 +525,10 @@ export function usePosCommand(session: PosSession) {
     }
     setHasPending(!!pending.current);
   }, [storageKey]);
-  const run = async (
+  const run = async <T = PosOrder>(
     path: string,
     body: unknown,
-  ): Promise<PosOrder | undefined> => {
+  ): Promise<T | undefined> => {
     if (lock.current) return;
     lock.current = true;
     setBusy(true);
@@ -538,7 +545,7 @@ export function usePosCommand(session: PosSession) {
       if (!pending.current)
         pending.current = { signature, key: crypto.randomUUID(), path, body };
       sessionStorage.setItem(storageKey, JSON.stringify(pending.current));
-      const result = await apiClient.post<PosOrder>(
+      const result = await apiClient.post<T>(
         posPath(session.outlet, path),
         body,
         { headers: { "Idempotency-Key": pending.current.key } },
@@ -546,7 +553,7 @@ export function usePosCommand(session: PosSession) {
       pending.current = null;
       setHasPending(false);
       sessionStorage.removeItem(storageKey);
-      session.refresh();
+      window.dispatchEvent(new CustomEvent('pos:order-changed', { detail: { outlet: session.outlet, order: result } }));
       return result;
     } catch (e) {
       if (e instanceof ApiError && e.status >= 400 && e.status < 500) {

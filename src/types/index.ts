@@ -146,6 +146,7 @@ export interface Product {
   isDirectInventoryItem?: boolean; // If item is directly sold from inventory purchases (e.g. cigarettes, red bull)
   linkedInventoryItemId?: string; // specific InventoryItem.id
   isComboPackage?: boolean; // True if this item is a Combo Package deal
+  comboProducts?: Product[];
   comboItems?: ComboPackageItem[]; // bundled menu items inside this package
   comboDiscountType?: "percentage" | "fixed_price" | "amount_off";
   comboDiscountValue?: number;
