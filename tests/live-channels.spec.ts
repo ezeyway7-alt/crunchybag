@@ -1,4 +1,4 @@
-import {receiptFixture} from "./receiptFixture";
+import {receiptFixture,receiptQr} from "./receiptFixture";
 import {readFileSync} from 'node:fs';
 import {test,expect,Page} from '@playwright/test';
 
@@ -151,7 +151,7 @@ test('kiosk persists the tray and contact details and retries a lost response wi
   await expect(page.getByText('KIOSK-1-00000005',{exact:true}).first()).toBeVisible();
   await expect(page.getByRole('article',{name:'Order receipt'})).toContainText('Saved Street, Kathmandu');
   await expect(page.getByRole('article',{name:'Order receipt'})).toHaveAttribute('data-receipt-format','compact-v1');
-  await expect(page.getByRole('link',{name:'Track this order'})).toHaveAttribute('href',/track\?token=receipt-signed/);
+  await expect(page.getByRole('link',{name:'Open payment QR'})).toHaveAttribute('href',receiptQr);
   expect(state.writes).toHaveLength(2);expect(state.writes[0].key).toBe(state.writes[1].key);
   expect(state.writes[0].body).toMatchObject({order_source:'KIOSK',customer_name:'Suraj',customer_phone:'9800000000',items:[{product_id:'burger',quantity:1}],expected_total:'200.00'});
   state.orders[0].status='READY';emit(state);

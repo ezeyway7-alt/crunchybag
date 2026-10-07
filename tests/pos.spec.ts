@@ -496,13 +496,13 @@ test('delivery kitchen handover dispatches instead of completing the order',asyn
 });
 
 
-test('staff token and settled bill use the same saved compact receipt and tracking QR',async({page})=>{
+test('staff token and settled bill use the same saved compact receipt and payment QR',async({page})=>{
   const state=await setup(page);await addBurger(page);await expect(fireOrder(page)).toBeEnabled();await fireOrder(page).click();
   const paper=page.getByRole('article',{name:'Order receipt'});
   await expect(paper).toHaveAttribute('data-receipt-format','compact-v1');
   await expect(paper).toContainText('Actual outlet address');
   await expect(paper.getByTestId('receipt-order-number')).toHaveText(state.orders[0].order_number);
-  const tracking=await paper.getByRole('link',{name:'Track this order'}).getAttribute('href');
+  const tracking=await paper.getByRole('link',{name:'Open payment QR'}).getAttribute('href');
   await page.getByRole('button',{name:'Close dialog'}).click();
   await page.getByRole('button',{name:'Bill',exact:true}).first().click();
   await expect(page.getByLabel('Amount applied')).toHaveValue('220');
@@ -511,7 +511,7 @@ test('staff token and settled bill use the same saved compact receipt and tracki
   await expect(paper).toContainText('Bill');await expect(paper).not.toContainText('VAT');
   await expect(paper.getByRole('img',{name:'Scan to visit our website'})).toBeVisible();
   await expect(paper).toContainText('24-hour delivery within Kathmandu');
-  await expect(paper.getByRole('link',{name:'Track this order'})).toHaveAttribute('href',tracking!);
+  await expect(paper.getByRole('link',{name:'Open payment QR'})).toHaveAttribute('href',tracking!);
   await expect.poll(()=>state.orders[0].paid_amount).toBe('220.00');
   await page.screenshot({path:test.info().outputPath('compact-staff-bill.png'),fullPage:true});
 });

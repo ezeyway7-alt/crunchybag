@@ -1,4 +1,4 @@
-import {receiptFixture} from "./receiptFixture";
+import {receiptFixture,receiptQr} from "./receiptFixture";
 import {test,expect,Page} from '@playwright/test';
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0x8AAAAASUVORK5CYII=';
 async function setup(page:Page, signedIn=false, role='CUSTOMER', hiddenComboItem=false) {
@@ -283,12 +283,12 @@ test('web receipt uses the saved outlet compact format and prints only the same 
   const paper=page.getByRole('article',{name:'Order receipt'});
   await expect(paper).toHaveAttribute('data-receipt-format','compact-v1');await expect(paper).toContainText('Saved Street, Kathmandu');
   await expect(paper.getByTestId('receipt-order-number')).toHaveText('WEB-REAL-7');
-  await expect(paper.getByRole('img',{name:'Scan to track this order'})).toBeVisible();
+  await expect(paper.getByRole('img',{name:'Scan to pay'})).toBeVisible();
   const size=await paper.boundingBox();expect(size!.width).toBeLessThanOrEqual(288);
   await page.screenshot({path:test.info().outputPath('compact-web-receipt.png'),fullPage:true});
   const popupPromise=page.waitForEvent('popup');await page.locator('#print-receipt-btn').click();const popup=await popupPromise;
   await expect(popup.getByRole('article',{name:'Order receipt'})).toHaveAttribute('data-receipt-format','compact-v1');
-  await expect(popup.getByRole('link',{name:'Track this order'})).toHaveAttribute('href','http://127.0.0.1:4173/track?token=receipt-signed');
+  await expect(popup.getByRole('link',{name:'Open payment QR'})).toHaveAttribute('href',receiptQr);
   await expect(popup.getByRole('button')).toHaveCount(0);await popup.close();
 });
 

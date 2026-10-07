@@ -3,6 +3,7 @@ import React from 'react';
 export interface ReceiptDocument {
   number:string;kind:string;created_at:string;snapshot:any;
   tracking_url?:string;tracking_qr?:string;website_url?:string;website_qr?:string;
+  payment_qr?:string|null;
 }
 export function consolidateReceiptItems(rawItems: any[]): any[] {
   if (!Array.isArray(rawItems)) return [];
@@ -134,10 +135,10 @@ export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})
     </div>
     {s.notes && <div style={{...rule,fontSize:10}}>Note: {s.notes}</div>}
     <footer style={{...rule,textAlign:'center',breakInside:'avoid',display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr)',alignItems:'center',gap:6}}>
-      <div style={{display:'flex',justifyContent:'center',gap:'5mm'}}>
-        {receipt.tracking_qr && receipt.tracking_url && <a href={receipt.tracking_url} target="_blank" rel="noopener noreferrer" aria-label="Track this order" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.tracking_qr} alt="Scan to track this order" style={{display:'block',width:'28mm',height:'28mm',background:'#fff'}}/><span style={{fontSize:9}}>Track order</span></a>}
+      <div style={{display:'flex',justifyContent:'center',gridColumn:'1 / -1'}}>
+        {receipt.payment_qr && <a href={receipt.payment_qr} target="_blank" rel="noopener noreferrer" aria-label="Open payment QR" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.payment_qr} alt="Scan to pay" style={{display:'block',width:'40mm',height:'auto',margin:'0 auto',background:'#fff'}}/><span style={{fontSize:9}}>Scan to pay</span></a>}
       </div>
-      <div style={{minWidth:0}}>
+      <div style={{minWidth:0,gridColumn:'1 / -1'}}>
       <div style={{fontWeight:700,fontSize:11,marginTop:2}}>{website.replace(/^https?:\/\//,'').replace(/\/$/,'')}</div>
       <div style={{fontSize:10,margin:'5px 0'}}>24-hour delivery <br/>within Kathmandu</div>
       <div style={{fontSize:9}}>Thank you! Visit again.</div>
