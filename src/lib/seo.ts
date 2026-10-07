@@ -21,7 +21,7 @@ export interface SEOMetadata {
 const DEFAULT_METADATA: SEOMetadata = {
   title: 'Crunchy Bag | Fried Chicken & Burgers in Imadol, Lalitpur',
   description:
-    "Order Kathmandu's best crispy fried chicken, gourmet smash burgers, crunchy pakodas, and combos online from Crunchy Bag. Express food delivery across Kathmandu, Lalitpur & Bhaktapur with instant eSewa & cash payment.",
+    "Order fried chicken, burgers, pakodas and family combos from Crunchy Bag in Imadol, Lalitpur. Browse the menu, book a table or contact us for delivery.",
   canonical: 'https://crunchybag.com/',
   image: 'https://crunchybag.com/crunchy_logo.png',
   noIndex: false,
@@ -30,6 +30,15 @@ const DEFAULT_METADATA: SEOMetadata = {
 
 export function updatePageSEO(meta: SEOMetadata) {
   const merged = { ...DEFAULT_METADATA, ...meta };
+
+  // A breadcrumb from a prerendered page must not survive navigation elsewhere.
+  const breadcrumbs = document.getElementById('route-breadcrumbs');
+  if (breadcrumbs && merged.canonical) {
+    try {
+      const entries = JSON.parse(breadcrumbs.textContent || '{}').itemListElement || [];
+      if (entries.at(-1)?.item !== merged.canonical) breadcrumbs.remove();
+    } catch { breadcrumbs.remove(); }
+  }
 
   // 1. Update Document Title
   if (merged.title) {

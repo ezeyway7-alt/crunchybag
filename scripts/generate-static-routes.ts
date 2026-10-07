@@ -719,7 +719,13 @@ async function generateStaticRoutes() {
       );
     }
 
-    // 7. Inject Article JSON-LD Schema into <head>
+    // Breadcrumbs describe this page's ancestry, never unrelated sibling pages.
+    const crumbs = [{ '@type': 'ListItem', position: 1, name: 'Crunchy Bag', item: 'https://crunchybag.com/' },
+      ...(canonicalPath.startsWith('/product/') ? [{ '@type': 'ListItem', position: 2, name: 'Menu', item: 'https://crunchybag.com/menu' }] : [])];
+    crumbs.push({ '@type': 'ListItem', position: crumbs.length + 1, name: route.h1, item: `https://crunchybag.com${canonicalPath}` });
+    pageHtml = pageHtml.replace('</head>', `<script id="route-breadcrumbs" type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs }).replace(/</g, '\\u003c')}</script></head>`);
+
+    // 7. Inject route JSON-LD Schema into <head>
     if (route.schemaJson) {
       pageHtml = pageHtml.replace(
         /<\/head>/i,
@@ -734,10 +740,10 @@ async function generateStaticRoutes() {
         route.contentHtml.trim()
       );
     } else {
-      // For categories, update H1 cleanly
+      // Give each route its own heading and description.
       pageHtml = pageHtml.replace(
-        /<h1\b[^>]*>.*?<\/h1>/i,
-        `<h1>${escapeHtml(route.h1)}</h1>`
+        /<main id="app-landing-summary"[\s\S]*?<\/main>/i,
+        `<main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300"><h1>${escapeHtml(route.h1)}</h1><p>${escapeHtml(route.description)}</p><nav><a href="/">Home</a> / <a href="/menu">Food Menu</a> / <a href="/combos">Combos</a> / <a href="/contact">Contact &amp; Directions</a></nav></main>`
       );
     }
 
@@ -764,7 +770,7 @@ async function generateStaticRoutes() {
   const canonicalPaths = ['/', ...STATIC_ROUTES.filter(route => !route.noIndex &&
     (!route.canonicalPath || route.canonicalPath === route.path) &&
     route.path !== '/blog' && !route.path.startsWith('/blogs/')).map(route => route.path)];
-  const sitemap = (paths: string[]) => `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[...new Set(paths)].map(url => `  <url><loc>https://crunchybag.com${escapeHtml(url)}</loc></url>`).join('\n')}\n</urlset>\n`;
+  const sitemap = (paths: string[]) => `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${[...new Set(paths)].map(url => `  <url><loc>https://crunchybag.com${escapeHtml(url)}</loc>${STATIC_ROUTES.find(route => route.path === url)?.image ? `<image:image><image:loc>${escapeHtml(STATIC_ROUTES.find(route => route.path === url)!.image)}</image:loc></image:image>` : ''}</url>`).join('\n')}\n</urlset>\n`;
   fs.writeFileSync(path.join(distDir, 'sitemap.xml'), sitemap(canonicalPaths));
   for (const [name, prefix] of [['menu', '/product/'], ['delivery', '/delivery'], ['combos', '/combos']]) {
     fs.writeFileSync(path.join(distDir, `sitemap-${name}.xml`), sitemap(canonicalPaths.filter(url => url.startsWith(prefix))));

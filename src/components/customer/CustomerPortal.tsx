@@ -1,3 +1,4 @@
+import { productSEO } from '../../lib/productSEO';
 import { BlogsPortalPage } from "./BlogsPortalPage";
 import { BlogDetailPage } from "./BlogDetailPage";
 import { readStaticInformation, StaticInformationPage } from "./StaticInformationPage";
@@ -149,6 +150,7 @@ export const CustomerPortal: React.FC = () => {
         description: product.description || `Order ${product.name} online from Crunchy Bag Kathmandu with fast delivery & instant eSewa.`,
         image: product.images?.[0] || "https://crunchybag.com/crunchy_logo.png",
         canonical: `https://crunchybag.com${cleanPath}`,
+        schema: productSEO(product, `https://crunchybag.com${cleanPath}`),
       });
     }
   };

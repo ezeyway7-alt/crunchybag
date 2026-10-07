@@ -1,3 +1,4 @@
+import { productSEO } from '../src/lib/productSEO';
 import fs from 'node:fs';
 import { productPath } from '../src/lib/productRoutes';
 
@@ -31,11 +32,13 @@ export async function productPages() {
       h1: product.name,
       description,
       image,
+      schemaJson: JSON.stringify(productSEO(product, `https://crunchybag.com${canonicalPath}`)),
       contentHtml: `<main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300">
         <nav><a href="/">Crunchy Bag</a> / <a href="/menu">Menu</a></nav>
         <h1>${escapeHtml(product.name)}</h1>
         ${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(product.name)}" width="480" />` : ''}
         <p>${escapeHtml(description)}</p>
+        <p>Base price: NPR ${escapeHtml(product.base_price)}. Required choices and extras may change the total.</p>
         <p>Prepared at Crunchy Bag, Imadol, Lalitpur. Current options, availability and prices are shown when ordering.</p>
         <a href="/menu">Browse the full menu</a>
       </main>`,

@@ -78,3 +78,21 @@ test('delivery information survives React mounting and identifies the real outle
   await expect(page.locator('#app-landing-summary')).not.toContainText('Kings Way flagship');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://crunchybag.com/delivery/thamel');
 });
+
+
+test('brand icons and product metadata are present without JavaScript', () => {
+  const home = fs.readFileSync('dist/index.html', 'utf8');
+  expect(home).toContain('href="/favicon-96.png"');
+  expect(home).not.toContain('"@type": "BreadcrumbList"');
+  for (const icon of ['favicon-96.png', 'apple-touch-icon.png', 'icon-512.png', 'favicon.ico']) {
+    expect(fs.statSync(`dist/${icon}`).size).toBeGreaterThan(100);
+  }
+  const html = fs.readFileSync(`dist${productUrl}/index.html`, 'utf8');
+  const schema = JSON.parse(html.match(/id="dynamic-route-schema" type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]);
+  expect(schema['@type']).toBe('Product');
+  expect(schema.name).toBeTruthy();
+  expect(schema.image.length).toBeGreaterThan(0);
+  expect(schema.url).toBe(`https://crunchybag.com${productUrl}`);
+  expect(html).toContain('Base price: NPR');
+  expect(fs.readFileSync('dist/sitemap-menu.xml', 'utf8')).toContain('<image:loc>');
+});
