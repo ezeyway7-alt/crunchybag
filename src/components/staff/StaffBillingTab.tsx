@@ -1,3 +1,4 @@
+import { CustomerPicker } from "../common/CustomerPicker";
 import {useOrderReceipt} from "../../lib/orderReceipt";
 import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
 import React, { useState, useMemo, useEffect } from "react";
@@ -479,6 +480,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
             </div>
           </div>
 
+<CustomerPicker outlet={posSession.outlet} onSelect={customer => { setCustomerName(customer.name); setCustomerPhone(customer.phone); }} />
           {/* Customer Info & Credit Sale (Khata) Phone Verification Strip */}
           <div
             className={`p-2 border flex flex-wrap items-center justify-between gap-2 text-[11px] transition-colors ${

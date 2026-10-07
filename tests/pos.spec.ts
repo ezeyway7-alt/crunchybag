@@ -346,6 +346,28 @@ async function setup(page: Page) {
 }
 
 const addBurger = (page: Page) => page.getByRole('button', { name: /Test Burger/ }).click();
+
+test('customer picker focuses search, selects matches, and accepts a new phone', async ({ page }) => {
+  await setup(page);
+  await page.route('**/orders/pos/customers/**', async route => {
+    const query = new URL(route.request().url()).searchParams.get('search') || '';
+    await route.fulfill({ json: { results: query.includes('980') ? [] : [{ name: 'Returning Customer', phone: '+9779841234567' }] } });
+  });
+  const selector = page.getByRole('button', { name: 'Select customer / Search phone or name' });
+  await selector.click();
+  const search = page.getByRole('textbox', { name: 'Search customer by phone or name' });
+  await expect(search).toBeFocused();
+  await search.fill('Returning');
+  await page.getByRole('button', { name: 'Returning Customer · +9779841234567' }).click();
+  await expect(page.locator('#pos-customer-phone')).toHaveValue('+9779841234567');
+  await expect(page.getByPlaceholder('Walk-in Guest')).toHaveValue('Returning Customer');
+  await selector.click();
+  await expect(search).toBeFocused();
+  await search.fill('9800000012');
+  await page.getByRole('button', { name: 'Use new customer: 9800000012' }).click();
+  await expect(page.locator('#pos-customer-phone')).toHaveValue('9800000012');
+  await expect(page.getByPlaceholder('Walk-in Guest')).toHaveValue('');
+});
 const fireOrder = (page: Page) => page.getByRole('button', { name: /FIRE ORDER TO KITCHEN/ });
 
 test('an unchanged cart does not repeat quotes, metadata, or socket tickets while idle', async ({ page }) => {
@@ -622,3 +644,21 @@ test('POS shows the backend discount remarks validation instead of a generic err
   expect(state.orders).toHaveLength(0);
   await expect(fireOrder(page)).toBeEnabled();
 });
+
+test('order details drawer in pos_orders has print token button below print slip and opens token preview', async ({page}) => {
+  const state = await setup(page);
+  await addBurger(page);
+  await fireOrder(page).click();
+  await page.getByRole('button', {name: 'Close dialog'}).click();
+
+  await page.getByTitle('View Full Order Drawer').first().click();
+  const printTokenBtn = page.getByTestId('print-token-btn');
+  await expect(printTokenBtn).toBeVisible();
+  await expect(printTokenBtn).toContainText('Print Token');
+
+  await printTokenBtn.click();
+  await expect(page.getByText('Customer Token Slip Preview')).toBeVisible();
+  await expect(page.getByTestId('token-slip-number')).toHaveText(state.orders[0].order_number);
+  await expect(page.getByTestId('confirm-print-token-btn')).toBeVisible();
+});
+

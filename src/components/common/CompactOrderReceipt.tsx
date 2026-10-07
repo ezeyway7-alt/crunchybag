@@ -85,8 +85,8 @@ export function consolidateReceiptItems(rawItems: any[]): any[] {
   return order.map(k => map.get(k)!);
 }
 
-const line:React.CSSProperties={display:'flex',justifyContent:'space-between',gap:8};
-const rule:React.CSSProperties={borderTop:'1px dashed #aaa',paddingTop:6,marginTop:6};
+const line:React.CSSProperties={display:'flex',justifyContent:'space-between',gap:6};
+const rule:React.CSSProperties={borderTop:'1px dashed #aaa',paddingTop:3,marginTop:3};
 export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})=>{
   const s=receipt.snapshot, seller=s.seller || {};
   const logo='/bill_logo.jpg';
@@ -94,58 +94,62 @@ export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})
   const amount=(value:any)=>Number(value || 0).toLocaleString('en-NP',{minimumFractionDigits:2,maximumFractionDigits:2});
   const rows=[['Subtotal',s.subtotal],['Discount',s.discount_amount],['Service charge',s.service_charge_amount],['Rounding savings',s.cash_round_down_savings]];
   const consolidatedItems = consolidateReceiptItems(s.items || []);
-  return <article aria-label="Order receipt" data-receipt-format="compact-v1" style={{width:'100%',maxWidth:'76mm',boxSizing:'border-box',margin:'0 auto',position:'relative',isolation:'isolate',padding:'2mm',background:'#fff',color:'#111',fontFamily:'ui-monospace,monospace',fontSize:11,lineHeight:1.35,overflowWrap:'anywhere',colorScheme:'light'}}>
-    <header style={{textAlign:'center',display:'grid',gridTemplateColumns:receipt.website_qr?'20mm minmax(0,1fr) 20mm':'20mm minmax(0,1fr)',alignItems:'center',gap:4}}>
-      <img src={logo} alt="Restaurant logo" width={76} height={76} style={{width:'20mm',height:'20mm',objectFit:'contain'}}/>
+  return <article aria-label="Order receipt" data-receipt-format="compact-v1" style={{width:'100%',maxWidth:'76mm',boxSizing:'border-box',margin:'0 auto',position:'relative',isolation:'isolate',padding:'1.5mm',background:'#fff',color:'#111',fontFamily:'ui-monospace,monospace',fontSize:10.5,lineHeight:1.22,overflowWrap:'anywhere',colorScheme:'light'}}>
+    <header style={{textAlign:'center',display:'grid',gridTemplateColumns:receipt.website_qr?'18mm minmax(0,1fr) 18mm':'18mm minmax(0,1fr)',alignItems:'center',gap:4}}>
+      <img src={logo} alt="Restaurant logo" width={76} height={76} style={{width:'18mm',height:'18mm',objectFit:'contain'}}/>
       <div style={{flex:1,minWidth:0}}>
-      <h2 style={{fontSize:17,fontWeight:800,margin:0}}>{seller.name}</h2>
-      {seller.address && <div style={{fontSize:10}}>{seller.address}</div>}
-      {seller.phone && <div style={{fontSize:10}}>Tel: {seller.phone}</div>}
+      <h2 style={{fontSize:15,fontWeight:800,margin:0,lineHeight:1.2}}>{seller.name}</h2>
+      {seller.address && <div style={{fontSize:9.5,lineHeight:1.2}}>{seller.address}</div>}
+      {seller.phone && <div style={{fontSize:9.5,lineHeight:1.2}}>Tel: {seller.phone}</div>}
       </div>
-        {receipt.website_qr && <a href={website} target="_blank" rel="noopener noreferrer" aria-label="Visit our website" style={{color:'inherit',textDecoration:'none',flexShrink:0}}><img src={receipt.website_qr} alt="Scan to visit our website" style={{display:'block',width:'20mm',height:'20mm',background:'#fff'}}/><span style={{fontSize:9}}>Order online</span></a>}
+        {receipt.website_qr && <a href={website} target="_blank" rel="noopener noreferrer" aria-label="Visit our website" style={{color:'inherit',textDecoration:'none',flexShrink:0}}><img src={receipt.website_qr} alt="Scan to visit our website" style={{display:'block',width:'18mm',height:'18mm',background:'#fff'}}/><span style={{fontSize:8.5}}>Order online</span></a>}
     </header>
-    <div style={{...rule,textAlign:'center'}}>
-      <div style={{fontSize:9,textTransform:'uppercase'}}>{receipt.kind==='TOKEN'?'Order token':receipt.kind==='REFUND'?'Refund receipt':'Bill'}</div>
-      <div data-testid="receipt-order-number" style={{fontSize:23,fontWeight:900,lineHeight:1.2,margin:'2px 0'}}>{s.order_number}</div>
-      <div style={{fontSize:10}}>{s.fulfillment_type?.replace(/_/g,' ')}{s.table_number?` | ${s.table_number}`:''}</div>
-      <div style={{fontSize:9,color:'#444'}}>Ref: {receipt.number}</div>
-      <div style={{fontSize:9,color:'#444'}}>{new Date(receipt.created_at).toLocaleString('en-GB',{timeZone:'Asia/Kathmandu',dateStyle:'short',timeStyle:'short'})}</div>
+    <div style={{...rule,display:'flex',justifyContent:'space-between',alignItems:'center',gap:4}}>
+      <div style={{minWidth:0}}>
+        <div style={{fontSize:9,textTransform:'uppercase',letterSpacing:0.5,color:'#333'}}>{receipt.kind==='TOKEN'?'Order token':receipt.kind==='REFUND'?'Refund receipt':'Bill'}</div>
+        <div data-testid="receipt-order-number" style={{fontSize:23,fontWeight:900,lineHeight:1.1,margin:'1px 0'}}>{s.order_number}</div>
+      </div>
+      <div style={{textAlign:'right',fontSize:9,color:'#444',lineHeight:1.2,flexShrink:0}}>
+        <div style={{fontSize:10,fontWeight:700,color:'#111'}}>{s.fulfillment_type?.replace(/_/g,' ')}{s.table_number?` | ${s.table_number}`:''}</div>
+        <div>Ref: {receipt.number}</div>
+        <div>{new Date(receipt.created_at).toLocaleString('en-GB',{timeZone:'Asia/Kathmandu',dateStyle:'short',timeStyle:'short'})}</div>
+      </div>
     </div>
-    {(s.customer_name || s.customer_phone) && <div style={rule}>{s.customer_name}{s.customer_phone && <div style={{fontSize:10}}>{s.customer_phone}</div>}</div>}
+    {(s.customer_name || s.customer_phone) && <div style={{...rule,...line,fontSize:9.5}}><span>{s.customer_name}</span>{s.customer_phone && <span>Tel: {s.customer_phone}</span>}</div>}
     <div style={{...rule,display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',columnGap:4}}>
       <strong>Item</strong><strong style={{textAlign:'center'}}>Qty</strong><strong style={{textAlign:'right'}}>Amount</strong>
-      {consolidatedItems.map((item:any,index:number)=><div key={item.id || index} style={{gridColumn:'1 / -1',padding:'3px 0',breakInside:'avoid'}}>
-        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',gap:4}}><strong>{item.product_name}</strong><span style={{textAlign:'center'}}>{item.quantity}</span><span style={{textAlign:'right'}}>{amount(item.line_total)}</span></div>
-        {item.variant_name && <div style={{fontSize:10,color:'#444'}}>{item.variant_name}</div>}
-        {(item.modifiers || []).length>0 && <div style={{fontSize:10,color:'#444'}}>{item.modifiers.map((m:any)=>typeof m === 'string' ? m : (m.name || m.option_name)).filter(Boolean).join(', ')}</div>}
-        {(item.combo_components || []).map((part:any,i:number)=><div key={i} style={{fontSize:10,paddingLeft:8}}>{part.quantity * item.quantity} x {part.product_name || part.name}{part.variant_name?` (${part.variant_name})`:''}{part.modifiers?.length?` - ${part.modifiers.map((m:any)=>typeof m === 'string' ? m : (m.name || m.option_name)).filter(Boolean).join(', ')}`:''}</div>)}
-        {item.item_notes && <div style={{fontSize:10}}>Note: {item.item_notes}</div>}
+      {consolidatedItems.map((item:any,index:number)=><div key={item.id || index} style={{gridColumn:'1 / -1',padding:'1.5px 0',breakInside:'avoid'}}>
+        <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',gap:4,lineHeight:1.2}}><strong>{item.product_name}</strong><span style={{textAlign:'center'}}>{item.quantity}</span><span style={{textAlign:'right'}}>{amount(item.line_total)}</span></div>
+        {item.variant_name && <div style={{fontSize:9,color:'#444',lineHeight:1.2}}>{item.variant_name}</div>}
+        {(item.modifiers || []).length>0 && <div style={{fontSize:9,color:'#444',lineHeight:1.2}}>{item.modifiers.map((m:any)=>typeof m === 'string' ? m : (m.name || m.option_name)).filter(Boolean).join(', ')}</div>}
+        {(item.combo_components || []).map((part:any,i:number)=><div key={i} style={{fontSize:9,paddingLeft:6,lineHeight:1.2}}>{part.quantity * item.quantity} x {part.product_name || part.name}{part.variant_name?` (${part.variant_name})`:''}{part.modifiers?.length?` - ${part.modifiers.map((m:any)=>typeof m === 'string' ? m : (m.name || m.option_name)).filter(Boolean).join(', ')}`:''}</div>)}
+        {item.item_notes && <div style={{fontSize:9,lineHeight:1.2}}>Note: {item.item_notes}</div>}
       </div>)}
     </div>
     <div style={rule}>
-      {rows.filter(([name,value])=>name==='Subtotal' || Number(value)>0).map(([name,value])=><div key={name} style={{...line,fontSize:10}}><span>{name}</span><span>{amount(value)}</span></div>)}
-      <div style={{...line,fontWeight:800,fontSize:13,borderTop:'1px solid #222',paddingTop:4,marginTop:4}}><span>Total ({seller.currency || 'NPR'})</span><span>{amount(s.total_payable)}</span></div>
-      <div style={line}><span>Paid</span><span>{amount(s.paid_amount)}</span></div>
-      <div style={{...line,fontWeight:700}}><span>Due</span><span>{amount(s.due_amount)}</span></div>
-      {Number(s.credit_amount)>0 && <div style={line}><span>Khata balance</span><span>{amount(s.credit_amount)}</span></div>}
-      {Number(s.refunded_amount)>0 && <div style={line}><span>Refunded</span><span>{amount(s.refunded_amount)}</span></div>}
-      {s.payment_method && <div style={{fontSize:10}}>Method: {s.payment_method.replace(/_/g,' ')}</div>}
-      {(s.payments || []).filter((p:any)=>p.status==='SUCCESS').map((p:any,index:number)=><div key={index} style={{...line,fontSize:10}}><span>{p.method}</span><span>{amount(p.amount)}</span></div>)}
-      {s.payment_review==='PENDING' && <div style={{fontSize:10}}>Payment verification pending</div>}
+      {rows.filter(([name,value])=>name==='Subtotal' || Number(value)>0).map(([name,value])=><div key={name} style={{...line,fontSize:9.5,lineHeight:1.25}}><span>{name}</span><span>{amount(value)}</span></div>)}
+      <div style={{...line,fontWeight:800,fontSize:12.5,borderTop:'1px solid #222',paddingTop:3,marginTop:3}}><span>Total ({seller.currency || 'NPR'})</span><span>{amount(s.total_payable)}</span></div>
+      <div style={{...line,fontSize:9.5,lineHeight:1.25}}><span>Paid</span><span>{amount(s.paid_amount)}</span></div>
+      <div style={{...line,fontWeight:700,fontSize:9.5,lineHeight:1.25}}><span>Due</span><span>{amount(s.due_amount)}</span></div>
+      {Number(s.credit_amount)>0 && <div style={{...line,fontSize:9.5,lineHeight:1.25}}><span>Khata balance</span><span>{amount(s.credit_amount)}</span></div>}
+      {Number(s.refunded_amount)>0 && <div style={{...line,fontSize:9.5,lineHeight:1.25}}><span>Refunded</span><span>{amount(s.refunded_amount)}</span></div>}
+      {s.payment_method && <div style={{fontSize:9.5,lineHeight:1.25}}>Method: {s.payment_method.replace(/_/g,' ')}</div>}
+      {(s.payments || []).filter((p:any)=>p.status==='SUCCESS').map((p:any,index:number)=><div key={index} style={{...line,fontSize:9.5,lineHeight:1.25}}><span>{p.method}</span><span>{amount(p.amount)}</span></div>)}
+      {s.payment_review==='PENDING' && <div style={{fontSize:9.5,lineHeight:1.25}}>Payment verification pending</div>}
     </div>
-    {s.notes && <div style={{...rule,fontSize:10}}>Note: {s.notes}</div>}
-    <footer style={{...rule,textAlign:'center',breakInside:'avoid',display:'grid',gridTemplateColumns:(receipt.payment_qr || receipt.tracking_qr)?'minmax(0,1fr) minmax(0,1fr)':'1fr',alignItems:'center',gap:6}}>
+    {s.notes && <div style={{...rule,fontSize:9.5}}>Note: {s.notes}</div>}
+    <footer style={{...rule,textAlign:'center',breakInside:'avoid',display:'grid',gridTemplateColumns:(receipt.payment_qr || receipt.tracking_qr)?'minmax(0,1fr) minmax(0,1fr)':'1fr',alignItems:'center',gap:4}}>
       <div style={{display:'flex',justifyContent:'center',alignItems:'center'}}>
         {receipt.payment_qr ? (
-          <a href={receipt.payment_qr} target="_blank" rel="noopener noreferrer" aria-label="Open payment QR" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.payment_qr} alt="Scan to pay" style={{display:'block',width:'28mm',height:'28mm',margin:'0 auto',background:'#fff'}}/><span style={{fontSize:9}}>Scan to pay</span></a>
+          <a href={receipt.payment_qr} target="_blank" rel="noopener noreferrer" aria-label="Open payment QR" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.payment_qr} alt="Scan to pay" style={{display:'block',width:'24mm',height:'24mm',margin:'0 auto',background:'#fff'}}/><span style={{fontSize:8.5}}>Scan to pay</span></a>
         ) : receipt.tracking_qr && receipt.tracking_url ? (
-          <a href={receipt.tracking_url} target="_blank" rel="noopener noreferrer" aria-label="Track this order" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.tracking_qr} alt="Scan to track this order" style={{display:'block',width:'28mm',height:'28mm',margin:'0 auto',background:'#fff'}}/><span style={{fontSize:9}}>Track order</span></a>
+          <a href={receipt.tracking_url} target="_blank" rel="noopener noreferrer" aria-label="Track this order" style={{color:'inherit',textDecoration:'none'}}><img src={receipt.tracking_qr} alt="Scan to track this order" style={{display:'block',width:'24mm',height:'24mm',margin:'0 auto',background:'#fff'}}/><span style={{fontSize:8.5}}>Track order</span></a>
         ) : null}
       </div>
       <div style={{minWidth:0}}>
-      <div style={{fontWeight:700,fontSize:11,marginTop:2}}>{website.replace(/^https?:\/\//,'').replace(/\/$/,'')}</div>
-      <div style={{fontSize:10,margin:'5px 0'}}>24-hour delivery <br/>within Kathmandu</div>
-      <div style={{fontSize:9}}>Thank you! Visit again.</div>
+        <div style={{fontWeight:700,fontSize:10.5,marginTop:1}}>{website.replace(/^https?:\/\//,'').replace(/\/$/,'')}</div>
+        <div style={{fontSize:9,margin:'2px 0',lineHeight:1.2}}>24-hour delivery <br/>within Kathmandu</div>
+        <div style={{fontSize:8.5}}>Thank you! Visit again.</div>
       </div>
     </footer>
   </article>;

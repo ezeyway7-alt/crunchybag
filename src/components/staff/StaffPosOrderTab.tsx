@@ -1,6 +1,8 @@
+import { CustomerPicker } from "../common/CustomerPicker";
 import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
 import {useOrderReceipt} from "../../lib/orderReceipt";
 import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
+import {printTokenOnly, TokenOnlySlip} from "../../lib/tokenPrinting";
 import { DeliveryOrderDetails, deliveryInfo, DeliveryDispatchModal } from "../customer/DeliveryOrderDetails";
 import React, { useState, useMemo, useEffect } from "react";
 import {
@@ -140,6 +142,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   // Modals & Drawers
   const [selectedOrderForDrawer, setSelectedOrderForDrawer] = useState<Order | null>(null);
   const [printSlipOrder, setPrintSlipOrder] = useState<Order | null>(null);
+  const [printTokenOrder, setPrintTokenOrder] = useState<Order | null>(null);
   const [dispatchOrder, setDispatchOrder] = useState<Order | null>(null);
 
   // -------------------------------------------------------------
@@ -180,7 +183,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
     if (message) addToast({ title: 'POS request failed', description: message, type: 'error' });
   }, [posSession.error, posCommand.error, menu.error, registerQuery.error, backendOngoingQuery.error]);
   useEffect(() => {
-    setSelectedItems([]); setSelectedOngoingOrderId(''); setSelectedOrderForDrawer(null); setPrintSlipOrder(null); setTableNumber('');
+    setSelectedItems([]); setSelectedOngoingOrderId(''); setSelectedOrderForDrawer(null); setPrintSlipOrder(null); setPrintTokenOrder(null); setTableNumber('');
   }, [posSession.outlet]);
 
   // Loyalty Phone Auto-Check
@@ -891,6 +894,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                   </div>
                 </div>
 
+<CustomerPicker outlet={posSession.outlet} onSelect={customer => { setCustomerName(customer.name); setCustomerPhone(customer.phone); }} />
                 {/* Customer Phone & Name */}
                 <div className="space-y-1.5">
                   <div className={`grid ${fulfillmentType === "DINE_IN" ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
@@ -2243,6 +2247,15 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
               >
                 <Printer className="w-3.5 h-3.5" /> Print Thermal Slip
               </button>
+
+              <button
+                type="button"
+                data-testid="print-token-btn"
+                onClick={() => setPrintTokenOrder(selectedOrderForDrawer)}
+                className="w-full py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 font-bold text-xs flex items-center justify-center gap-1.5 border border-amber-500/40 cursor-pointer transition-colors"
+              >
+                <Receipt className="w-3.5 h-3.5" /> Print Token
+              </button>
             </div>
           </div>
         )}
@@ -2272,6 +2285,38 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                 className="w-full py-2 bg-black text-white font-bold text-xs uppercase tracking-wider cursor-pointer"
               >
                 Print Slip
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* -------------------------------------------------------------
+          CUSTOMER TOKEN ONLY PRINT MODAL
+      ------------------------------------------------------------- */}
+      {printTokenOrder && (
+        <Modal
+          isOpen={!!printTokenOrder}
+          onClose={() => setPrintTokenOrder(null)}
+          title="Customer Token Slip Preview"
+          size="sm"
+        >
+          <div className="space-y-3">
+            <TokenOnlySlip order={printTokenOrder} outletName={currentOutlet.name} />
+            <div className="pt-2">
+              <button
+                type="button"
+                data-testid="confirm-print-token-btn"
+                onClick={() => {
+                  try {
+                    printTokenOnly(printTokenOrder, currentOutlet.name);
+                  } catch (e: any) {
+                    addToast({ title: 'Print failed', description: e?.message || 'Could not print token slip', type: 'error' });
+                  }
+                }}
+                className="w-full py-2 bg-black text-amber-400 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-900 border border-amber-500/30"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print Token
               </button>
             </div>
           </div>

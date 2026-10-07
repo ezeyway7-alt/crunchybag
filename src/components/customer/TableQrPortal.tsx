@@ -1,3 +1,4 @@
+import { CustomerPicker } from "../common/CustomerPicker";
 import { extractErrorMessage } from "../../lib/api";
 import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
 import {backendOrder, PreparationRound, PosItem} from '../../lib/posApi';
@@ -561,6 +562,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       ------------------------------------------------------------- */}
       <section className="bg-[#0D0D11] border-b border-zinc-800/60 px-2.5 sm:px-3.5 py-2 sm:py-2.5 w-full max-w-full">
         <div className="max-w-md mx-auto space-y-2 w-full min-w-0">
+<CustomerPicker personalCustomer={{ name: customerProfile.name || "", phone: customerProfile.phone || "" }} onSelect={customer => { setGuestName(customer.name); setPhoneNumber(customer.phone); }} />
           {/* Optional Contact Number & Customer Name */}
           <div className="grid grid-cols-2 gap-1.5 sm:gap-2 w-full">
             <div className="min-w-0 flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 bg-[#141418] border border-zinc-800/80 focus-within:border-amber-500/80 transition-colors overflow-hidden">
