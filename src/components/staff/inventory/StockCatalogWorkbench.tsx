@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "../../../lib/api";
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
   Search,
@@ -207,46 +208,8 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
         // Synchronize live backend items into AppContext so Stock Audit & movements have identical stock
         syncBackendInventory(data.results);
       }
-    } catch {
-      // Local fallback
-      const local = localInventoryRef.current;
-      const filtered = local.filter((item) => {
-        const matchCat = selectedCategory === "ALL" || item.category === selectedCategory;
-        const q = debouncedSearch.toLowerCase().trim();
-        const matchSearch =
-          !q ||
-          item.name.toLowerCase().includes(q) ||
-          item.category.toLowerCase().includes(q) ||
-          item.supplierName.toLowerCase().includes(q);
-        const matchLow = !isLowStockOnly || item.currentStock <= item.minThreshold;
-        return matchCat && matchSearch && matchLow;
-      });
-
-      const totalValuation = local.reduce((sum, i) => sum + i.currentStock * i.costPerUnit, 0);
-      const lowCount = local.filter((i) => i.currentStock <= i.minThreshold).length;
-
-      setMetrics({
-        count: local.length,
-        low_stock_count: lowCount,
-        total_valuation: totalValuation,
-      });
-
-      setCatalogResults(
-        filtered.map((i) => ({
-          id: i.id,
-          sku: `SKU-${i.id.slice(0, 8).toUpperCase()}`,
-          name: i.name,
-          category_name: i.category,
-          supplier_name: i.supplierName,
-          current_stock: i.currentStock,
-          unit: i.unit.toUpperCase(),
-          min_threshold: i.minThreshold,
-          cost_per_unit: i.costPerUnit,
-          total_valuation: i.currentStock * i.costPerUnit,
-          is_low_stock: i.currentStock <= i.minThreshold,
-          last_restocked: i.lastRestocked,
-        }))
-      );
+    } catch (error) {
+      addToast({title:'Stock catalog could not be loaded', description:extractErrorMessage(error), type:'error'});
     } finally {
       setIsLoading(false);
     }
@@ -336,19 +299,8 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
 
       setIsAuditModalOpen(false);
       loadCatalog();
-    } catch {
-      // Local fallback
-      auditRows.forEach((r) => {
-        const val = parseFloat(r.physicalStock) || 0;
-        updateInventoryStock(String(r.itemId), val);
-      });
-      addToast({
-        title: "Audit Saved Locally",
-        description: "Physical counts updated in system.",
-        type: "info",
-      });
-      setIsAuditModalOpen(false);
-      loadCatalog();
+    } catch (error) {
+      addToast({title:'Audit could not be saved', description:extractErrorMessage(error), type:'error'});
     } finally {
       setIsSubmittingAudit(false);
     }
@@ -413,8 +365,9 @@ export const StockCatalogWorkbench: React.FC<StockCatalogWorkbenchProps> = ({
           },
         ],
       });
-    } catch {
-      // Reconciled locally if offline
+    } catch (error) {
+      addToast({title:"Stock could not be updated", description:extractErrorMessage(error), type:"error"});
+      return;
     }
 
     updateInventoryStock(String(item.id), val, "Quick stock adjustment");

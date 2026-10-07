@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "../../lib/api";
 import React, { useState, useEffect, useMemo } from "react";
 import { apiClient } from "../../lib/api";
 import { PosSession, usePosCommand, posPath } from "../../lib/posApi";
@@ -147,7 +148,7 @@ export function PosTableManager({ session, onClose }: PosTableManagerProps) {
       const data = await apiClient.get<any>(`/tables/${table.id}/qr/?outlet_id=${session.outlet}`);
       setQrData(data);
     } catch (err: any) {
-      setQrError(err.message || "Failed to generate table QR code.");
+      setQrError(extractErrorMessage(err));
     } finally {
       setQrBusy(false);
     }
@@ -290,7 +291,7 @@ export function PosTableManager({ session, onClose }: PosTableManagerProps) {
     } catch (err: any) {
       addToast({
         title: "Failed to Add Table",
-        description: err.message || "An error occurred while creating the table.",
+        description: extractErrorMessage(err),
         type: "error",
       });
     } finally {
@@ -321,7 +322,7 @@ export function PosTableManager({ session, onClose }: PosTableManagerProps) {
     } catch (err: any) {
       addToast({
         title: "Failed to Add Floor",
-        description: err.message || "An error occurred creating the floor section.",
+        description: extractErrorMessage(err),
         type: "error",
       });
     } finally {
@@ -364,7 +365,7 @@ export function PosTableManager({ session, onClose }: PosTableManagerProps) {
     } catch (err: any) {
       addToast({
         title: "Update Failed",
-        description: err.message || "Could not update table details.",
+        description: extractErrorMessage(err),
         type: "error",
       });
     } finally {
@@ -398,7 +399,7 @@ export function PosTableManager({ session, onClose }: PosTableManagerProps) {
     } catch (err: any) {
       addToast({
         title: "Delete Failed",
-        description: err.message || "Failed to delete table.",
+        description: extractErrorMessage(err),
         type: "error",
       });
     } finally {

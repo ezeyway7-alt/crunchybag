@@ -1,7 +1,7 @@
 import {receiptFixture} from "./receiptFixture";
 import {test,expect,Page} from '@playwright/test';
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0x8AAAAASUVORK5CYII=';
-async function setup(page:Page, signedIn=false, role='CUSTOMER') {
+async function setup(page:Page, signedIn=false, role='CUSTOMER', hiddenComboItem=false) {
   // External font availability must not hold up storefront navigation in tests.
   await page.route('https://fonts.googleapis.com/**', route => route.abort());
   page.on('pageerror',e=>console.log('BROWSER ERROR',e.stack));
@@ -9,6 +9,11 @@ async function setup(page:Page, signedIn=false, role='CUSTOMER') {
   const outlet={id:1,name:'Web Outlet',branch_code:'WEB',enable_delivery:true,enable_takeaway:true,accepting_orders:true};
   const product={id:'burger',category:'food',name:'Web Burger',description:'Burger',base_price:'200.00',variants:[],modifier_groups:[],images:[`data:image/png;base64,${png}`],dietary_tags:[],is_available:true,is_web_visible:true,is_delivery_eligible:true,requires_kitchen:true};
   const combo={...product,id:'combo',name:'Web Combo',base_price:'350.00',is_combo_package:true,combo_discount_type:'fixed_price',combo_discount_value:'350.00',combo_items:[{product_id:'burger',product_name:'Web Burger',quantity:2,unit_price:'200.00'}]};
+  if (hiddenComboItem) {
+    const hidden = {...product, id:'hidden-chicken', name:'Included Fried Chicken', is_web_visible:false};
+    combo.combo_items = [{product_id:product.id,product_name:product.name,quantity:1,unit_price:'200.00'}, {product_id:hidden.id,product_name:hidden.name,quantity:1,unit_price:'200.00'}];
+    (combo as any).combo_products = [product, hidden];
+  }
   const state:any={user,outlet,orders:[],favorites:[],calls:[],writes:[],sockets:[],created:0,failCreate:false,cart:{items:[],version:0},merges:new Set(),addresses:[]};
   if(signedIn)await page.addInitScript(({user,outlet})=>{localStorage.setItem('crunchy_access_token','test-access');localStorage.setItem('crunchy_refresh_token','test-refresh');localStorage.setItem('crunchy_auth_user',JSON.stringify(user));localStorage.setItem('crunchy_auth_outlet',JSON.stringify(outlet));},{user,outlet});
   await page.addInitScript(()=>{document.cookie='csrftoken=abcdefghijklmnopqrstuvwx12345678; path=/';});
@@ -515,4 +520,16 @@ test('customer orders view opens full orders list first and shows tracking detai
   // Drill down into ORD-B202
   await page.getByRole('button', {name: 'View order ORD-B202'}).click();
   await expect(page.getByRole('heading', {name: 'Order #ORD-B202'})).toBeVisible();
+});
+
+
+test('combo retains included products hidden from standalone menu', async ({page}) => {
+  const state = await setup(page, false, 'CUSTOMER', true);
+  await page.getByRole('button', {name:'Customize', exact:true}).click();
+  await expect(page.getByText('Included Fried Chicken', {exact:true})).toBeVisible();
+  await expect(page.getByText('2 items', {exact:true})).toBeVisible();
+  await expect.poll(() => state.writes.filter(w => w.path === 'catalog/quote/').length).toBeGreaterThan(0);
+  const quote = state.writes.filter(w => w.path === 'catalog/quote/').at(-1);
+  expect(quote.body.items[0].combo_selections.map(i => i.product_id)).toEqual(['burger','hidden-chicken']);
+  await expect(page.getByRole('button', {name:/Add to Cart/i}).last()).toBeEnabled();
 });

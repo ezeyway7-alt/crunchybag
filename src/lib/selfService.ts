@@ -1,3 +1,5 @@
+import { reportApiError } from "./api";
+import { extractErrorMessage } from "./api";
 import {useEffect,useRef,useState} from 'react';
 import {apiClient,ApiError} from './api';
 import {posOrderToOrder} from './posApi';
@@ -26,7 +28,7 @@ export function useSelfServiceOrder(outlet:string,name:string,token:string) {
     const current=++seq.current;
     try{const data=await apiClient.get<any>(`/orders/self-service/order/?token=${encodeURIComponent(token)}`,{skipAuth:true});
       if(current===seq.current && data && (data.id || data.order_number))setOrder(posOrderToOrder(data,name));
-    }catch{}
+    }catch(error){if(current===seq.current)reportApiError(error, "Order tracking could not be refreshed");}
   };
   useEffect(()=>{setOrder(null);void refresh();return()=>{seq.current++;};},[token,outlet]);
   useEffect(()=>{const listener=()=>void refresh();window.addEventListener('self-service:refresh',listener);return()=>window.removeEventListener('self-service:refresh',listener);},[token,outlet]);
@@ -42,7 +44,7 @@ export function useSelfServiceQuote(body:any) {
     if(!key)return;
     const abort=new AbortController();let alive=true;
     const timer=setTimeout(()=>{apiClient.post<any>('/orders/self-service/quote/',JSON.parse(key),{skipAuth:true,signal:abort.signal})
-      .then(quote=>{if(alive)setState({key,quote,error:''});}).catch(error=>{if(alive)setState({key,quote:null,error:error.message});});},200);
+      .then(quote=>{if(alive)setState({key,quote,error:''});}).catch(error=>{if(alive)setState({key,quote:null,error:extractErrorMessage(error)});});},200);
     return()=>{alive=false;clearTimeout(timer);abort.abort();};
   },[key,revision]);
   return {...(state.key===key?state:{quote:null,error:'',key}),refresh};

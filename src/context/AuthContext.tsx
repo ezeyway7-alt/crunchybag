@@ -1,3 +1,4 @@
+import { reportApiError } from "../lib/api";
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import {
   AuthTokens,
@@ -74,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (err) {
         // If 401 and refresh also failed, clear session
-        console.warn("Auth initialization check:", err);
+        if(mounted)reportApiError(err,"Session could not be verified");
       } finally {
         if (mounted) setIsLoading(false);
       }

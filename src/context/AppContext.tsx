@@ -1,3 +1,4 @@
+import { reportApiError } from "../lib/api";
 import { NepaliAudioPlayer, announcementAudioUrl } from "../lib/nepaliAudio";
 import { useOutletEvents } from "../lib/useOutletEvents";
 import { usePersistentCart } from './usePersistentCart';
@@ -604,7 +605,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       } catch (err) {
-        console.warn("Could not fetch branches from backend:", err);
+        reportApiError(err, "Branches could not be loaded");
       }
     };
 
@@ -813,10 +814,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addToast = (toast: Omit<ToastItem, "id">) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { ...toast, id }]);
+    setToasts((prev) => prev.some(t => t.type === "error" && toast.type === "error" && t.description === toast.description) ? prev : [...prev, { ...toast, id }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    }, toast.type === "error" ? 12000 : 4000);
   };
 
   useEffect(() => { if(customerAccount.error) addToast({title:'Customer request failed',description:customerAccount.error,type:'error'}); }, [customerAccount.error]);
@@ -836,7 +837,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!res.results.length || remote.length >= res.count) break;
       }
       if (orderScopeRef.current === scope && sequence === orderLoadRef.current) setOrders(remote.map(po=>posOrderToOrder(po,currentOutlet.name)));
-    } catch (error) { console.warn('Unable to sync live staff orders', error); }
+    } catch (error) { if (sequence === orderLoadRef.current) reportApiError(error, 'Orders could not be refreshed'); }
   }, [staffOrdersEnabled,currentOutlet.id,currentOutlet.name]);
   useEffect(()=>{
     if (staffOrdersEnabled) {
@@ -844,6 +845,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   },[fetchActiveOrders, staffOrdersEnabled]);
   useOutletEvents(String(currentOutlet.id),staffOrdersEnabled,()=>void fetchActiveOrders());
+
+  useEffect(() => {
+    const show = (event: Event) => addToast((event as CustomEvent).detail);
+    window.addEventListener('crunchy:api-error', show);
+    return () => window.removeEventListener('crunchy:api-error', show);
+  }, []);
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));

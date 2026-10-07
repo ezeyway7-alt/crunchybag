@@ -1,0 +1,12 @@
+﻿import { chromium } from 'playwright';
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const page=await browser.newPage();
+page.on('pageerror',e=>console.log('ERROR',e.message));
+page.on('request',r=>{if(r.url().includes('catalog/quote')) console.log('QUOTE',r.postData());});
+await page.goto('https://crunchybag.com/',{waitUntil:'domcontentloaded'});
+const title=page.getByText('Crunchy Beast Combo',{exact:true});
+await title.last().click();
+await page.waitForTimeout(3000);
+console.log((await page.locator('body').innerText()).slice(-8500));
+await page.screenshot({path:'artifacts/live-combo.png'});
+await browser.close();

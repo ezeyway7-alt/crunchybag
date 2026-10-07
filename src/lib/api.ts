@@ -138,18 +138,19 @@ export class ApiError extends Error {
 
 // Concurrency lock and queue for silent token refresh
 let isRefreshing = false;
-let refreshSubscribers: ((newToken: string) => void)[] = [];
+let refreshSubscribers: {resolve: (newToken: string) => void; reject: (error: unknown) => void}[] = [];
 
-const subscribeTokenRefresh = (cb: (newToken: string) => void) => {
-  refreshSubscribers.push(cb);
+const subscribeTokenRefresh = (resolve: (newToken: string) => void, reject: (error: unknown) => void) => {
+  refreshSubscribers.push({resolve, reject});
 };
 
 const onTokenRefreshed = (newToken: string) => {
-  refreshSubscribers.forEach((cb) => cb(newToken));
+  refreshSubscribers.forEach((subscriber) => subscriber.resolve(newToken));
   refreshSubscribers = [];
 };
 
-const onTokenRefreshFailed = () => {
+const onTokenRefreshFailed = (error: unknown) => {
+  refreshSubscribers.forEach(subscriber => subscriber.reject(error));
   refreshSubscribers = [];
 };
 
@@ -157,91 +158,54 @@ const onTokenRefreshFailed = () => {
  * Format human-friendly error messages from DRF backend error payloads.
  * Strictly guarantees no raw HTML strings or technical dumps are shown to the user.
  */
+const genericMessages = /^(error|failed|failure|bad request|validation error|request failed|invalid input)[.!]?$/i;
+
+function responseMessages(value: unknown, path: string[] = []): string[] {
+  if (typeof value === "string") {
+    const message = value.trim();
+    if (!message || genericMessages.test(message) || /<\/?(?:html|body|script|head|!doctype)\b|Traceback \(most recent call last\)|\bat .+\([^)]*:\d+:\d+\)|SQLSTATE|django\.db|password\s*[=:]|authorization\s*[=:]/i.test(message)) return [];
+    return [path.length ? `${path.join(' > ')}: ${message}` : message];
+  }
+  if (Array.isArray(value)) return value.flatMap((part, index) => responseMessages(part,
+    part && typeof part === 'object' ? [...path, `Item ${index + 1}`] : path));
+  if (!value || typeof value !== 'object') return [];
+  const envelopes = new Set(['detail', 'details', 'error', 'errors', 'message', 'messages', 'non_field_errors', 'data']);
+  const metadata = new Set(['code', 'status', 'status_code', 'success', 'type', 'request_id', 'trace_id']);
+  return Object.entries(value).flatMap(([field, part]) => {
+    if (metadata.has(field) && !Array.isArray(part) && (typeof part !== 'object' || part === null)) return [];
+    const label = field.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+    return responseMessages(part, envelopes.has(field) ? path : [...path, label]);
+  });
+}
+
 export function extractErrorMessage(error: unknown): string {
+  const wrapped = error as {response?: {data?: unknown; status?: number}; data?: unknown; status?: number; message?: string} | null;
+  if (!(error instanceof ApiError) && wrapped?.response) return extractErrorMessage(new ApiError(wrapped.message || '', wrapped.response.status || 0, wrapped.response.data));
+  const data = error instanceof ApiError ? error.data : error instanceof Error ? null : error;
+  const messages = [...new Set(responseMessages(data))];
+  if (messages.length) return messages.join('\n');
   if (error instanceof ApiError) {
-    // If backend returned a structured JSON payload
-    if (error.data && typeof error.data === "object") {
-      if (Array.isArray(error.data) && error.data.length > 0) {
-        return typeof error.data[0] === "string" ? error.data[0] : extractErrorMessage(new ApiError(error.message, error.status, error.data[0]));
-      }
-      if (error.data.detail) return String(error.data.detail);
-      if (error.data.error) return String(error.data.error);
-      if (error.data.message) return String(error.data.message);
-      if (Array.isArray(error.data.non_field_errors) && error.data.non_field_errors.length > 0) {
-        return error.data.non_field_errors[0];
-      }
-      // If object with field errors: e.g. { identifier: ["This field is required."] }
-      const entries = Object.entries(error.data);
-      if (entries.length > 0) {
-        const [field, val] = entries[0];
-        // If field is numeric index like "0", return the value directly without "0:"
-        if (/^\d+$/.test(field)) {
-          return Array.isArray(val) ? String(val[0]) : String(val);
-        }
-        const formattedField = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ");
-        if (Array.isArray(val) && val.length > 0) {
-          return `${formattedField}: ${val[0]}`;
-        }
-        if (typeof val === "string") {
-          return `${formattedField}: ${val}`;
-        }
-      }
-    }
-
-    // Check if error.data is a raw string (e.g. HTML error page or text)
-    if (typeof error.data === "string") {
-      const isHtml =
-        error.data.includes("<html") ||
-        error.data.includes("<!doctype") ||
-        error.data.includes("<body") ||
-        error.data.includes("<h1");
-      if (!isHtml && error.data.trim().length > 0 && error.data.length < 200) {
-        return error.data.trim();
-      }
-    }
-
-    // Check if error is related to CSRF
-    const detailLower = String(
-      (error.data && typeof error.data === "object" ? error.data.detail || error.data.error || "" : "") ||
-      (typeof error.data === "string" ? error.data : "") ||
-      error.message ||
-      ""
-    ).toLowerCase();
-
-    if (detailLower.includes("csrf failed") || detailLower.includes("csrf token")) {
-      return "Security session verification failed (CSRF token missing). Please reload the page to refresh session.";
-    }
-
-    // Status code fallbacks
-    if (error.status === 400) {
-      return "Invalid credentials or malformed request. Please check your username/email and password.";
-    }
-    if (error.status === 401) {
-      return "Invalid credentials. Please verify your email, phone, or username and password.";
-    }
-    if (error.status === 403) {
-      return "Account disabled / Access restricted. Contact administration.";
-    }
-    if (error.status === 404) {
-      return "Requested service or endpoint not found on server.";
-    }
-    if (error.status >= 500) {
-      return "Crunchy Bag server error. Please try again shortly.";
-    }
-
-    if (error.message && !error.message.includes("<html") && !error.message.includes("<!doctype")) {
-      return error.message;
-    }
-    return "An unexpected server response occurred. Please try again.";
+    const fallback: Record<number, string> = {
+      0: 'Unable to reach the server. Check your connection and try again.',
+      400: 'Please check the entered values and try again.',
+      401: 'Your session has expired or your sign-in details are incorrect. Please sign in again.',
+      403: 'You do not have permission to perform this action.',
+      404: 'The requested item could not be found.',
+      409: 'This information has changed. Review the latest details and try again.',
+      413: 'The upload is too large. Choose a smaller file.',
+      422: 'Please correct the invalid values and try again.',
+      429: 'Too many requests. Please wait a moment and try again.',
+    };
+    if ([502,503,504].includes(error.status)) return 'The service is temporarily unavailable. Please try again shortly.';
+    if (error.status >= 500) return 'The server could not complete this request. Please try again shortly.';
+    const specific = responseMessages(error.message).filter(message => !/^HTTP Error/i.test(message));
+    return specific.join('\n') || fallback[error.status] || 'The request could not be completed. Please try again.';
   }
-
   if (error instanceof Error) {
-    if (error.message.includes("<html") || error.message.includes("<!doctype")) {
-      return "Server returned an unexpected response. Please try again.";
-    }
-    return error.message;
+    if (/failed to fetch|networkerror|load failed/i.test(error.message)) return 'Unable to reach the server. Check your connection and try again.';
+    return responseMessages(error.message).join('\n') || 'The request could not be completed. Please try again.';
   }
-  return "Unable to connect to server. Please check your internet connection.";
+  return 'The request could not be completed. Please try again.';
 }
 
 /**
@@ -317,6 +281,7 @@ export async function baseRequest<T = any>(
       headers: requestHeaders,
     });
   } catch (networkErr: any) {
+    if (restOptions.signal?.aborted || networkErr?.name === "AbortError") throw networkErr;
     // If request failed (e.g. direct CORS failure), attempt fallback via proxy URL
     if (targetUrl.startsWith(LIVE_API_ORIGIN)) {
       try {
@@ -391,9 +356,10 @@ export async function baseRequest<T = any>(
           });
         } catch (refreshErr) {
           isRefreshing = false;
-          onTokenRefreshFailed();
+          const failure = refreshErr instanceof ApiError ? refreshErr : new ApiError("Session expired. Please sign in again.", 401);
+          onTokenRefreshFailed(failure);
           authStorage.clearSession();
-          throw new ApiError("Session expired. Please sign in again.", 401, refreshErr);
+          throw failure;
         }
       } else {
         // Queue parallel requests until refresh completes
@@ -407,7 +373,7 @@ export async function baseRequest<T = any>(
             })
               .then(resolve)
               .catch(reject);
-          });
+          }, reject);
         });
       }
     } else {
@@ -419,7 +385,7 @@ export async function baseRequest<T = any>(
   // Parse response body
   let responseData: any = null;
   const contentType = response.headers.get("Content-Type") || "";
-  if (contentType.includes("application/json")) {
+  if ((contentType.includes("application/json") || contentType.includes("+json"))) {
     try {
       responseData = await response.json();
     } catch {
@@ -434,20 +400,9 @@ export async function baseRequest<T = any>(
   }
 
   if (!response.ok) {
-    let errorMsg = `HTTP Error ${response.status}: ${response.statusText}`;
-    if (responseData && typeof responseData === "object") {
-      errorMsg = responseData.detail || responseData.error || responseData.message || errorMsg;
-    } else if (typeof responseData === "string") {
-      const isHtml =
-        responseData.includes("<html") ||
-        responseData.includes("<!doctype") ||
-        responseData.includes("<body") ||
-        responseData.includes("<h1");
-      if (!isHtml && responseData.trim().length > 0 && responseData.length < 200) {
-        errorMsg = responseData.trim();
-      }
-    }
-    throw new ApiError(errorMsg, response.status, responseData);
+    const error = new ApiError('', response.status, responseData);
+    error.message = extractErrorMessage(error);
+    throw error;
   }
 
   return responseData as T;
@@ -489,7 +444,11 @@ async function performTokenRefresh(refreshToken: string): Promise<string> {
   }
 
   if (!resp.ok) {
-    throw new Error(`Refresh token rejected with status ${resp.status}`);
+    let data: unknown;
+    try { data = await resp.json(); } catch { data = null; }
+    const error = new ApiError('', resp.status, data);
+    error.message = extractErrorMessage(error);
+    throw error;
   }
 
   const data: RefreshResponse = await resp.json();
@@ -527,8 +486,7 @@ export const branchApi = {
       if (raw?.results && Array.isArray(raw.results)) return raw.results;
       return [];
     } catch (e) {
-      console.warn("Failed to fetch branches from backend:", e);
-      return [];
+      throw e;
     }
   },
 };
@@ -841,3 +799,9 @@ export const apiClient = {
   delete: <T = any>(path: string, options?: RequestOptions) =>
     baseRequest<T>(path, { ...options, method: "DELETE" }),
 };
+
+
+export function reportApiError(error: unknown, title = 'Request could not be completed') {
+  if ((error as {name?: string})?.name === 'AbortError') return;
+  window.dispatchEvent(new CustomEvent('crunchy:api-error', {detail:{title, description:extractErrorMessage(error), type:'error'}}));
+}

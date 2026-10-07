@@ -1,3 +1,5 @@
+import { reportApiError } from "../../../lib/api";
+import { extractErrorMessage } from "../../../lib/api";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Truck,
@@ -101,14 +103,8 @@ const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
             ]);
           }
         }
-      } catch {
-        if (active) {
-          setApiSuppliers([
-            { id: "s1", name: "Valley Poultry & Fresh Farm Nepal", phone: "9841234567" },
-            { id: "s2", name: "Baker King Pvt Ltd", phone: "9851122334" },
-            { id: "s3", name: "Kathmandu Artisan Bakery Pvt. Ltd.", phone: "9801234567" },
-          ]);
-        }
+      } catch (error) {
+        if (active) reportApiError(error, 'Suppliers could not be loaded');
       } finally {
         if (active) setIsLoading(false);
       }
@@ -312,9 +308,7 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({
           const base = DEFAULT_CATEGORIES.filter((c) => !excluded.includes(c));
           setCategories(Array.from(new Set([...names, ...base])));
         }
-      } catch {
-        // Fallback to defaults
-      }
+      } catch (error) {if(active)reportApiError(error,"Categories could not be loaded");}
     };
     if (isOpen) {
       fetchCats();
@@ -397,16 +391,16 @@ const CategorySelect2: React.FC<CategorySelect2Props> = ({
         });
       } else {
         addToast({
-          title: "Category Removed from UI",
-          description: `${result.message} Backend endpoint DELETE /api/v1/inventory/categories/<id>/ will be called on backend update.`,
-          type: "info",
+          title: "Category could not be removed",
+          description: result.message,
+          type: "error",
         });
       }
-    } catch {
+    } catch (error) {
       addToast({
-        title: "Category Removed from UI",
-        description: `Category "${catToDelete}" hidden from selection.`,
-        type: "info",
+        title: "Category could not be removed",
+        description: extractErrorMessage(error),
+        type: "error",
       });
     }
   };
@@ -564,9 +558,7 @@ export const PurchaseInwardWorkbench: React.FC<{
         if (active && res?.results) {
           setApiItems(res.results);
         }
-      } catch {
-        // Fallback to local inventory
-      }
+      } catch (error) {if(active)reportApiError(error,"Purchase items could not be loaded");}
     };
     fetchExisting();
     return () => {
@@ -827,11 +819,10 @@ export const PurchaseInwardWorkbench: React.FC<{
       if (onPurchaseSaved) onPurchaseSaved();
     } catch (err: any) {
       addToast({
-        title: "Inward Recorded Locally",
-        description: "Bill saved. Backend will sync on reconnect.",
-        type: "info",
+        title: "Purchase could not be saved",
+        description: extractErrorMessage(err),
+        type: "error",
       });
-      if (onPurchaseSaved) onPurchaseSaved();
     } finally {
       setIsSubmitting(false);
     }

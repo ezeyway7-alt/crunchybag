@@ -1,4 +1,4 @@
-import { apiClient } from "../../lib/api";
+import { apiClient, extractErrorMessage } from "../../lib/api";
 import { catalogPath } from "../../lib/catalogApi";
 import React, { useState, useEffect, useMemo } from "react";
 import { Modal } from "../common/Modal";
@@ -95,6 +95,8 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
   const [selectedAddCategory, setSelectedAddCategory] = useState<string>("all");
   const [addSearchQuery, setAddSearchQuery] = useState("");
 
+  const definitionKey = JSON.stringify([combo?.comboItems, combo?.includedProductIds,
+    combo?.includedProductIds.map(id => componentProducts.find(p => p.id === id))]);
   // Initialize combo items whenever combo or products change
   useEffect(() => {
     if (!combo || !isOpen) return;
@@ -125,8 +127,8 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
         const defaultMods: SelectedModifier[] = [];
 
         prod.modifierGroups.forEach((group) => {
-          const defOpt = group.options.find((o) => o.isDefault);
-          if (defOpt) {
+          const defaults = group.options.filter((o) => o.isDefault);
+          for (const defOpt of defaults) {
             defaultMods.push({
               groupId: group.id,
               groupName: group.name,
@@ -165,8 +167,8 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
         const defaultMods: SelectedModifier[] = [];
 
         prod.modifierGroups.forEach((group) => {
-          const defOpt = group.options.find((o) => o.isDefault);
-          if (defOpt) {
+          const defaults = group.options.filter((o) => o.isDefault);
+          for (const defOpt of defaults) {
             defaultMods.push({
               groupId: group.id,
               groupName: group.name,
@@ -237,7 +239,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
     } else {
       setItems(initialItems);
     }
-  }, [combo?.id, isOpen]);
+  }, [combo?.id, isOpen, definitionKey]);
 
   // Active items (not removed and quantity > 0)
   const activeItems = useMemo(
@@ -258,7 +260,7 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
     const controller=new AbortController();let live=true;
     const timer=setTimeout(()=>apiClient.post<any>(catalogPath('quote/',currentOutlet.id),JSON.parse(quoteBody),{signal:controller.signal})
       .then(result=>{if(live){setLivePrice({key:quoteBody,price:Number(result.items[0].unit_price)});setPriceError('');}})
-      .catch(()=>{if(live)setPriceError('Check required choices and availability.');}),250);
+      .catch(error=>{if(live)setPriceError(extractErrorMessage(error));}),250);
     return()=>{live=false;clearTimeout(timer);controller.abort();};
   },[isOpen,currentOutlet.id,quoteBody]);
   const priceReady = !missingComponents && livePrice?.key===quoteBody;
@@ -426,8 +428,8 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
         channel: channelOverride || channel, items: [{ product_id: combo.id, quantity: 1, combo_selections: selections }],
       });
       confirmedPrice = Number(quoted.items[0].unit_price);
-    } catch {
-      addToast({ title: "Combo could not be priced", description: "Check availability and required choices, then try again.", type: "error" });
+    } catch (error) {
+      addToast({ title: "Combo could not be priced", description: extractErrorMessage(error), type: "error" });
       setIsQuoting(false); return;
     }
     setIsQuoting(false);
@@ -839,9 +841,9 @@ export const ComboPackageModal: React.FC<ComboPackageModalProps> = ({
                                     >
                                       {isSel && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                                       <span>{opt.name}</span>
-                                      {opt.priceDelta > 0 && (
+                                      {(item.isBaseItem && opt.isDefault) ? <span className="text-[9px]">Included</span> : opt.priceDelta > 0 && (
                                         <span className="text-[9px] font-mono">
-                                          (+{formatNPR(opt.priceDelta)})
+                                          (+{formatNPR(item.isBaseItem && group.maxSelections === 1 ? Math.max(0, opt.priceDelta - group.options.filter(o => o.isDefault).reduce((sum, o) => sum + o.priceDelta, 0)) : opt.priceDelta)})
                                         </span>
                                       )}
                                     </button>

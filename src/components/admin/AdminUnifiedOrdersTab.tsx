@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "../../lib/api";
 import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
@@ -316,7 +317,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
       } catch (err: any) {
         addToast({
           title: "Update Failed",
-          description: err?.message || "Could not transition order status",
+          description: extractErrorMessage(err),
           type: "error",
         });
       } finally {
@@ -349,7 +350,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
     } catch (err: any) {
       addToast({
         title: "Transition Failed",
-        description: err?.message || "Could not update status",
+        description: extractErrorMessage(err),
         type: "error",
       });
     } finally {
@@ -386,7 +387,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
     } catch (err: any) {
       addToast({
         title: "Cancellation Failed",
-        description: err?.message || "Could not cancel order",
+        description: extractErrorMessage(err),
         type: "error",
       });
     } finally {
@@ -1365,7 +1366,7 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
               <button
                 type="button"
                 disabled={!receipt}
-                onClick={() => receipt && printReceiptDocument(receipt).catch(error => alert(error.message))}
+                onClick={() => receipt && printReceiptDocument(receipt).catch(error => alert(extractErrorMessage(error)))}
                 className="px-4 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black rounded-none flex items-center gap-1.5 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />

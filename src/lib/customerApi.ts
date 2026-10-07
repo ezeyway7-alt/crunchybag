@@ -54,7 +54,7 @@ export function useCustomerAccount() {
         if(message.type==='heartbeat'){if(version!==undefined&&version!==message.revision)refresh();version=message.revision;}
       }catch{socket.close();}};
       socket.onerror=()=>socket.close();socket.onclose=e=>{if(e.code!==4403)reconnect();};
-    }catch{reconnect();}};
+    }catch(error){if(!stopped){setError(extractErrorMessage(error));reconnect();}}};
     void connect();
     const ping=()=>{if(socket?.readyState===WebSocket.OPEN){if(Date.now()-heard>65000)socket.close();else socket.send(JSON.stringify({type:'ping'}));}};
     const timer=setInterval(ping,30000);window.addEventListener('online',ping);document.addEventListener('visibilitychange',ping);

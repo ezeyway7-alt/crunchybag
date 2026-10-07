@@ -1,3 +1,5 @@
+import { reportApiError } from "../../lib/api";
+import { extractErrorMessage } from "../../lib/api";
 import {posOrderToOrder} from "../../lib/posApi";
 import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
 import {useOrderReceipt} from "../../lib/orderReceipt";
@@ -188,7 +190,7 @@ export const KioskPortal: React.FC = () => {
       // 1. Fetch tables
       const tableData = await apiClient
         .get<any>(`/orders/self-service/tables/${currentOutlet.id}/`, { skipAuth: true })
-        .catch(() => null);
+        .catch(error => {reportApiError(error,"Kiosk information could not be refreshed");return null;});
 
       if (tableData?.tables && Array.isArray(tableData.tables) && tableData.tables.length > 0) {
         setTables(tableData.tables);
@@ -197,7 +199,7 @@ export const KioskPortal: React.FC = () => {
       // 2. Fetch live active tickets from public display endpoint
       const displayData = await apiClient
         .get<any>(`/orders/display/${currentOutlet.id}/`, { skipAuth: true })
-        .catch(() => null);
+        .catch(error => {reportApiError(error,"Kiosk information could not be refreshed");return null;});
 
       if (displayData?.tickets && Array.isArray(displayData.tickets)) {
         const mapped: Order[] = displayData.tickets.map((t: any) => {
@@ -224,8 +226,8 @@ export const KioskPortal: React.FC = () => {
         });
         setDisplayOrders(mapped);
       }
-    } catch {
-      // Ignore background sync errors
+    } catch (error) {
+      reportApiError(error,"Kiosk information could not be refreshed");
     }
   }, [currentOutlet.id]);
 
@@ -866,7 +868,7 @@ export const KioskPortal: React.FC = () => {
           message: `Round ${nextRound} successfully sent to kitchen for Table ${tableNumber}. Added to Bill #${targetOngoingOrder.orderNumber}.`,
         });
       } catch (err: any) {
-        setOrderError(err.message || 'Failed to append items to table bill.');
+        setOrderError(extractErrorMessage(err));
       } finally {
         submitting.current = false;
         setPaymentProcessing(false);
@@ -897,7 +899,7 @@ export const KioskPortal: React.FC = () => {
       setSavedTotal(Number(created.total_payable));setTrackingToken(created.tracking_token);setReceiptOrder(posOrderToOrder(created,currentOutlet.name));
       setOrderTimeEstimate(`In ${currentOutlet.estimatedPrepTimeMin || 12} mins`);
       playKioskSound('success');setPaymentSuccess(true);setStep('RECEIPT_TOKEN');
-    } catch(error:any){setOrderError(error.message || 'Order not confirmed. Retry to recover the same request.');serverQuote.refresh();}
+    } catch(error:any){setOrderError(extractErrorMessage(error));serverQuote.refresh();}
     finally{submitting.current=false;setPaymentProcessing(false);}
   };
 
@@ -905,7 +907,7 @@ export const KioskPortal: React.FC = () => {
     if(!kioskReceipt.receipt)return;
     setIsPrinting(true);setOrderError('');
     try{await printReceiptDocument(kioskReceipt.receipt);setHasPrinted(true);}
-    catch(error:any){setOrderError(error.message);}
+    catch(error:any){setOrderError(extractErrorMessage(error));}
     finally{setIsPrinting(false);}
   };
 

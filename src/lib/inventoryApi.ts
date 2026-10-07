@@ -1,4 +1,4 @@
-import { baseRequest, ApiError } from "./api";
+import { baseRequest, ApiError, extractErrorMessage } from "./api";
 import { authStorage } from "./authStorage";
 
 export interface BackendInventoryItem {
@@ -163,8 +163,8 @@ export const inventoryApi = {
       if (Array.isArray(res?.results)) return res.results;
       if (Array.isArray(res)) return res;
       return [];
-    } catch {
-      return [];
+    } catch (error) {
+      throw error;
     }
   },
 
@@ -184,8 +184,8 @@ export const inventoryApi = {
       if (Array.isArray(res?.results)) return res.results;
       if (Array.isArray(res)) return res;
       return [];
-    } catch {
-      return [];
+    } catch (error) {
+      throw error;
     }
   },
 
@@ -211,8 +211,8 @@ export const inventoryApi = {
         if (matched && matched.id) {
           targetId = matched.id;
         }
-      } catch {
-        // Ignored
+      } catch (error) {
+        throw error;
       }
     }
 
@@ -258,7 +258,7 @@ export const inventoryApi = {
               success: false,
               method: "FAILED",
               id: targetId,
-              message: `Backend returned error deleting category #${targetId}. Deactivated in UI.`,
+              message: extractErrorMessage(delErr),
             };
           }
         }
@@ -327,8 +327,8 @@ export const inventoryApi = {
       if (Array.isArray(res?.results)) return { count: res.count ?? res.results.length, results: res.results };
       if (Array.isArray(res)) return { count: res.length, results: res };
       return { count: 0, results: [] };
-    } catch {
-      return { count: 0, results: [] };
+    } catch (error) {
+      throw error;
     }
   },
 };

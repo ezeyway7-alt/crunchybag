@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "../../lib/api";
 import React, { useEffect, useId, useRef, useState } from "react";
 import { X, ChevronDown, Check, Loader2, Trash2 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
@@ -49,7 +50,7 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
       } catch (err: any) {
         addToast?.({
           title: "Category could not be created",
-          description: err?.message || "Please check your network connection and try again.",
+          description: extractErrorMessage(err),
           type: "error",
         });
       } finally {
@@ -80,7 +81,7 @@ export function CategorySelect({ value, onChange }: { value: string; onChange: (
     } catch (err: any) {
       addToast?.({
         title: "Could not delete category",
-        description: err?.message || "Failed to remove category. Please try again.",
+        description: extractErrorMessage(err),
         type: "error",
       });
     } finally {

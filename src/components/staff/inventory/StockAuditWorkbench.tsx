@@ -1,3 +1,5 @@
+import { reportApiError } from "../../../lib/api";
+import { extractErrorMessage } from "../../../lib/api";
 import React, { useState, useMemo, useEffect } from "react";
 import {
   Search,
@@ -72,7 +74,7 @@ export const StockAuditWorkbench: React.FC = () => {
         if (active && data?.results && data.results.length > 0) {
           syncBackendInventory(data.results);
         }
-      } catch {}
+      } catch (error) {if(active)reportApiError(error,"Stock audit data could not be loaded");}
     };
     fetchLive();
     return () => {
@@ -198,7 +200,10 @@ export const StockAuditWorkbench: React.FC = () => {
           },
         ],
       });
-    } catch {}
+    } catch (error) {
+      addToast({title:"Stock could not be updated", description:extractErrorMessage(error), type:"error"});
+      return;
+    }
 
     updateInventoryStock(
       item.id,
@@ -232,7 +237,10 @@ export const StockAuditWorkbench: React.FC = () => {
           note: countReasons[item.id] || `Batch Audit (${variance > 0 ? "+" : ""}${variance} ${item.unit})`,
         })),
       });
-    } catch {}
+    } catch (error) {
+      addToast({title:"Audit could not be saved", description:extractErrorMessage(error), type:"error"});
+      return;
+    }
 
     itemsToReconcile.forEach(({ item, physical, variance }) => {
       const defaultReason =
@@ -286,7 +294,10 @@ export const StockAuditWorkbench: React.FC = () => {
           },
         ],
       });
-    } catch {}
+    } catch (error) {
+      addToast({title:"Stock could not be updated", description:extractErrorMessage(error), type:"error"});
+      return;
+    }
 
     updateInventoryStock(
       item.id,

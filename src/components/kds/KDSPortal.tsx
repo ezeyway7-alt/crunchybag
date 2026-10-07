@@ -194,7 +194,7 @@ export const KDSPortal: React.FC = () => {
       }
       if(generation!==fetchGeneration.current)return;
       setServerTickets(tickets);setLastSyncTime(new Date());setAuthErrorNotice(null);
-    }catch(error:any){if(generation===fetchGeneration.current)setAuthErrorNotice(error.message || 'Unable to sync kitchen orders.');}
+    }catch(error:any){if(generation===fetchGeneration.current)setAuthErrorNotice(extractErrorMessage(error));}
     finally{if(generation===fetchGeneration.current){setIsSyncing(false);setIsInitialLoading(false);}}
   },[effectiveOutletId]);
   useEffect(()=>{setServerTickets([]);void fetchKitchenTickets();return()=>{fetchGeneration.current++;};},[fetchKitchenTickets]);
@@ -354,7 +354,7 @@ export const KDSPortal: React.FC = () => {
         type: "success",
       });
     } catch (err: any) {
-      addToast({title:'Call could not be sent',description:err.message || 'Refresh the order status and retry.',type:'error'});
+      addToast({title:'Call could not be sent',description:extractErrorMessage(err),type:'error'});
       void fetchKitchenTickets(true);
     }
   };

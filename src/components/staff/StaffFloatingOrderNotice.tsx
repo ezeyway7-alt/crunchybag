@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "../../lib/api";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Bell,
@@ -153,9 +154,9 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
     } catch (error: any) {
       console.warn("Backend order transition error:", error);
       addToast({
-        title: "Dispatched to Kitchen",
-        description: `Order #${order.orderNumber} moved to kitchen cooking.`,
-        type: "info",
+        title: "Order could not be sent to kitchen",
+        description: extractErrorMessage(error),
+        type: "error",
       });
     } finally {
       setPendingOrder(null);
@@ -196,7 +197,7 @@ export const StaffFloatingOrderNotice: React.FC<Props> = ({
         type: "info",
       });
     } catch (error: any) {
-      console.warn("Backend order reject error:", error);
+      addToast({title:"Order could not be cancelled", description:extractErrorMessage(error), type:"error"});
     } finally {
       setPendingOrder(null);
     }

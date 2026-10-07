@@ -1,3 +1,4 @@
+import { reportApiError } from "./api";
 import {useEffect, useRef, useState} from 'react';
 import {apiClient, ApiError, DEFAULT_API_BASE, extractErrorMessage} from './api';
 import {useAuth} from '../context/AuthContext';
@@ -43,7 +44,7 @@ export function useDaybookLive(outlet:string, onRefresh:()=>void) {
         }catch{ws.close();}};
         ws.onerror=()=>ws.close();
         ws.onclose=e=>{if(stopped)return;setLive(false);if(e.code!==4403)schedule();};
-      }catch(e){if(!stopped&&!(e instanceof ApiError&&[401,403].includes(e.status)))schedule();}
+      }catch(e){if(!stopped){reportApiError(e,"Daybook live connection failed");if(!(e instanceof ApiError&&[401,403].includes(e.status)))schedule();}}
     };
     void connect();
     const ping=()=>{if(socket?.readyState===WebSocket.OPEN){if(Date.now()-heard>65000)socket.close();else socket.send(JSON.stringify({type:'ping'}));}};

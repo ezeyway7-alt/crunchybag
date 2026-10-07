@@ -609,3 +609,16 @@ test('order deletion button is absent without backend permission',async({page})=
   await page.getByTitle('View complete order details & item audit').first().click();
   await expect(page.getByRole('button',{name:'Delete order permanently',exact:true})).toHaveCount(0);
 });
+
+test('POS shows the backend discount remarks validation instead of a generic error', async ({page}) => {
+  const state = await setup(page);
+  await page.route('**/api/v1/orders/pos/?*', async route => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    await route.fulfill({status:400,json:{error:'Error',errors:{discount_reason:['Please provide remarks for the discount.']}}});
+  });
+  await addBurger(page);
+  await fireOrder(page).click();
+  await expect(page.getByRole('alert').filter({hasText:'Discount reason: Please provide remarks for the discount.'})).toBeVisible();
+  expect(state.orders).toHaveLength(0);
+  await expect(fireOrder(page)).toBeEnabled();
+});

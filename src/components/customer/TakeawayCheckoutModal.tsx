@@ -121,7 +121,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
       .then(result=>{if(live){setMeta(result);if(!result.fulfillment_modes.includes(selectedFulfillment))setSelectedFulfillment(result.fulfillment_modes[0] || 'TAKEAWAY');}})
       .catch(e=>{if(live)setError(extractErrorMessage(e));});
     const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');
-    if(pending)apiClient.get<any>(customerPath('orders/'),{signal:controller.signal}).then(result=>{const order=result.results.find((o:any)=>o.request_key===pending.key);if(live&&order)finishOrder(order);}).catch(()=>{});
+    if(pending)apiClient.get<any>(customerPath('orders/'),{signal:controller.signal}).then(result=>{const order=result.results.find((o:any)=>o.request_key===pending.key);if(live&&order)finishOrder(order);}).catch(error=>{if(live)setError(extractErrorMessage(error));});
     return()=>{live=false;controller.abort();};
   },[isOpen,currentOutlet.id,authUser?.id]);
   useEffect(()=>{

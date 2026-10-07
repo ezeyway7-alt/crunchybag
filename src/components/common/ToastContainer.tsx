@@ -20,6 +20,7 @@ export const ToastContainer: React.FC = () => {
           return (
             <motion.div
               key={toast.id}
+              role={toast.type === "error" ? "alert" : "status"}
               initial={{ opacity: 0, y: -16, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.9, transition: { duration: 0.15 } }}
@@ -29,7 +30,7 @@ export const ToastContainer: React.FC = () => {
               <div className="flex-1 min-w-0 pr-1">
                 <p className="text-sm font-semibold leading-tight">{toast.title}</p>
                 {toast.description && (
-                  <p className="text-xs text-zinc-400 mt-1 leading-normal">
+                  <p className="whitespace-pre-line break-words text-xs text-zinc-400 mt-1 leading-normal">
                     {toast.description}
                   </p>
                 )}

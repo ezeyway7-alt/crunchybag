@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "../../lib/api";
 import React,{useState} from 'react';
 import {Printer,X,Copy,ExternalLink} from 'lucide-react';
 import {Order} from '../../types';
@@ -20,7 +21,7 @@ export const PrintableTokenReceiptModal:React.FC<{order:Order|null;isOpen:boolea
       {notice && <p role="status" className="px-3 text-xs text-amber-400">{notice}</p>}
       <footer className="p-2 flex flex-wrap gap-2 justify-center border-t border-zinc-800 text-xs">
         <button disabled={!receipt} onClick={async()=>{try{await navigator.clipboard.writeText(receipt!.snapshot.order_number);setNotice('Order number copied.');}catch{setNotice('Copy is unavailable in this browser.');}}} className="px-2 py-2 bg-zinc-800 text-zinc-200 flex gap-1 items-center disabled:opacity-40"><Copy className="w-3 h-3"/>Copy token</button>
-        <button id="print-receipt-btn" disabled={!receipt} onClick={()=>void printReceiptDocument(receipt!).catch(error=>setNotice(error.message))} className="px-3 py-2 bg-zinc-100 text-black font-bold flex items-center gap-1 disabled:opacity-40"><Printer className="w-3 h-3"/>Print Slip</button>
+        <button id="print-receipt-btn" disabled={!receipt} onClick={()=>void printReceiptDocument(receipt!).catch(error=>setNotice(extractErrorMessage(error)))} className="px-3 py-2 bg-zinc-100 text-black font-bold flex items-center gap-1 disabled:opacity-40"><Printer className="w-3 h-3"/>Print Slip</button>
         {receipt?.tracking_url && <a href={receipt.tracking_url} target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-amber-500 text-black font-bold flex items-center gap-1">Track order<ExternalLink className="w-3 h-3"/></a>}
       </footer>
     </div>

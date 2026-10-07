@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "../../lib/api";
 import {apiClient} from "../../lib/api";
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -128,9 +129,9 @@ export const StaffIncomingOrderDispatchBar: React.FC<Props> = ({
     } catch (error: any) {
       console.warn("Incoming order transition error:", error);
       addToast({
-        title: "Order Updated",
-        description: `Order #${order.orderNumber} status updated.`,
-        type: "info",
+        title: "Order could not be updated",
+        description: extractErrorMessage(error),
+        type: "error",
       });
     }
   };

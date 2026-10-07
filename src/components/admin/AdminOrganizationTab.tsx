@@ -1,3 +1,4 @@
+import { reportApiError } from "../../lib/api";
 import {OrganizationSmsSettings} from './OrganizationSmsSettings';
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -42,7 +43,7 @@ export const AdminOrganizationTab: React.FC = () => {
   const { authOutlet, authUser } = useAuth();
   const [paymentQr,setPaymentQr] = useState('');
   const [qrBusy,setQrBusy] = useState(false);
-  useEffect(()=>{apiClient.get<any>('/organization/').then(value=>setPaymentQr(value.payment_qr || '')).catch(()=>{});},[]);
+  useEffect(()=>{apiClient.get<any>('/organization/').then(value=>setPaymentQr(value.payment_qr || '')).catch(error=>reportApiError(error,"Payment QR could not be loaded"));},[]);
   const uploadPaymentQr = async (file:File) => {
     if(file.size>5*1024*1024){addToast({title:'QR image must be smaller than 5 MB',type:'error'});return;}
     setQrBusy(true);try{const form=new FormData();form.append('payment_qr',file);const value=await apiClient.patch<any>('/organization/',form);setPaymentQr(value.payment_qr || '');addToast({title:'Payment QR saved',type:'success'});}catch(e){addToast({title:'QR upload failed',description:extractErrorMessage(e),type:'error'});}finally{setQrBusy(false);}
@@ -267,9 +268,9 @@ export const AdminOrganizationTab: React.FC = () => {
       });
     } catch (err) {
       addToast({
-        title: "Saved Locally",
-        description: "Settings updated in session.",
-        type: "info",
+        title: "Settings could not be saved",
+        description: extractErrorMessage(err),
+        type: "error",
       });
     } finally {
       if (addActivityLog) {

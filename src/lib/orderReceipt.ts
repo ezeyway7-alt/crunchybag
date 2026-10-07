@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "./api";
 import {useEffect,useState} from 'react';
 import {apiClient} from './api';
 import {Order} from '../types';
@@ -19,7 +20,7 @@ export function useOrderReceipt(order:Order|null,trackingToken='',kind?:'TOKEN'|
     apiClient.get<ReceiptDocument>(path,{skipAuth:!!token,signal:abort.signal}).then(receipt=>{
       if(!receipt?.snapshot?.order_number)throw new Error('The saved receipt is unavailable.');
       if(live)setState({scope,receipt,error:''});
-    }).catch(error=>{if(live)setState({scope,receipt:null,error:error.message || 'Unable to load saved receipt.'});});
+    }).catch(error=>{if(live)setState({scope,receipt:null,error:extractErrorMessage(error)});});
     return()=>{live=false;abort.abort();};
   },[scope,attempt]);
   return {receipt:state.scope===scope?state.receipt:null,

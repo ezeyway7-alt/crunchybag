@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "../../lib/api";
 import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
 import {backendOrder, PreparationRound, PosItem} from '../../lib/posApi';
 import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
@@ -221,7 +222,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
           setTrackingToken(stored);
         }
       }
-    }).catch(error=>{if(alive)setCheckoutError(error.message || 'Invalid table QR code.');});
+    }).catch(error=>{if(alive)setCheckoutError(extractErrorMessage(error));});
     return()=>{alive=false;};
   },[qrToken]);
 
@@ -420,7 +421,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
         try {
           quote = await apiClient.post<any>('/orders/self-service/quote/', checkoutBody, { skipAuth: true });
         } catch (qErr: any) {
-          throw new Error(qErr.message || 'Please wait for the current price quote.');
+          throw new Error(extractErrorMessage(qErr));
         }
       }
       if(activeRunningOrder && backendOrder(activeRunningOrder) && !backendOrder(activeRunningOrder)?.can_append) {
@@ -433,7 +434,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       window.dispatchEvent(new Event('self-service:refresh'));
       clearCart();setIsConfirmDrawerOpen(false);playMobileSound('success');
     } catch (error: any) {
-      setCheckoutError(error.message || 'Unable to confirm order. Please try again.');
+      setCheckoutError(extractErrorMessage(error));
       serverQuote.refresh();
     } finally {
       submitLock.current = false;
@@ -543,7 +544,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                   headers: { 'Idempotency-Key': `qr-void:${order.id}:${order.version}:${itemId}:${quantity}` },
                 });
               } catch (error: any) {
-                setCheckoutError(error.message || 'Unable to remove item.');
+                setCheckoutError(extractErrorMessage(error));
               } finally {
                 window.dispatchEvent(new Event('self-service:refresh'));
                 submitLock.current = false;
@@ -937,7 +938,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
             </div>
 
             {tableReceipt.receipt ? <CompactOrderReceipt receipt={tableReceipt.receipt}/> : <p role={tableReceipt.error?'alert':'status'} className="text-xs text-zinc-400">{tableReceipt.error || 'Loading saved receipt...'}{tableReceipt.error && <button onClick={tableReceipt.retry} className="ml-2 underline">Retry</button>}</p>}
-            <button type="button" disabled={!tableReceipt.receipt} onClick={()=>void printReceiptDocument(tableReceipt.receipt!).catch(error=>setCheckoutError(error.message))} className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 disabled:opacity-40">Print Slip</button>
+            <button type="button" disabled={!tableReceipt.receipt} onClick={()=>void printReceiptDocument(tableReceipt.receipt!).catch(error=>setCheckoutError(extractErrorMessage(error)))} className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 disabled:opacity-40">Print Slip</button>
             {checkoutError && <p role="alert" className="text-xs text-rose-400">{checkoutError}</p>}
 
             {/* Actions */}

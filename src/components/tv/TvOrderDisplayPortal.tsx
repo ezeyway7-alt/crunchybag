@@ -1,5 +1,5 @@
 import { NepaliAudioPlayer, announcementAudioUrl, NEPALI_VOICE_SAMPLE } from "../../lib/nepaliAudio";
-import { apiClient } from "../../lib/api";
+import { apiClient, extractErrorMessage } from "../../lib/api";
 import { useOutletEvents } from "../../lib/useOutletEvents";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
@@ -73,7 +73,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
         customerName:'',outletId:effectiveOutletId,items:[],
       } as Order)));
       setSyncError('');
-    }catch{setSyncError('Unable to sync orders');}
+    }catch(error){setSyncError(extractErrorMessage(error));}
   };
   useEffect(()=>{setOrders([]);void loadDisplay();return()=>{loadSequence.current++;};},[effectiveOutletId]);
   const displayLive=useOutletEvents(effectiveOutletId,true,()=>void loadDisplay(),event=>{

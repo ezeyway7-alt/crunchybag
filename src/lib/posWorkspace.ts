@@ -1,3 +1,4 @@
+import { reportApiError } from "./api";
 import { useEffect, useState } from "react";
 import { apiClient } from "./api";
 import { fromCategory, fromProduct } from "./catalogApi";
@@ -202,7 +203,7 @@ export function usePosReceipt(session: PosSession, order: PosOrder | undefined, 
     if (!receipt) return;
     const abort = new AbortController(); let live = true;
     apiClient.get<any>(posPath(session.outlet, `receipts/${receipt.id}/`), { signal: abort.signal })
-      .then(value => { if(live) setData(value); }).catch(() => {});
+      .then(value => { if(live) setData(value); }).catch(error => {if(live)reportApiError(error, "Receipt could not be loaded");});
     return () => { live = false; abort.abort(); };
   }, [session.outlet, receipt?.id]);
   return data;

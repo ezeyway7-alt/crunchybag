@@ -1,3 +1,4 @@
+import { extractErrorMessage } from "../../lib/api";
 import React, { useState, useMemo } from "react";
 import { useApp } from "../../context/AppContext";
 import { PricingChannel, TimePricingSchedule } from "../../types";
@@ -148,7 +149,7 @@ export const StaffTimePricing: React.FC = () => {
       title: draft.title.trim(),
       discountPercentage: -(draft.adjustmentPercentage || 0),
       productNames: products.filter((p) => draft.productIds.includes(p.id)).map((p) => p.name),
-    }); } catch { setError("Pricing tier could not be saved. Check the values and try again."); return; }
+    }); } catch (error) { setError(extractErrorMessage(error)); return; }
     setDraft(null);
     addToast({ title: "Pricing tier saved", type: "success" });
   };
