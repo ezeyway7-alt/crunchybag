@@ -423,7 +423,7 @@ const STATIC_ROUTES: RouteSEO[] = [
         </section>
 
         <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
-          <p>© 2026 Crunchy Bag Restaurant. All rights reserved.</p>
+          <p>© 2026 Crunchy Bag Restaurant. All rights reserved. • Designed &amp; Developed by <a href="https://brandwave.com.np" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Brandwave</a></p>
           <p><a href="/" class="text-amber-500 hover:underline">&larr; Return to Crunchy Bag Home</a></p>
         </footer>
       </main>

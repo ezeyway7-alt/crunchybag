@@ -508,7 +508,21 @@ export const CustomerFooter: React.FC = () => {
 
           {/* Bottom Bar: Legal & Policy Direct Quick Links */}
           <div className="pt-4 border-t border-zinc-200/80 dark:border-zinc-800/80 flex flex-col md:flex-row items-center justify-between gap-3 text-[11px] text-zinc-500">
-            <p>© {new Date().getFullYear()} Crunchy Bag Restaurant. All rights reserved.</p>
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-2 gap-y-1 text-center md:text-left">
+              <span>© {new Date().getFullYear()} Crunchy Bag Restaurant. All rights reserved.</span>
+              <span className="hidden sm:inline text-zinc-600 dark:text-zinc-600">•</span>
+              <span>
+                Designed &amp; Developed by{" "}
+                <a
+                  href="https://brandwave.com.np"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-500 hover:text-amber-400 font-semibold hover:underline transition-colors"
+                >
+                  Brandwave
+                </a>
+              </span>
+            </div>
 
             <nav aria-label="Footer Legal and Policy Links" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
               <button
