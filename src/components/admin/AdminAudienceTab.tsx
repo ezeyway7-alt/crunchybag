@@ -1,3 +1,4 @@
+import { CustomerAccountPanel } from "./CustomerAccountPanel";
 import React,{useEffect,useState} from 'react';
 import {useApp} from '../../context/AppContext';
 import {apiClient,extractErrorMessage} from '../../lib/api';
@@ -10,6 +11,7 @@ const date=(value:string)=>value?new Date(value).toLocaleString('en-GB',{timeZon
 export const AdminAudienceTab:React.FC<{mode:'analytics'|'customers'}>=({mode})=>{
   const {currentOutlet}=useApp();const outlet=String(currentOutlet?.id||'');
   const [days,setDays]=useState('30'),[search,setSearch]=useState(''),[query,setQuery]=useState(''),[page,setPage]=useState(1),[revision,setRevision]=useState(0);
+  const [selected,setSelected]=useState<{outlet:string,id:number}|null>(null);
   const [state,setState]=useState<{scope:string,data:any,error:string}>({scope:'',data:null,error:''});
   const scope=`${mode}:${outlet}:${days}:${query}:${page}`;
   const valid=/^\d+$/.test(outlet);
@@ -23,6 +25,7 @@ export const AdminAudienceTab:React.FC<{mode:'analytics'|'customers'}>=({mode})=
     return()=>{active=false;abort.abort();};
   },[scope,revision]);
   const data=state.scope===scope?state.data:null,error=state.scope===scope?state.error:'';
+  if(mode==='customers' && selected?.outlet===outlet) return <CustomerAccountPanel key={`${outlet}:${selected.id}`} outlet={outlet} contactId={selected.id} revision={revision} onBack={()=>setSelected(null)} onChanged={()=>setRevision(n=>n+1)}/>;
   return <section className="space-y-4" aria-label={mode==='analytics'?'Website Analytics':'Customers'}>
     <header className="flex flex-wrap justify-between items-center gap-3"><div><h1 className="text-lg font-bold">{mode==='analytics'?'Website Analytics':'Customers'}</h1><p className="text-xs text-zinc-500 mt-1">{currentOutlet?.name} - {live?'Connected':'Connecting'}</p></div>
       {mode==='analytics'?<select aria-label="Traffic period" value={days} onChange={e=>setDays(e.target.value)} className="bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>:<Input aria-label="Search customers" placeholder="Search name, mobile or email" value={search} onChange={e=>setSearch(e.target.value)} className="text-xs w-full sm:w-72"/>}
@@ -43,9 +46,9 @@ export const AdminAudienceTab:React.FC<{mode:'analytics'|'customers'}>=({mode})=
     </>}
     {data&&mode==='customers'&&<>
       <p className="text-xs text-zinc-400">{data.count} contacts - Customers from POS, table QR, kiosk and web orders, including name-only entries.</p>
-      <div className="border border-zinc-800 overflow-x-auto"><table className="w-full text-xs text-left whitespace-nowrap"><thead className="bg-zinc-900 text-zinc-400"><tr>{['Customer','Mobile','Account','Source','Orders','Order value','Last activity'].map(title=><th key={title} className="p-3 font-medium">{title}</th>)}</tr></thead><tbody>
-        {data.results.map((row:any)=><tr key={row.id} className="border-t border-zinc-800 hover:bg-zinc-900/50"><td className="p-3"><div className="font-semibold">{row.name}</div>{row.email&&<div className="text-[10px] text-zinc-500 mt-1">{row.email}</div>}</td><td className="p-3">{row.phone?<a className="text-amber-400" href={`tel:${row.phone}`}>{row.phone}</a>:<span className="text-zinc-500">Not provided</span>}</td><td className="p-3"><span className={row.registered?'text-emerald-400':'text-zinc-400'}>{row.registered?'Registered':'Guest'}</span>{row.last_login&&<div className="text-[10px] text-zinc-500 mt-1">Login: {date(row.last_login)}</div>}</td><td className="p-3">{row.sources.map((source:string)=><span key={source} className="inline-block bg-zinc-800 px-1.5 py-1 mr-1 text-[10px]">{channelName[source]||source}</span>)}</td><td className="p-3">{row.orders}</td><td className="p-3 font-mono">NPR {Number(row.order_total).toLocaleString('en-NP',{minimumFractionDigits:2})}</td><td className="p-3 text-zinc-400">{date(row.last_seen)}</td></tr>)}
-        {!data.results.length&&<tr><td colSpan={7} className="p-8 text-center text-zinc-500">{query?'No customers match your search.':'No customer contacts recorded yet.'}</td></tr>}
+      <div className="border border-zinc-800 overflow-x-auto"><table className="w-full text-xs text-left whitespace-nowrap"><thead className="bg-zinc-900 text-zinc-400"><tr>{['Customer','Mobile','Account','Source','Orders','Order value','Outstanding','Credit','Last activity'].map(title=><th key={title} className="p-3 font-medium">{title}</th>)}</tr></thead><tbody>
+        {data.results.map((row:any)=><tr key={row.id} className="border-t border-zinc-800 hover:bg-zinc-900/50 cursor-pointer" onClick={()=>setSelected({outlet,id:row.id})}><td className="p-3"><button className="font-semibold text-amber-400 text-left" onClick={()=>setSelected({outlet,id:row.id})}>{row.name}</button>{row.email&&<div className="text-[10px] text-zinc-500 mt-1">{row.email}</div>}</td><td className="p-3">{row.phone?<a className="text-amber-400" onClick={event=>event.stopPropagation()} href={`tel:${row.phone}`}>{row.phone}</a>:<span className="text-zinc-500">Not provided</span>}</td><td className="p-3"><span className={row.registered?'text-emerald-400':'text-zinc-400'}>{row.registered?'Registered':'Guest'}</span>{row.last_login&&<div className="text-[10px] text-zinc-500 mt-1">Login: {date(row.last_login)}</div>}</td><td className="p-3">{row.sources.map((source:string)=><span key={source} className="inline-block bg-zinc-800 px-1.5 py-1 mr-1 text-[10px]">{channelName[source]||source}</span>)}</td><td className="p-3">{row.orders}</td><td className="p-3 font-mono">NPR {Number(row.order_total).toLocaleString('en-NP',{minimumFractionDigits:2})}</td><td className="p-3 font-mono text-rose-400">NPR {Number(row.due||0).toFixed(2)}</td><td className="p-3 font-mono">NPR {Number(row.credit||0).toFixed(2)}</td><td className="p-3 text-zinc-400">{date(row.last_seen)}</td></tr>)}
+        {!data.results.length&&<tr><td colSpan={9} className="p-8 text-center text-zinc-500">{query?'No customers match your search.':'No customer contacts recorded yet.'}</td></tr>}
       </tbody></table></div>
       <footer className="flex flex-wrap justify-between gap-3 items-center"><p className="text-[11px] text-zinc-500">Order value excludes cancelled orders; it is not a paid balance.</p><div className="flex items-center gap-3 text-xs"><Button size="sm" variant="outline" disabled={page===1} onClick={()=>setPage(n=>n-1)}>Previous</Button><span>Page {page} of {Math.max(1,Math.ceil(data.count/25))}</span><Button size="sm" variant="outline" disabled={page*25>=data.count} onClick={()=>setPage(n=>n+1)}>Next</Button></div></footer>
     </>}

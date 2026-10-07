@@ -57,6 +57,7 @@ export interface InwardPurchaseItemPayload {
 }
 
 export interface InwardPurchasePayload {
+  outlet_id?: string;
   invoice_number: string;
   supplier_name: string;
   supplier_phone?: string;
@@ -151,8 +152,9 @@ export const inventoryApi = {
    * Fetch Suppliers List for Select2 Combobox
    * GET /api/v1/inventory/suppliers/?search=<query>
    */
-  async fetchSuppliers(searchQuery?: string): Promise<SupplierItem[]> {
+  async fetchSuppliers(searchQuery?: string, outletId?: string): Promise<SupplierItem[]> {
     const query = new URLSearchParams();
+    if (outletId) query.set('outlet_id', outletId);
     if (searchQuery?.trim()) query.set("search", searchQuery.trim());
     const qs = query.toString();
     const endpoint = `/inventory/suppliers/${qs ? `?${qs}` : ""}`;

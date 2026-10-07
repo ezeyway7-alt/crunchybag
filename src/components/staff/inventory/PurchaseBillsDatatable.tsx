@@ -1,3 +1,4 @@
+import { usePurchaseRecords } from "../../../lib/usePurchaseRecords";
 import React, { useState, useMemo } from "react";
 import {
   FileText,
@@ -15,7 +16,8 @@ import { formatNPR } from "../../../lib/utils";
 import { PrintablePurchaseBillModal } from "./PrintablePurchaseBillModal";
 
 export const PurchaseBillsDatatable: React.FC = () => {
-  const { purchases, currentOutlet } = useApp();
+  const { currentOutlet } = useApp();
+  const { purchases, error: purchaseError, loading: purchasesLoading, retry: retryPurchases } = usePurchaseRecords(String(currentOutlet?.id || ""));
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState<string>("ALL");
@@ -113,6 +115,9 @@ export const PurchaseBillsDatatable: React.FC = () => {
     const startIdx = (currentPage - 1) * pageSize;
     return filteredPurchases.slice(startIdx, startIdx + pageSize);
   }, [filteredPurchases, currentPage, pageSize]);
+
+  if (purchasesLoading) return <p role="status" className="p-4 text-sm text-zinc-400">Loading purchase bills...</p>;
+  if (purchaseError) return <p role="alert" className="p-4 text-sm text-rose-400">{purchaseError} <button className="underline" onClick={retryPurchases}>Retry</button></p>;
 
   return (
     <div className="bg-zinc-900/40 p-4 rounded-xl space-y-3.5">

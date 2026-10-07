@@ -1,3 +1,4 @@
+import { apiClient } from "../../../lib/api";
 import { reportApiError } from "../../../lib/api";
 import { extractErrorMessage } from "../../../lib/api";
 import React, { useState, useMemo, useRef, useEffect } from "react";
@@ -71,6 +72,8 @@ const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const { currentOutlet } = useApp();
+  const creatingSupplier = useRef(false);
   const [apiSuppliers, setApiSuppliers] = useState<SupplierItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -88,20 +91,9 @@ const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
     const fetchList = async () => {
       setIsLoading(true);
       try {
-        const list = await inventoryApi.fetchSuppliers(query);
+        const list = await inventoryApi.fetchSuppliers(query, String(currentOutlet.id));
         if (active) {
-          if (list && list.length > 0) {
-            setApiSuppliers(list);
-          } else {
-            // Default seed suppliers if backend returns empty
-            setApiSuppliers([
-              { id: "s1", name: "Valley Poultry & Fresh Farm Nepal", phone: "9841234567" },
-              { id: "s2", name: "Baker King Pvt Ltd", phone: "9851122334" },
-              { id: "s3", name: "Kathmandu Artisan Bakery Pvt. Ltd.", phone: "9801234567" },
-              { id: "s4", name: "Himalayan Organic Dairy Pvt. Ltd.", phone: "9812345678" },
-              { id: "s5", name: "EcoPack Nepal Solutions", phone: "9823456789" },
-            ]);
-          }
+          setApiSuppliers(list || []);
         }
       } catch (error) {
         if (active) reportApiError(error, 'Suppliers could not be loaded');
@@ -116,7 +108,7 @@ const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
     return () => {
       active = false;
     };
-  }, [isOpen, query]);
+  }, [isOpen, query, currentOutlet.id]);
 
   // Auto-commit on click outside
   useEffect(() => {
@@ -151,13 +143,16 @@ const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
     if (onSupplierSelected) onSupplierSelected();
   };
 
-  const handleCreateNew = (typed: string) => {
+  const handleCreateNew = async (typed: string) => {
     const trimmed = typed.trim();
-    if (!trimmed) return;
-    onChange(trimmed);
-    setQuery(trimmed);
-    setIsOpen(false);
-    if (onSupplierSelected) onSupplierSelected();
+    if (!trimmed || creatingSupplier.current) return;
+    creatingSupplier.current = true;
+    setIsLoading(true);
+    try {
+      const supplier = await apiClient.post<SupplierItem>(`/inventory/supplier-accounts/?outlet_id=${encodeURIComponent(currentOutlet.id)}`, { name: trimmed, phone: value === trimmed ? phone : '' });
+      handleSelect(supplier);
+    } catch (error) { reportApiError(error, 'Supplier could not be saved'); }
+    finally { creatingSupplier.current = false; setIsLoading(false); }
   };
 
   return (
@@ -166,6 +161,7 @@ const SupplierSelect2: React.FC<SupplierSelect2Props> = ({
         <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
         <input
           ref={inputRef}
+          aria-label="Supplier name"
           type="text"
           value={isOpen ? query : value}
           onChange={(e) => {
@@ -689,6 +685,7 @@ export const PurchaseInwardWorkbench: React.FC<{
       paidAmount >= netPayable ? "PAID" : paidAmount > 0 ? "PARTIAL" : "PENDING";
 
     const payload: InwardPurchasePayload = {
+      outlet_id: String(currentOutlet.id),
       invoice_number: invoiceNumber.trim() || `BILL-${Date.now()}`,
       supplier_name: selectedSupplier.trim(),
       supplier_phone: supplierPhone.trim() || undefined,
@@ -842,7 +839,7 @@ export const PurchaseInwardWorkbench: React.FC<{
             phone={supplierPhone}
             onChange={(sup, ph) => {
               setSelectedSupplier(sup);
-              if (ph) setSupplierPhone(ph);
+              setSupplierPhone(ph || "");
             }}
             onSupplierSelected={() => {
               firstProductInputRef.current?.focus();

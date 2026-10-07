@@ -104,6 +104,8 @@ async function setup(page: Page) {
     }
     let result: any = {};
     if (path === "auth/me/") result = { user, outlet };
+    else if (path === 'customer/orders/') result = { results: [] };
+    else if (path === 'customer/profile/') result = { favorites: [], member_since: '2026-01-01', name: 'Owner' };
     else if (path.includes("branches")) result = [outlet];
     else if (path === "catalog/management/")
       result = {
@@ -346,6 +348,44 @@ async function setup(page: Page) {
 }
 
 const addBurger = (page: Page) => page.getByRole('button', { name: /Test Burger/ }).click();
+
+test('customer accounts receive credit, recover a lost response, and refresh the directory', async ({ page }) => {
+  await setup(page);
+  let received = 0, lost = true;
+  const requests: string[] = [], saved: Record<string, any> = {};
+  const customer = { id: 42, name: 'Account Customer', phone: '+9779841234567', email: '', registered: false, sources: ['POS', 'TABLE_QR'] };
+  const snapshot = () => ({ number: 'RCV-1-00000001', customer_name: customer.name, customer_phone: customer.phone,
+    seller: 'Test restaurant', outlet: 'Test outlet', date: '2026-10-07', amount: '40.00', method: 'CASH', reference: '', notes: '', recorded_by: 'Owner', remaining_due: '60.00', allocations: [{ order_number: 'POS-OLD', amount: '40.00', receipt_id: 1 }] });
+  await page.route('**/api/v1/customer/directory/**', async route => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (route.request().method() === 'POST') {
+      const key = route.request().headers()['idempotency-key']; requests.push(key);
+      if (!saved[key]) { received += Number(route.request().postDataJSON().amount); saved[key] = { id: 1, snapshot: snapshot() }; }
+      if (lost) { lost = false; await route.abort(); return; }
+      await route.fulfill({ json: saved[key] }); return;
+    }
+    const json = pathname.endsWith('/42/') ? {
+      customer, can_receive: true, methods: ['CASH'], summary: { orders: 1, order_total: '100', received: String(received), refunded: '0', due: String(100-received), credit: String(80-received) },
+      orders: [{ id: 1, order_number: 'POS-OLD', source: 'POS', status: 'COMPLETED', date: '2026-10-01T10:00:00Z', total: '100', paid: String(received), due: String(100-received), credit: String(80-received), refunded: '0', items: [], receipts: [] }],
+      payments: [], credits: [], collections: received ? [{ id: 1, snapshot: snapshot() }] : [],
+    } : { count: 1, page: 1, page_size: 25, results: [{ ...customer, orders: 1, order_total: '100', due: String(100-received), credit: String(80-received), last_seen: '2026-10-07T10:00:00Z', last_login: null }] };
+    await route.fulfill({ json });
+  });
+  await page.goto('/admin?tab=customers');
+  await page.getByRole('button', { name: 'Account Customer', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Account Customer', exact: true })).toBeVisible();
+  await expect(page.getByText('Outstanding', { exact: true }).locator('..')).toContainText('100.00');
+  await page.getByLabel('Amount received (NPR)').fill('40');
+  await page.getByRole('button', { name: 'Record received payment', exact: true }).click();
+  await page.getByRole('button', { name: 'Retry saved receipt', exact: true }).click();
+  await expect(page.getByText('Outstanding', { exact: true }).locator('..')).toContainText('60.00');
+  await expect(page.getByRole('button', { name: 'Print payment receipt', exact: true })).toBeVisible();
+  expect(received).toBe(40);
+  expect(requests[0]).toBe(requests[1]);
+  await page.screenshot({ path: test.info().outputPath('customer-account.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Back to customers', exact: false }).click();
+  await expect(page.getByRole('cell', { name: 'NPR 60.00', exact: true })).toBeVisible();
+});
 
 test('customer picker focuses search, selects matches, and accepts a new phone', async ({ page }) => {
   await setup(page);

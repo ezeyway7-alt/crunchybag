@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {DEFAULT_API_BASE} from './api';
 
 // Public outlet events carry identifiers/status only. Private snapshots still require authorization.
-export function useOutletEvents(outlet: string, enabled: boolean, onRefresh: () => void, onEvent?: (event:any)=>void, channel:'display'|'analytics'='display') {
+export function useOutletEvents(outlet: string, enabled: boolean, onRefresh: () => void, onEvent?: (event:any)=>void, channel:'display'|'analytics'|'suppliers'='display') {
   const refreshRef=useRef(onRefresh), eventRef=useRef(onEvent);
   refreshRef.current=onRefresh;eventRef.current=onEvent;
   const [live,setLive]=useState(false);

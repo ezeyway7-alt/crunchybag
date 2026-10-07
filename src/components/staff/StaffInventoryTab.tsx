@@ -1,3 +1,4 @@
+import { SupplierAccountsWorkbench } from "./inventory/SupplierAccountsWorkbench";
 import React, { useState, useMemo, useCallback } from "react";
 import {
   Boxes,
@@ -48,7 +49,7 @@ export const StaffInventoryTab: React.FC = () => {
   // "bills" = Purchase Invoices Datatable
   // "audit" = Stock Audit & Variances
   // "movements" = Stock Movement Log
-  const [activeView, setActiveView] = useState<"items" | "bills" | "audit" | "movements">("items");
+  const [activeView, setActiveView] = useState<"items" | "bills" | "audit" | "movements" | "suppliers">("items");
   const [isPurchaseFormVisible, setIsPurchaseFormVisible] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -101,6 +102,10 @@ export const StaffInventoryTab: React.FC = () => {
             <span>Stock & Inward Purchase</span>
           </button>
 
+          <button type="button" onClick={() => setActiveView("suppliers")} className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 font-medium whitespace-nowrap ${activeView === "suppliers" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900"}`}>
+            <Truck className="w-3.5 h-3.5" /> Suppliers
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveView("bills")}
@@ -111,7 +116,7 @@ export const StaffInventoryTab: React.FC = () => {
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Bills History ({purchases.length})</span>
+            <span>Bills History</span>
           </button>
 
           <button
@@ -172,6 +177,8 @@ export const StaffInventoryTab: React.FC = () => {
           <StockCatalogWorkbench refreshTrigger={refreshKey} />
         </div>
       )}
+
+      {activeView === "suppliers" && <SupplierAccountsWorkbench />}
 
       {/* VIEW 2: BILLS HISTORY */}
       {activeView === "bills" && <PurchaseBillsDatatable />}
