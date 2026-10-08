@@ -129,7 +129,6 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
   const [isCancelling, setIsCancelling] = useState(false);
 
   // Order Queries from POS API
-  const backendOngoingQuery = usePosOrderFeed(posSession, { open_tabs: true });
   const registerQuery = usePosOrderFeed(posSession, {
     ...(startDate ? { start_date: startDate } : {}),
     ...(endDate ? { end_date: endDate } : {}),
@@ -143,23 +142,9 @@ export const AdminUnifiedOrdersTab: React.FC<Props> = ({
     [registerQuery.results, currentOutlet?.name]
   );
 
-  const ongoingOrders: Order[] = useMemo(
-    () =>
-      backendOngoingQuery.results.map((po) =>
-        posOrderToOrder(po, currentOutlet?.name || "Crunchy Bag")
-      ),
-    [backendOngoingQuery.results, currentOutlet?.name]
-  );
-
-  // Deduplicated merged orders list
-  const mergedOrders = useMemo(() => {
-    const map = new Map<string, Order>();
-    ongoingOrders.forEach((o) => map.set(o.id, o));
-    orders.forEach((o) => map.set(o.id, o));
-    return Array.from(map.values()).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  }, [orders, ongoingOrders]);
+  // The register already contains every status in the selected date range.
+  // Mixing in open tabs would add historical orders back into today's totals.
+  const mergedOrders = orders;
 
   // Keep drawer updated on active orders refresh
   useEffect(() => {

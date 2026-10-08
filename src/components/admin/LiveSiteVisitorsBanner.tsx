@@ -1,4 +1,6 @@
 import React from "react";
+import { usePosSession, todayNepal } from "../../lib/posApi";
+import { usePosOrderFeed } from "../../lib/posWorkspace";
 import {
   TrendingUp,
   Flame,
@@ -9,20 +11,23 @@ import {
 import { formatNPR } from "../../lib/utils";
 
 interface Props {
-  totalRevenue: number;
-  totalOrders: number;
   activeKitchenOrders: number;
   readyOrders: number;
   lowStockCount: number;
 }
 
 export const LiveSiteVisitorsBanner: React.FC<Props> = ({
-  totalRevenue,
-  totalOrders,
   activeKitchenOrders,
   readyOrders,
   lowStockCount,
 }) => {
+  const session = usePosSession();
+  const date = todayNepal();
+  const todayOrders = usePosOrderFeed(session, { start_date: date, end_date: date });
+  const totalRevenue = todayOrders.results.reduce(
+    (sum, order) => order.status === 'CANCELLED' ? sum : sum + Number(order.total_payable), 0
+  );
+  const totalOrders = todayOrders.results.length;
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
       {/* Net Sales */}

@@ -315,10 +315,16 @@ async function setup(page: Page) {
         );
         saveReceipt(result, "BILL");
       }
-    } else if (path === "orders/pos/")
+    } else if (path === "orders/pos/") {
+      const matching = state.orders.filter(o => {
+        const date = new Intl.DateTimeFormat('en-CA', {timeZone: 'Asia/Kathmandu'}).format(new Date(o.created_at));
+        return (!url.searchParams.get('start_date') || date >= url.searchParams.get('start_date')!)
+          && (!url.searchParams.get('end_date') || date <= url.searchParams.get('end_date')!)
+          && (!url.searchParams.get('kitchen') || ["PENDING", "ACCEPTED", "PREPARING", "READY"].includes(o.status));
+      });
       result = {
-        results: url.searchParams.get("kitchen") ? state.orders.filter(o => ["PENDING", "ACCEPTED", "PREPARING", "READY"].includes(o.status)) : state.orders,
-        count: state.orders.length,
+        results: matching,
+        count: matching.length,
         page: 1,
         page_size: 25,
         summary: {
@@ -337,6 +343,7 @@ async function setup(page: Page) {
         },
         status_counts: {},
       };
+    }
     await route.fulfill({ json: result });
   });
   await page.goto("/admin?tab=pos_orders");
@@ -718,3 +725,20 @@ for (const status of ['ACCEPTED', 'PREPARING', 'READY', 'COMPLETED']) {
     expect(state.writes.find(w => w.path.endsWith('/append/')).body).toMatchObject({version: 1, expected_total: '440.00'});
   });
 }
+
+test('dashboard totals use today POS orders without historical open tabs', async ({page}) => {
+  test.setTimeout(60000);
+  const state = await setup(page);
+  await addBurger(page); await fireOrder(page).click();
+  await expect.poll(() => state.orders.length).toBe(1);
+  const original = state.orders[0];
+  state.orders.push({...structuredClone(original), id: 2, order_number: 'OLD-ORDER', created_at: '2000-01-01T00:00:00Z', total_payable: '99000.00'});
+  state.orders.push({...structuredClone(original), id: 3, order_number: 'DONE-TODAY', status: 'COMPLETED', total_payable: '330.00'});
+  state.orders.push({...structuredClone(original), id: 4, order_number: 'CANCEL-TODAY', status: 'CANCELLED', total_payable: '1000.00'});
+  await page.goto('/admin?tab=overview');
+  await expect(page.getByText("Today's Net Sales").locator('..')).toContainText('550.00');
+  await expect(page.getByText('Orders Today').locator('..')).toContainText('3');
+  await expect(page.getByText('Final Net:').locator('..')).toContainText('550.00');
+  await expect(page.getByText('DONE-TODAY', {exact:true})).toBeVisible();
+  await expect(page.getByText('OLD-ORDER', {exact:true})).toHaveCount(0);
+});

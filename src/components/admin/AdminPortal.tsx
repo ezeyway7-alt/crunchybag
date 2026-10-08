@@ -214,11 +214,6 @@ export const AdminPortal: React.FC = () => {
   const safeActivityLogs = Array.isArray(activityLogs) ? activityLogs : [];
   const safeLoyaltyRecords = Array.isArray(loyaltyRecords) ? loyaltyRecords : [];
 
-  const totalRevenue = safeOrders.reduce(
-    (sum, o) => (o && o.status !== "CANCELLED" ? sum + (Number(o.totalAmount) || 0) : sum),
-    0
-  );
-  const totalOrders = safeOrders.length;
   const activeKitchenOrders = safeOrders.filter(
     (o) => o && (o.status === "PROCESSING" || o.status === "CONFIRMED")
   ).length;
@@ -792,8 +787,6 @@ export const AdminPortal: React.FC = () => {
               <div className="space-y-4">
                 {/* 1. Total Users Open Site & Operational KPIs Live Banner */}
                 <LiveSiteVisitorsBanner
-                  totalRevenue={totalRevenue}
-                  totalOrders={totalOrders}
                   activeKitchenOrders={activeKitchenOrders}
                   readyOrders={readyOrders}
                   lowStockCount={lowStockCount}
