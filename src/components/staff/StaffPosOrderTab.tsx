@@ -163,8 +163,8 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const backendOngoingQuery = usePosOrderFeed(posSession, { open_tabs: true });
   const registerQuery = usePosOrderFeed(posSession, { ...(startDate ? { start_date: startDate } : {}), ...(endDate ? { end_date: endDate } : {}) });
   const orders: Order[] = useMemo(() => registerQuery.results.map(po => posOrderToOrder(po, currentOutlet.name)), [registerQuery.results, currentOutlet.name]);
-  const ongoingOrders: Order[] = useMemo(() => backendOngoingQuery.results.map(po => posOrderToOrder(po, currentOutlet.name)), [backendOngoingQuery.results, currentOutlet.name]);
-  const targetOngoingOrder = (selectedOngoingOrderId ? ongoingOrders.find(o => o.id === selectedOngoingOrderId) : ongoingOrders[0]) || null;
+  const ongoingOrders: Order[] = useMemo(() => backendOngoingQuery.results.filter(po => po.can_append).map(po => posOrderToOrder(po, currentOutlet.name)), [backendOngoingQuery.results, currentOutlet.name]);
+  const targetOngoingOrder = (selectedOngoingOrderId ? [...ongoingOrders, ...orders].find(o => o.id === selectedOngoingOrderId) : ongoingOrders[0]) || null;
   const mergedOrders = orders;
   const findOrder = (id: string) => [...orders, ...ongoingOrders].find(o => o.id === id);
   const receiptState=useOrderReceipt(printSlipOrder,'', 'TOKEN');
@@ -291,7 +291,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   };
   const handleAddItemsToOngoingOrder = async () => {
     const order = backendOrder(targetOngoingOrder);
-    if (cannotSave || !order || !selectedItems.length) return;
+    if (cannotSave || !order?.can_append || !selectedItems.length) return;
     const result = await posCommand.run(`${order.id}/append/`, { items: lines, version: quote.quote!.order_version, expected_total: quote.quote!.total_payable });
     if (result) { setSelectedItems([]); addToast({ title: 'Round added', description: result.order_number, type: 'success' }); }
   };
@@ -315,7 +315,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
 
   // Initiate Adding Items from Table Row
   const handleStartAddingItemsToOrder = (order: Order) => {
-    if(!backendOrder(order)?.can_append){addToast({title:'This order cannot accept more items',description:'Create a new order after dispatch or final handover.',type:'info'});return;}
+    if(!backendOrder(order)?.can_append){addToast({title:'This order cannot accept more items',description:'Items can be added until billing or payment, including after kitchen completion.',type:'info'});return;}
     setPosMode("ADD_TO_ONGOING");
     setSelectedOngoingOrderId(order.id);
     setSelectedItems([]);
@@ -835,7 +835,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                   <button
                     type="button"
                     onClick={handleAddItemsToOngoingOrder}
-                    disabled={cannotSave || selectedItems.length === 0 || !targetOngoingOrder}
+                    disabled={cannotSave || selectedItems.length === 0 || !backendOrder(targetOngoingOrder)?.can_append}
                     className="h-11 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />

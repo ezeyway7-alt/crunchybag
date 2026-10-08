@@ -702,3 +702,19 @@ test('order details drawer in pos_orders has print token button below print slip
   await expect(page.getByTestId('confirm-print-token-btn')).toBeVisible();
 });
 
+
+for (const status of ['ACCEPTED', 'PREPARING', 'READY', 'COMPLETED']) {
+  test(`POS register adds a round to an unbilled ${status} order`, async ({ page }) => {
+    const state = await setup(page);
+    await addBurger(page); await fireOrder(page).click();
+    await expect.poll(() => state.orders.length).toBe(1);
+    state.orders[0].status = status;
+    state.orders[0].can_append = true;
+    await page.goto('/admin?tab=pos_orders');
+    await page.getByRole('button', { name: 'Add', exact: true }).first().click();
+    await addBurger(page);
+    await page.getByRole('button', { name: 'Add Round to Tab', exact: true }).click();
+    await expect.poll(() => state.writes.filter(w => w.path.endsWith('/append/')).length).toBe(1);
+    expect(state.writes.find(w => w.path.endsWith('/append/')).body).toMatchObject({version: 1, expected_total: '440.00'});
+  });
+}
