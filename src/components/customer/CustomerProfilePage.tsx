@@ -17,7 +17,7 @@ export function CustomerProfilePage() {
   const [address, setAddress] = useState('');
   const [point, setPoint] = useState<DeliveryPoint | undefined>();
   const [isDefault, setDefault] = useState(false), [mapOpen, setMapOpen] = useState(false);
-  useEffect(() => {setName(customerProfile.name);setEmail(customerProfile.email);}, [customerProfile.name, customerProfile.email]);
+  useEffect(() => {setName(customerProfile.name || '');setEmail(customerProfile.email || '');}, [customerProfile.name, customerProfile.email]);
   const startAddress = (row: SavedAddress | null) => {
     setEditing(row);setLabel(row?.label || 'Home');setAddress(row?.address || '');
     setPoint(row ? addressPoint(row) : undefined);setDefault(row?.is_default || false);setMessage('');
@@ -59,7 +59,7 @@ export function CustomerProfilePage() {
       </div>
       <button onClick={()=>setCustomerActiveTab('orders')} className="text-xs font-bold text-amber-400 hover:underline">View My Orders →</button>
     </div>
-    <form className="space-y-4" onSubmit={async e=>{e.preventDefault();setBusy(true);setMessage('');try{setMessage(await updateCustomerProfile({name: name.trim(), email: email.trim()}) ? 'Profile saved.' : 'Could not save profile. Check your details and try again.');}finally{setBusy(false);}}}>
+    <form className="space-y-4" onSubmit={async e=>{e.preventDefault();setBusy(true);setMessage('');try{setMessage(await updateCustomerProfile({name: (name || '').trim(), email: (email || '').trim()}) ? 'Profile saved.' : 'Could not save profile. Check your details and try again.');}finally{setBusy(false);}}}>
       <div className="grid sm:grid-cols-2 gap-4"><Input label="Username" value={name} onChange={e=>setName(e.target.value)} minLength={3} maxLength={150} pattern="[a-zA-Z0-9_.@+\-]+" required />
         <Input label="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} maxLength={254} /></div>
       <Input label="Phone number" value={customerProfile.phone} readOnly />
@@ -78,14 +78,14 @@ export function CustomerProfilePage() {
           <button disabled={busy} onClick={async()=>{setBusy(true);try{await saved.remove(row.id);}catch{}finally{setBusy(false);}}} className="text-rose-400">Remove</button></div>
       </article>)}
       {editing !== undefined && <form className="p-4 border border-zinc-700 space-y-3" onSubmit={async e=>{
-        e.preventDefault();setBusy(true);try{await saved.save({label:label.trim(),address:address.trim(),landmark:point?.landmark || '',latitude:point ? point.lat.toFixed(7):null,longitude:point?point.lng.toFixed(7):null,is_default:isDefault},editing?.id);setEditing(undefined);}catch{}finally{setBusy(false);}
+        e.preventDefault();setBusy(true);try{await saved.save({label:(label || '').trim(),address:(address || '').trim(),landmark:point?.landmark || '',latitude:point ? point.lat.toFixed(7):null,longitude:point?point.lng.toFixed(7):null,is_default:isDefault},editing?.id);setEditing(undefined);}catch{}finally{setBusy(false);}
       }}>
         <h3 className="text-sm font-semibold">{editing ? 'Edit address' : 'New address'}</h3>
         <Input label="Address label" value={label} onChange={e=>setLabel(e.target.value)} maxLength={60} required />
         <Input label="Address" value={address} onChange={e=>{setAddress(e.target.value);setPoint(undefined);}} maxLength={800} required />
         <button type="button" onClick={()=>setMapOpen(true)} className="text-sm text-amber-400">{point ? 'Edit map pin' : 'Choose on map'}</button>
         <label className="flex gap-2 text-sm"><input type="checkbox" checked={isDefault} onChange={e=>setDefault(e.target.checked)} />Default delivery address</label>
-        <div className="flex gap-3"><Button type="submit" disabled={busy || !address.trim() || !label.trim()}>Save address</Button><Button type="button" variant="outline" onClick={()=>setEditing(undefined)}>Cancel</Button></div>
+        <div className="flex gap-3"><Button type="submit" disabled={busy || !(address || '').trim() || !(label || '').trim()}>Save address</Button><Button type="button" variant="outline" onClick={()=>setEditing(undefined)}>Cancel</Button></div>
       </form>}
     </section>
     <button onClick={()=>{logout();setCustomerActiveTab('menu');}} className="text-sm text-zinc-400">Sign out</button>

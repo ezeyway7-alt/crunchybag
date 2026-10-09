@@ -46,10 +46,10 @@ export const CustomerProfileModal: React.FC = () => {
 
   useEffect(() => {
     if (isProfileModalOpen) {
-      setName(customerProfile.name);
-      setEmail(customerProfile.email);
-      setPhone(customerProfile.phone);
-      setAddress(customerProfile.address);
+      setName(customerProfile.name || '');
+      setEmail(customerProfile.email || '');
+      setPhone(customerProfile.phone || '');
+      setAddress(customerProfile.address || '');
       setIsSaved(false);
     }
   }, [isProfileModalOpen, customerProfile]);
@@ -57,10 +57,10 @@ export const CustomerProfileModal: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const saved = await updateCustomerProfile({
-      name: name.trim() || customerProfile.name,
-      email: email.trim() || customerProfile.email,
-      phone: phone.trim() || customerProfile.phone,
-      address: address.trim() || customerProfile.address,
+      name: (name || '').trim() || customerProfile.name,
+      email: (email || '').trim() || customerProfile.email,
+      phone: (phone || '').trim() || customerProfile.phone,
+      address: (address || '').trim() || customerProfile.address,
     });
     if (!saved) return;
     setIsSaved(true);

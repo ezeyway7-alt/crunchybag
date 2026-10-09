@@ -24,6 +24,16 @@ type Overview = {
     pending_events: number;
     failed_events: number;
     sent_events: number;
+    visitors: {
+      available: boolean;
+      message: string;
+      unique_visitors?: number;
+      sessions?: number;
+      page_views?: number;
+      daily?: {date: string; visitors: number; sessions: number; page_views: number}[];
+      top_events?: {event: string; events: number; visitors: number}[];
+      top_pages?: {path: string; page_views: number; visitors: number}[];
+    };
   };
   scope: string;
 };
@@ -42,11 +52,40 @@ function Metric({label, value, note}: {label: string; value: string; note?: stri
   </article>;
 }
 
+function VisitorChart({rows}: {rows: NonNullable<Overview['analytics']['visitors']['daily']>}) {
+  const width = Math.max(640, rows.length * 72);
+  const height = 200;
+  const chartTop = 20;
+  const chartBottom = 150;
+  const max = Math.max(1, ...rows.map(row => row.visitors));
+  const step = rows.length ? width / rows.length : width;
+  const barWidth = Math.min(32, step * 0.55);
+  return <div className="overflow-x-auto">
+    <svg role="img" aria-label="Anonymous visitors by day" viewBox={`0 0 ${width} ${height}`} className="h-52 w-full min-w-[640px]">
+      <line x1="0" y1={chartBottom} x2={width} y2={chartBottom} stroke="#52525b"/>
+      {rows.map((row, index) => {
+        const barHeight = Math.max(row.visitors ? 3 : 0, row.visitors / max * (chartBottom - chartTop));
+        const x = index * step + (step - barWidth) / 2;
+        const y = chartBottom - barHeight;
+        return <g key={row.date}>
+          <title>{`${row.date}: ${row.visitors} visitors, ${row.sessions} visits, ${row.page_views} page views`}</title>
+          <rect x={x} y={y} width={barWidth} height={barHeight} rx="3" fill="#f59e0b"/>
+          <text x={x + barWidth / 2} y={Math.max(13, y - 5)} textAnchor="middle" fill="#f4f4f5" fontSize="10">{row.visitors}</text>
+          <text x={x + barWidth / 2} y="174" textAnchor="middle" fill="#a1a1aa" fontSize="10">{row.date.slice(5)}</text>
+        </g>;
+      })}
+    </svg>
+  </div>;
+}
+
 export function PostHogAnalyticsTab() {
   const {currentOutlet} = useApp();
   const outlet = String(currentOutlet?.id || '');
-  const [startDate, setStartDate] = useState(todayNepal());
   const [endDate, setEndDate] = useState(todayNepal());
+  const [startDate, setStartDate] = useState(() => {
+    const [year, month, day] = todayNepal().split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day - 6)).toISOString().slice(0, 10);
+  });
   const [refresh, setRefresh] = useState(0);
   const [state, setState] = useState<{scope: string; data: Overview | null; error: string}>({
     scope: '',
@@ -74,6 +113,7 @@ export function PostHogAnalyticsTab() {
   const data = state.scope === scope ? state.data : null;
   const error = state.scope === scope ? state.error : '';
   const analytics = data?.analytics;
+  const visitors = analytics?.visitors;
 
   return <section className="space-y-4" aria-label="Analytics">
     <header className="flex flex-wrap items-start justify-between gap-3">
@@ -163,6 +203,44 @@ export function PostHogAnalyticsTab() {
                 Some server-confirmed order events failed to send. Check the Celery worker logs before relying on PostHog purchase counts.
               </p>}
             </>}
+        {analytics?.configured && visitors && !visitors.available && <div role="status" className="rounded border border-amber-900/70 bg-amber-950/30 p-3 text-xs text-amber-200">
+          {visitors.message} Open PostHog to see its built-in charts and session replays.
+        </div>}
+        {visitors?.available && <>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Metric label="Anonymous visitors" value={(visitors.unique_visitors || 0).toLocaleString()} note="Distinct browsers with a page view"/>
+            <Metric label="Visits" value={(visitors.sessions || 0).toLocaleString()} note="PostHog sessions with a page view"/>
+            <Metric label="Page views" value={(visitors.page_views || 0).toLocaleString()}/>
+          </div>
+          <p className="text-[11px] text-zinc-500">
+            Counts include browser-tracked activity for this outlet in the selected dates. A visitor is an anonymous browser ID, not a named or logged-in person; a different browser or device normally counts separately. Tracking skips browsers that signal Do Not Track or Global Privacy Control.
+          </p>
+          <p className="text-[11px] text-zinc-500">PostHog totals may take up to 2 minutes to refresh. After visiting from another browser, wait briefly and then select Refresh.</p>
+          <div className={`${panel} space-y-3`}>
+            <div>
+              <h3 className="text-sm font-semibold">Visitors by day</h3>
+              <p className="mt-1 text-[11px] text-zinc-500">Hover a bar for visitors, visits and page views.</p>
+            </div>
+            {visitors.daily?.length
+              ? <VisitorChart rows={visitors.daily}/>
+              : <p className="py-8 text-center text-xs text-zinc-500">No page views recorded in this date range yet. Visit the public website in another browser and refresh.</p>}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className={`${panel} space-y-3`}>
+              <h3 className="text-sm font-semibold">What visitors did</h3>
+              {visitors.top_events?.length
+                ? <div className="divide-y divide-zinc-800">{visitors.top_events.map(row=><div key={row.event} className="flex justify-between gap-3 py-2 text-xs"><span className="break-all">{row.event}</span><span className="shrink-0 text-zinc-400">{row.events} events · {row.visitors} browsers</span></div>)}</div>
+                : <p className="text-xs text-zinc-500">No tracked actions in this date range yet.</p>}
+              <p className="text-[11px] text-zinc-500">For individual anonymous visits and replay, open PostHog and choose Session Replay.</p>
+            </div>
+            <div className={`${panel} space-y-3`}>
+              <h3 className="text-sm font-semibold">Most-viewed pages</h3>
+              {visitors.top_pages?.length
+                ? <div className="divide-y divide-zinc-800">{visitors.top_pages.map(row=><div key={row.path} className="flex justify-between gap-3 py-2 text-xs"><span className="break-all">{row.path}</span><span className="shrink-0 text-zinc-400">{row.page_views} views · {row.visitors} browsers</span></div>)}</div>
+                : <p className="text-xs text-zinc-500">No page views in this date range yet.</p>}
+            </div>
+          </div>
+        </>}
       </section>
     </>}
   </section>;

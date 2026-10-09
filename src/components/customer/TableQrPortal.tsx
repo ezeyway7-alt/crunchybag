@@ -270,8 +270,8 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
       : {}),
     fulfillment_type:'DINE_IN',
     qr_token:qrToken,
-    customer_name:guestName.trim(),
-    customer_phone:phoneNumber.trim(),
+    customer_name:(guestName || '').trim(),
+    customer_phone:(phoneNumber || '').trim(),
     notes:tableNotes,
     items:cartLines(cart.items)
   };

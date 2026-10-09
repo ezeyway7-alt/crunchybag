@@ -34,7 +34,27 @@ export function useCustomerAccount() {
     if (!enabled) return;
     let live = true; const controller = new AbortController();
     Promise.all([apiClient.get<any>(customerPath('profile/'),{signal:controller.signal}),apiClient.get<any>(customerPath('orders/'),{signal:controller.signal})])
-      .then(([profile,orders]) => {if(live){setError('');setState({scope,orders:orders.results.map(customerOrder),favorites:profile.favorites.map(String),profile:{...emptyProfile,...profile,memberSince:new Date(profile.member_since).toLocaleDateString()}});}})
+      .then(([profile,orders]) => {
+        if(live){
+          setError('');
+          setState({
+            scope,
+            orders:(orders?.results || []).map(customerOrder),
+            favorites:(profile?.favorites || []).map(String),
+            profile:{
+              ...emptyProfile,
+              ...(profile || {}),
+              name: profile?.name || '',
+              phone: profile?.phone || '',
+              email: profile?.email || '',
+              address: profile?.address || '',
+              points: typeof profile?.points === 'number' ? profile.points : 0,
+              tier: profile?.tier || '',
+              memberSince: profile?.member_since ? new Date(profile.member_since).toLocaleDateString() : ''
+            }
+          });
+        }
+      })
       .catch(e=>{if(live)setError(extractErrorMessage(e));});
     return () => {live=false;controller.abort();};
   },[enabled,scope,revision]);

@@ -54,8 +54,8 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const [selectedFulfillment, setSelectedFulfillment] = useState<FulfillmentType>("DELIVERY");
 
   // Contact info
-  const [name, setName] = useState(customerProfile.name || "");
-  const [phone, setPhone] = useState(customerProfile.phone || "");
+  const [name, setName] = useState(customerProfile.name || authUser?.name || authUser?.username || "");
+  const [phone, setPhone] = useState(customerProfile.phone || (authUser as any)?.phone || (authUser as any)?.phone_number || "");
   const [notes, setNotes] = useState("");
 
   // Delivery address & location state
@@ -92,7 +92,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     location?: { lat: number; lng: number; landmark?: string }
   ) => {
     trackEvent('location_selected');
-    setDeliveryAddress(newAddress);
+    setDeliveryAddress(newAddress || "");
     setDeliveryLocation(location);setSelectedAddressId('');
   };
 
@@ -104,10 +104,15 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const [quoteError,setQuoteError] = useState('');
   const lock = useRef(false);
   const addressInitialized = useRef(false);
+
+  const cleanName = (name || '').trim();
+  const cleanPhone = (phone || '').trim();
+  const cleanAddress = (deliveryAddress || '').trim();
+
   const payload = {outlet_id:Number(currentOutlet.id),items:cartLines(cart.items),fulfillment_type:selectedFulfillment,
     cart_line_ids:cart.items.map(item=>item.cartItemId),
-    customer_name:name.trim() || authUser?.username || '',delivery_address:selectedFulfillment==='DELIVERY'?deliveryAddress:'',
-    table_id:selectedFulfillment==='DINE_IN'?meta?.tables.find((t:any)=>t.table_number===tableNumber)?.id || null:null,
+    customer_name:cleanName || authUser?.name || authUser?.username || '',delivery_address:selectedFulfillment==='DELIVERY'?cleanAddress:'',
+    table_id:selectedFulfillment==='DINE_IN'?meta?.tables?.find((t:any)=>t.table_number===tableNumber)?.id || null:null,
     notes:[vehicleInfo?`Vehicle: ${vehicleInfo}`:'',notes].filter(Boolean).join(' — '),delivery_location:selectedFulfillment==='DELIVERY' ? deliveryLocation || {} : {}};
   const signature = JSON.stringify(payload);
   const quote = quoted?.signature===signature ? quoted.data : null;
@@ -118,13 +123,13 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     if(!isOpen)return;
     trackEvent('checkout_start',cartMetadata(cart));
     addressInitialized.current=false;setDeliveryAddress('');setDeliveryLocation(undefined);setSelectedAddressId('');setSaveAddress(false);
-    setName(authUser?.username || customerProfile.name);setPhone((authUser as any)?.phone_number || customerProfile.phone);setError(null);setProofError('');setTouched(false);setProof(null);setMeta(null);
+    setName(authUser?.name || authUser?.username || customerProfile.name || '');setPhone((authUser as any)?.phone || (authUser as any)?.phone_number || customerProfile.phone || '');setError(null);setProofError('');setTouched(false);setProof(null);setMeta(null);
     const controller=new AbortController();let live=true;
     apiClient.get<any>(`${customerPath('checkout/meta/')}?outlet_id=${currentOutlet.id}`,{signal:controller.signal})
-      .then(result=>{if(live){setMeta(result);if(!result.fulfillment_modes.includes(selectedFulfillment))setSelectedFulfillment(result.fulfillment_modes[0] || 'TAKEAWAY');}})
+      .then(result=>{if(live){setMeta(result);if(result?.fulfillment_modes && !result.fulfillment_modes.includes(selectedFulfillment))setSelectedFulfillment(result.fulfillment_modes[0] || 'TAKEAWAY');}})
       .catch(e=>{if(live)setError(extractErrorMessage(e));});
     const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');
-    if(pending)apiClient.get<any>(customerPath('orders/'),{signal:controller.signal}).then(result=>{const order=result.results.find((o:any)=>o.request_key===pending.key);if(live&&order)finishOrder(order);}).catch(error=>{if(live)setError(extractErrorMessage(error));});
+    if(pending)apiClient.get<any>(customerPath('orders/'),{signal:controller.signal}).then(result=>{const order=result?.results?.find((o:any)=>o.request_key===pending.key);if(live&&order)finishOrder(order);}).catch(error=>{if(live)setError(extractErrorMessage(error));});
     return()=>{live=false;controller.abort();};
   },[isOpen,currentOutlet.id,authUser?.id]);
   useEffect(()=>{
@@ -137,16 +142,16 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   useEffect(()=>{
     if (!isOpen || addressInitialized.current || savedAddresses.loading) return;
     addressInitialized.current=true;
-    const row = savedAddresses.addresses.find(row=>row.is_default) || savedAddresses.addresses[0];
-    if (row) {setSelectedAddressId(String(row.id));setDeliveryAddress(row.address);setDeliveryLocation(addressPoint(row));}
-    else if(customerProfile.address) setDeliveryAddress(customerProfile.address);
+    const row = savedAddresses.addresses?.find(row=>row.is_default) || savedAddresses.addresses?.[0];
+    if (row) {setSelectedAddressId(String(row.id));setDeliveryAddress(row.address || '');setDeliveryLocation(addressPoint(row));}
+    else if(customerProfile.address) setDeliveryAddress(customerProfile.address || '');
   },[isOpen,savedAddresses.addresses,savedAddresses.loading,customerProfile.address,authUser?.id]);
-  const addressError = selectedFulfillment==='DELIVERY' && !deliveryAddress.trim() ? 'Choose your delivery address.' : '';
-  const nameError = !name.trim() ? 'Enter your name.' : name.trim().length > 120 ? 'Use no more than 120 characters.' : '';
+  const addressError = selectedFulfillment==='DELIVERY' && !cleanAddress ? 'Choose your delivery address.' : '';
+  const nameError = !cleanName ? 'Enter your name.' : cleanName.length > 120 ? 'Use no more than 120 characters.' : '';
   const tableError = selectedFulfillment==='DINE_IN' && !payload.table_id ? 'Choose a table.' : '';
-  useEffect(()=>{if(isOpen && name.trim() && !nameError)trackEvent('name_entered');},[isOpen,!!name.trim(),!!nameError]);
-  useEffect(()=>{if(isOpen && phone.trim())trackEvent('phone_entered');},[isOpen,!!phone.trim()]);
-  useEffect(()=>{if(isOpen && deliveryAddress.trim()){trackEvent('address_entered');trackEvent('delivery_information',{fulfillment_type:selectedFulfillment});}},[isOpen,!!deliveryAddress.trim()]);
+  useEffect(()=>{if(isOpen && cleanName && !nameError)trackEvent('name_entered');},[isOpen,cleanName,!!nameError]);
+  useEffect(()=>{if(isOpen && cleanPhone)trackEvent('phone_entered');},[isOpen,cleanPhone]);
+  useEffect(()=>{if(isOpen && cleanAddress){trackEvent('address_entered');trackEvent('delivery_information',{fulfillment_type:selectedFulfillment});}},[isOpen,cleanAddress,selectedFulfillment]);
   useEffect(()=>{if(isOpen && deliveryLocation)trackEvent('location_selected');},[isOpen,!!deliveryLocation]);
   useEffect(()=>{if(isOpen && meta?.qr_url){trackEvent('payment_method_view',{payment_method:'FONEPAY'});trackEvent('payment_method_selected',{payment_method:'FONEPAY'});}},[isOpen,!!meta?.qr_url]);
   const handleProof = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,12 +169,12 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     if(nameError || addressError || tableError || cartSyncing || cartSyncError){trackEvent('checkout_validation_failed',{error_category:nameError?'name_missing':addressError?'address_missing':tableError?'table_missing':'cart_sync',cart_value:grandPayableTotal});return;}
     if(!isAuthenticated||!authUser||authUser.is_active===false){setError('Sign in before placing your order.');return;}
     if(!quote||!proof||!meta?.qr_url){setError('Scan the payment QR and upload your receipt before placing the order.');return;}
-    if(selectedFulfillment==='DELIVERY'&&!deliveryAddress.trim()){setError('Enter your delivery address.');return;}
+    if(selectedFulfillment==='DELIVERY'&&!cleanAddress){setError('Enter your delivery address.');return;}
     trackEvent('confirm_order_click',cartMetadata(cart));
     lock.current=true;setIsSubmitting(true);setError(null);
     try {
       if(saveAddress && selectedFulfillment==='DELIVERY' && !selectedAddressId) {
-        const row = await savedAddresses.save({label:addressLabel.trim() || 'Home',address:deliveryAddress,landmark:deliveryLocation?.landmark || '',latitude:deliveryLocation ? deliveryLocation.lat.toFixed(7):null,longitude:deliveryLocation ? deliveryLocation.lng.toFixed(7):null});
+        const row = await savedAddresses.save({label:(addressLabel || '').trim() || 'Home',address:deliveryAddress || '',landmark:deliveryLocation?.landmark || '',latitude:deliveryLocation ? deliveryLocation.lat.toFixed(7):null,longitude:deliveryLocation ? deliveryLocation.lng.toFixed(7):null});
         setSelectedAddressId(String(row.id));setSaveAddress(false);
       }
       const body={...payload,expected_total:quote.total_payable};
@@ -227,7 +232,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 <button
                   type="button"
                   id="fulfillment-opt-delivery"
-                  disabled={!meta?.fulfillment_modes.includes("DELIVERY")}
+                  disabled={!meta?.fulfillment_modes?.includes("DELIVERY")}
                   onClick={() => handleFulfillmentChange("DELIVERY")}
                   className={`h-8 px-1 sm:px-2 border flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                     selectedFulfillment === "DELIVERY"
@@ -244,7 +249,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 <button
                   type="button"
                   id="fulfillment-opt-takeaway"
-                  disabled={!meta?.fulfillment_modes.includes("TAKEAWAY")}
+                  disabled={!meta?.fulfillment_modes?.includes("TAKEAWAY")}
                   onClick={() => handleFulfillmentChange("TAKEAWAY")}
                   className={`h-8 px-1 sm:px-2 border flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                     selectedFulfillment === "TAKEAWAY"
@@ -364,7 +369,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   <UtensilsCrossed className="h-3.5 w-3.5 text-amber-500" />
                   <span>Table Number</span>
                 </div>
-                <select aria-label="Table number" value={tableNumber} onChange={e=>setTableNumber(e.target.value)} className="w-full p-2 bg-zinc-900 border border-zinc-700 text-base sm:text-xs"><option value="">Choose a table</option>{meta?.tables.map((table:any)=><option key={table.id} value={table.table_number}>{table.table_number}</option>)}</select>
+                <select aria-label="Table number" value={tableNumber} onChange={e=>setTableNumber(e.target.value)} className="w-full p-2 bg-zinc-900 border border-zinc-700 text-base sm:text-xs"><option value="">Choose a table</option>{meta?.tables?.map((table:any)=><option key={table.id} value={table.table_number}>{table.table_number}</option>)}</select>
               </div>
             )}
 
