@@ -49,6 +49,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   onOrderSuccess,
 }) => {
   const { cart, currentOutlet, consumePurchasedCart, customerProfile, cartSyncing, cartSyncError } = useApp();
+  const {authUser,isAuthenticated} = useAuth();
 
   // 1. By default, DELIVERY is selected as requested!
   const [selectedFulfillment, setSelectedFulfillment] = useState<FulfillmentType>("DELIVERY");
@@ -96,7 +97,6 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     setDeliveryLocation(location);setSelectedAddressId('');
   };
 
-  const {authUser,isAuthenticated} = useAuth();
   const [meta,setMeta] = useState<any>(null);
   const [proof,setProof] = useState<File | null>(null);
   const [quoted,setQuoted] = useState<{signature:string;data:any}|null>(null);
