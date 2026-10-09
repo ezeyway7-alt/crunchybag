@@ -174,7 +174,7 @@ export function PostHogAnalyticsTab() {
     const controller = new AbortController();
     let active = true;
     setState({scope, data: null, error: ''});
-    const query = new URLSearchParams({outlet_id: outlet, start_date: startDate, end_date: endDate});
+    const query = new URLSearchParams({outlet_id: outlet, start_date: startDate, end_date: endDate, refresh: String(refresh)});
     apiClient.get<Overview>(`/customer/reporting-overview/?${query}`, {signal: controller.signal})
       .then(data => { if (active) setState({scope, data, error: ''}); })
       .catch(error => {
