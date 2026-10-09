@@ -189,7 +189,7 @@ export function PostHogAnalyticsTab() {
       params._t = String(Date.now());
     }
     const query = new URLSearchParams(params);
-    apiClient.get<Overview>(`/customer/reporting-overview/?${query}`, {signal: controller.signal})
+    apiClient.get<Overview>(`/customer/reporting-overview/?${query}`, {signal: controller.signal, cache: 'no-store'})
       .then(data => { if (active) setState({scope, data, error: ''}); })
       .catch(error => {
         if (active) setState({scope, data: null, error: extractErrorMessage(error)});
