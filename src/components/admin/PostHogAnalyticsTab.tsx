@@ -259,12 +259,6 @@ export function PostHogAnalyticsTab() {
                 {analytics.can_open && !analytics.project_url && <span className="text-amber-300">Project URL is not configured.</span>}
                 {!analytics.can_open && <span className="text-zinc-400">Ask an outlet owner or manager to open the PostHog project.</span>}
               </div>
-              <div className="grid grid-cols-2 gap-x-5 gap-y-2 border-y border-zinc-800 py-2 sm:grid-cols-4">
-                <Metric label="Orders linked" value={analytics.linked_orders.toLocaleString()}/>
-                <Metric label="Events sent" value={analytics.sent_events.toLocaleString()}/>
-                <Metric label="Events waiting" value={analytics.pending_events.toLocaleString()}/>
-                <Metric label="Events failed" value={analytics.failed_events.toLocaleString()}/>
-              </div>
               {analytics.failed_events > 0 && <p role="status" className="text-xs text-amber-300">
                 Some server-confirmed order events failed to send. Check the Celery worker logs before relying on PostHog purchase counts.
               </p>}
@@ -273,15 +267,21 @@ export function PostHogAnalyticsTab() {
           {visitors.message} Open PostHog to see its built-in charts and session replays.
         </div>}
         {visitors?.available && <>
-          <div className="grid grid-cols-3 gap-4 border-b border-zinc-800 pb-2 sm:max-w-lg">
+          <div className="overflow-x-auto border-y border-zinc-800 py-1.5">
+            <div className="grid min-w-[700px] grid-cols-7 gap-3">
+              <Metric label="Orders linked" value={(analytics?.linked_orders || 0).toLocaleString()}/>
+              <Metric label="Events sent" value={(analytics?.sent_events || 0).toLocaleString()}/>
+              <Metric label="Events waiting" value={(analytics?.pending_events || 0).toLocaleString()}/>
+              <Metric label="Events failed" value={(analytics?.failed_events || 0).toLocaleString()}/>
             <Metric label="Visitors" value={(visitors.unique_visitors || 0).toLocaleString()}/>
             <Metric label="Visits" value={(visitors.sessions || 0).toLocaleString()}/>
             <Metric label="Page views" value={(visitors.page_views || 0).toLocaleString()}/>
+            </div>
           </div>
           <div className="grid items-start gap-3 lg:grid-cols-2">
             <div className="space-y-3">
               <div className={`${panel} space-y-2`}>
-                <h3 className="text-xs font-semibold">Visitors by day</h3>
+                <h3 className="text-xs font-semibold">Visitors by day · current month</h3>
                 {visitors.daily?.length ? <VisitorChart rows={visitors.daily}/> : <p className="text-xs text-zinc-500">No page views for this date.</p>}
               </div>
               <div className={`${panel} space-y-2`}>
