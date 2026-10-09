@@ -19,9 +19,9 @@ export function useWebsiteTraffic(path:string,outlet:string,portal:string,staff:
         last.current=scope;
         if(website){
           configureTracking(outlet,true);
+          trackEvent('page_view');
           const ids=trackingContext();
           if(!ids)return;
-          trackEvent('page_view');
           const marker=`journey:landing:${ids.session_id}`;
           if(!sessionStorage.getItem(marker)){trackEvent('landing_page_view');trackEvent('session_start');sessionStorage.setItem(marker,'1');}
           else trackEvent('route_change');
