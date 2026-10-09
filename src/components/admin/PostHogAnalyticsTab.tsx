@@ -41,7 +41,7 @@ type Overview = {
   scope: string;
 };
 
-const panel = 'bg-[#121214] border border-zinc-800 rounded-lg p-4';
+const panel = 'bg-[#121214] border border-zinc-800 rounded-lg p-3';
 const actionLabels: Record<string, string> = {
   login_started: 'Sign-in started',
   login_success: 'Signed in',
@@ -84,11 +84,10 @@ function money(value: string) {
   return `NPR ${Number(value || 0).toLocaleString('en-NP', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 }
 
-function Metric({label, value, note}: {label: string; value: string; note?: string}) {
-  return <article className="min-w-0 border-l border-zinc-800 px-3 py-1 first:border-l-0">
-    <p className="text-xs text-zinc-400">{label}</p>
-    <p className="mt-1 break-words text-base font-semibold text-amber-400">{value}</p>
-    {note && <p className="mt-1 text-[11px] text-zinc-500">{note}</p>}
+function Metric({label, value}: {label: string; value: string}) {
+  return <article className="min-w-0">
+    <p className="text-[10px] leading-tight text-zinc-500">{label}</p>
+    <p className="mt-0.5 break-words text-sm font-semibold tabular-nums text-zinc-100">{value}</p>
   </article>;
 }
 
@@ -130,15 +129,15 @@ function FunnelRows({rows}: {rows: NonNullable<Overview['analytics']['visitors']
 }
 
 function VisitorChart({rows}: {rows: NonNullable<Overview['analytics']['visitors']['daily']>}) {
-  const width = Math.max(640, rows.length * 72);
-  const height = 200;
-  const chartTop = 20;
-  const chartBottom = 150;
+  const width = Math.max(320, rows.length * 44);
+  const height = 145;
+  const chartTop = 14;
+  const chartBottom = 106;
   const max = Math.max(1, ...rows.map(row => row.visitors));
   const step = rows.length ? width / rows.length : width;
-  const barWidth = Math.min(32, step * 0.55);
+  const barWidth = Math.min(20, step * 0.55);
   return <div className="overflow-x-auto">
-    <svg role="img" aria-label="Anonymous visitors by day" viewBox={`0 0 ${width} ${height}`} className="h-52 w-full min-w-[640px]">
+    <svg role="img" aria-label="Anonymous visitors by day" viewBox={`0 0 ${width} ${height}`} className="h-36 w-full min-w-[320px]">
       <line x1="0" y1={chartBottom} x2={width} y2={chartBottom} stroke="#52525b"/>
       {rows.map((row, index) => {
         const barHeight = Math.max(row.visitors ? 3 : 0, row.visitors / max * (chartBottom - chartTop));
@@ -148,7 +147,7 @@ function VisitorChart({rows}: {rows: NonNullable<Overview['analytics']['visitors
           <title>{`${row.date}: ${row.visitors} visitors, ${row.sessions} visits, ${row.page_views} page views`}</title>
           <rect x={x} y={y} width={barWidth} height={barHeight} rx="3" fill="#f59e0b"/>
           <text x={x + barWidth / 2} y={Math.max(13, y - 5)} textAnchor="middle" fill="#f4f4f5" fontSize="10">{row.visitors}</text>
-          <text x={x + barWidth / 2} y="174" textAnchor="middle" fill="#a1a1aa" fontSize="10">{row.date.slice(5)}</text>
+          <text x={x + barWidth / 2} y="128" textAnchor="middle" fill="#a1a1aa" fontSize="9">{row.date.slice(5)}</text>
         </g>;
       })}
     </svg>
@@ -159,10 +158,7 @@ export function PostHogAnalyticsTab() {
   const {currentOutlet} = useApp();
   const outlet = String(currentOutlet?.id || '');
   const [endDate, setEndDate] = useState(todayNepal());
-  const [startDate, setStartDate] = useState(() => {
-    const [year, month, day] = todayNepal().split('-').map(Number);
-    return new Date(Date.UTC(year, month - 1, day - 6)).toISOString().slice(0, 10);
-  });
+  const [startDate, setStartDate] = useState(todayNepal());
   const [refresh, setRefresh] = useState(0);
   const [state, setState] = useState<{scope: string; data: Overview | null; error: string}>({
     scope: '',
@@ -197,30 +193,28 @@ export function PostHogAnalyticsTab() {
 
   return <section className="space-y-4" aria-label="Analytics">
     <header className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <p className="text-[10px] uppercase tracking-widest text-amber-500">One clear source for each number</p>
-        <h1 className="mt-1 text-2xl font-bold">Analytics</h1>
-        <p className="mt-1 text-xs text-zinc-400">{currentOutlet?.name || 'Select an outlet'} · Nepal time</p>
+      <div className="flex min-w-0 items-baseline gap-2">
+        <h1 className="text-lg font-bold">Analytics</h1>
+        <span className="truncate text-[11px] text-zinc-500">{currentOutlet?.name || 'Select an outlet'} · Nepal time</span>
       </div>
-      <button className="flex items-center gap-2 rounded border border-zinc-700 px-3 py-2 text-xs hover:border-amber-500 disabled:opacity-40"
-        onClick={() => setRefresh(value => value + 1)} disabled={!valid || !datesValid}>
-        <RefreshCw size={14}/> Refresh
-      </button>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <label className="flex items-center gap-1 text-[10px] text-zinc-500">From
+          <input aria-label="Analytics start date" type="date" value={startDate} max={endDate || undefined}
+            onChange={event => setStartDate(event.target.value)}
+            className="bg-transparent px-1 py-1 text-[11px] text-zinc-300 outline-none"/>
+        </label>
+        <label className="flex items-center gap-1 text-[10px] text-zinc-500">To
+          <input aria-label="Analytics end date" type="date" value={endDate} min={startDate || undefined}
+            onChange={event => setEndDate(event.target.value)}
+            className="bg-transparent px-1 py-1 text-[11px] text-zinc-300 outline-none"/>
+        </label>
+        <button aria-label="Refresh analytics" className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-amber-400 disabled:opacity-40"
+          onClick={() => setRefresh(value => value + 1)} disabled={!valid || !datesValid}>
+          <RefreshCw size={12}/> Refresh
+        </button>
+      </div>
+      {!datesValid && <p role="alert" className="w-full text-xs text-rose-400">Choose a valid date range.</p>}
     </header>
-
-    <div className={`${panel} flex flex-wrap items-end gap-3`}>
-      <label className="text-xs">From
-        <input aria-label="Analytics start date" type="date" value={startDate} max={endDate || undefined}
-          onChange={event => setStartDate(event.target.value)}
-          className="mt-1 block rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs"/>
-      </label>
-      <label className="text-xs">To
-        <input aria-label="Analytics end date" type="date" value={endDate} min={startDate || undefined}
-          onChange={event => setEndDate(event.target.value)}
-          className="mt-1 block rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs"/>
-      </label>
-      {!datesValid && <p role="alert" className="text-xs text-rose-400">Choose a valid date range.</p>}
-    </div>
 
     {!valid && <p className={`${panel} text-sm text-zinc-400`}>Select an outlet to view its sales and PostHog project.</p>}
     {valid && !data && !error && <p role="status" className={`${panel} text-sm text-zinc-400`}>Loading sales and analytics status…</p>}
@@ -229,30 +223,22 @@ export function PostHogAnalyticsTab() {
     </div>}
 
     {data && <>
-      <section aria-labelledby="sales-heading" className="space-y-3">
-        <div>
-          <h2 id="sales-heading" className="text-sm font-semibold">Sales and payments · Django records</h2>
-          <p className="mt-1 text-[11px] text-zinc-500">These are authoritative order and payment records, not browser estimates.</p>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          <Metric label="Website orders" value={data.sales.orders.toLocaleString()} note={`${data.sales.cancelled.toLocaleString()} cancelled`}/>
-          <Metric label="Order value" value={money(data.sales.order_value)} note="Excludes cancelled orders"/>
-          <Metric label="Fully paid orders" value={data.sales.paid_orders.toLocaleString()}/>
+      <section aria-labelledby="sales-heading" className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-zinc-800 pb-3">
+        <h2 id="sales-heading" className="shrink-0 text-xs font-semibold">Sales · Django</h2>
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-5 gap-y-2 sm:grid-cols-3 xl:grid-cols-6">
+          <Metric label="Website orders" value={`${data.sales.orders.toLocaleString()} · ${data.sales.cancelled.toLocaleString()} cancelled`}/>
+          <Metric label="Order value" value={money(data.sales.order_value)}/>
+          <Metric label="Fully paid" value={data.sales.paid_orders.toLocaleString()}/>
           <Metric label="Payments received" value={money(data.sales.received)}/>
-          <Metric label="Refunds recorded" value={money(data.sales.refunded)}/>
-          <Metric label="Net received" value={money(data.sales.net_received)} note="Recorded payments less refunds"/>
+          <Metric label="Refunds" value={money(data.sales.refunded)}/>
+          <Metric label="Net received" value={money(data.sales.net_received)}/>
         </div>
-        <p className="text-[11px] text-zinc-500">{data.scope}</p>
       </section>
 
-      <section aria-labelledby="visitor-heading" className={`${panel} space-y-3`}>
+      <section aria-labelledby="visitor-heading" className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 id="visitor-heading" className="text-sm font-semibold">Visitor behaviour · PostHog</h2>
-            <p className="mt-1 max-w-3xl text-xs text-zinc-400">
-              Use PostHog for funnels, campaign paths, segmentation and privacy-masked session replay.
-              Sales and verified payments above remain sourced from Django.
-            </p>
+            <h2 id="visitor-heading" className="text-xs font-semibold">Visitors · PostHog</h2>
           </div>
           {analytics?.configured && analytics.can_open && analytics.project_url
             ? <a href={analytics.project_url} target="_blank" rel="noopener noreferrer"
@@ -267,17 +253,17 @@ export function PostHogAnalyticsTab() {
               PostHog is not configured for this outlet yet. An administrator must set its project token, region and project URL on the backend before visitor tracking or replay can start.
             </div>
           : <>
-              <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px]">
                 <span>Project: <strong className="text-emerald-400">Connected</strong></span>
                 <span>Session replay: <strong>{analytics.replay_enabled ? 'Enabled' : 'Disabled'}</strong></span>
                 {analytics.can_open && !analytics.project_url && <span className="text-amber-300">Project URL is not configured.</span>}
                 {!analytics.can_open && <span className="text-zinc-400">Ask an outlet owner or manager to open the PostHog project.</span>}
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                <Metric label="Orders linked to a visitor session" value={analytics.linked_orders.toLocaleString()}/>
-                <Metric label="Business events delivered" value={analytics.sent_events.toLocaleString()}/>
-                <Metric label="Events waiting to send" value={analytics.pending_events.toLocaleString()}/>
-                <Metric label="Events requiring attention" value={analytics.failed_events.toLocaleString()}/>
+              <div className="grid grid-cols-2 gap-x-5 gap-y-2 border-y border-zinc-800 py-2 sm:grid-cols-4">
+                <Metric label="Orders linked" value={analytics.linked_orders.toLocaleString()}/>
+                <Metric label="Events sent" value={analytics.sent_events.toLocaleString()}/>
+                <Metric label="Events waiting" value={analytics.pending_events.toLocaleString()}/>
+                <Metric label="Events failed" value={analytics.failed_events.toLocaleString()}/>
               </div>
               {analytics.failed_events > 0 && <p role="status" className="text-xs text-amber-300">
                 Some server-confirmed order events failed to send. Check the Celery worker logs before relying on PostHog purchase counts.
@@ -287,52 +273,50 @@ export function PostHogAnalyticsTab() {
           {visitors.message} Open PostHog to see its built-in charts and session replays.
         </div>}
         {visitors?.available && <>
-          <div className="flex flex-wrap items-center divide-x divide-zinc-800 rounded border border-zinc-800 py-2">
-            <Metric label="Anonymous visitors" value={(visitors.unique_visitors || 0).toLocaleString()} note="Distinct browsers with a page view"/>
-            <Metric label="Visits" value={(visitors.sessions || 0).toLocaleString()} note="PostHog sessions with a page view"/>
+          <div className="grid grid-cols-3 gap-4 border-b border-zinc-800 pb-2 sm:max-w-lg">
+            <Metric label="Visitors" value={(visitors.unique_visitors || 0).toLocaleString()}/>
+            <Metric label="Visits" value={(visitors.sessions || 0).toLocaleString()}/>
             <Metric label="Page views" value={(visitors.page_views || 0).toLocaleString()}/>
           </div>
-          {!insightsAvailable && <div role="status" className="rounded border border-amber-900/70 bg-amber-950/30 p-3 text-xs text-amber-200">
-            Visitor events are reaching PostHog, but this server response does not include the funnel insights yet. Deploy and restart the updated backend; this is not evidence that PostHog received no events.
-          </div>}
-          {insightsAvailable && <>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(16rem,2fr)]">
-            <div className={`${panel} space-y-3`}>
-              <div>
-                <h3 className="text-sm font-semibold">Where checkout sessions stop</h3>
-                <p className="mt-1 text-[11px] text-zinc-500">Sessions reaching each step in order. Missing events or alternate paths can look like drop-off; this does not prove why someone left.</p>
+          <div className="grid items-start gap-3 lg:grid-cols-2">
+            <div className="space-y-3">
+              <div className={`${panel} space-y-2`}>
+                <h3 className="text-xs font-semibold">Visitors by day</h3>
+                {visitors.daily?.length ? <VisitorChart rows={visitors.daily}/> : <p className="text-xs text-zinc-500">No page views for this date.</p>}
               </div>
-              {visitors.funnel?.length
-                ? <FunnelRows rows={visitors.funnel}/>
-                : <p className="text-xs text-zinc-500">No funnel data for this date range.</p>}
-            </div>
-            <div className={`${panel} space-y-3`}>
-              <div>
-                <h3 className="text-sm font-semibold">What happened before they left</h3>
-                <p className="mt-1 text-[11px] text-zinc-500">Last meaningful action in sessions idle for at least 30 minutes. This is not proof of why someone left.</p>
+              <div className={`${panel} space-y-2`}>
+                <h3 className="text-xs font-semibold">Most-viewed pages</h3>
+                {visitors.top_pages?.length
+                  ? <div className="divide-y divide-zinc-800">{visitors.top_pages.map(row=><div key={row.path} className="flex justify-between gap-3 py-1.5 text-xs"><span className="break-all">{row.path}</span><span className="shrink-0 text-zinc-400">{row.page_views} views · {row.visitors} visitors</span></div>)}</div>
+                  : <p className="text-xs text-zinc-500">No page views for this date.</p>}
               </div>
-              {visitors.last_steps?.length
-                ? <div className="divide-y divide-zinc-800">{visitors.last_steps.slice(0, 8).map(row=><div key={row.event} className="flex justify-between gap-3 py-2 text-xs"><span>{actionLabel(row.event)}</span><span className="shrink-0 text-zinc-400">{row.sessions} sessions</span></div>)}</div>
-                : <p className="text-xs text-zinc-500">No inactive sessions yet. Check again after visitors have been idle for 30 minutes.</p>}
+            </div>
+            <div className="space-y-3">
+              {!insightsAvailable && <div role="status" className="rounded border border-amber-900/70 bg-amber-950/30 p-3 text-xs text-amber-200">
+                Visitor counts are available, but checkout insights are missing from the backend response. Deploy and restart the updated backend.
+              </div>}
+              {insightsAvailable && <>
+                <div className={`${panel} space-y-2`}>
+                  <h3 className="text-xs font-semibold">Checkout funnel · sessions</h3>
+                  {visitors.funnel?.length
+                    ? <FunnelRows rows={visitors.funnel}/>
+                    : <p className="text-xs text-zinc-500">No funnel events for this date.</p>}
+                </div>
+                <div className={`${panel} space-y-2`}>
+                  <h3 className="text-xs font-semibold">Last action · idle 30+ min</h3>
+                  {visitors.last_steps?.length
+                    ? <div className="divide-y divide-zinc-800">{visitors.last_steps.slice(0, 6).map(row=><div key={row.event} className="flex justify-between gap-3 py-1.5 text-xs"><span>{actionLabel(row.event)}</span><span className="shrink-0 text-zinc-400">{row.sessions} sessions</span></div>)}</div>
+                    : <p className="text-xs text-zinc-500">No inactive sessions yet.</p>}
+                </div>
+                <div className={`${panel} space-y-2`}>
+                  <h3 className="text-xs font-semibold">Checkout checkpoints and errors</h3>
+                  {visitors.friction?.length
+                    ? <div className="max-h-52 divide-y divide-zinc-800 overflow-y-auto">{visitors.friction.map(row=><div key={`${row.event}:${row.category}`} className="flex justify-between gap-3 py-1.5 text-xs"><span>{actionLabel(row.event, row.category)}</span><span className="shrink-0 text-zinc-400">{row.sessions} sessions · {row.events} events</span></div>)}</div>
+                    : <p className="text-xs text-zinc-500">No checkout checkpoint events for this date.</p>}
+                </div>
+              </>}
             </div>
           </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            <div className={`${panel} space-y-3`}>
-              <h3 className="text-sm font-semibold">Checkout checkpoints and errors</h3>
-              {visitors.friction?.length
-                ? <div className="max-h-72 divide-y divide-zinc-800 overflow-y-auto">{visitors.friction.map(row=><div key={`${row.event}:${row.category}`} className="flex justify-between gap-3 py-2 text-xs"><span>{actionLabel(row.event, row.category)}</span><span className="shrink-0 text-zinc-400">{row.sessions} sessions · {row.events} events</span></div>)}</div>
-                : <p className="text-xs text-zinc-500">No sign-in, map, receipt or checkout checkpoint events in this date range.</p>}
-            </div>
-          </div>
-          </>}
-          <div className={`${panel} space-y-3`}>
-            <h3 className="text-sm font-semibold">Visitors by day and most-viewed pages</h3>
-            {visitors.daily?.length ? <VisitorChart rows={visitors.daily}/> : <p className="text-xs text-zinc-500">No page views recorded for these dates.</p>}
-            {visitors.top_pages?.length
-              ? <div className="divide-y divide-zinc-800">{visitors.top_pages.map(row=><div key={row.path} className="flex justify-between gap-3 py-2 text-xs"><span className="break-all">{row.path}</span><span className="shrink-0 text-zinc-400">{row.page_views} views · {row.visitors} browsers</span></div>)}</div>
-              : <p className="text-xs text-zinc-500">No page views in this date range yet.</p>}
-          </div>
-          <p className="text-[11px] text-zinc-500">Counts are anonymous browser sessions for this outlet and date range. Refresh may take up to 2 minutes to include new events.</p>
         </>}
       </section>
     </>}
