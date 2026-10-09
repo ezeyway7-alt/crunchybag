@@ -160,6 +160,7 @@ export function PostHogAnalyticsTab() {
   const [endDate, setEndDate] = useState(todayNepal());
   const [startDate, setStartDate] = useState(todayNepal());
   const [refresh, setRefresh] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [state, setState] = useState<{scope: string; data: Overview | null; error: string}>({
     scope: '',
     data: null,
@@ -173,12 +174,28 @@ export function PostHogAnalyticsTab() {
     if (!valid || !datesValid) return;
     const controller = new AbortController();
     let active = true;
-    setState({scope, data: null, error: ''});
-    const query = new URLSearchParams({outlet_id: outlet, start_date: startDate, end_date: endDate, refresh: String(refresh)});
+    setIsRefreshing(true);
+    if (state.scope !== scope) {
+      setState({scope, data: null, error: ''});
+    }
+    const params: Record<string, string> = {
+      outlet_id: outlet,
+      start_date: startDate,
+      end_date: endDate,
+    };
+    if (refresh > 0) {
+      params.refresh = 'true';
+      params.force = 'true';
+      params._t = String(Date.now());
+    }
+    const query = new URLSearchParams(params);
     apiClient.get<Overview>(`/customer/reporting-overview/?${query}`, {signal: controller.signal})
       .then(data => { if (active) setState({scope, data, error: ''}); })
       .catch(error => {
         if (active) setState({scope, data: null, error: extractErrorMessage(error)});
+      })
+      .finally(() => {
+        if (active) setIsRefreshing(false);
       });
     return () => { active = false; controller.abort(); };
   }, [valid, datesValid, scope, refresh]);
@@ -208,9 +225,9 @@ export function PostHogAnalyticsTab() {
             onChange={event => setEndDate(event.target.value)}
             className="bg-transparent px-1 py-1 text-[11px] text-zinc-300 outline-none"/>
         </label>
-        <button aria-label="Refresh analytics" className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-amber-400 disabled:opacity-40"
-          onClick={() => setRefresh(value => value + 1)} disabled={!valid || !datesValid}>
-          <RefreshCw size={12}/> Refresh
+        <button aria-label="Refresh analytics" className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-amber-400 disabled:opacity-40 cursor-pointer"
+          onClick={() => setRefresh(value => value + 1)} disabled={isRefreshing || !valid || !datesValid}>
+          <RefreshCw size={12} className={isRefreshing ? "animate-spin text-amber-400" : ""}/> {isRefreshing ? "Refreshing..." : "Refresh"}
         </button>
       </div>
       {!datesValid && <p role="alert" className="w-full text-xs text-rose-400">Choose a valid date range.</p>}
