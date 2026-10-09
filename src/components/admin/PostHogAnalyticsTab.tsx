@@ -109,7 +109,7 @@ function FunnelRows({rows}: {rows: NonNullable<Overview['analytics']['visitors']
 
   return <div className="space-y-2">
     {largestDrop.drop > 0 && <p className="text-xs text-amber-300">
-      Largest drop: {largest.drop} of {rows.find(row => row.step === largestDrop.from)?.sessions} sessions ({Math.round(largestDrop.rate * 100)}%) from {largestDrop.from} to {largestDrop.to}.
+      Largest drop: {largestDrop.drop} of {rows.find(row => row.step === largestDrop.from)?.sessions} sessions ({Math.round(largestDrop.rate * 100)}%) from {largestDrop.from} to {largestDrop.to}.
     </p>}
     {rows.map((row, index) => {
       const previous = index ? rows[index - 1].sessions : row.sessions;
