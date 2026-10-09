@@ -1,3 +1,4 @@
+import {trackEvent} from '../../lib/journeyTracking';
 import React, { useState } from "react";
 import { Plus, SlidersHorizontal, Flame, Sparkles, Clock, Heart, Eye, ShoppingCart, ArrowRight } from "lucide-react";
 import { Product } from "../../types";
@@ -20,6 +21,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onQuickAdd,
   isLoading = false,
 }) => {
+  const cardRef=React.useRef<HTMLDivElement>(null);
+  React.useEffect(()=>{
+    if(isLoading || !cardRef.current)return;
+    const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){trackEvent('product_view',{product_id:product.id,product_name:product.name,category:product.categoryId,unit_price:product.basePrice});observer.disconnect();}},{threshold:0.5});
+    observer.observe(cardRef.current);return()=>observer.disconnect();
+  },[product.id,isLoading]);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { isFavorite, toggleFavorite } = useApp();
@@ -34,7 +41,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <>
-      <div
+      <div ref={cardRef}
         onClick={() => onSelect(product)}
       className="group relative bg-[#121214] border border-zinc-800 hover:border-amber-500 rounded-none overflow-hidden shadow-sm transition-all duration-150 flex flex-col cursor-pointer"
     >

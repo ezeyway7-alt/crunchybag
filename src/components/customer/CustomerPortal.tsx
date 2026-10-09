@@ -1,3 +1,4 @@
+import {trackEvent} from '../../lib/journeyTracking';
 import { productSEO } from '../../lib/productSEO';
 import { BlogsPortalPage } from "./BlogsPortalPage";
 import { BlogDetailPage } from "./BlogDetailPage";
@@ -80,6 +81,7 @@ export const CustomerPortal: React.FC = () => {
   const handleCategorySelect = (catId: string) => {
     if (catId === selectedCategory) return;
     setIsCategoryLoading(true);
+    trackEvent('category_view',{category:catId});
     setSelectedCategory(catId);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -155,6 +157,10 @@ export const CustomerPortal: React.FC = () => {
     }
   };
 
+  useEffect(()=>{
+    if(activeProductForConfig)trackEvent('product_detail_view',{product_id:activeProductForConfig.id,product_name:activeProductForConfig.name,category:activeProductForConfig.categoryId});
+  },[activeProductForConfig?.id]);
+
   const handleCloseProduct = () => {
     setActiveProductForConfig(null);
     if (typeof window !== "undefined") {
@@ -220,6 +226,8 @@ export const CustomerPortal: React.FC = () => {
   const [trackedOrderId, setTrackedOrderId] = useState<string | undefined>(undefined);
 
   const openCheckout = () => {
+    trackEvent('checkout_click');
+    if(!isAuthenticated)trackEvent('auth_required',{error_category:'login_before_checkout'});
     if (!isAuthenticated || !authUser || authUser.is_active === false) {sessionStorage.setItem('customer:return-to-checkout','yes');setResumeCheckout(true);setIsAuthOpen(true);}
     else {sessionStorage.setItem('customer:return-to-checkout','yes');setResumeCheckout(true);}
   };

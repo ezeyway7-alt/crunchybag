@@ -1,3 +1,4 @@
+import {trackEvent} from '../../lib/journeyTracking';
 import React, { useState, useMemo } from "react";
 import { Search, Sparkles, SlidersHorizontal, ArrowRight, X } from "lucide-react";
 import { useApp } from "../../context/AppContext";
@@ -33,6 +34,8 @@ export const InstantSearchModal: React.FC<InstantSearchModalProps> = ({
       return matchesText && matchesCat;
     });
   }, [products, searchTerm, selectedCategory]);
+
+  React.useEffect(()=>{if(!isOpen||!searchTerm.trim())return;const timer=setTimeout(()=>trackEvent('product_search',{search_length:searchTerm.trim().length,result_count:filteredProducts.length}),600);return()=>clearTimeout(timer);},[isOpen,searchTerm,filteredProducts.length]);
 
   return (
     <Modal

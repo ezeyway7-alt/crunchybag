@@ -19,9 +19,9 @@ export interface SEOMetadata {
 }
 
 const DEFAULT_METADATA: SEOMetadata = {
-  title: 'Crunchy Bag | Fried Chicken & Burgers in Imadol, Lalitpur',
+  title: 'Crunchy Bag | Food Delivery, Fried Chicken & Burgers in Imadol, Lalitpur',
   description:
-    "Order fried chicken, burgers, pakodas and family combos from Crunchy Bag in Imadol, Lalitpur. Browse the menu, book a table or contact us for delivery.",
+    "Online food delivery in Imadol, Lalitpur. Order crispy fried chicken, smash burgers, pakodas and family combos from Crunchy Bag. Fast delivery across Lalitpur & Kathmandu.",
   canonical: 'https://crunchybag.com/',
   image: 'https://crunchybag.com/crunchy_logo.png',
   noIndex: false,

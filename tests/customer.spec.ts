@@ -313,10 +313,11 @@ test('SMS recovery verifies the code before resetting password and PIN without d
 
 test('website traffic records page views without query strings or personal data',async({page})=>{
   const state=await setup(page);await page.goto('/menu?token=private-test');
-  await expect.poll(()=>state.writes.filter(w=>w.path==='customer/traffic/'&&w.body.path==='/menu').length).toBe(1);
-  const visit=state.writes.find(w=>w.path==='customer/traffic/'&&w.body.path==='/menu').body;expect(visit.path).toBe(new URL(page.url()).pathname);expect(JSON.stringify(visit)).not.toContain('private-test');expect(visit).not.toHaveProperty('phone');
-  await page.reload();await expect.poll(()=>state.writes.filter(w=>w.path==='customer/traffic/'&&w.body.path==='/menu').length).toBe(2);
-  const second=state.writes.filter(w=>w.path==='customer/traffic/'&&w.body.path==='/menu')[1].body;expect(second.visitor_id).toBe(visit.visitor_id);expect(second.session_id).toBe(visit.session_id);expect(second.event_id).not.toBe(visit.event_id);
+  const visits=()=>state.writes.filter(w=>w.path==='customer/events/').flatMap(w=>w.body.events.filter(e=>e.name==='page_view'&&e.path==='/menu').map(e=>({...e,visitor_id:w.body.visitor_id,session_id:w.body.session_id})));
+  await expect.poll(()=>new Set(visits().map(e=>e.event_id)).size).toBe(1);
+  const visit=visits()[0];expect(visit.path).toBe(new URL(page.url()).pathname);expect(JSON.stringify(visit)).not.toContain('private-test');expect(visit).not.toHaveProperty('phone');
+  await page.reload();await expect.poll(()=>new Set(visits().map(e=>e.event_id)).size).toBe(2);
+  const second=visits().find(e=>e.event_id!==visit.event_id);expect(second.visitor_id).toBe(visit.visitor_id);expect(second.session_id).toBe(visit.session_id);
 });
 
 
@@ -532,4 +533,41 @@ test('combo retains included products hidden from standalone menu', async ({page
   const quote = state.writes.filter(w => w.path === 'catalog/quote/').at(-1);
   expect(quote.body.items[0].combo_selections.map(i => i.product_id)).toEqual(['burger','hidden-chicken']);
   await expect(page.getByRole('button', {name:/Add to Cart/i}).last()).toBeEnabled();
+});
+
+test('anonymous journey events preserve attribution and omit contact information',async({page})=>{
+  await setup(page);
+  await page.goto('/?utm_source=facebook&utm_campaign=Burger&ad_id=123456789012345');
+  const batches:any[]=[];
+  await page.route('**/api/v1/customer/events/',async route=>{batches.push(route.request().postDataJSON());await route.fulfill({json:{accepted:1,duplicates:0}});});
+  await page.evaluate(async()=>{
+    const modulePath='/src/lib/journeyTracking.ts';const tracker=await import(modulePath);
+    tracker.configureTracking('1',true);
+    await tracker.flushTracking();
+  });
+  await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();
+  await expect.poll(()=>batches.some(batch=>batch.events.some((e:any)=>e.name==='add_to_cart'))).toBe(true);
+  const batch=batches.find(row=>row.events.some((e:any)=>e.name==='add_to_cart'));
+  expect(batch.attribution).toMatchObject({utm_source:'facebook',utm_campaign:'Burger',ad_id:'123456789012345'});
+  expect(batch.session_id).toBeTruthy();expect(batch.visitor_id).toBeTruthy();
+  expect(JSON.stringify(batch)).not.toContain('phone_number');
+  await page.evaluate(async()=>{
+    const modulePath='/src/lib/journeyTracking.ts';const tracker=await import(modulePath);
+    Object.defineProperty(navigator,'doNotTrack',{value:'1',configurable:true});
+    tracker.configureTracking('1',true);tracker.trackEvent('checkout_start');await tracker.flushTracking();
+  });
+  expect(batches.flatMap(row=>row.events).some((e:any)=>e.name==='checkout_start')).toBe(false);
+});
+
+test('checkout carries anonymous attribution without claiming verified payment',async({page})=>{
+  const state=await setup(page,true);
+  await openCheckout(page);await receipt(page);
+  await page.getByRole('button',{name:/Submit Receipt & Place Order/}).click();
+  await expect.poll(()=>state.created).toBe(1);
+  expect(state.lastPayload.analytics_context.visitor_id).toBeTruthy();
+  expect(state.lastPayload.analytics_context.session_id).toBeTruthy();
+  await expect.poll(()=>state.writes.filter(w=>w.path==='customer/events/').flatMap(w=>w.body.events).some(e=>e.name==='order_submit')).toBe(true);
+  const events=state.writes.filter(w=>w.path==='customer/events/').flatMap(w=>w.body.events);
+  expect(events.some(e=>['order_success','payment_success'].includes(e.name))).toBe(false);
+  expect(JSON.stringify(events)).not.toContain('+9779841234567');
 });

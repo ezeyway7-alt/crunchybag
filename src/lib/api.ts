@@ -211,7 +211,7 @@ export function extractErrorMessage(error: unknown): string {
 /**
  * Core HTTP client with automatic Authorization header and silent 401 token refresh
  */
-export async function baseRequest<T = any>(
+async function unobservedRequest<T = any>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
@@ -804,4 +804,18 @@ export const apiClient = {
 export function reportApiError(error: unknown, title = 'Request could not be completed') {
   if ((error as {name?: string})?.name === 'AbortError') return;
   window.dispatchEvent(new CustomEvent('crunchy:api-error', {detail:{title, description:extractErrorMessage(error), type:'error'}}));
+}
+
+// Only endpoint category, status and timing leave the HTTP client. Never headers or payloads.
+export async function baseRequest<T = any>(endpoint:string, options:RequestOptions={}):Promise<T> {
+  const started=performance.now();
+  const observed=/^\/?(?:customer\/(?:checkout|cart|orders)|catalog\/(?:menu|quote))/.test(endpoint);
+  const emit=(status:number)=>{
+    if(observed && typeof window!=='undefined') window.dispatchEvent(new CustomEvent('journey:api',{detail:{
+      endpoint:endpoint.split('?')[0].replace(/\/\d+(?=\/|$)/g,'/:id'),method:options.method || 'GET',status,duration_ms:Math.max(0,performance.now()-started),
+      error_category:status===0?'network':status>=500?'server':status>=400?'request_rejected':'none',
+    }}));
+  };
+  try{const result=await unobservedRequest<T>(endpoint,options);emit(200);return result;}
+  catch(error){if(!(error instanceof DOMException && error.name==='AbortError')&&!options.signal?.aborted)emit(error instanceof ApiError?error.status:0);throw error;}
 }

@@ -1,7 +1,9 @@
+import {analyticsFixture} from './analyticsFixture';
 import {receiptFixture} from './receiptFixture';
 import { test, expect, Page } from "@playwright/test";
 
 async function setup(page: Page) {
+  await page.route('https://fonts.googleapis.com/**', route => route.abort());
   const user = {
     id: 1,
     username: "test-owner",
@@ -593,6 +595,7 @@ test('website analytics and customer directory show real scoped data with simple
   await page.route('**/api/v1/customer/analytics/**',route=>{trafficReads++;return route.fulfill({json:{visitors:12,sessions:15,page_views:25,daily:[{date:'2026-09-29',visitors:5,page_views:10},{date:'2026-09-30',visitors:7,page_views:15}],channels:[{channel:'WEBSITE',page_views:20},{channel:'TABLE_QR',page_views:5}],pages:[{path:'/menu',page_views:25}]}});});
   await page.route('**/api/v1/customer/directory/**',route=>{const search=new URL(route.request().url()).searchParams.get('search');return route.fulfill({json:{count:search==='missing'?0:1,page:1,page_size:25,results:search==='missing'?[]:[{id:1,name:'Suraj',phone:'+9779841234567',email:'',registered:true,sources:['WEBSITE','TABLE_QR','KIOSK'],orders:3,order_total:'600.00',last_seen:'2026-09-30T10:00:00Z',last_login:'2026-09-30T09:00:00Z'}]}});});
   await page.getByRole('button',{name:'Website Analytics',exact:true}).click();
+  await page.getByRole('button',{name:'Traffic history',exact:true}).click();
   await expect(page.getByRole('img',{name:'Daily website visitors'})).toBeVisible();
   await expect(page.getByRole('region',{name:'Website Analytics'})).toContainText('12');
   await page.getByLabel('Traffic period').selectOption('7');
@@ -741,4 +744,38 @@ test('dashboard totals use today POS orders without historical open tabs', async
   await expect(page.getByText('Final Net:').locator('..')).toContainText('550.00');
   await expect(page.getByText('DONE-TODAY', {exact:true})).toBeVisible();
   await expect(page.getByText('OLD-ORDER', {exact:true})).toHaveCount(0);
+});
+
+test('conversion intelligence explains losses, opens journeys, filters and exports',async({page})=>{
+  test.setTimeout(60000);
+  await setup(page);
+  const report=analyticsFixture();const queries:string[]=[];
+  await page.route('**/api/v1/customer/intelligence/**',route=>{queries.push(route.request().url());return route.fulfill({json:report});});
+  await page.route('**/api/v1/customer/journeys/**',route=>{
+    const url=new URL(route.request().url());const id=url.pathname.split('/').filter(Boolean).at(-1);
+    if(id==='journeys')return route.fulfill({json:{count:4,results:report.data.sessions,page:1,page_size:25}});
+    const session=report.data.sessions.find(row=>row.id===id)!;
+    return route.fulfill({json:{session,count:2,page:1,page_size:100,visitor_session_count:1,visitor_first_seen:session.first_seen,events:[
+      {id:'event1',event_name:'checkout_start',timestamp:session.first_seen,authority:'browser',page:'/menu',metadata:{cart_value:200}},
+      {id:'event2',event_name:'payment_failed',timestamp:session.last_seen,authority:'browser',page:'/checkout',metadata:{error_category:'provider_declined'}}]}});
+  });
+  await page.route('**/api/v1/customer/intelligence-export/**',route=>route.fulfill({contentType:'text/csv',body:'event_name\npage_view\n'}));
+  await page.route('**/api/v1/customer/analyst/**',route=>route.fulfill({json:{status:'READY',data:{mode:'Rules-based evidence',answer:'One purchase was observed.',evidence:[{id:'executive.orders',label:'Orders',value:1}],findings:report.data.diagnosis}}}));
+  await page.goto('/admin?tab=analytics');
+  await expect(page.getByRole('heading',{name:'From click to confirmed order'})).toBeVisible();
+  await expect(page.getByText('Payment failure observed',{exact:true})).toBeVisible();
+  await expect(page.getByText('Ad clicks',{exact:true}).locator('..')).toContainText('Not available');
+  await page.getByRole('button',{name:'User Journeys',exact:true}).click();
+  await page.getByRole('button',{name:'View journey',exact:true}).nth(1).click();
+  await expect(page.getByRole('heading',{name:/User Journey ?/})).toBeVisible();
+  await expect(page.getByText('Payment Failed',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'AI Diagnosis',exact:true}).click();
+  await page.getByRole('button',{name:'Ask',exact:true}).click();
+  await expect(page.getByText('executive.orders',{exact:true})).toBeVisible();
+  await page.locator('summary').filter({hasText:'Segment filters'}).click();
+  await page.getByLabel('Filter campaign',{exact:true}).fill('Burger campaign');
+  await expect.poll(()=>queries.some(url=>url.includes('campaign=Burger+campaign'))).toBe(true);
+  const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'CSV',exact:true}).click();
+  expect((await downloaded).suggestedFilename()).toBe('analytics-events.csv');
+  await page.screenshot({path:test.info().outputPath('conversion-intelligence.png'),fullPage:true});
 });

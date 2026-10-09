@@ -1,3 +1,4 @@
+import {trackEvent,cartMetadata} from '../../lib/journeyTracking';
 import { ComboPackageModal } from "./ComboPackageModal";
 import { comboDefinitions } from "../../lib/catalogApi";
 import React, { useState, useRef } from "react";
@@ -41,6 +42,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onOpenCheckout }) => {
     addCustomComboToCart,
   } = useApp();
 
+  React.useEffect(()=>{if(isCartDrawerOpen)trackEvent('cart_view',cartMetadata(cart));},[isCartDrawerOpen]);
   const [inspectingItem, setInspectingItem] = useState<CartLineItem | null>(null);
   const [editingItem, setEditingItem] = useState<{
     item: CartLineItem;

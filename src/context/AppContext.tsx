@@ -1,3 +1,4 @@
+import {trackEvent,cartMetadata} from '../lib/journeyTracking';
 import { reportApiError } from "../lib/api";
 import { NepaliAudioPlayer, announcementAudioUrl } from "../lib/nepaliAudio";
 import { useOutletEvents } from "../lib/useOutletEvents";
@@ -915,6 +916,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       quoteExpiresAt: Date.now() + 15 * 60 * 1000,
     };
 
+    trackEvent('add_to_cart',{product_id:newItem.productId,product_name:newItem.productName,quantity:newItem.quantity,unit_price:newItem.unitPrice,cart_value:cart.finalTotal+newItem.lineTotal,items:[...cart.items,newItem].map(i=>({product_id:i.productId,product_name:i.productName,quantity:i.quantity,unit_price:i.unitPrice}))});
     setCartItems((prev) => [...prev, newItem]);
     addToast({
       title: "Added to Cart",
@@ -963,6 +965,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       quoteExpiresAt: Date.now() + 15 * 60 * 1000,
     };
 
+    trackEvent('add_to_cart',{product_id:newItem.productId,product_name:newItem.productName,quantity:newItem.quantity,unit_price:newItem.unitPrice,cart_value:cart.finalTotal+newItem.lineTotal,items:[...cart.items,newItem].map(i=>({product_id:i.productId,product_name:i.productName,quantity:i.quantity,unit_price:i.unitPrice}))});
     setCartItems((prev) => [...prev, newItem]);
     addToast({
       title: "Combo Package Added",
@@ -972,6 +975,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCartItemQty = (cartItemId: string, delta: number) => {
+    const item=cartItems.find(row=>row.cartItemId===cartItemId);
+    if(item)trackEvent(item.quantity+delta<=0?'remove_from_cart':delta>0?'quantity_increase':'quantity_decrease',{product_id:item.productId,product_name:item.productName,quantity:Math.max(0,item.quantity+delta),...cartMetadata({finalTotal:Math.max(0,cart.finalTotal+item.unitPrice*delta),items:cartItems.map(row=>row.cartItemId===cartItemId?{...row,quantity:Math.max(0,row.quantity+delta)}:row).filter(row=>row.quantity>0)})});
     setCartItems((prev) =>
       prev
         .map((item) => {
@@ -1023,6 +1028,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const removeCartItem = (cartItemId: string) => {
+    const item=cartItems.find(row=>row.cartItemId===cartItemId);
+    if(item)trackEvent('remove_from_cart',{product_id:item.productId,product_name:item.productName,quantity:item.quantity,...cartMetadata({finalTotal:Math.max(0,cart.finalTotal-item.lineTotal),items:cartItems.filter(row=>row.cartItemId!==cartItemId)})});
     setCartItems((prev) => prev.filter((item) => item.cartItemId !== cartItemId));
     addToast({
       title: "Item Removed",
@@ -1031,7 +1038,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const clearCart = () => setCartItems([]);
+  const clearCart = () => {trackEvent('cart_clear',{cart_value:0,items:[]});setCartItems([]);};
 
   // Orders and KDS integrations
   const placeTakeawayOrder = (details: {

@@ -538,14 +538,64 @@ export const DeliveryOrderDetails: React.FC<{
     ? 'px-2 py-1 text-[11px] font-bold border border-zinc-300 dark:border-zinc-700 rounded-xs hover:border-amber-500 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 transition-colors flex items-center gap-1'
     : 'px-3 py-1.5 text-xs font-bold border border-zinc-700 hover:border-amber-400 bg-zinc-900 text-zinc-100 transition-colors flex items-center gap-1.5';
 
+  if (compact) {
+    return (
+      <>
+        <section
+          aria-label="Delivery details"
+          className="flex min-w-0 items-center gap-2 border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[11px] text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300"
+        >
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+          <p
+            className="min-w-0 flex-1 truncate"
+            title={info.address || 'No street address saved for this order.'}
+          >
+            {info.address || 'No street address saved for this order.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => void copy()}
+            aria-label="Copy delivery details"
+            title="Copy delivery details"
+            className="shrink-0 border border-zinc-300 p-1 text-zinc-600 hover:border-amber-500 hover:text-amber-500 dark:border-zinc-700 dark:text-zinc-300"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void share()}
+            aria-label="Share delivery details"
+            title="Share delivery details"
+            className="shrink-0 border border-zinc-300 p-1 text-zinc-600 hover:border-amber-500 hover:text-amber-500 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+          </button>
+          {notice && <span role="status" className="sr-only">{notice}</span>}
+        </section>
+        {manual && (
+          <textarea
+            aria-label="Delivery details to copy"
+            readOnly
+            value={info.text}
+            onFocus={(event) => event.target.select()}
+            rows={3}
+            className="mt-1 w-full border border-zinc-300 bg-white p-2 font-mono text-xs text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+          />
+        )}
+        <DeliveryDispatchModal
+          order={order}
+          isOpen={isDispatchModalOpen}
+          onClose={() => setIsDispatchModalOpen(false)}
+        />
+      </>
+    );
+  }
+
   return (
     <section
       aria-label="Delivery details"
-      className={
-        compact
-          ? 'p-2.5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xs space-y-2.5 text-[11px] text-zinc-700 dark:text-zinc-300'
-          : 'p-4 bg-amber-500/10 border-2 border-amber-500/40 space-y-3.5 text-xs rounded-xs'
-      }
+      className="p-4 bg-amber-500/10 border-2 border-amber-500/40 space-y-3.5 text-xs rounded-xs"
     >
       {/* Header & Map Toggle */}
       <div className="flex items-center justify-between gap-2">

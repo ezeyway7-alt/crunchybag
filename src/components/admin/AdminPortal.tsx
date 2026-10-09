@@ -1,4 +1,5 @@
 import {AdminAudienceTab} from './AdminAudienceTab';
+import {PostHogAnalyticsTab} from './PostHogAnalyticsTab';
 import React, { useState } from "react";
 import {
   TrendingUp,
@@ -282,7 +283,7 @@ export const AdminPortal: React.FC = () => {
       icon: Users,
       badge: safeEmployees.length,
     },
-    { id: "analytics", label: "Website Analytics", icon: TrendingUp },
+    { id: "analytics", label: "Analytics", icon: TrendingUp },
     { id: "customers", label: "Customers", icon: Users },
     {
       id: "organization",
@@ -838,7 +839,7 @@ export const AdminPortal: React.FC = () => {
 
         {/* TAB 10: ORGANIZATION */}
         {activeTab === "organization" && <AdminOrganizationTab />}
-        {activeTab === "analytics" && <AdminAudienceTab mode="analytics"/>}
+        {activeTab === "analytics" && <PostHogAnalyticsTab/>}
         {activeTab === "customers" && <AdminAudienceTab mode="customers"/>}
 
         {/* TAB 11: ACTIVITY & AUDIT LOGS */}

@@ -1,3 +1,4 @@
+import {trackEvent} from '../../lib/journeyTracking';
 import React from "react";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
@@ -24,6 +25,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     setActiveImageIndex(0);
   }, [product?.id, isOpen]);
 
+  React.useEffect(()=>{if(isOpen&&product)trackEvent('product_detail_view',{product_id:product.id,product_name:product.name,category:product.categoryId});},[isOpen,product?.id]);
+  React.useEffect(()=>{if(isOpen&&product)trackEvent('product_image_view',{product_id:product.id});},[isOpen,product?.id,activeImageIndex]);
   if (!product) return null;
 
   const hasMultipleOptions =

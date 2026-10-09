@@ -1,3 +1,4 @@
+import {trackEvent,cartMetadata,trackingContext} from '../../lib/journeyTracking';
 import {useCustomerAddresses, addressPoint} from '../../lib/customerAddresses';
 import { apiClient, ApiError, extractErrorMessage } from "../../lib/api";
 import { customerPath, cartLines, customerRefresh } from "../../lib/customerApi";
@@ -90,6 +91,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     newAddress: string,
     location?: { lat: number; lng: number; landmark?: string }
   ) => {
+    trackEvent('location_selected');
     setDeliveryAddress(newAddress);
     setDeliveryLocation(location);setSelectedAddressId('');
   };
@@ -114,6 +116,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const finishOrder = (order:any) => {const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');consumePurchasedCart(pending?.cartLineIds || []);sessionStorage.removeItem(pendingKey);customerRefresh();onClose();onOrderSuccess(String(order.id));};
   useEffect(()=>{
     if(!isOpen)return;
+    trackEvent('checkout_start',cartMetadata(cart));
     addressInitialized.current=false;setDeliveryAddress('');setDeliveryLocation(undefined);setSelectedAddressId('');setSaveAddress(false);
     setName(authUser?.username || customerProfile.name);setPhone((authUser as any)?.phone_number || customerProfile.phone);setError(null);setProofError('');setTouched(false);setProof(null);setMeta(null);
     const controller=new AbortController();let live=true;
@@ -141,6 +144,11 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const addressError = selectedFulfillment==='DELIVERY' && !deliveryAddress.trim() ? 'Choose your delivery address.' : '';
   const nameError = !name.trim() ? 'Enter your name.' : name.trim().length > 120 ? 'Use no more than 120 characters.' : '';
   const tableError = selectedFulfillment==='DINE_IN' && !payload.table_id ? 'Choose a table.' : '';
+  useEffect(()=>{if(isOpen && name.trim() && !nameError)trackEvent('name_entered');},[isOpen,!!name.trim(),!!nameError]);
+  useEffect(()=>{if(isOpen && phone.trim())trackEvent('phone_entered');},[isOpen,!!phone.trim()]);
+  useEffect(()=>{if(isOpen && deliveryAddress.trim()){trackEvent('address_entered');trackEvent('delivery_information',{fulfillment_type:selectedFulfillment});}},[isOpen,!!deliveryAddress.trim()]);
+  useEffect(()=>{if(isOpen && deliveryLocation)trackEvent('location_selected');},[isOpen,!!deliveryLocation]);
+  useEffect(()=>{if(isOpen && meta?.qr_url){trackEvent('payment_method_view',{payment_method:'FONEPAY'});trackEvent('payment_method_selected',{payment_method:'FONEPAY'});}},[isOpen,!!meta?.qr_url]);
   const handleProof = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget, file = input.files?.[0];
     setProof(null);setProofError('');
@@ -148,14 +156,16 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     if (!['image/png','image/jpeg','image/webp'].includes(file.type)) {setProofError('Choose a PNG, JPEG, or WebP image.');input.value='';return;}
     if(file.size > 5*1024*1024) {setProofError('Receipt must be smaller than 5 MB.');input.value='';return;}
     if(!file.size) {setProofError('This file is empty. Choose another receipt.');input.value='';return;}
+    trackEvent('payment_proof_uploaded',{payment_method:'FONEPAY',cart_value:grandPayableTotal});
     setProof(file);
   };
   const handleSubmit = async (e:React.FormEvent) => {
     e.preventDefault();setTouched(true);if(lock.current)return;
-    if(nameError || addressError || tableError || cartSyncing || cartSyncError)return;
+    if(nameError || addressError || tableError || cartSyncing || cartSyncError){trackEvent('checkout_validation_failed',{error_category:nameError?'name_missing':addressError?'address_missing':tableError?'table_missing':'cart_sync',cart_value:grandPayableTotal});return;}
     if(!isAuthenticated||!authUser||authUser.is_active===false){setError('Sign in before placing your order.');return;}
     if(!quote||!proof||!meta?.qr_url){setError('Scan the payment QR and upload your receipt before placing the order.');return;}
     if(selectedFulfillment==='DELIVERY'&&!deliveryAddress.trim()){setError('Enter your delivery address.');return;}
+    trackEvent('confirm_order_click',cartMetadata(cart));
     lock.current=true;setIsSubmitting(true);setError(null);
     try {
       if(saveAddress && selectedFulfillment==='DELIVERY' && !selectedAddressId) {
@@ -170,10 +180,11 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
       if(pending&&pending.fingerprint!==fingerprint)sessionStorage.removeItem(pendingKey);
       const freshPending=pending?.fingerprint===fingerprint ? pending : null;
       const requestKey=freshPending?.key || crypto.randomUUID();sessionStorage.setItem(pendingKey,JSON.stringify({key:requestKey,fingerprint,cartLineIds:payload.cart_line_ids}));
-      const form=new FormData();form.append('payload',JSON.stringify(body));form.append('receipt',proof);
+      const form=new FormData();form.append('payload',JSON.stringify({...body,analytics_context:trackingContext()}));form.append('receipt',proof);
+      trackEvent('order_submit',{...cartMetadata(cart),attempt_id:requestKey});
       const result=await apiClient.post<any>(customerPath('checkout/'),form,{headers:{'Idempotency-Key':requestKey}});
       setProof(null);finishOrder(result);
-    }catch(e){if(e instanceof ApiError&&e.status>=400&&e.status<500)sessionStorage.removeItem(pendingKey);if(e instanceof ApiError&&e.status===409){setQuoted(null);setQuoteVersion(v=>v+1);}setError(extractErrorMessage(e));}
+    }catch(e){trackEvent('order_failed',{error_category:e instanceof ApiError?`http_${e.status}`:'network',cart_value:grandPayableTotal});if(e instanceof ApiError&&e.status>=400&&e.status<500)sessionStorage.removeItem(pendingKey);if(e instanceof ApiError&&e.status===409){setQuoted(null);setQuoteVersion(v=>v+1);}setError(extractErrorMessage(e));}
     finally{lock.current=false;setIsSubmitting(false);}
   };
 
@@ -400,7 +411,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
               </label>
               <div className="p-2.5 sm:p-3 bg-zinc-900/60 border border-zinc-700/80 flex flex-col sm:flex-row items-center gap-3">
                 {meta?.qr_url ? (
-                  <a href={meta.qr_url} target="_blank" rel="noreferrer" className="shrink-0 group relative">
+                  <a onClick={()=>trackEvent('payment_started',{provider:'manual_qr',payment_method:'FONEPAY',cart_value:grandPayableTotal})} href={meta.qr_url} target="_blank" rel="noreferrer" className="shrink-0 group relative">
                     <img src={meta.qr_url} alt="Merchant payment QR" className="w-28 h-28 object-contain bg-white p-1 border border-zinc-700 shadow-sm" />
                     <span className="absolute bottom-1 right-1 text-[9px] bg-black/85 text-white px-1 py-0.5 rounded font-mono">Zoom</span>
                   </a>
