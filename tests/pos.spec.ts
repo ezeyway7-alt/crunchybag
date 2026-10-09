@@ -779,3 +779,29 @@ test('conversion intelligence explains losses, opens journeys, filters and expor
   expect((await downloaded).suggestedFilename()).toBe('analytics-events.csv');
   await page.screenshot({path:test.info().outputPath('conversion-intelligence.png'),fullPage:true});
 });
+
+
+test('PostHog dashboard updates from live notifications without a refresh loop',async({page})=>{
+  test.setTimeout(60000);
+  await setup(page);
+  let socket:any;let ready=false;
+  const queries:string[]=[];
+  await page.routeWebSocket('**/ws/outlets/1/analytics/**',ws=>{socket=ws;});
+  await page.route('**/customer/reporting-overview/**',route=>{
+    queries.push(route.request().url());
+    return route.fulfill({json:{sales:{orders:1,cancelled:0,order_value:'200',paid_orders:0,received:'0',refunded:'0',net_received:'0'},
+      analytics:{configured:true,can_open:true,replay_enabled:false,project_url:'https://us.posthog.com/project/1',linked_orders:1,pending_events:0,failed_events:0,sent_events:1,
+        visitors:ready?{available:true,updated_at:'2026-10-09T10:00:00Z',unique_visitors:7,sessions:8,page_views:9,daily:[],top_events:[],top_pages:[],funnel:[],last_steps:[],friction:[]}:{available:false,refreshing:true,message:'Updating visitor analytics...'}},scope:'Website orders for the selected Nepal day.'}});
+  });
+  await page.goto('/admin?tab=analytics');
+  await expect(page.getByText('Website orders',{exact:true})).toBeVisible();
+  await expect(page.getByText('Updating visitor counts...',{exact:false})).toBeVisible();
+  await expect.poll(()=>!!socket).toBe(true);
+  ready=true;socket.send(JSON.stringify({event_type:'ANALYTICS_READY',event_id:'ready-1'}));
+  await expect(page.getByText('Visitors',{exact:true}).locator('..')).toContainText('7');
+  await page.getByRole('button',{name:'Refresh analytics'}).click();
+  await expect.poll(()=>queries.filter(url=>url.includes('refresh=true')).length).toBe(1);
+  socket.send(JSON.stringify({event_type:'ANALYTICS_READY',event_id:'ready-2'}));
+  await expect.poll(()=>queries.at(-1)?.includes('refresh=true')).toBe(false);
+  await page.screenshot({path:test.info().outputPath('posthog-live-report.png'),fullPage:true});
+});

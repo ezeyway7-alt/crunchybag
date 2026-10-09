@@ -1,7 +1,8 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useRef} from 'react';
 import {ExternalLink, RefreshCw} from 'lucide-react';
 import {useApp} from '../../context/AppContext';
 import {apiClient, extractErrorMessage} from '../../lib/api';
+import {useOutletEvents} from '../../lib/useOutletEvents';
 import {todayNepal} from '../../lib/posApi';
 
 type Overview = {
@@ -27,6 +28,9 @@ type Overview = {
     visitors: {
       available: boolean;
       message: string;
+      updated_at?: string;
+      refreshing?: boolean;
+      stale?: boolean;
       unique_visitors?: number;
       sessions?: number;
       page_views?: number;
@@ -160,6 +164,8 @@ export function PostHogAnalyticsTab() {
   const [endDate, setEndDate] = useState(todayNepal());
   const [startDate, setStartDate] = useState(todayNepal());
   const [refresh, setRefresh] = useState(0);
+  const [revision,setRevision]=useState(0);
+  const consumedRefresh=useRef(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [state, setState] = useState<{scope: string; data: Overview | null; error: string}>({
     scope: '',
@@ -169,6 +175,7 @@ export function PostHogAnalyticsTab() {
   const valid = /^\d+$/.test(outlet);
   const datesValid = Boolean(startDate && endDate && startDate <= endDate);
   const scope = `${outlet}:${startDate}:${endDate}`;
+  const live=useOutletEvents(outlet,valid&&datesValid,()=>setRevision(value=>value+1),undefined,'analytics');
 
   useEffect(() => {
     if (!valid || !datesValid) return;
@@ -183,22 +190,21 @@ export function PostHogAnalyticsTab() {
       start_date: startDate,
       end_date: endDate,
     };
-    if (refresh > 0) {
+    if (refresh > consumedRefresh.current) {
       params.refresh = 'true';
-      params.force = 'true';
-      params._t = String(Date.now());
+      consumedRefresh.current=refresh;
     }
     const query = new URLSearchParams(params);
     apiClient.get<Overview>(`/customer/reporting-overview/?${query}`, {signal: controller.signal, cache: 'no-store'})
       .then(data => { if (active) setState({scope, data, error: ''}); })
       .catch(error => {
-        if (active) setState({scope, data: null, error: extractErrorMessage(error)});
+        if (active) setState(previous=>({scope,data:previous.scope===scope?previous.data:null,error:extractErrorMessage(error)}));
       })
       .finally(() => {
         if (active) setIsRefreshing(false);
       });
     return () => { active = false; controller.abort(); };
-  }, [valid, datesValid, scope, refresh]);
+  }, [valid, datesValid, scope, refresh, revision]);
 
   const data = state.scope === scope ? state.data : null;
   const error = state.scope === scope ? state.error : '';
@@ -256,6 +262,8 @@ export function PostHogAnalyticsTab() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 id="visitor-heading" className="text-xs font-semibold">Visitors · PostHog</h2>
+            <p className="mt-1 text-[10px] text-zinc-400">{visitors?.refreshing?'Updating visitor counts...':live?'Updates automatically':'Live connection reconnecting...'}{visitors?.updated_at?` - Updated ${new Date(visitors.updated_at).toLocaleTimeString('en-GB',{timeZone:'Asia/Kathmandu'})} Nepal time`:''}. Recent visits may take time to appear.</p>
+            {visitors?.available&&visitors.stale&&<p className="text-[10px] text-amber-300">Showing the last successful visitor report while it refreshes.</p>}
           </div>
           {analytics?.configured && analytics.can_open && analytics.project_url
             ? <a href={analytics.project_url} target="_blank" rel="noopener noreferrer"

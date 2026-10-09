@@ -7,9 +7,12 @@ type Meta=Record<string,unknown>;
 type Config={enabled:boolean;token:string;host:string;replay:boolean};
 let outlet='',enabled=false,client:PostHog|undefined,loading:Promise<void>|undefined;
 let activeConfig:Config|undefined;
+let retryTimer:ReturnType<typeof setTimeout>|undefined,retryAttempts=0;
+const instanceScopes=new Map<string,number>();
 let generation=0;
 let attribution:Record<string,string>={};
-let pending:{name:string;metadata:Meta;id:string;path:string}[]=[];
+type PendingEvent={name:string;metadata:Meta;id:string;path:string;touch:Record<string,string>};
+let pending:PendingEvent[]=[];
 const instances=new Map<string,PostHog>();
 const keys='utm_source utm_medium utm_campaign utm_content utm_term fbclid campaign_id campaign_name adset_id adset_name ad_id ad_name'.split(' ');
 const fields=new Set('product_id product_name category payment_method provider error_category endpoint method metric network area fulfillment_type attempt_id quantity unit_price cart_value delivery_fee total duration_ms value scroll_percent status search_length result_count'.split(' '));
@@ -38,18 +41,27 @@ export function trackingContext(){
   const session_id=client.get_session_id();
   return {visitor_id,session_id,posthog_session_id:session_id};
 }
-function capture(name:string,metadata:Meta,id:string,page:string){
+function capture(name:string,metadata:Meta,id:string,page:string,touch=attribution){
   if(!client||!enabled||!trackingAllowed())return;
   // Only this function captures browser events. Autocapture/pageview/error SDK
   // collection is disabled, so a business interaction is never counted twice.
-  client.capture(name==='page_view'?'$pageview':name,{...sanitize(metadata),...attribution,
+  client.capture(name==='page_view'?'$pageview':name,{...sanitize(metadata),...touch,
     outlet_id:outlet,authority:'browser',event_id:id,$insert_id:id,path:page,
-    $current_url:location.origin+page,$pathname:page,$referrer:attribution.referrer||'',
-    $process_person_profile:false});
+    $current_url:location.origin+page,$pathname:page,$referrer:touch.referrer||'',
+    $process_person_profile:false},{uuid:id,send_instantly:name==='page_view'||name==='exit',...(name==='exit'?{transport:'sendBeacon' as const}:{})});
+  if(name==='page_view'){
+    // Resolve session-dependent events after initialization, never discard them
+    // merely because trackingContext was unavailable during the React effect.
+    const marker=`journey:landing:${outlet}:${client.get_session_id()}`;
+    let first=true;try{first=!sessionStorage.getItem(marker);sessionStorage.setItem(marker,'1');}catch{}
+    if(first){capture('landing_page_view',{},crypto.randomUUID(),page,touch);capture('session_start',{},crypto.randomUUID(),page,touch);}
+    else capture('route_change',{},crypto.randomUUID(),page,touch);
+    if(['/','/menu','/food'].includes(page))capture('menu_view',{},crypto.randomUUID(),page,touch);
+  }
 }
 export function configureTracking(id:string,active:boolean){
   const next=active&&/^\d+$/.test(id)&&trackingAllowed();
-  if(outlet!==id||!next){generation++;client?.stopSessionRecording();client?.opt_out_capturing();client=undefined;pending=[];loading=undefined;activeConfig=undefined;}
+  if(outlet!==id||!next){clearTimeout(retryTimer);retryTimer=undefined;retryAttempts=0;generation++;client?.stopSessionRecording();client?.opt_out_capturing();client=undefined;pending=[];loading=undefined;activeConfig=undefined;}
   outlet=id;enabled=next;
   if(!enabled)return;
   try{
@@ -67,12 +79,17 @@ export function configureTracking(id:string,active:boolean){
   const scope=generation;
   loading=(async()=>{
     try{
-      const response=await fetch(`${DEFAULT_API_BASE}/customer/tracking-config/?outlet_id=${id}`,{credentials:'omit'});
-      if(!response.ok)return;
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),8000);
+      let response:Response;
+      try{response=await fetch(`${DEFAULT_API_BASE}/customer/tracking-config/?outlet_id=${id}`,{credentials:'omit',signal:controller.signal});}
+      finally{clearTimeout(timeout);}
+      if(!response.ok)throw new Error('Tracking configuration unavailable');
       const config:Config=await response.json();
       if(scope!==generation||!enabled||!trackingAllowed()||!config.enabled)return;
       const visitor=anonymousId();if(!visitor)return;
       const instanceKey=`outlet_${id}_${config.token}`;
+      instanceScopes.set(instanceKey,scope);
       client=instances.get(instanceKey);
       if(!client){
         client=posthog.init(config.token,{
@@ -87,7 +104,7 @@ export function configureTracking(id:string,active:boolean){
             maskAttributeFn:(name,value)=>['class','style','width','height','type','role'].includes(name)?value:'',
             recordHeaders:false,recordBody:false,maskCapturedNetworkRequestFn:()=>null},
           before_send:(event)=>{
-            if(!enabled||!trackingAllowed()||scope!==generation)return null;
+            if(!event||!enabled||!trackingAllowed()||instanceScopes.get(instanceKey)!==generation||outlet!==id)return null;
             if(['order_success','order_confirmed','payment_success','$autocapture','$identify','$set'].includes(event.event))return null;
             for(const key of Object.keys(event.properties)){
               if(/url|referrer|pathname/i.test(key)&&typeof event.properties[key]==='string'){
@@ -102,9 +119,14 @@ export function configureTracking(id:string,active:boolean){
         if(client)instances.set(instanceKey,client);
       }
       client?.opt_in_capturing({captureEventName:false});
-      activeConfig=config;updateReplay();
-      for(const event of pending.splice(0))capture(event.name,event.metadata,event.id,event.path);
-    }catch{/* Ordering must keep working when analytics is unavailable. */}
+      activeConfig=config;retryAttempts=0;updateReplay();
+      for(const event of pending.splice(0))capture(event.name,event.metadata,event.id,event.path,event.touch);
+    }catch{
+      if(scope===generation&&enabled&&trackingAllowed()&&retryAttempts<5){
+        const delay=Math.min(30000,1000*2**retryAttempts++);
+        retryTimer=setTimeout(()=>{retryTimer=undefined;configureTracking(id,true);},delay);
+      }
+    }
     finally{if(scope===generation)loading=undefined;}
   })();
 }
@@ -114,9 +136,9 @@ function updateReplay(){
 }
 export function trackEvent(name:string,metadata:Meta={},eventId?:string){
   if(!enabled||!trackingAllowed()||['order_success','order_confirmed','payment_success'].includes(name))return;
-  const event={name,metadata:sanitize(metadata),id:eventId||crypto.randomUUID(),path:path()};
+  const event={name,metadata:sanitize(metadata),id:eventId||crypto.randomUUID(),path:path(),touch:{...attribution}};
   if(client)capture(event.name,event.metadata,event.id,event.path);
-  else if(loading){pending.push(event);if(pending.length>150)pending.shift();}
+  else if(loading||retryTimer){pending.push(event);if(pending.length>150)pending.shift();}
 }
 export async function flushTracking(_beacon=false){await loading;}
 
@@ -129,6 +151,8 @@ export function installJourneyListeners() {
   const scroll=()=>{const depth=Math.round((window.scrollY+innerHeight)/Math.max(document.documentElement.scrollHeight,1)*100);for(const value of [25,50,75,100])if(depth>=value&&!scrolls.has(value)){scrolls.add(value);trackEvent('scroll',{scroll_percent:value});}};
   const exit=()=>{trackEvent('exit');void flushTracking(true);};
   const visibility=()=>{if(document.visibilityState==='hidden')void flushTracking(true);};
+  const online=()=>{if(enabled&&!client){retryAttempts=0;clearTimeout(retryTimer);retryTimer=undefined;configureTracking(outlet,true);}};
+  window.addEventListener('online',online);
   const back=(event:PopStateEvent)=>{if(event.isTrusted)trackEvent('back_navigation');};
   const failure=(event:globalThis.Event)=>trackEvent(event.target instanceof HTMLImageElement?'image_error':'javascript_error',{error_category:event.target instanceof HTMLImageElement?'image_load':'uncaught_exception'});
   const rejection=()=>trackEvent('javascript_error',{error_category:'unhandled_rejection'});
@@ -145,5 +169,5 @@ export function installJourneyListeners() {
   }
   const navigation=performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming|undefined;
   if(navigation){trackEvent('performance',{metric:'DOM',value:navigation.domContentLoadedEventEnd});if(navigation.loadEventEnd)trackEvent('performance',{metric:'load',value:navigation.loadEventEnd});}
-  return()=>{clearInterval(heartbeat);window.removeEventListener('scroll',scroll);window.removeEventListener('pagehide',exit);window.removeEventListener('popstate',back);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('error',failure,true);window.removeEventListener('unhandledrejection',rejection);window.removeEventListener('journey:api',api);document.removeEventListener('click',click);};
+  return()=>{window.removeEventListener('online',online);clearInterval(heartbeat);window.removeEventListener('scroll',scroll);window.removeEventListener('pagehide',exit);window.removeEventListener('popstate',back);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('error',failure,true);window.removeEventListener('unhandledrejection',rejection);window.removeEventListener('journey:api',api);document.removeEventListener('click',click);};
 }
