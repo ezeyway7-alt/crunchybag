@@ -152,15 +152,14 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   useEffect(()=>{if(isOpen && cleanName && !nameError)trackEvent('name_entered');},[isOpen,cleanName,!!nameError]);
   useEffect(()=>{if(isOpen && cleanPhone)trackEvent('phone_entered');},[isOpen,cleanPhone]);
   useEffect(()=>{if(isOpen && cleanAddress){trackEvent('address_entered');trackEvent('delivery_information',{fulfillment_type:selectedFulfillment});}},[isOpen,cleanAddress,selectedFulfillment]);
-  useEffect(()=>{if(isOpen && deliveryLocation)trackEvent('location_selected');},[isOpen,!!deliveryLocation]);
-  useEffect(()=>{if(isOpen && meta?.qr_url){trackEvent('payment_method_view',{payment_method:'FONEPAY'});trackEvent('payment_method_selected',{payment_method:'FONEPAY'});}},[isOpen,!!meta?.qr_url]);
+  useEffect(()=>{if(isOpen && meta?.qr_url)trackEvent('payment_method_view',{payment_method:'FONEPAY'});},[isOpen,!!meta?.qr_url]);
   const handleProof = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget, file = input.files?.[0];
     setProof(null);setProofError('');
     if (!file) return;
-    if (!['image/png','image/jpeg','image/webp'].includes(file.type)) {setProofError('Choose a PNG, JPEG, or WebP image.');input.value='';return;}
-    if(file.size > 5*1024*1024) {setProofError('Receipt must be smaller than 5 MB.');input.value='';return;}
-    if(!file.size) {setProofError('This file is empty. Choose another receipt.');input.value='';return;}
+    if (!['image/png','image/jpeg','image/webp'].includes(file.type)) {setProofError('Choose a PNG, JPEG, or WebP image.');trackEvent('payment_proof_rejected',{error_category:'unsupported_type'});input.value='';return;}
+    if(file.size > 5*1024*1024) {setProofError('Receipt must be smaller than 5 MB.');trackEvent('payment_proof_rejected',{error_category:'file_too_large'});input.value='';return;}
+    if(!file.size) {setProofError('This file is empty. Choose another receipt.');trackEvent('payment_proof_rejected',{error_category:'empty_file'});input.value='';return;}
     trackEvent('payment_proof_uploaded',{payment_method:'FONEPAY',cart_value:grandPayableTotal});
     setProof(file);
   };

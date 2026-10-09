@@ -1,6 +1,7 @@
 import {Input} from '../common/Input';
 import { apiClient, extractErrorMessage } from "../../lib/api";
 import { customerPath, saveCustomerSession } from "../../lib/customerApi";
+import { trackEvent } from "../../lib/journeyTracking";
 import React, { useState, useEffect, useRef } from "react";
 import { Phone, Lock, Eye, EyeOff, CheckCircle2, User, KeyRound, ArrowLeft, ShieldCheck, ArrowRight } from "lucide-react";
 import { Modal } from "../common/Modal";
@@ -134,17 +135,24 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       return;
     }
 
+    trackEvent("login_started", {method: /^\d{4}$/.test(cleanCred) ? "pin" : "password"});
     void perform(async () => {
       // Determine if numeric 4-digit PIN or text password
       const is4Digit = /^\d{4}$/.test(cleanCred);
       const primaryMethod = is4Digit ? "PIN" : "PASSWORD";
 
-      const result = await apiClient.post<any>(
-        customerPath("auth/login/"),
-        { phone: cleanPhone, outlet_id:currentOutlet?.id, method: primaryMethod, credential: cleanCred },
-        { skipAuth: true }
-      );
-      finish(result);
+      try {
+        const result = await apiClient.post<any>(
+          customerPath("auth/login/"),
+          { phone: cleanPhone, outlet_id:currentOutlet?.id, method: primaryMethod, credential: cleanCred },
+          { skipAuth: true }
+        );
+        trackEvent("login_success");
+        finish(result);
+      } catch (error) {
+        trackEvent("login_failed");
+        throw error;
+      }
     });
   };
 

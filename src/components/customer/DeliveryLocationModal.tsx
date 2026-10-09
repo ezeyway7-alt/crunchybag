@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import {Modal} from '../common/Modal';
 import {Button} from '../common/Button';
 import {DeliveryPoint} from '../../lib/customerAddresses';
+import {trackEvent} from '../../lib/journeyTracking';
 
 export interface LandmarkItem {
   id: string;
@@ -60,12 +61,14 @@ export function DeliveryLocationModal({isOpen, onClose, currentAddress, currentL
       marker.current.on('dragend', () => {
         requestId.current++;setBusy(false);setAccuracy(null);
         const position = marker.current!.getLatLng();setPoint({lat:position.lat,lng:position.lng});
+        trackEvent('map_pin_selected',{method:'drag'});
       });
     } else marker.current.setLatLng(coords);
     if (zoom) map.current.setView(coords, 17);
   };
   useEffect(() => {
     if (!isOpen) return;
+    trackEvent('map_opened');
     setStreet(currentAddress || '');setLandmark(currentLocation?.landmark || '');setSearch('');
     setPoint(currentLocation);setAccuracy(null);setError('');setBusy(false);
     const timer = setTimeout(() => {
@@ -74,7 +77,7 @@ export function DeliveryLocationModal({isOpen, onClose, currentAddress, currentL
       const center: L.LatLngExpression = currentLocation ? [currentLocation.lat,currentLocation.lng] : [27.7172,85.3240];
       map.current = L.map(container.current, {center, zoom:currentLocation ? 17 : 12});
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',maxZoom:19}).addTo(map.current);
-      map.current.on('click', (event:L.LeafletMouseEvent) => {requestId.current++;setBusy(false);setAccuracy(null);pin({lat:event.latlng.lat,lng:event.latlng.lng});});
+      map.current.on('click', (event:L.LeafletMouseEvent) => {requestId.current++;setBusy(false);setAccuracy(null);pin({lat:event.latlng.lat,lng:event.latlng.lng});trackEvent('map_pin_selected',{method:'map'});});
       if (currentLocation) pin(currentLocation);
       map.current.invalidateSize();
     }, 200);
@@ -83,17 +86,19 @@ export function DeliveryLocationModal({isOpen, onClose, currentAddress, currentL
   const locate = () => {
     const id = ++requestId.current;
     setError('');setBusy(true);
-    if (!navigator.geolocation) {setError('Location is unavailable. Choose a point on the map.');setBusy(false);return;}
+    if (!navigator.geolocation) {setError('Location is unavailable. Choose a point on the map.');setBusy(false);trackEvent('delivery_location_error',{error_category:'location_unavailable'});return;}
     navigator.geolocation.getCurrentPosition(position => {
       if (id !== requestId.current) return;
       setBusy(false);
       const {latitude,longitude,accuracy} = position.coords;
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {setError('Could not locate you. Choose a point on the map.');return;}
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {setError('Could not locate you. Choose a point on the map.');trackEvent('delivery_location_error',{error_category:'location_invalid'});return;}
       pin({lat:latitude,lng:longitude}, true);setAccuracy(accuracy);
+      trackEvent('map_pin_selected',{method:'gps'});
       // Never invent a street or landmark from an approximate GPS reading.
     }, failure => {
       if (id !== requestId.current) return;
       setBusy(false);setError(failure.code === 1 ? 'Allow location access or choose a point on the map.' : 'Could not get your location. Try again or choose a point on the map.');
+      trackEvent('delivery_location_error',{error_category:failure.code === 1 ? 'location_permission' : failure.code === 3 ? 'location_timeout' : 'location_unavailable'});
     }, {enableHighAccuracy:true,maximumAge:0,timeout:15000});
   };
   const matches = search.trim() ? KATHMANDU_LANDMARKS.filter(row => `${row.name} ${row.area}`.toLowerCase().includes(search.toLowerCase())) : [];
@@ -101,7 +106,7 @@ export function DeliveryLocationModal({isOpen, onClose, currentAddress, currentL
     <div className="p-3 space-y-3">
       <div className="flex gap-2"><input aria-label="Search landmarks" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search landmarks" className="min-w-0 flex-1 bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs" />
         <Button type="button" size="sm" onClick={locate} disabled={busy}>{busy ? 'Locating…' : 'Current location'}</Button></div>
-      {search.trim() && <div className="max-h-28 overflow-auto text-xs">{matches.length ? matches.map(row=><button type="button" key={row.id} className="block w-full text-left p-2 hover:bg-zinc-800" onClick={()=>{requestId.current++;setBusy(false);pin({lat:row.lat,lng:row.lng},true);setLandmark(row.name);setSearch('');setAccuracy(null);}}>{row.name}</button>) : <p className="text-zinc-400">No matching landmark. Select a point on the map.</p>}</div>}
+      {search.trim() &&       <div className="max-h-28 overflow-auto text-xs">{matches.length ? matches.map(row=><button type="button" key={row.id} className="block w-full text-left p-2 hover:bg-zinc-800" onClick={()=>{requestId.current++;setBusy(false);pin({lat:row.lat,lng:row.lng},true);setLandmark(row.name);setSearch('');setAccuracy(null);trackEvent('map_pin_selected',{method:'landmark'});}}>{row.name}</button>) : <p className="text-zinc-400">No matching landmark. Select a point on the map.</p>}</div>}
       {error && <p role="alert" className="text-xs text-rose-400">{error}</p>}
       <div ref={container} className="h-[min(40vh,320px)] min-h-48 bg-zinc-800" aria-label="Delivery map" />
       <div className="text-[11px] text-zinc-400" role="status">{point ? `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}` : 'Select a point on the map.'}{accuracy !== null && ` · Accuracy ±${Math.round(accuracy)} m`}</div>

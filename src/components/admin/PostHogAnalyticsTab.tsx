@@ -33,23 +33,100 @@ type Overview = {
       daily?: {date: string; visitors: number; sessions: number; page_views: number}[];
       top_events?: {event: string; events: number; visitors: number}[];
       top_pages?: {path: string; page_views: number; visitors: number}[];
+      funnel?: {step: string; sessions: number}[];
+      last_steps?: {event: string; sessions: number; visitors: number}[];
+      friction?: {event: string; category: string; events: number; sessions: number}[];
     };
   };
   scope: string;
 };
 
 const panel = 'bg-[#121214] border border-zinc-800 rounded-lg p-4';
+const actionLabels: Record<string, string> = {
+  login_started: 'Sign-in started',
+  login_success: 'Signed in',
+  login_failed: 'Sign-in failed',
+  auth_required: 'Sign-in required',
+  map_opened: 'Delivery map opened',
+  map_pin_selected: 'Map point selected',
+  delivery_location_error: 'Map / location error',
+  location_selected: 'Delivery location saved',
+  payment_method_view: 'Payment details shown',
+  payment_method_selected: 'Payment method selected',
+  payment_proof_uploaded: 'Receipt selected',
+  payment_proof_rejected: 'Receipt rejected',
+  checkout_validation_failed: 'Checkout validation failed',
+  order_failed: 'Order request failed',
+  api_error: 'API error',
+  network_error: 'Network error',
+  javascript_error: 'Website error',
+  image_error: 'Product image failed',
+};
+const categoryLabels: Record<string, string> = {
+  name_missing: 'name missing',
+  address_missing: 'delivery address missing',
+  table_missing: 'table not selected',
+  cart_sync: 'cart sync failed',
+  location_unavailable: 'location unavailable',
+  location_invalid: 'invalid location result',
+  location_permission: 'location permission denied',
+  location_timeout: 'location timed out',
+  unsupported_type: 'unsupported file type',
+  file_too_large: 'file too large',
+  empty_file: 'empty file',
+  image_load: 'image load',
+  uncaught_exception: 'website error',
+  unhandled_rejection: 'website error',
+  network: 'network failure',
+};
 
 function money(value: string) {
   return `NPR ${Number(value || 0).toLocaleString('en-NP', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 }
 
 function Metric({label, value, note}: {label: string; value: string; note?: string}) {
-  return <article className={`${panel} min-w-0`}>
+  return <article className="min-w-0 border-l border-zinc-800 px-3 py-1 first:border-l-0">
     <p className="text-xs text-zinc-400">{label}</p>
-    <p className="mt-2 break-words text-xl font-semibold text-amber-400">{value}</p>
+    <p className="mt-1 break-words text-base font-semibold text-amber-400">{value}</p>
     {note && <p className="mt-1 text-[11px] text-zinc-500">{note}</p>}
   </article>;
+}
+
+function actionLabel(event: string, category = '') {
+  const label = actionLabels[event] || event.replace(/_/g, ' ');
+  if (!category) return label;
+  if (category.startsWith('http_')) return `${label} · request failed`;
+  return category === 'other' ? `${label} · other` : `${label} · ${categoryLabels[category] || category}`;
+}
+
+function FunnelRows({rows}: {rows: NonNullable<Overview['analytics']['visitors']['funnel']>}) {
+  const total = rows[0]?.sessions || 0;
+  const largestDrop = rows.slice(1).reduce((largest, row, index) => {
+    const previous = rows[index].sessions;
+    const drop = Math.max(0, previous - row.sessions);
+    return drop > largest.drop ? {from: rows[index].step, to: row.step, drop, rate: previous ? drop / previous : 0} : largest;
+  }, {from: '', to: '', drop: 0, rate: 0});
+
+  return <div className="space-y-2">
+    {largestDrop.drop > 0 && <p className="text-xs text-amber-300">
+      Largest drop: {largest.drop} of {rows.find(row => row.step === largestDrop.from)?.sessions} sessions ({Math.round(largestDrop.rate * 100)}%) from {largestDrop.from} to {largestDrop.to}.
+    </p>}
+    {rows.map((row, index) => {
+      const previous = index ? rows[index - 1].sessions : row.sessions;
+      const lost = Math.max(0, previous - row.sessions);
+      const percent = previous ? Math.round((lost / previous) * 100) : 0;
+      return <div key={row.step} className="grid grid-cols-[minmax(7rem,1fr)_minmax(3rem,2fr)_auto] items-center gap-3 text-xs">
+        <span className="text-zinc-300">{row.step}</span>
+        <div className="h-1.5 overflow-hidden rounded bg-zinc-800">
+          <div className="h-full rounded bg-amber-500" style={{width: `${total ? Math.min(100, row.sessions / total * 100) : 0}%`}}/>
+        </div>
+        <span className="min-w-20 text-right tabular-nums">
+          {row.sessions}
+          {index > 0 && lost > 0 && <span className="ml-2 text-zinc-500">−{lost} ({percent}%)</span>}
+        </span>
+      </div>;
+    })}
+  </div>;
 }
 
 function VisitorChart({rows}: {rows: NonNullable<Overview['analytics']['visitors']['daily']>}) {
@@ -207,39 +284,47 @@ export function PostHogAnalyticsTab() {
           {visitors.message} Open PostHog to see its built-in charts and session replays.
         </div>}
         {visitors?.available && <>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="flex flex-wrap items-center divide-x divide-zinc-800 rounded border border-zinc-800 py-2">
             <Metric label="Anonymous visitors" value={(visitors.unique_visitors || 0).toLocaleString()} note="Distinct browsers with a page view"/>
             <Metric label="Visits" value={(visitors.sessions || 0).toLocaleString()} note="PostHog sessions with a page view"/>
             <Metric label="Page views" value={(visitors.page_views || 0).toLocaleString()}/>
           </div>
-          <p className="text-[11px] text-zinc-500">
-            Counts include browser-tracked activity for this outlet in the selected dates. A visitor is an anonymous browser ID, not a named or logged-in person; a different browser or device normally counts separately. Tracking skips browsers that signal Do Not Track or Global Privacy Control.
-          </p>
-          <p className="text-[11px] text-zinc-500">PostHog totals may take up to 2 minutes to refresh. After visiting from another browser, wait briefly and then select Refresh.</p>
-          <div className={`${panel} space-y-3`}>
-            <div>
-              <h3 className="text-sm font-semibold">Visitors by day</h3>
-              <p className="mt-1 text-[11px] text-zinc-500">Hover a bar for visitors, visits and page views.</p>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(16rem,2fr)]">
+            <div className={`${panel} space-y-3`}>
+              <div>
+                <h3 className="text-sm font-semibold">Where checkout sessions stop</h3>
+                <p className="mt-1 text-[11px] text-zinc-500">Sessions reaching each step in order. Missing events or alternate paths can look like drop-off; this does not prove why someone left.</p>
+              </div>
+              {visitors.funnel?.length
+                ? <FunnelRows rows={visitors.funnel}/>
+                : <p className="text-xs text-zinc-500">No funnel data for this date range.</p>}
             </div>
-            {visitors.daily?.length
-              ? <VisitorChart rows={visitors.daily}/>
-              : <p className="py-8 text-center text-xs text-zinc-500">No page views recorded in this date range yet. Visit the public website in another browser and refresh.</p>}
+            <div className={`${panel} space-y-3`}>
+              <div>
+                <h3 className="text-sm font-semibold">What happened before they left</h3>
+                <p className="mt-1 text-[11px] text-zinc-500">Last meaningful action in sessions idle for at least 30 minutes. This is not proof of why someone left.</p>
+              </div>
+              {visitors.last_steps?.length
+                ? <div className="divide-y divide-zinc-800">{visitors.last_steps.slice(0, 8).map(row=><div key={row.event} className="flex justify-between gap-3 py-2 text-xs"><span>{actionLabel(row.event)}</span><span className="shrink-0 text-zinc-400">{row.sessions} sessions</span></div>)}</div>
+                : <p className="text-xs text-zinc-500">No inactive sessions yet. Check again after visitors have been idle for 30 minutes.</p>}
+            </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
             <div className={`${panel} space-y-3`}>
-              <h3 className="text-sm font-semibold">What visitors did</h3>
-              {visitors.top_events?.length
-                ? <div className="divide-y divide-zinc-800">{visitors.top_events.map(row=><div key={row.event} className="flex justify-between gap-3 py-2 text-xs"><span className="break-all">{row.event}</span><span className="shrink-0 text-zinc-400">{row.events} events · {row.visitors} browsers</span></div>)}</div>
-                : <p className="text-xs text-zinc-500">No tracked actions in this date range yet.</p>}
-              <p className="text-[11px] text-zinc-500">For individual anonymous visits and replay, open PostHog and choose Session Replay.</p>
+              <h3 className="text-sm font-semibold">Checkout checkpoints and errors</h3>
+              {visitors.friction?.length
+                ? <div className="max-h-72 divide-y divide-zinc-800 overflow-y-auto">{visitors.friction.map(row=><div key={`${row.event}:${row.category}`} className="flex justify-between gap-3 py-2 text-xs"><span>{actionLabel(row.event, row.category)}</span><span className="shrink-0 text-zinc-400">{row.sessions} sessions · {row.events} events</span></div>)}</div>
+                : <p className="text-xs text-zinc-500">No sign-in, map, receipt or checkout checkpoint events in this date range.</p>}
             </div>
             <div className={`${panel} space-y-3`}>
-              <h3 className="text-sm font-semibold">Most-viewed pages</h3>
+              <h3 className="text-sm font-semibold">Visitors by day and most-viewed pages</h3>
+              {visitors.daily?.length ? <VisitorChart rows={visitors.daily}/> : <p className="text-xs text-zinc-500">No page views recorded for these dates.</p>}
               {visitors.top_pages?.length
                 ? <div className="divide-y divide-zinc-800">{visitors.top_pages.map(row=><div key={row.path} className="flex justify-between gap-3 py-2 text-xs"><span className="break-all">{row.path}</span><span className="shrink-0 text-zinc-400">{row.page_views} views · {row.visitors} browsers</span></div>)}</div>
                 : <p className="text-xs text-zinc-500">No page views in this date range yet.</p>}
             </div>
           </div>
+          <p className="text-[11px] text-zinc-500">Counts are anonymous browser sessions for this outlet and date range. Refresh may take up to 2 minutes to include new events.</p>
         </>}
       </section>
     </>}
