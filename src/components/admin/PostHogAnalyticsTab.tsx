@@ -191,6 +191,9 @@ export function PostHogAnalyticsTab() {
   const error = state.scope === scope ? state.error : '';
   const analytics = data?.analytics;
   const visitors = analytics?.visitors;
+  const insightsAvailable = Array.isArray(visitors?.funnel)
+    && Array.isArray(visitors?.last_steps)
+    && Array.isArray(visitors?.friction);
 
   return <section className="space-y-4" aria-label="Analytics">
     <header className="flex flex-wrap items-start justify-between gap-3">
@@ -289,6 +292,10 @@ export function PostHogAnalyticsTab() {
             <Metric label="Visits" value={(visitors.sessions || 0).toLocaleString()} note="PostHog sessions with a page view"/>
             <Metric label="Page views" value={(visitors.page_views || 0).toLocaleString()}/>
           </div>
+          {!insightsAvailable && <div role="status" className="rounded border border-amber-900/70 bg-amber-950/30 p-3 text-xs text-amber-200">
+            Visitor events are reaching PostHog, but this server response does not include the funnel insights yet. Deploy and restart the updated backend; this is not evidence that PostHog received no events.
+          </div>}
+          {insightsAvailable && <>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(16rem,2fr)]">
             <div className={`${panel} space-y-3`}>
               <div>
@@ -316,13 +323,14 @@ export function PostHogAnalyticsTab() {
                 ? <div className="max-h-72 divide-y divide-zinc-800 overflow-y-auto">{visitors.friction.map(row=><div key={`${row.event}:${row.category}`} className="flex justify-between gap-3 py-2 text-xs"><span>{actionLabel(row.event, row.category)}</span><span className="shrink-0 text-zinc-400">{row.sessions} sessions · {row.events} events</span></div>)}</div>
                 : <p className="text-xs text-zinc-500">No sign-in, map, receipt or checkout checkpoint events in this date range.</p>}
             </div>
-            <div className={`${panel} space-y-3`}>
-              <h3 className="text-sm font-semibold">Visitors by day and most-viewed pages</h3>
-              {visitors.daily?.length ? <VisitorChart rows={visitors.daily}/> : <p className="text-xs text-zinc-500">No page views recorded for these dates.</p>}
-              {visitors.top_pages?.length
-                ? <div className="divide-y divide-zinc-800">{visitors.top_pages.map(row=><div key={row.path} className="flex justify-between gap-3 py-2 text-xs"><span className="break-all">{row.path}</span><span className="shrink-0 text-zinc-400">{row.page_views} views · {row.visitors} browsers</span></div>)}</div>
-                : <p className="text-xs text-zinc-500">No page views in this date range yet.</p>}
-            </div>
+          </div>
+          </>}
+          <div className={`${panel} space-y-3`}>
+            <h3 className="text-sm font-semibold">Visitors by day and most-viewed pages</h3>
+            {visitors.daily?.length ? <VisitorChart rows={visitors.daily}/> : <p className="text-xs text-zinc-500">No page views recorded for these dates.</p>}
+            {visitors.top_pages?.length
+              ? <div className="divide-y divide-zinc-800">{visitors.top_pages.map(row=><div key={row.path} className="flex justify-between gap-3 py-2 text-xs"><span className="break-all">{row.path}</span><span className="shrink-0 text-zinc-400">{row.page_views} views · {row.visitors} browsers</span></div>)}</div>
+              : <p className="text-xs text-zinc-500">No page views in this date range yet.</p>}
           </div>
           <p className="text-[11px] text-zinc-500">Counts are anonymous browser sessions for this outlet and date range. Refresh may take up to 2 minutes to include new events.</p>
         </>}
