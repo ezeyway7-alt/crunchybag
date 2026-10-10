@@ -191,6 +191,9 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              <a href="/track" className="text-xs font-bold text-amber-500 hover:text-amber-400 underline underline-offset-4">
+                Track guest order
+              </a>
               <Button
                 variant="outline"
                 size="sm"

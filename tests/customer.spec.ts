@@ -217,6 +217,42 @@ test('guest signup resumes cart checkout and real tracking without required add-
   await expect(page.getByAltText('Merchant payment QR')).toBeVisible();await expect(page.getByText('Customer Sign In',{exact:true})).toHaveCount(0);
 });
 
+test('guest can place an order and track it with the saved order number and checkout phone',async({page})=>{
+  const state=await setup(page);
+  const trackingCalls:any[]=[];
+  await page.route('**/api/v1/customer/guest-orders/track/',async route=>{
+    const body=route.request().postDataJSON();
+    trackingCalls.push(body);
+    await route.fulfill({json:{order_number:body.order_number,outlet_id:1,outlet_name:'Web Outlet',rounds:[],status:'PENDING',
+      fulfillment_type:'TAKEAWAY',table_number:null,updated_at:new Date().toISOString(),history:[]}});
+  });
+
+  await openCheckout(page);
+  await page.getByRole('button',{name:'Continue as a guest'}).click();
+  await expect(page.getByAltText('Merchant payment QR')).toBeVisible();
+  await page.getByLabel('Full Name').fill('Guest Customer');
+  await page.getByRole('textbox',{name:'Phone Number',exact:true}).fill('9841234567');
+  await receipt(page);
+  const submit=page.getByRole('button',{name:/Submit Receipt & Place Order/});
+  await expect(submit).toBeEnabled();
+  await submit.click();
+
+  await expect(page.getByRole('heading',{name:'Track a guest order'})).toBeVisible();
+  await expect.poll(()=>trackingCalls.length).toBeGreaterThan(0);
+  await expect(page.getByRole('heading',{name:'WEB-REAL-7'})).toBeVisible();
+  expect(state.created).toBe(1);
+  expect(state.lastPayload.customer_phone).toBe('+9779841234567');
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('crunchy_guest_orders')||'[]'))).toContain('WEB-REAL-7');
+  expect(trackingCalls.at(-1)).toEqual({order_number:'WEB-REAL-7',customer_phone:'9841234567'});
+
+  await page.goto('/track');
+  await expect(page.getByLabel('Saved guest orders')).toHaveValue('WEB-REAL-7');
+  await page.getByLabel('Checkout phone number').fill('9841234567');
+  await page.getByRole('button',{name:'Find order'}).click();
+  await expect(page.getByRole('heading',{name:'WEB-REAL-7'})).toBeVisible();
+  expect(trackingCalls.at(-1)).toEqual({order_number:'WEB-REAL-7',customer_phone:'9841234567'});
+});
+
 test('returning customer can use mobile and PIN or password; favourites persist',async({page})=>{
   const state=await setup(page);await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();
   await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9800000000');await page.getByLabel('Account Password or PIN').fill('1234');

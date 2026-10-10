@@ -1,7 +1,7 @@
 import {trackEvent,cartMetadata,trackingContext} from '../../lib/journeyTracking';
 import {useCustomerAddresses, addressPoint} from '../../lib/customerAddresses';
 import { apiClient, ApiError, extractErrorMessage } from "../../lib/api";
-import { customerPath, cartLines, customerRefresh } from "../../lib/customerApi";
+import { customerPath, cartLines, customerRefresh, saveGuestOrderNumber } from "../../lib/customerApi";
 import { useAuth } from "../../context/AuthContext";
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -41,7 +41,7 @@ import { resolveLocationAddress } from "../../lib/locationGeocode";
 interface TakeawayCheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onOrderSuccess: (orderId: string) => void;
+  onOrderSuccess: (orderId: string, orderNumber?: string) => void;
 }
 
 export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
@@ -51,6 +51,8 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
 }) => {
   const { cart, currentOutlet, consumePurchasedCart, customerProfile, cartSyncing, cartSyncError } = useApp();
   const {authUser,isAuthenticated} = useAuth();
+  const isSignedIn = isAuthenticated && !!authUser && authUser.is_active !== false;
+  const isGuestCheckout = !isSignedIn;
 
   // 1. By default, DELIVERY is selected as requested!
   const [selectedFulfillment, setSelectedFulfillment] = useState<FulfillmentType>("DELIVERY");
@@ -164,17 +166,33 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const cleanName = (name || '').trim();
   const cleanPhone = (phone || '').trim();
   const cleanAddress = (deliveryAddress || '').trim();
+  const canonicalPhone = (value: string) => {
+    let digits = value.replace(/\D/g, '');
+    if (digits.startsWith('977') && digits.length === 13) digits = digits.slice(3);
+    return /^9[78]\d{8}$/.test(digits) ? `+977${digits}` : '';
+  };
+  const guestPhone = isGuestCheckout ? canonicalPhone(cleanPhone) : '';
 
   const payload = {outlet_id:Number(currentOutlet.id),items:cartLines(cart.items),fulfillment_type:selectedFulfillment,
     cart_line_ids:cart.items.map(item=>item.cartItemId),
     customer_name:cleanName || authUser?.name || authUser?.username || '',delivery_address:selectedFulfillment==='DELIVERY'?cleanAddress:'',
+    ...(isGuestCheckout ? {customer_phone:guestPhone} : {}),
     table_id:selectedFulfillment==='DINE_IN'?meta?.tables?.find((t:any)=>t.table_number===tableNumber)?.id || null:null,
     notes:[vehicleInfo?`Vehicle: ${vehicleInfo}`:'',notes].filter(Boolean).join(' — '),delivery_location:selectedFulfillment==='DELIVERY' ? deliveryLocation || {} : {}};
   const signature = JSON.stringify(payload);
   const quote = quoted?.signature===signature ? quoted.data : null;
   const grandPayableTotal = Number(quote?.total_payable ?? cart.finalTotal);
-  const pendingKey = `customer-checkout:${authUser?.id}:${currentOutlet.id}`;
-  const finishOrder = (order:any) => {const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');consumePurchasedCart(pending?.cartLineIds || []);sessionStorage.removeItem(pendingKey);customerRefresh();onClose();onOrderSuccess(String(order.id));};
+  const pendingKey = `customer-checkout:${isSignedIn ? authUser.id : 'guest'}:${currentOutlet.id}`;
+  const finishOrder = (order:any) => {
+    const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');
+    consumePurchasedCart(pending?.cartLineIds || []);
+    sessionStorage.removeItem(pendingKey);
+    if(isGuestCheckout && order.order_number) {
+      saveGuestOrderNumber(String(order.order_number));
+      try { sessionStorage.setItem('customer:guest-order-phone', cleanPhone); } catch {}
+    }
+    customerRefresh();onClose();onOrderSuccess(String(order.id), String(order.order_number || ''));
+  };
   useEffect(()=>{
     if(!isOpen)return;
     trackEvent('checkout_start',cartMetadata(cart));
@@ -182,20 +200,20 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     setIsLocatingCurrent(false);setGeoError('');
     setName(authUser?.name || authUser?.username || customerProfile.name || '');setPhone((authUser as any)?.phone || (authUser as any)?.phone_number || customerProfile.phone || '');setError(null);setProofError('');setTouched(false);setProof(null);setMeta(null);
     const controller=new AbortController();let live=true;
-    apiClient.get<any>(`${customerPath('checkout/meta/')}?outlet_id=${currentOutlet.id}`,{signal:controller.signal})
+    apiClient.get<any>(`${customerPath('checkout/meta/')}?outlet_id=${currentOutlet.id}`,{signal:controller.signal,skipAuth:true})
       .then(result=>{if(live){setMeta(result);if(result?.fulfillment_modes && !result.fulfillment_modes.includes(selectedFulfillment))setSelectedFulfillment(result.fulfillment_modes[0] || 'TAKEAWAY');}})
       .catch(e=>{if(live)setError(extractErrorMessage(e));});
     const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');
-    if(pending)apiClient.get<any>(customerPath('orders/'),{signal:controller.signal}).then(result=>{const order=result?.results?.find((o:any)=>o.request_key===pending.key);if(live&&order)finishOrder(order);}).catch(error=>{if(live)setError(extractErrorMessage(error));});
+    if(pending && isSignedIn)apiClient.get<any>(customerPath('orders/'),{signal:controller.signal}).then(result=>{const order=result?.results?.find((o:any)=>o.request_key===pending.key);if(live&&order)finishOrder(order);}).catch(error=>{if(live)setError(extractErrorMessage(error));});
     return()=>{live=false;controller.abort();};
-  },[isOpen,currentOutlet.id,authUser?.id]);
+  },[isOpen,currentOutlet.id,authUser?.id,isSignedIn]);
   useEffect(()=>{
-    if(!isOpen||!isAuthenticated||!cart.items.length)return;
+    if(!isOpen||!cart.items.length||(isGuestCheckout&&!guestPhone))return;
     const controller=new AbortController();let live=true;
-    const timer=setTimeout(()=>apiClient.post<any>(customerPath('checkout/quote/'),JSON.parse(signature),{signal:controller.signal})
+    const timer=setTimeout(()=>apiClient.post<any>(customerPath('checkout/quote/'),JSON.parse(signature),{signal:controller.signal,skipAuth:isGuestCheckout})
       .then(data=>{if(live){setQuoted({signature,data});setQuoteError('');}}).catch(e=>{if(live)setQuoteError(extractErrorMessage(e));}),250);
     return()=>{live=false;clearTimeout(timer);controller.abort();};
-  },[isOpen,isAuthenticated,signature,quoteVersion]);
+  },[isOpen,isSignedIn,signature,quoteVersion,guestPhone]);
   useEffect(()=>{
     if (!isOpen || addressInitialized.current || savedAddresses.loading) return;
     addressInitialized.current=true;
@@ -205,6 +223,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   },[isOpen,savedAddresses.addresses,savedAddresses.loading,customerProfile.address,authUser?.id]);
   const addressError = selectedFulfillment==='DELIVERY' && !cleanAddress ? 'Choose your delivery address.' : '';
   const nameError = !cleanName ? 'Enter your name.' : cleanName.length > 120 ? 'Use no more than 120 characters.' : '';
+  const phoneError = isGuestCheckout && !guestPhone ? 'Enter a valid 10-digit Nepali mobile number.' : '';
   const tableError = selectedFulfillment==='DINE_IN' && !payload.table_id ? 'Choose a table.' : '';
   useEffect(()=>{if(isOpen && cleanName && !nameError)trackEvent('name_entered');},[isOpen,cleanName,!!nameError]);
   useEffect(()=>{if(isOpen && cleanPhone)trackEvent('phone_entered');},[isOpen,cleanPhone]);
@@ -222,8 +241,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   };
   const handleSubmit = async (e:React.FormEvent) => {
     e.preventDefault();setTouched(true);if(lock.current)return;
-    if(nameError || addressError || tableError || cartSyncing || cartSyncError){trackEvent('checkout_validation_failed',{error_category:nameError?'name_missing':addressError?'address_missing':tableError?'table_missing':'cart_sync',cart_value:grandPayableTotal});return;}
-    if(!isAuthenticated||!authUser||authUser.is_active===false){setError('Sign in before placing your order.');return;}
+    if(nameError || phoneError || addressError || tableError || cartSyncing || cartSyncError){trackEvent('checkout_validation_failed',{error_category:nameError?'name_missing':phoneError?'phone_invalid':addressError?'address_missing':tableError?'table_missing':'cart_sync',cart_value:grandPayableTotal});return;}
     if(!quote||!proof||!meta?.qr_url){setError('Scan the payment QR and upload your receipt before placing the order.');return;}
     if(selectedFulfillment==='DELIVERY'&&!cleanAddress){setError('Enter your delivery address.');return;}
     trackEvent('confirm_order_click',cartMetadata(cart));
@@ -243,7 +261,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
       const requestKey=freshPending?.key || crypto.randomUUID();sessionStorage.setItem(pendingKey,JSON.stringify({key:requestKey,fingerprint,cartLineIds:payload.cart_line_ids}));
       const form=new FormData();form.append('payload',JSON.stringify({...body,analytics_context:trackingContext()}));form.append('receipt',proof);
       trackEvent('order_submit',{...cartMetadata(cart),attempt_id:requestKey});
-      const result=await apiClient.post<any>(customerPath('checkout/'),form,{headers:{'Idempotency-Key':requestKey}});
+      const result=await apiClient.post<any>(customerPath('checkout/'),form,{headers:{'Idempotency-Key':requestKey},skipAuth:isGuestCheckout});
       setProof(null);finishOrder(result);
     }catch(e){trackEvent('order_failed',{error_category:e instanceof ApiError?`http_${e.status}`:'network',cart_value:grandPayableTotal});if(e instanceof ApiError&&e.status>=400&&e.status<500)sessionStorage.removeItem(pendingKey);if(e instanceof ApiError&&e.status===409){setQuoted(null);setQuoteVersion(v=>v+1);}setError(extractErrorMessage(e));}
     finally{lock.current=false;setIsSubmitting(false);}
@@ -539,7 +557,12 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 <Input
                   label="Phone Number"
                   value={phone}
-                  readOnly
+                  onChange={(e) => setPhone(e.target.value)}
+                  readOnly={!isGuestCheckout}
+                  placeholder={isGuestCheckout ? "98XXXXXXXX" : undefined}
+                  autoComplete="tel"
+                  inputMode="tel"
+                  error={touched ? phoneError : undefined}
                   leftIcon={<Phone className="h-3.5 w-3.5" />}
                   className="rounded-none text-xs h-7.5"
                   required
@@ -659,7 +682,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
               type="submit"
               size="sm"
               variant="primary"
-              disabled={isSubmitting || cartSyncing || !!cartSyncError || !!nameError || !!addressError || !!tableError || !quote || !proof || !meta?.qr_url || !meta?.accepting_orders || cart.items.length === 0}
+              disabled={isSubmitting || cartSyncing || !!cartSyncError || !!nameError || !!phoneError || !!addressError || !!tableError || !quote || !proof || !meta?.qr_url || !meta?.accepting_orders || cart.items.length === 0}
               className="w-full text-xs sm:text-sm font-black rounded-none h-8 sm:h-8.5 bg-[#60BB46] hover:bg-[#52a43b] text-white border border-[#44912e] shadow-xs cursor-pointer flex items-center justify-between px-3 transition-colors"
               leftIcon={
                 isSubmitting ? (

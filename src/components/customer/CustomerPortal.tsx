@@ -227,7 +227,6 @@ export const CustomerPortal: React.FC = () => {
 
   const openCheckout = () => {
     trackEvent('checkout_click');
-    if(!isAuthenticated)trackEvent('auth_required',{error_category:'login_before_checkout'});
     if (!isAuthenticated || !authUser || authUser.is_active === false) {sessionStorage.setItem('customer:return-to-checkout','yes');setResumeCheckout(true);setIsAuthOpen(true);}
     else {sessionStorage.setItem('customer:return-to-checkout','yes');setResumeCheckout(true);}
   };
@@ -341,7 +340,14 @@ export const CustomerPortal: React.FC = () => {
     addToCart(product, product.variants[0], [], 1);
   };
 
-  const handleOrderSuccess = (orderId: string) => {
+  const handleOrderSuccess = (orderId: string, orderNumber?: string) => {
+    if (!isAuthenticated || !authUser || authUser.is_active === false) {
+      const url = new URL("/track", window.location.origin);
+      if (orderNumber) url.searchParams.set("order_number", orderNumber);
+      window.history.pushState({}, "", `${url.pathname}${url.search}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
+    }
     setTrackedOrderId(orderId);
     const placed = orders.find((o) => o.id === orderId);
     if (placed) {
@@ -604,6 +610,12 @@ export const CustomerPortal: React.FC = () => {
         onSuccess={() => setIsAuthOpen(false)}
         isOpen={isAuthOpen}
         onClose={() => {setIsAuthOpen(false);setResumeCheckout(false);sessionStorage.removeItem('customer:return-to-checkout');}}
+        onContinueAsGuest={resumeCheckout ? () => {
+          sessionStorage.removeItem('customer:return-to-checkout');
+          setResumeCheckout(false);
+          setIsAuthOpen(false);
+          setIsCheckoutOpen(true);
+        } : undefined}
       />
 
       {/* Customer Profile Modal with Order History & 1-Click Reorder */}

@@ -13,6 +13,7 @@ interface CustomerAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  onContinueAsGuest?: () => void;
 }
 
 type AuthView = "LOGIN" | "SIGNUP_PHONE" | "SIGNUP_OTP" | "SIGNUP_PROFILE" | "OTP_LOGIN_PHONE" | "OTP_LOGIN_OTP" | "RESET_PASSWORD";
@@ -26,6 +27,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  onContinueAsGuest,
 }) => {
   const { addToast, currentOutlet } = useApp();
 
@@ -449,6 +451,18 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         ------------------------------------------------------------- */}
         {authView === "LOGIN" && (
           <form onSubmit={handleLogin} className="space-y-4 py-1">
+            {onContinueAsGuest && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                disabled={busy}
+                onClick={onContinueAsGuest}
+                className="w-full font-bold h-10 rounded-none border border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+              >
+                Continue as a guest
+              </Button>
+            )}
             {/* Mobile Phone Input */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">

@@ -7,6 +7,24 @@ import { CartLineItem, Order } from "../types";
 
 export const customerPath = (path: string) => `/customer/${path}`;
 export const customerRefresh = () => window.dispatchEvent(new Event('customer:refresh'));
+const GUEST_ORDERS_KEY = 'crunchy_guest_orders';
+export function getSavedGuestOrders(): string[] {
+  try {
+    const rows = JSON.parse(localStorage.getItem(GUEST_ORDERS_KEY) || '[]');
+    return Array.isArray(rows) ? rows.filter((value): value is string => typeof value === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+export function saveGuestOrderNumber(orderNumber: string) {
+  try {
+    const orders = getSavedGuestOrders().filter(value => value !== orderNumber);
+    localStorage.setItem(GUEST_ORDERS_KEY, JSON.stringify([orderNumber, ...orders].slice(0, 20)));
+    return true;
+  } catch {
+    return false;
+  }
+}
 export const cartLines = (items: CartLineItem[]) => items.map(item => ({product_id: item.productId, quantity: item.quantity,
   variant_id: item.comboSelections ? null : item.variant.id || null,
   modifier_option_ids: item.comboSelections ? [] : item.selectedModifiers.map(m => m.optionId),
