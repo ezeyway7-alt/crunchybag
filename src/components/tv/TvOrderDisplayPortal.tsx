@@ -504,7 +504,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                     key={`${product.id}-${index >= showcaseProducts.length ? "loop" : "item"}`}
                     className="tv-menu-slide flex h-full min-w-0 flex-col justify-center px-5 sm:px-8"
                   >
-                    <div className="tv-menu-image relative aspect-[1.08/1] overflow-hidden bg-zinc-900/70">
+                    <div className="tv-menu-image relative aspect-[1.08/1] overflow-hidden bg-zinc-900/70 xl:aspect-[0.72/1]">
                       <img
                         src={image}
                         alt={product.name}
