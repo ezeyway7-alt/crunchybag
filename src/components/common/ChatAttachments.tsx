@@ -153,20 +153,31 @@ export const AttachmentPicker:React.FC<{
   </div>;
 };
 
+// In-memory media URL cache so audio, video and images load instantly and stay cached
+const mediaUrlCache = new Map<string, string>();
+
 export const ChatAttachment:React.FC<{
   message:ChatMessage;
   accessPath:string;
   options:RequestOptions;
   mine?:boolean;
 }>=({message,accessPath,options,mine})=>{
-  const [url,setUrl]=useState(''),[error,setError]=useState(''),[loading,setLoading]=useState(false);
+  const [url,setUrl]=useState(()=>mediaUrlCache.get(accessPath)||'');
+  const [error,setError]=useState('');
+  const [loading,setLoading]=useState(false);
   const attachment=message.attachment!;
 
   const load=async()=>{
+    const cached=mediaUrlCache.get(accessPath);
+    if(cached){
+      setUrl(cached);
+      return cached;
+    }
     setLoading(true);
     try{
       const data=await apiClient.get<{url:string}>(accessPath,options);
       const resolved=new URL(data.url,new URL(DEFAULT_API_BASE,location.origin)).href;
+      mediaUrlCache.set(accessPath,resolved);
       setUrl(resolved);
       setError('');
       return resolved;
@@ -180,13 +191,25 @@ export const ChatAttachment:React.FC<{
 
   useEffect(()=>{
     let cancelled=false;
-    if(attachment.kind==='image'){
+    const cached=mediaUrlCache.get(accessPath);
+    if(cached){
+      setUrl(cached);
+      return;
+    }
+    if(['image','audio','video'].includes(attachment.kind)){
+      setLoading(true);
       apiClient.get<{url:string}>(accessPath,options)
-        .then(data=>{if(!cancelled)setUrl(new URL(data.url,new URL(DEFAULT_API_BASE,location.origin)).href);})
-        .catch(()=>{if(!cancelled)setError('Preview unavailable. Open again.');});
+        .then(data=>{
+          if(cancelled)return;
+          const resolved=new URL(data.url,new URL(DEFAULT_API_BASE,location.origin)).href;
+          mediaUrlCache.set(accessPath,resolved);
+          setUrl(resolved);
+        })
+        .catch(()=>{if(!cancelled)setError('Preview unavailable. Open again.');})
+        .finally(()=>{if(!cancelled)setLoading(false);});
     }
     return()=>{cancelled=true;};
-  },[message.id,accessPath]);
+  },[message.id,accessPath,attachment.kind]);
 
   return <div className="min-w-0 my-0.5 space-y-1">
     {url&&attachment.kind==='image'&&(
@@ -202,7 +225,7 @@ export const ChatAttachment:React.FC<{
     )}
 
     {url&&attachment.kind==='audio'&&(
-      <audio aria-label={attachment.name} src={url} controls preload="metadata" className="w-full max-w-56 h-7 my-0.5"/>
+      <audio aria-label={attachment.name} src={url} controls preload="auto" className="w-full max-w-56 h-7 my-0.5"/>
     )}
 
     {url&&attachment.kind==='video'&&(
@@ -265,7 +288,7 @@ export const DraftAttachment:React.FC<{file:File;remove:()=>void}>=({file,remove
         {file.name} <span className="text-[10px] text-zinc-500">({Math.ceil(file.size/1024)} KB)</span>
       </span>
     </div>
-    {url&&file.type.startsWith('audio/')&&<audio src={url} controls className="h-6 w-32" aria-label="Preview voice message"/>}
+    {url&&file.type.startsWith('audio/')&&<audio src={url} controls className="h-6 w-32" aria-label="Preview voice message" preload="auto"/>}
     {url&&file.type.startsWith('image/')&&file.type!=='image/svg+xml'&&<img src={url} alt="Selected photo" className="h-5 w-5 rounded-none object-cover border border-zinc-700"/>}
     <button aria-label="Remove attachment" onClick={remove} className="text-[10px] text-red-400 hover:underline shrink-0">Remove</button>
   </div>;

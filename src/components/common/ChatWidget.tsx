@@ -13,6 +13,12 @@ function getGoogleMapsUrl(text?: string): string | null {
   return match ? match[0] : null;
 }
 
+function getFirstUrl(text?: string): string | null {
+  if (!text) return null;
+  const match = text.match(/https?:\/\/[^\s]+/i);
+  return match ? match[0] : null;
+}
+
 type Pending={client_id:string;text:string;conversation_id:string;fileName?:string};
 export function ChatWidget(){
   const {authUser,authOutlet,isLoading}=useAuth();
@@ -140,18 +146,33 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
   }catch(e){setError(extractErrorMessage(e));}finally{setLoading(false);}};
 
   return <div className="ph-no-capture ph-sensitive fixed right-3 sm:right-4 bottom-20 sm:bottom-5 z-[90] font-sans" data-ph-no-capture>
-    {!open?<button
-      aria-label="Open messages"
-      onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
-      className="relative h-8 w-8 rounded-full bg-amber-400 text-zinc-950 shadow-lg shadow-black/30 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white"
-    >
-      <MessageCircle size={15}/>
-      {unread>0&&<span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold px-0.5 flex items-center justify-center shadow-sm">{unread>99?'99+':unread}</span>}
-    </button>:
+    {!open?(
+      <div className="flex items-center gap-2 group">
+        <button
+          type="button"
+          onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
+          className="px-2.5 py-1 rounded-none bg-zinc-950/95 border border-amber-400 text-amber-300 text-[11px] font-semibold shadow-lg shadow-black/50 flex items-center gap-1.5 hover:bg-zinc-900 active:scale-95 transition-all select-none cursor-pointer animate-pulse"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+          <span>Order by chat</span>
+        </button>
+        <button
+          aria-label="Open messages"
+          onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
+          className="relative h-10 w-10 rounded-full bg-amber-400 text-zinc-950 border border-amber-300 shadow-lg shadow-black/40 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white"
+        >
+          {/* Ambient wave animation around the chat icon */}
+          <span className="absolute -inset-1 rounded-full bg-amber-400/35 animate-ping pointer-events-none -z-10" />
+          <span className="absolute -inset-1.5 rounded-full border border-amber-400/50 animate-pulse pointer-events-none -z-10" />
+          <MessageCircle size={18}/>
+          {unread>0&&<span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] rounded-full bg-red-500 text-white text-[9px] font-bold px-0.5 flex items-center justify-center shadow-sm">{unread>99?'99+':unread}</span>}
+        </button>
+      </div>
+    ):
     <section
       role="dialog"
       aria-label={staff?'Customer messages':'Chat with CrunchyBag'}
-      className="w-[calc(100vw-1.5rem)] sm:w-[350px] h-[min(560px,76dvh)] rounded-none border border-zinc-700 bg-zinc-950 text-zinc-100 shadow-2xl flex flex-col overflow-hidden"
+      className="w-[calc(100vw-1.5rem)] sm:w-[350px] h-[min(570px,78dvh)] rounded-none border border-amber-400 bg-zinc-950 text-zinc-100 shadow-2xl shadow-black/80 flex flex-col overflow-hidden"
     >
       <header className="flex items-center justify-between px-2.5 py-1.5 border-b border-zinc-800 bg-zinc-900/95 text-xs select-none">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -198,33 +219,63 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
           const hasImage=message.attachment?.kind==='image';
           const hasOnlyImage=hasImage&&!message.text;
           const mapsUrl=getGoogleMapsUrl(message.text);
+          const anyUrl=mapsUrl||getFirstUrl(message.text);
+          const isLocation=!!mapsUrl;
+          const isClickableUrl=!!anyUrl;
+
+          const openLink=(e: React.MouseEvent)=>{
+            if(!anyUrl)return;
+            const target=(e.target as HTMLElement);
+            if(target.closest('button')||target.closest('audio')||target.closest('video'))return;
+            window.open(anyUrl,'_blank','noopener,noreferrer');
+          };
+
           return <div key={message.id} className={`flex ${mine?'justify-end':'justify-start'}`}>
-            <div className={`max-w-[85%] rounded-none transition-all ${hasOnlyImage?'p-0.5 bg-zinc-900 border border-zinc-800':mine?'px-2.5 py-1.5 bg-amber-400 text-zinc-950 border border-amber-400/80 shadow-sm':'px-2.5 py-1.5 bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'}`}>
-              {message.text&&<p className="whitespace-pre-wrap break-words text-xs leading-relaxed">{message.text}</p>}
-              {mapsUrl&&(
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`mt-1 flex items-center gap-1.5 p-1 rounded-none border transition-colors ${
-                    mine
-                      ? 'bg-amber-300/40 border-amber-600/30 text-zinc-950 hover:bg-amber-300/60'
-                      : 'bg-zinc-800/80 border-zinc-700/60 text-zinc-200 hover:bg-zinc-800'
-                  }`}
-                >
-                  <div className="w-5 h-5 bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
-                    <MapPin size={11}/>
+            <div
+              onClick={isClickableUrl?openLink:undefined}
+              className={`max-w-[85%] rounded-none transition-all ${
+                hasOnlyImage
+                  ? 'p-0.5 bg-zinc-900 border border-zinc-800'
+                  : isLocation
+                  ? 'p-2 bg-zinc-900 border border-amber-400 text-zinc-100 hover:bg-zinc-850 hover:border-amber-300 cursor-pointer shadow-md'
+                  : isClickableUrl
+                  ? mine
+                    ? 'px-2.5 py-1.5 bg-amber-400 text-zinc-950 border border-amber-400 hover:bg-amber-300 cursor-pointer shadow-sm'
+                    : 'px-2.5 py-1.5 bg-zinc-900 text-zinc-100 border border-zinc-800 hover:border-amber-400 cursor-pointer shadow-sm'
+                  : mine
+                  ? 'px-2.5 py-1.5 bg-amber-400 text-zinc-950 border border-amber-400/80 shadow-sm'
+                  : 'px-2.5 py-1.5 bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'
+              }`}
+            >
+              {isLocation ? (
+                <div>
+                  <div className="flex items-start gap-2">
+                    <div className="w-6 h-6 bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                      <MapPin size={13}/>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[11px] font-semibold text-amber-400">Live Location Pin</span>
+                        <span className="text-[9px] text-zinc-400 flex items-center gap-0.5 hover:underline">
+                          Open Maps <ExternalLink size={9}/>
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-300 truncate mt-0.5">{message.text}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-semibold block leading-tight">Live Location Pin</span>
-                    <span className="text-[9px] opacity-80 flex items-center gap-0.5">
-                      Open in Google Maps <ExternalLink size={8}/>
-                    </span>
-                  </div>
-                </a>
+                  <span className="text-[9px] text-amber-400/80 block mt-1">Tap anywhere to open in Google Maps ↗</span>
+                </div>
+              ) : (
+                message.text && (
+                  <p className={`whitespace-pre-wrap break-words text-xs leading-relaxed ${isClickableUrl?'underline decoration-amber-400/60 hover:decoration-amber-400':''}`}>
+                    {message.text}
+                  </p>
+                )
               )}
+
               {message.attachment&&<ChatAttachment message={message} accessPath={path(`conversations/${message.conversation_id}/messages/${message.id}/attachment/`)} options={options.current} mine={mine}/>}
-              <div className={`text-[9px] mt-0.5 flex items-center gap-1 ${hasOnlyImage?'px-1 py-0.5 text-zinc-400 justify-end':mine?'text-zinc-800 justify-end':'text-zinc-500 justify-start'}`}>
+
+              <div className={`text-[9px] mt-0.5 flex items-center gap-1 ${hasOnlyImage?'px-1 py-0.5 text-zinc-400 justify-end':isLocation?'text-zinc-400 justify-end':mine?'text-zinc-800 justify-end':'text-zinc-500 justify-start'}`}>
                 {!mine&&message.is_staff&&<span>CrunchyBag · </span>}
                 <span>{new Date(message.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
                 {mine&&<span>· {(staff?thread?.customer_read_id:thread?.staff_read_id)!>=message.id?'Read':'Sent'}</span>}
