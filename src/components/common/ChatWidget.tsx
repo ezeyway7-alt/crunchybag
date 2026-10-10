@@ -147,19 +147,19 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
 
   return <div className="ph-no-capture ph-sensitive fixed right-3 sm:right-4 bottom-20 sm:bottom-5 z-[90] font-sans" data-ph-no-capture>
     {!open?(
-      <div className="flex items-center gap-2 group">
+      <div className="flex flex-col items-center sm:items-end gap-1.5 group select-none">
         <button
           type="button"
           onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
-          className="px-2.5 py-1 rounded-none bg-zinc-950/95 border border-amber-400 text-amber-300 text-[11px] font-semibold shadow-lg shadow-black/50 flex items-center gap-1.5 hover:bg-zinc-900 active:scale-95 transition-all select-none cursor-pointer animate-pulse"
+          className="px-2 py-0.5 rounded-none bg-zinc-950/95 border border-amber-400 text-amber-300 text-[10px] font-semibold shadow-md shadow-black/60 flex items-center gap-1 hover:bg-zinc-900 active:scale-95 transition-all cursor-pointer whitespace-nowrap animate-pulse touch-manipulation"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
           <span>Order by chat</span>
         </button>
         <button
           aria-label="Open messages"
           onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
-          className="relative h-10 w-10 rounded-full bg-amber-400 text-zinc-950 border border-amber-300 shadow-lg shadow-black/40 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white"
+          className="relative h-10 w-10 rounded-full bg-amber-400 text-zinc-950 border border-amber-300 shadow-lg shadow-black/40 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white touch-manipulation"
         >
           {/* Ambient wave animation around the chat icon */}
           <span className="absolute -inset-1 rounded-full bg-amber-400/35 animate-ping pointer-events-none -z-10" />

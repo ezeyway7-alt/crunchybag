@@ -111,7 +111,7 @@ export const AttachmentPicker:React.FC<{
       title="Attach file"
       disabled={disabled||recording||starting}
       onClick={()=>input.current?.click()}
-      className="p-1 rounded-none hover:text-amber-400 hover:bg-zinc-800 disabled:opacity-30 transition-colors"
+      className="p-1 rounded-none hover:text-amber-400 hover:bg-zinc-800 disabled:opacity-30 transition-colors touch-manipulation"
     >
       <Paperclip size={14}/>
     </button>
@@ -122,7 +122,7 @@ export const AttachmentPicker:React.FC<{
       title="Attach photo"
       disabled={disabled||recording||starting}
       onClick={()=>camera.current?.click()}
-      className="p-1 rounded-none hover:text-amber-400 hover:bg-zinc-800 disabled:opacity-30 transition-colors"
+      className="p-1 rounded-none hover:text-amber-400 hover:bg-zinc-800 disabled:opacity-30 transition-colors touch-manipulation"
     >
       <Camera size={14}/>
     </button>
@@ -133,7 +133,7 @@ export const AttachmentPicker:React.FC<{
       title="Share live location"
       disabled={disabled||recording||starting||locating}
       onClick={handleShareLocation}
-      className={`p-1 rounded-none hover:text-amber-400 hover:bg-zinc-800 disabled:opacity-30 transition-colors ${locating?'text-amber-400 animate-pulse':''}`}
+      className={`p-1 rounded-none hover:text-amber-400 hover:bg-zinc-800 disabled:opacity-30 transition-colors touch-manipulation ${locating?'text-amber-400 animate-pulse':''}`}
     >
       <MapPin size={14}/>
     </button>
@@ -144,7 +144,7 @@ export const AttachmentPicker:React.FC<{
       title={recording?'Stop recording':'Record voice'}
       disabled={disabled||starting}
       onClick={()=>void record()}
-      className={`p-1 rounded-none transition-colors ${recording?'text-red-400 bg-red-500/20 animate-pulse':'hover:text-amber-400 hover:bg-zinc-800 disabled:opacity-30'}`}
+      className={`p-1 rounded-none transition-colors touch-manipulation ${recording?'text-red-400 bg-red-500/20 animate-pulse':'hover:text-amber-400 hover:bg-zinc-800 disabled:opacity-30'}`}
     >
       {recording?<Square size={14}/>:<Mic size={14}/>}
     </button>
