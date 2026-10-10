@@ -36,6 +36,7 @@ import { formatNPR } from "../../lib/utils";
 import { FulfillmentType, PaymentMethod } from "../../types";
 import { DeliveryLocationModal } from "./DeliveryLocationModal";
 import { OrderItemsPreviewModal } from "./OrderItemsPreviewModal";
+import { resolveLocationAddress } from "../../lib/locationGeocode";
 
 interface TakeawayCheckoutModalProps {
   isOpen: boolean;
@@ -81,6 +82,8 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const [touched, setTouched] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
+  const [geoError, setGeoError] = useState('');
 
   // Sync payment method when switching fulfillment
   const handleFulfillmentChange = (type: FulfillmentType) => {
@@ -95,6 +98,59 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     trackEvent('location_selected');
     setDeliveryAddress(newAddress || "");
     setDeliveryLocation(location);setSelectedAddressId('');
+  };
+
+  const handlePickCurrentLocation = () => {
+    setGeoError('');
+    setIsLocatingCurrent(true);
+    if (!navigator.geolocation) {
+      setGeoError('Location is unavailable on this device. Choose on map.');
+      setIsLocatingCurrent(false);
+      trackEvent('delivery_location_error', { error_category: 'location_unavailable' });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setIsLocatingCurrent(false);
+        const { latitude, longitude } = position.coords;
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          setGeoError('Could not detect location coordinates. Choose on map.');
+          trackEvent('delivery_location_error', { error_category: 'location_invalid' });
+          return;
+        }
+        const resolved = resolveLocationAddress(latitude, longitude, (refined) => {
+          setDeliveryAddress((curr) => (!curr || curr === resolved.address ? refined.address : curr));
+          if (refined.landmark) {
+            setDeliveryLocation((prev) =>
+              prev ? { ...prev, landmark: refined.landmark } : { lat: latitude, lng: longitude, landmark: refined.landmark }
+            );
+          }
+        });
+        setDeliveryAddress(resolved.address);
+        setDeliveryLocation({ lat: latitude, lng: longitude, landmark: resolved.landmark });
+        setSelectedAddressId('');
+        setGeoError('');
+        trackEvent('map_pin_selected', { method: 'gps' });
+        trackEvent('location_selected');
+      },
+      (failure) => {
+        setIsLocatingCurrent(false);
+        const msg =
+          failure.code === 1
+            ? 'Allow location access or choose a point on the map.'
+            : 'Could not get your location. Try again or choose a point on the map.';
+        setGeoError(msg);
+        trackEvent('delivery_location_error', {
+          error_category:
+            failure.code === 1
+              ? 'location_permission'
+              : failure.code === 3
+              ? 'location_timeout'
+              : 'location_unavailable',
+        });
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+    );
   };
 
   const [meta,setMeta] = useState<any>(null);
@@ -123,6 +179,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     if(!isOpen)return;
     trackEvent('checkout_start',cartMetadata(cart));
     addressInitialized.current=false;setDeliveryAddress('');setDeliveryLocation(undefined);setSelectedAddressId('');setSaveAddress(false);
+    setIsLocatingCurrent(false);setGeoError('');
     setName(authUser?.name || authUser?.username || customerProfile.name || '');setPhone((authUser as any)?.phone || (authUser as any)?.phone_number || customerProfile.phone || '');setError(null);setProofError('');setTouched(false);setProof(null);setMeta(null);
     const controller=new AbortController();let live=true;
     apiClient.get<any>(`${customerPath('checkout/meta/')}?outlet_id=${currentOutlet.id}`,{signal:controller.signal})
@@ -297,17 +354,46 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
 
             {/* Conditional Fulfillment Blocks - Very Compact */}
             {selectedFulfillment === "DELIVERY" && (
-              <div className="p-2 sm:p-2.5 bg-zinc-50 dark:bg-[#151518] border border-zinc-200 dark:border-zinc-800 space-y-1">
-                {/* Single clean line: Icon + Chosen Address Name + Edit/Choose button */}
+              <div className="p-2 sm:p-2.5 bg-zinc-50 dark:bg-[#151518] border border-zinc-200 dark:border-zinc-800 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-extrabold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Delivery Address
+                  </span>
+                  {/* Outside "Pick Current Location" Button */}
+                  <button
+                    type="button"
+                    id="checkout-pick-current-location-btn"
+                    onClick={handlePickCurrentLocation}
+                    disabled={isLocatingCurrent}
+                    className="flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-black border border-black cursor-pointer shrink-0 transition-colors disabled:opacity-50"
+                    title="Detect and auto-fill current GPS location"
+                  >
+                    {isLocatingCurrent ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-black" />
+                    ) : (
+                      <Compass className="h-3 w-3 text-black stroke-[2.5]" />
+                    )}
+                    <span>{isLocatingCurrent ? "Locating…" : "Pick Current Location"}</span>
+                  </button>
+                </div>
+
+                {/* Single clean line: Icon + Chosen Address Name + Edit/Choose on Map button */}
                 <div
                   onClick={() => setIsLocationModalOpen(true)}
                   className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-[#1E1E22] border border-zinc-200 dark:border-zinc-700 hover:border-amber-500 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                    <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                      {deliveryAddress || "Choose delivery address"}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate block">
+                        {deliveryAddress || "Choose delivery address"}
+                      </span>
+                      {deliveryLocation?.landmark && (
+                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate block">
+                          Near: {deliveryLocation.landmark}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -316,12 +402,73 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                       e.stopPropagation();
                       setIsLocationModalOpen(true);
                     }}
-                    className="px-2.5 py-1 text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-black border border-black cursor-pointer shrink-0 transition-colors"
+                    className="px-2.5 py-1 text-[11px] font-bold bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-600 cursor-pointer shrink-0 transition-colors"
                   >
-                    {deliveryAddress ? "Edit" : "Choose"}
+                    {deliveryAddress ? "Map" : "Choose on Map"}
                   </button>
                 </div>
-                {touched && addressError && <p className="text-xs text-rose-400 font-medium">{addressError}</p>}
+
+                {savedAddresses.addresses.length > 0 && (
+                  <select
+                    aria-label="Saved delivery address"
+                    value={selectedAddressId}
+                    onChange={(e) => {
+                      setSelectedAddressId(e.target.value);
+                      const row = savedAddresses.addresses.find(
+                        (row) => String(row.id) === e.target.value
+                      );
+                      if (row) {
+                        setDeliveryAddress(row.address);
+                        setDeliveryLocation(addressPoint(row));
+                        setSaveAddress(false);
+                      } else {
+                        setDeliveryAddress("");
+                        setDeliveryLocation(undefined);
+                      }
+                    }}
+                    className="w-full bg-zinc-900 border border-zinc-700 p-1.5 text-xs text-white"
+                  >
+                    <option value="">New address</option>
+                    {savedAddresses.addresses.map((row) => (
+                      <option key={row.id} value={row.id}>
+                        {row.label}: {row.address}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {!selectedAddressId && deliveryAddress && (
+                  <div className="space-y-1.5 pt-0.5">
+                    <label className="flex gap-2 items-center text-xs text-zinc-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveAddress}
+                        onChange={(e) => setSaveAddress(e.target.checked)}
+                        className="accent-amber-500"
+                      />
+                      <span>Save this address for future orders</span>
+                    </label>
+                    {saveAddress && (
+                      <Input
+                        label="Address label"
+                        value={addressLabel}
+                        onChange={(e) => setAddressLabel(e.target.value)}
+                        maxLength={60}
+                        className="h-7 text-xs rounded-none"
+                        required
+                      />
+                    )}
+                  </div>
+                )}
+
+                {geoError && (
+                  <p role="alert" className="text-xs text-rose-400 font-medium">
+                    {geoError}
+                  </p>
+                )}
+                {touched && addressError && !geoError && (
+                  <p className="text-xs text-rose-400 font-medium">{addressError}</p>
+                )}
               </div>
             )}
 

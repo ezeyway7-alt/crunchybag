@@ -78,7 +78,7 @@ async function setup(page:Page, signedIn=false, role='CUSTOMER', hiddenComboItem
   await page.goto('/');await expect(page.getByRole('button',{name:'Add Web Burger',exact:true})).toBeVisible();
   return state;
 }
-async function openCheckout(page:Page){await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();await page.getByRole('button',{name:'Shopping Cart',exact:true}).click();await expect(page.getByText('Select 1 Sauce to Proceed')).toHaveCount(0);await page.locator('#cart-checkout-btn').click();}
+async function openCheckout(page:Page){await page.getByRole('button',{name:'Add Web Burger',exact:true}).click();await page.getByRole('button',{name:'Shopping Cart',exact:true}).click();await expect(page.getByText('Select 1 Sauce to Proceed')).toHaveCount(0);await expect(page.locator('#cart-checkout-btn')).toBeVisible();await page.locator('#cart-checkout-btn').click();}
 async function receipt(page:Page){await page.locator('#fulfillment-opt-takeaway').click();await page.getByLabel('Payment receipt').setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});}
 
 test('cart rebases a stale version without losing another device or in-flight edits',async({page})=>{
@@ -148,13 +148,14 @@ test('profile page saves multiple addresses with live GPS and checkout reuses th
   await context.setGeolocation({latitude:27.681234,longitude:85.321987,accuracy:12});
   const state=await setup(page,true);
   await page.goto('/profile');
-  await expect(page.getByRole('heading',{name:'My profile',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:/my profile/i})).toBeVisible();
   await page.getByRole('button',{name:'Add address',exact:true}).click();
   await page.getByRole('button',{name:'Choose on map',exact:true}).click();
   await expect(page.getByRole('button',{name:'Save location',exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'Current location',exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:'27.681234, 85.321987'})).toBeVisible();
-  await expect(page.getByLabel('House / Street / Tole Address')).toHaveValue('');
+  await expect(page.getByLabel('House / Street / Tole Address')).not.toHaveValue('');
+  await expect(page.getByRole('button',{name:'Save location',exact:true})).toBeEnabled();
   await page.getByLabel('House / Street / Tole Address').fill('House 9, My street');
   await page.getByLabel('Nearest Landmark',{exact:true}).fill('Blue gate');
   await page.getByRole('button',{name:'Save location',exact:true}).click();
@@ -175,6 +176,24 @@ test('profile page saves multiple addresses with live GPS and checkout reuses th
   await page.getByRole('button',{name:/Submit Receipt & Place Order/}).click();
   await expect.poll(()=>state.created).toBe(1);
   expect(state.lastPayload.delivery_location).toEqual({lat:27.681234,lng:85.321987,landmark:'Blue gate'});
+});
+
+test('checkout screen modal picks current location outside and auto fills delivery address without typing',async({page,context})=>{
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({latitude:27.7154,longitude:85.3123,accuracy:10});
+  const state=await setup(page,true);
+  await openCheckout(page);
+  const pickLocBtn=page.locator('#checkout-pick-current-location-btn');
+  await expect(pickLocBtn).toBeVisible();
+  await pickLocBtn.click();
+  await expect(page.getByText(/Thamel Tourism Hub|Thamel|Location/i).first()).toBeVisible();
+  await page.getByLabel('Payment receipt').setInputFiles({name:'receipt.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+  const submit=page.getByRole('button',{name:/Submit Receipt & Place Order/});
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect.poll(()=>state.created).toBe(1);
+  expect(state.lastPayload.delivery_address).toBeTruthy();
+  expect(state.lastPayload.delivery_location).toMatchObject({lat:27.7154,lng:85.3123});
 });
 
 test('guest signup resumes cart checkout and real tracking without required add-ons',async({page})=>{

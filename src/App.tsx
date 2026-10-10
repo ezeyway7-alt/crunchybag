@@ -1,3 +1,4 @@
+import {ChatWidget} from './components/common/ChatWidget';
 import {useWebsiteTraffic} from './lib/useWebsiteTraffic';
 import {ReceiptOrderTrackingPage} from "./components/customer/ReceiptOrderTrackingPage";
 import React from "react";
@@ -317,6 +318,7 @@ export default function App() {
     <AuthProvider>
       <AppProvider>
         <AppContent />
+        <ChatWidget />
       </AppProvider>
     </AuthProvider>
   );
