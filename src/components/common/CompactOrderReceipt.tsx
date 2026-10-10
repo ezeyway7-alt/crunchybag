@@ -5,14 +5,16 @@ export interface ReceiptDocument {
   tracking_url?:string;tracking_qr?:string;website_url?:string;website_qr?:string;
   payment_qr?:string|null;
 }
+const modifierDisplayLabel = (modifier: any) => {
+  if (typeof modifier === 'string') return modifier.trim();
+  const name = (modifier?.name || modifier?.option_name || '').trim();
+  const group = (modifier?.group || modifier?.group_name || '').trim();
+  return group && name ? `${group}: ${name}` : name;
+};
+
 export function consolidateReceiptItems(rawItems: any[]): any[] {
   if (!Array.isArray(rawItems)) return [];
   const activeItems = rawItems.filter((item: any) => item && !item.is_voided && !item.isVoided);
-
-  const getModName = (m: any) => {
-    if (typeof m === 'string') return m.trim();
-    return (m?.name || m?.option_name || '').trim();
-  };
 
   const getComboKey = (comboComponents: any[] = []) => {
     return comboComponents
@@ -20,7 +22,7 @@ export function consolidateReceiptItems(rawItems: any[]): any[] {
         const name = (c.product_name || c.productName || c.name || '').trim().toLowerCase();
         const variant = (c.variant_name || c.variantName || '').trim().toLowerCase();
         const qty = Number(c.quantity) || 1;
-        const mods = (c.modifiers || []).map(getModName).filter(Boolean).sort().join(',');
+        const mods = (c.modifiers || []).map(modifierDisplayLabel).filter(Boolean).sort().join(',');
         return `${name}::${variant}::${qty}::${mods}`;
       })
       .sort()
@@ -35,7 +37,7 @@ export function consolidateReceiptItems(rawItems: any[]): any[] {
     const unitPrice = item.unit_price ?? item.unitPrice;
     const priceKey = unitPrice != null && unitPrice !== '' ? Number(unitPrice).toFixed(2) : '';
     const rawMods = item.modifiers || item.modifiersSummary || [];
-    const modKey = (Array.isArray(rawMods) ? rawMods : []).map(getModName).filter(Boolean).sort().join('|').toLowerCase();
+    const modKey = (Array.isArray(rawMods) ? rawMods : []).map(modifierDisplayLabel).filter(Boolean).sort().join('|').toLowerCase();
     const comboKey = getComboKey(item.combo_components || item.comboComponents || []);
     const notes = (item.item_notes || item.notes || '').toString().trim().toLowerCase();
     return JSON.stringify([productIdentifier, variant, priceKey, modKey, comboKey, notes]);
@@ -121,8 +123,8 @@ export const CompactOrderReceipt:React.FC<{receipt:ReceiptDocument}>=({receipt})
       {consolidatedItems.map((item:any,index:number)=><div key={item.id || index} style={{gridColumn:'1 / -1',padding:'1.5px 0',breakInside:'avoid'}}>
         <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) 26px 61px',gap:4,lineHeight:1.2}}><strong>{item.product_name}</strong><span style={{textAlign:'center'}}>{item.quantity}</span><span style={{textAlign:'right'}}>{amount(item.line_total)}</span></div>
         {item.variant_name && <div style={{fontSize:9,color:'#444',lineHeight:1.2}}>{item.variant_name}</div>}
-        {(item.modifiers || []).length>0 && <div style={{fontSize:9,color:'#444',lineHeight:1.2}}>{item.modifiers.map((m:any)=>typeof m === 'string' ? m : (m.name || m.option_name)).filter(Boolean).join(', ')}</div>}
-        {(item.combo_components || []).map((part:any,i:number)=><div key={i} style={{fontSize:9,paddingLeft:6,lineHeight:1.2}}>{part.quantity * item.quantity} x {part.product_name || part.name}{part.variant_name?` (${part.variant_name})`:''}{part.modifiers?.length?` - ${part.modifiers.map((m:any)=>typeof m === 'string' ? m : (m.name || m.option_name)).filter(Boolean).join(', ')}`:''}</div>)}
+        {(item.modifiers || []).map((modifier:any,modifierIndex:number)=><div key={`modifier-${modifierIndex}`} style={{fontSize:9,color:'#444',lineHeight:1.2,paddingLeft:4}}>• {modifierDisplayLabel(modifier)}</div>)}
+        {(item.combo_components || []).map((part:any,i:number)=><div key={i} style={{fontSize:9,paddingLeft:6,lineHeight:1.2}}>{part.quantity * item.quantity} x {part.product_name || part.name}{part.variant_name?` (${part.variant_name})`:''}{part.modifiers?.length?` - ${part.modifiers.map(modifierDisplayLabel).filter(Boolean).join(', ')}`:''}</div>)}
         {item.item_notes && <div style={{fontSize:9,lineHeight:1.2}}>Note: {item.item_notes}</div>}
       </div>)}
     </div>

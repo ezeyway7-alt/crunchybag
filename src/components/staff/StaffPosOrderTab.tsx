@@ -724,6 +724,29 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                       <span>Total: <strong className="font-mono font-bold text-zinc-900 dark:text-white">{formatNPR(targetOngoingOrder.totalAmount)}</strong></span>
                       <span className="text-amber-500 font-bold">Round {(targetOngoingOrder.roundsCount || 1) + 1} Batch</span>
                     </div>
+
+                    <div className="max-h-36 space-y-2 overflow-y-auto border-t border-zinc-100 pt-2 dark:border-zinc-800">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Items already on this tab</p>
+                      {targetOngoingOrder.items.map((item) => (
+                        <div key={item.id} className="border-b border-zinc-100 pb-2 last:border-0 dark:border-zinc-800">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                                {item.quantity}× {item.productName}
+                                {item.variantName ? <span className="ml-1 font-normal text-zinc-500">({item.variantName})</span> : null}
+                              </p>
+                              <p className="text-[10px] text-zinc-500">Round {item.roundNumber || 1}</p>
+                            </div>
+                            <span className="shrink-0 font-mono text-zinc-500">{formatNPR(item.lineTotal)}</span>
+                          </div>
+                          {item.modifiersSummary.map((modifier, index) => (
+                            <p key={`${item.id}-modifier-${index}`} className="pl-2 text-[11px] text-zinc-500">
+                              • {modifier}
+                            </p>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -2111,6 +2134,11 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                         {it.variantName && (
                           <p className="text-[10px] text-zinc-500">{it.variantName}</p>
                         )}
+                        {it.modifiersSummary.map((modifier, modifierIndex) => (
+                          <p key={`${it.id}-modifier-${modifierIndex}`} className="text-[10px] text-zinc-500">
+                            • {modifier}
+                          </p>
+                        ))}
                       </div>
 
                       <div className="flex items-center gap-2">

@@ -59,6 +59,10 @@ export interface PosItem {
   }[];
   modifiers: {
     name: string;
+    group?: string;
+    group_name?: string;
+    option_name?: string;
+    price_delta?: string;
   }[];
 }
 export interface PosOrder {
@@ -197,7 +201,11 @@ export function posOrderToOrder(
       id: `pos-item-${item.id || idx}`,
       productName: item.product_name,
       variantName: item.variant_name || "",
-      modifiersSummary: (item.modifiers || []).map((m) => m.name),
+      modifiersSummary: (item.modifiers || []).map((modifier) =>
+        modifier.group || modifier.group_name
+          ? `${modifier.group || modifier.group_name}: ${modifier.name || modifier.option_name || ""}`
+          : modifier.name || modifier.option_name || "",
+      ).filter(Boolean),
       unitPrice: Number(item.unit_price) || 0,
       quantity: item.quantity,
       lineTotal: Number(item.line_total) || 0,

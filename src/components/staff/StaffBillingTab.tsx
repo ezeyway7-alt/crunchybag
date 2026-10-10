@@ -569,22 +569,26 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
               {/* Itemized lines with subtle dotted leaders (no gaping voids) */}
               <div className="max-h-36 overflow-y-auto space-y-1.5 divide-y divide-zinc-800/40 pr-1">
                 {activeOrder.items.map((it, idx) => (
-                  <div
-                    key={idx}
-                    className="pt-1 flex items-baseline justify-between text-[11px]"
-                  >
-                    <span className="truncate font-bold text-zinc-200">
-                      {it.quantity}x {it.productName}
-                      {it.variantName && (
-                        <span className="text-[10px] text-zinc-400 font-mono ml-0.5">
-                          ({it.variantName})
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex-1 border-b border-dotted border-zinc-700/60 mx-1 min-w-[8px]"></span>
-                    <span className="font-mono font-bold text-zinc-200 shrink-0">
-                      {formatNPR(it.lineTotal)}
-                    </span>
+                  <div key={idx} className="space-y-0.5 pt-1">
+                    <div className="flex items-baseline justify-between gap-2 text-[11px]">
+                      <span className="truncate font-bold text-zinc-200">
+                        {it.quantity}x {it.productName}
+                        {it.variantName && (
+                          <span className="ml-0.5 font-mono text-[10px] text-zinc-400">
+                            ({it.variantName})
+                          </span>
+                        )}
+                      </span>
+                      <span className="min-w-[8px] flex-1 border-b border-dotted border-zinc-700/60"></span>
+                      <span className="shrink-0 font-mono font-bold text-zinc-200">
+                        {formatNPR(it.lineTotal)}
+                      </span>
+                    </div>
+                    {it.modifiersSummary.map((modifier, modifierIndex) => (
+                      <p key={`${it.id}-modifier-${modifierIndex}`} className="pl-2 text-[10px] text-zinc-400">
+                        • {modifier}
+                      </p>
+                    ))}
                   </div>
                 ))}
               </div>
