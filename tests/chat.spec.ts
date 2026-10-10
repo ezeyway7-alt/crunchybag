@@ -12,18 +12,25 @@ async function setup(page:Page,signedIn=false,staff=false){
  await page.routeWebSocket('**/ws/**',socket=>{if(socket.url().includes('/ws/chat/')){state.sockets.push(socket);socket.onMessage(raw=>{const event=JSON.parse(String(raw));if(event.type==='typing')state.typing.push(event);else socket.send(JSON.stringify({event_type:'HEARTBEAT',revision:state.messages.length}));});}});
  await page.route('**/api/v1/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname.replace('/api/v1/','');let body:any={};try{body=req.postDataJSON()||{};}catch{}
+  let attachment:any=null;
+  if(req.headers()['content-type']?.startsWith('multipart/form-data')){
+    const form=await new Response(req.postDataBuffer(),{headers:{'Content-Type':req.headers()['content-type']}}).formData();
+    body={client_id:form.get('client_id'),text:form.get('text')};
+    const file=form.get('file') as File;attachment={name:file.name,size:file.size,mime:file.type,kind:file.type.startsWith('audio/')?'audio':file.type.startsWith('image/')?'image':file.type.startsWith('video/')?'video':'file'};
+  }
   let result:any={};
   if(path==='auth/me/')result=user;
   else if(path.includes('branches'))result=[outlet];
   else if(path==='catalog/menu/')result={categories:[]};
   else if(path==='chat/start/'){state.starts.push({body,guest:req.headers()['x-chat-guest']});result={conversation,messages:state.messages,has_more:false};}
   else if(path.includes('chat/')&&path.endsWith('socket-ticket/'))result={ticket:'test-ticket',path:'/ws/chat/'};
+  else if(path.includes('chat/')&&path.endsWith('/attachment/'))result={url:'/api/v1/chat/files/?ticket=test',expires_in:600};
   else if(path==='chat/staff/')result={results:[{...conversation,last_message:state.messages.at(-1),unread_count:1}],unread_count:1,has_more:false};
   else if(path.includes('chat/')&&path.endsWith('/messages/')){
    if(req.method()==='POST'){
     state.sends.push(body);
     if(state.fail){await route.fulfill({status:503,json:{detail:'Temporarily offline'}});return;}
-    result={...body,id:state.messages.length+1,is_staff:staff,created_at:'2026-10-10T06:00:00Z',conversation_id:conversation.id};state.messages.push(result);conversation.last_message_id=result.id;
+    result={...body,attachment,id:state.messages.length+1,is_staff:staff,created_at:'2026-10-10T06:00:00Z',conversation_id:conversation.id};state.messages.push(result);conversation.last_message_id=result.id;
    }else {const catchingUp=new URL(req.url()).searchParams.has('after');const after=Number(new URL(req.url()).searchParams.get('after')||0);const rows=catchingUp?state.messages.filter((m:any)=>m.id>after):state.messages;result={conversation,messages:catchingUp?rows.slice(0,100):rows.slice(-50),has_newer:catchingUp?rows.length>100:false,has_more:!catchingUp&&rows.length>50};}
   }else if(path.includes('chat/')&&path.endsWith('/read/')){state.reads.push(body);if(staff)conversation.staff_read_id=body.last_message_id;else conversation.customer_read_id=body.last_message_id;result={ok:true};}
   else if(path==='orders/pos/meta/')result={outlet_id:2,outlet_name:'Outlet Two',permissions:{orders:true},tables:[],fulfillment_modes:['TAKEAWAY'],payment_methods:['CASH']};
@@ -127,4 +134,48 @@ test('typing remains visible when a long conversation is scrolled up',async({pag
  await page.getByRole('log').evaluate(el=>{el.scrollTop=0;});
  state.sockets.at(-1).send(JSON.stringify({event_type:'CHAT_TYPING',conversation_id:state.conversation.id,is_staff:true,is_typing:true}));
  await expect(page.getByRole('status').filter({hasText:'CrunchyBag team is typing...'})).toBeInViewport();
+});
+
+
+test('PDF upload retries once with the original file after reload',async({page})=>{
+ const state=await setup(page);state.fail=true;
+ await page.getByLabel('Choose attachment',{exact:true}).setInputFiles({name:'receipt.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF-1.4 receipt')});
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Not confirmed - tap to retry'})).toBeVisible();
+ const key=state.sends[0].client_id;
+ await page.reload();await page.getByRole('button',{name:'Open messages',exact:true}).click();state.fail=false;
+ await page.getByRole('button',{name:'Not confirmed - tap to retry'}).click();
+ await expect(page.getByRole('button',{name:/Download receipt.pdf/})).toBeVisible();
+ expect(state.messages).toHaveLength(1);expect(state.messages[0].attachment.name).toBe('receipt.pdf');expect(state.sends.at(-1).client_id).toBe(key);
+});
+
+test('staff can send an audio attachment without a text caption',async({page})=>{
+ const state=await setup(page,true,true);await page.getByRole('button',{name:/Guest/}).last().click();
+ await page.getByLabel('Choose attachment',{exact:true}).setInputFiles({name:'Voice.m4a',mimeType:'audio/mp4',buffer:Buffer.from('audio fixture')});
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(page.getByRole('button',{name:/Open Voice.m4a/})).toBeVisible();
+ expect(state.messages[0].attachment.kind).toBe('audio');expect(state.messages[0].is_staff).toBe(true);
+});
+
+
+test('recording stops the microphone and creates a reviewable voice attachment',async({page})=>{
+ await page.addInitScript(()=>{
+   const stream={getTracks:()=>[{stop:()=>{(window as any).micStopped=true;}}]};
+   Object.defineProperty(navigator,'mediaDevices',{value:{getUserMedia:async()=>stream},configurable:true});
+   class Recorder {
+     static isTypeSupported(){return true;}
+     state='inactive';mimeType='audio/webm';ondataavailable:any;onstop:any;onerror:any;
+     start(){this.state='recording';}
+     stop(){this.state='inactive';this.ondataavailable?.({data:new Blob(['voice fixture'],{type:'audio/webm'})});this.onstop?.();}
+   }
+   (window as any).MediaRecorder=Recorder;
+ });
+ const state=await setup(page);
+ await page.getByRole('button',{name:'Record voice message',exact:true}).click();
+ await page.getByRole('button',{name:'Stop recording',exact:true}).click();
+ await expect(page.getByLabel('Preview voice message')).toBeVisible();
+ expect(await page.evaluate(()=>(window as any).micStopped)).toBe(true);
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect.poll(()=>state.messages.length).toBe(1);
+ expect(state.messages[0].attachment.kind).toBe('audio');
 });

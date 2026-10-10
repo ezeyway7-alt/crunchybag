@@ -1,6 +1,6 @@
 import { apiClient, DEFAULT_API_BASE, RequestOptions } from './api';
 
-export type ChatMessage = {id:number; client_id:string; conversation_id:string; text:string; is_staff:boolean; created_at:string};
+export type ChatMessage = {id:number; client_id:string; conversation_id:string; text:string; preview?:string; attachment?:{name:string;size:number;mime:string;kind:string}|null; is_staff:boolean; created_at:string};
 export type Conversation = {id:string; outlet_id:number; outlet_name:string; customer_name:string; is_guest:boolean; last_client_ip?:string; last_message_id:number; unread_count:number; customer_read_id:number; staff_read_id:number; last_message:ChatMessage|null};
 export type History = {conversation:Conversation; messages:ChatMessage[]; has_more:boolean};
 export type Inbox = {results:Conversation[]; unread_count:number; has_more:boolean};
