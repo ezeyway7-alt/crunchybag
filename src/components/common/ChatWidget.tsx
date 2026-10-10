@@ -152,7 +152,7 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
           <button
             type="button"
             onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
-            className="w-[90px] h-5 rotate-90 origin-center px-1.5 py-0.5 rounded-none bg-zinc-950/95 border border-amber-400 text-amber-300 text-[10px] font-semibold tracking-wide shadow-md shadow-black/60 flex items-center justify-center gap-1 hover:bg-zinc-900 active:scale-95 transition-all cursor-pointer whitespace-nowrap animate-pulse touch-manipulation"
+            className="w-[90px] h-5 -rotate-90 origin-center px-1.5 py-0.5 rounded-none bg-zinc-950/95 border border-amber-400 text-amber-300 text-[10px] font-semibold tracking-wide shadow-md shadow-black/60 flex items-center justify-center gap-1 hover:bg-zinc-900 active:scale-95 transition-all cursor-pointer whitespace-nowrap animate-pulse touch-manipulation"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
             <span>Order by chat</span>
