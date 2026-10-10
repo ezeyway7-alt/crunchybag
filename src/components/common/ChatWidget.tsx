@@ -145,22 +145,22 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
     setMessages(old=>mergeMessages(old,data.messages));setMore(data.has_more);
   }catch(e){setError(extractErrorMessage(e));}finally{setLoading(false);}};
 
-  return <div className="ph-no-capture ph-sensitive fixed right-3 sm:right-4 bottom-20 sm:bottom-5 z-[90] font-sans" data-ph-no-capture>
+  return <div className="ph-no-capture ph-sensitive fixed right-1 sm:right-2 bottom-20 sm:bottom-5 z-[90] font-sans" data-ph-no-capture>
     {!open?(
-      <div className="flex flex-col items-center select-none group mr-4 sm:mr-3">
+      <div className="relative w-[84px] h-10 select-none group touch-manipulation">
         <button
           type="button"
           onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
-          className="relative flex items-center justify-center -mb-3 z-10 hover:scale-105 active:scale-95 transition-all cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none"
+          className="absolute -top-[20.5px] left-0 w-[84px] h-[44px] p-0 m-0 border-0 bg-transparent z-10 hover:scale-105 active:scale-95 transition-all cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none"
           aria-label="Order by chat"
         >
-          <svg width="84" height="46" viewBox="0 0 84 46" className="overflow-visible drop-shadow-md drop-shadow-black/60">
-            {/* Amber outer border */}
-            <path d="M 12 40 A 30 30 0 0 1 72 40" fill="none" stroke="#fbbf24" strokeWidth="19" strokeLinecap="round" />
+          <svg width="84" height="44" viewBox="0 0 84 44" className="block overflow-visible drop-shadow-md drop-shadow-black/60">
+            {/* Amber outer border (inner edge at radius 20.5 merges with button 20px) */}
+            <path d="M 12.5 40 A 29.5 29.5 0 0 1 71.5 40" fill="none" stroke="#fbbf24" strokeWidth="18" strokeLinecap="round" />
             {/* Dark inner fill */}
-            <path d="M 12 40 A 30 30 0 0 1 72 40" fill="none" stroke="#09090b" strokeWidth="16.5" strokeLinecap="round" />
+            <path d="M 12.5 40 A 29.5 29.5 0 0 1 71.5 40" fill="none" stroke="#09090b" strokeWidth="15.5" strokeLinecap="round" />
             {/* Text path */}
-            <path id="chat-order-arc" d="M 12 40 A 30 30 0 0 1 72 40" fill="none" />
+            <path id="chat-order-arc" d="M 12.5 40 A 29.5 29.5 0 0 1 71.5 40" fill="none" />
             <text fill="#fde68a" fontSize="8.8" fontWeight="700" letterSpacing="0.03em" className="select-none font-sans">
               <textPath href="#chat-order-arc" startOffset="50%" textAnchor="middle">
                 <tspan fill="#34d399">● </tspan>Order by chat
@@ -171,7 +171,7 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
         <button
           aria-label="Open messages"
           onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
-          className="relative h-10 w-10 rounded-full bg-amber-400 text-zinc-950 border border-amber-300 shadow-lg shadow-black/40 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white touch-manipulation"
+          className="relative h-10 w-10 mx-auto rounded-full bg-amber-400 text-zinc-950 border border-amber-300 shadow-lg shadow-black/40 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white touch-manipulation z-0"
         >
           {/* Ambient wave animation around the chat icon */}
           <span className="absolute -inset-1 rounded-full bg-amber-400/35 animate-ping pointer-events-none -z-10" />

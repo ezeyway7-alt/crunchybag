@@ -69,24 +69,29 @@
 </div>
 
 <div class="card">
-  <h3>Nested Crown Arch (Sitting directly on the Top Border of Button)</h3>
-  <div class="preview" style="height: 160px; background: #09090b; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-    <button style="background: none; border: none; padding: 0; cursor: pointer; outline: none; margin-bottom: -14px; z-index: 5;">
-      <svg width="84" height="46" viewBox="0 0 84 46" style="overflow: visible;">
-        <!-- Amber border -->
-        <path d="M 12 40 A 30 30 0 0 1 72 40" fill="none" stroke="#fbbf24" stroke-width="19" stroke-linecap="round" />
-        <!-- Dark fill -->
-        <path d="M 12 40 A 30 30 0 0 1 72 40" fill="none" stroke="#09090b" stroke-width="16.5" stroke-linecap="round" />
-        <!-- Text arc -->
-        <path id="arcNested" d="M 12 40 A 30 30 0 0 1 72 40" fill="none" />
-        <text fill="#fde68a" font-size="8.8" font-weight="700" letter-spacing="0.03em" font-family="system-ui, -apple-system, sans-serif">
-          <textPath href="#arcNested" startOffset="50%" text-anchor="middle">
-            <tspan fill="#34d399">● </tspan>Order by chat
-          </textPath>
-        </text>
-      </svg>
-    </button>
-    <div class="btn-circle" style="z-index: 10;">💬</div>
+  <h3>Zero Gap Seamlessly Attached Arch (-top-[20.5px])</h3>
+  <div class="preview" style="height: 160px; background: #09090b; display: flex; align-items: center; justify-content: center;">
+    <!-- Container sized to the circular button 40x40 -->
+    <div style="position: relative; width: 40px; height: 40px;">
+      <!-- Arch positioned with top: -20.5px so inner 1px amber border merges with button's 1px amber border -->
+      <button style="position: absolute; top: -20.5px; left: 50%; transform: translateX(-50%); width: 84px; height: 44px; background: none; border: none; padding: 0; margin: 0; cursor: pointer; outline: none; z-index: 10;">
+        <svg width="84" height="44" viewBox="0 0 84 44" style="display: block; overflow: visible;">
+          <!-- Amber border (inner radius = 29.5 - 9 = 20.5px, hugs 40px circle r=20px) -->
+          <path d="M 12.5 40 A 29.5 29.5 0 0 1 71.5 40" fill="none" stroke="#fbbf24" stroke-width="18" stroke-linecap="round" />
+          <!-- Dark fill -->
+          <path d="M 12.5 40 A 29.5 29.5 0 0 1 71.5 40" fill="none" stroke="#09090b" stroke-width="15.5" stroke-linecap="round" />
+          <!-- Text arc -->
+          <path id="arcZeroGap" d="M 12.5 40 A 29.5 29.5 0 0 1 71.5 40" fill="none" />
+          <text fill="#fde68a" font-size="8.8" font-weight="700" letter-spacing="0.03em" font-family="system-ui, -apple-system, sans-serif">
+            <textPath href="#arcZeroGap" startOffset="50%" textAnchor="middle">
+              <tspan fill="#34d399">● </tspan>Order by chat
+            </textPath>
+          </text>
+        </svg>
+      </button>
+      <!-- Circular button 40x40 -->
+      <div class="btn-circle" style="position: relative; z-index: 5;">💬</div>
+    </div>
   </div>
 </div>
 
