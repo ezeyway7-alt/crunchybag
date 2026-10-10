@@ -26,6 +26,7 @@ import { useApp } from "../../context/AppContext";
 import { Order, OrderStatus } from "../../types";
 import { CrunchyLogo } from "../common/CrunchyLogo";
 import { Skeleton } from "../common/Skeleton";
+import { formatNPR } from "../../lib/utils";
 
 interface CallingAnnouncement {
   id: string;
@@ -44,6 +45,7 @@ interface TvOrderDisplayPortalProps {
 export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onClose }) => {
   const {
     products,
+    categories,
     currentOutlet,
     updateOrderStatus,
     setActivePortal,
@@ -115,6 +117,9 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
   // Sliding Menu Carousel index
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [menuCarouselIndex, setMenuCarouselIndex] = useState(0);
+  const [menuCarouselTransitionEnabled, setMenuCarouselTransitionEnabled] = useState(true);
+  const [displayMode, setDisplayMode] = useState<"menu" | "orders">("menu");
 
   // Auto-pagination / scroll page for preparing orders when there are many (8-16+)
   const [prepPage, setPrepPage] = useState(0);
@@ -391,6 +396,165 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
   const currentSlideProduct = showcaseProducts[activeSlideIndex] || showcaseProducts[0];
   const currentAnimation = SLIDER_IN_ANIMATIONS[activeSlideIndex % SLIDER_IN_ANIMATIONS.length];
+  const menuCarouselClones = Math.min(4, showcaseProducts.length);
+  const menuCarouselProducts = [
+    ...showcaseProducts,
+    ...showcaseProducts.slice(0, menuCarouselClones),
+  ];
+
+  useEffect(() => {
+    if (displayMode !== "menu" || showcaseProducts.length <= 1) return;
+
+    const interval = window.setInterval(() => {
+      setMenuCarouselIndex((index) => index + 1);
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [displayMode, showcaseProducts.length]);
+
+  useEffect(() => {
+    setMenuCarouselIndex(0);
+  }, [showcaseProducts.length]);
+
+  const handleMenuCarouselTransitionEnd = () => {
+    if (menuCarouselIndex < showcaseProducts.length) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setMenuCarouselTransitionEnabled(false);
+      setMenuCarouselIndex(0);
+      window.requestAnimationFrame(() => setMenuCarouselTransitionEnabled(true));
+      return;
+    }
+    setMenuCarouselTransitionEnabled(false);
+    setMenuCarouselIndex(0);
+    window.requestAnimationFrame(() => setMenuCarouselTransitionEnabled(true));
+  };
+
+  if (displayMode === "menu") {
+    return (
+      <div className="tv-menu-screen flex h-screen w-screen select-none flex-col overflow-hidden bg-[#08090b] text-white">
+        <header className="flex shrink-0 items-center justify-between gap-4 px-8 py-5 sm:px-12">
+          <div className="flex items-center gap-5">
+            <CrunchyLogo size="md" className="h-9 w-auto sm:h-11" />
+            <span className="h-8 w-px bg-white/15" aria-hidden="true" />
+            <span className="text-sm font-semibold uppercase tracking-[0.28em] text-zinc-300 sm:text-base">Our Menu</span>
+          </div>
+          <div className="flex items-center gap-5">
+            {showcaseProducts.length > 0 && (
+              <span className="font-mono text-sm tabular-nums text-zinc-400 sm:text-base">
+                {`${(menuCarouselIndex % showcaseProducts.length) + 1} / ${showcaseProducts.length}`}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setDisplayMode("orders")}
+              className="text-xs font-semibold uppercase tracking-wider text-zinc-400 transition-colors hover:text-white sm:text-sm"
+            >
+              Order board
+            </button>
+            <button
+              id="tv-fullscreen-toggle"
+              type="button"
+              onClick={toggleFullscreen}
+              className="text-zinc-400 transition-colors hover:text-white"
+              title="Toggle TV fullscreen"
+              aria-label="Toggle TV fullscreen"
+            >
+              {isFullscreen ? <Minimize2 className="h-5 w-5 sm:h-6 sm:w-6" /> : <Maximize2 className="h-5 w-5 sm:h-6 sm:w-6" />}
+            </button>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-zinc-400 transition-colors hover:text-white"
+                title="Exit TV display"
+                aria-label="Exit TV display"
+              >
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
+            )}
+          </div>
+        </header>
+
+        {isLoadingSkeleton ? (
+          <main className="grid min-h-0 flex-1 grid-cols-1 gap-8 px-8 py-6 sm:grid-cols-2 sm:px-12 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((item) => (
+              <div key={item} className="flex flex-col gap-6">
+                <Skeleton className="aspect-[1.08/1] w-full bg-zinc-900" />
+                <Skeleton className="h-8 w-4/5 bg-zinc-900" />
+                <Skeleton className="h-7 w-2/5 bg-zinc-900" />
+              </div>
+            ))}
+          </main>
+        ) : showcaseProducts.length > 0 ? (
+          <main className="min-h-0 flex-1 overflow-hidden py-4 sm:py-6">
+            <div
+              className={`tv-menu-track flex h-full items-center ${menuCarouselTransitionEnabled ? "" : "tv-menu-track-reset"}`}
+              style={{ transform: `translateX(calc(var(--tv-menu-card-width) * -${menuCarouselIndex}))` }}
+              onTransitionEnd={handleMenuCarouselTransitionEnd}
+            >
+              {menuCarouselProducts.map((product, index) => {
+                const category = categories.find((item) => item.id === product.categoryId);
+                const image = product.images[product.mainImageIndex ?? 0] || product.images[0];
+                const price = product.discountPercent
+                  ? Math.round(product.basePrice * (100 - product.discountPercent) / 100)
+                  : product.basePrice;
+
+                return (
+                  <article
+                    key={`${product.id}-${index >= showcaseProducts.length ? "loop" : "item"}`}
+                    className="tv-menu-slide flex h-full min-w-0 flex-col justify-center px-5 sm:px-8"
+                  >
+                    <div className="tv-menu-image relative aspect-[1.08/1] overflow-hidden bg-zinc-900/70">
+                      <img
+                        src={image}
+                        alt={product.name}
+                        className="h-full w-full object-cover"
+                        loading={index < 4 ? "eager" : "lazy"}
+                        decoding="async"
+                      />
+                      <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent" />
+                    </div>
+                    <div className="flex min-h-28 flex-col justify-center gap-2 px-1 pt-5 sm:pt-6">
+                      {category && (
+                        <p className="truncate text-xs font-semibold uppercase tracking-[0.2em] text-amber-400 sm:text-sm">
+                          {category.name}
+                        </p>
+                      )}
+                      <h2 className="line-clamp-2 text-2xl font-semibold leading-tight text-white sm:text-3xl 2xl:text-4xl">
+                        {product.name}
+                      </h2>
+                      <div className="flex items-baseline gap-3">
+                        <p className="font-mono text-2xl font-bold tabular-nums text-amber-400 sm:text-3xl 2xl:text-4xl">
+                          {formatNPR(price)}
+                        </p>
+                        {product.discountPercent ? (
+                          <span className="font-mono text-base tabular-nums text-zinc-500 line-through sm:text-lg">
+                            {formatNPR(product.basePrice)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </main>
+        ) : (
+          <main className="flex flex-1 items-center justify-center px-8 text-center">
+            <div>
+              <h1 className="text-3xl font-semibold text-white sm:text-5xl">Our menu is getting ready</h1>
+              <p className="mt-4 text-lg text-zinc-400 sm:text-2xl">Available items with photos will appear here.</p>
+            </div>
+          </main>
+        )}
+
+        <footer className="flex shrink-0 items-center justify-between px-8 pb-5 pt-3 text-xs uppercase tracking-[0.16em] text-zinc-500 sm:px-12 sm:text-sm">
+          <span>{currentOutlet?.name || "Freshly made, just for you"}</span>
+          <span>Fresh favourites, all day</span>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen bg-[#050608] text-zinc-100 flex flex-col font-sans select-none overflow-hidden">
@@ -476,6 +640,14 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
           </button>
 
           {/* Exit */}
+          <button
+            type="button"
+            onClick={() => setDisplayMode("menu")}
+            className="px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider text-amber-400 transition-colors hover:text-amber-300"
+            title="Show menu-only TV display"
+          >
+            Menu only
+          </button>
           {onClose ? (
             <button
               onClick={onClose}

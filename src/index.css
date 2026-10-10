@@ -199,3 +199,54 @@
   animation: tvSliderTiltIn 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+.tv-menu-track {
+  --tv-menu-card-width: 100vw;
+  width: max-content;
+  transition: transform 750ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.tv-menu-track-reset {
+  transition: none;
+}
+
+.tv-menu-slide {
+  flex: 0 0 var(--tv-menu-card-width);
+}
+
+.tv-menu-image img {
+  animation: tvMenuImageReveal 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes tvMenuImageReveal {
+  from {
+    opacity: 0.82;
+    transform: scale(1.035);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (min-width: 640px) {
+  .tv-menu-track {
+    --tv-menu-card-width: 50vw;
+  }
+}
+
+@media (min-width: 1280px) {
+  .tv-menu-track {
+    --tv-menu-card-width: 25vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-menu-track {
+    transition: none;
+  }
+
+  .tv-menu-image img {
+    animation: none;
+  }
+}
