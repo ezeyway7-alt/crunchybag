@@ -116,3 +116,15 @@ test('typing is scoped to the selected thread and stops after send',async({page}
  await page.getByRole('button',{name:'Send message',exact:true}).click();
  await expect.poll(()=>state.typing.at(-1)?.is_typing).toBe(false);
 });
+
+
+test('typing remains visible when a long conversation is scrolled up',async({page})=>{
+ const state=await setup(page);
+ await expect.poll(()=>state.sockets.length).toBeGreaterThan(0);
+ state.messages=Array.from({length:30},(_,i)=>({id:i+1,client_id:`m-${i}`,conversation_id:state.conversation.id,is_staff:true,text:`Long history message ${i}`,created_at:'2026-10-10T06:00:00Z'}));
+ state.sockets.at(-1).send(JSON.stringify({event_type:'CHAT_MESSAGE'}));
+ await expect(page.getByText('Long history message 29',{exact:true})).toBeVisible();
+ await page.getByRole('log').evaluate(el=>{el.scrollTop=0;});
+ state.sockets.at(-1).send(JSON.stringify({event_type:'CHAT_TYPING',conversation_id:state.conversation.id,is_staff:true,is_typing:true}));
+ await expect(page.getByRole('status').filter({hasText:'CrunchyBag team is typing...'})).toBeInViewport();
+});
