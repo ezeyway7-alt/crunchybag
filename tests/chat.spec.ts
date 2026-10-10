@@ -5,11 +5,11 @@ async function setup(page:Page,signedIn=false,staff=false){
  const user={id:91,username:staff?'Manager':'Customer',role:staff?'BRANCH_MANAGER':'CUSTOMER',is_active:true,outlet_id:2};
  const outlet={id:2,name:'Outlet Two',branch_code:'TWO',accepting_orders:true};
  const conversation:any={id:'11111111-1111-4111-8111-111111111111',outlet_id:signedIn?2:1,outlet_name:signedIn?'Outlet Two':'Main Outlet',customer_name:'Guest',is_guest:!signedIn,last_message_id:0,unread_count:0,customer_read_id:0,staff_read_id:0};
- const state:any={messages:[],sockets:[],sends:[],starts:[],reads:[],fail:false,conversation};
+ const state:any={messages:[],sockets:[],sends:[],starts:[],reads:[],typing:[],fail:false,conversation};
  if(signedIn)await page.addInitScript(({user,outlet})=>{localStorage.setItem('crunchy_access_token','test-access');localStorage.setItem('crunchy_refresh_token','test-refresh');localStorage.setItem('crunchy_auth_user',JSON.stringify(user));localStorage.setItem('crunchy_auth_outlet',JSON.stringify(outlet));},{user,outlet});
  await page.addInitScript(()=>{document.cookie='csrftoken=abcdefghijklmnopqrstuvwx12345678; path=/';});
  await page.route('https://fonts.googleapis.com/**',r=>r.abort());
- await page.routeWebSocket('**/ws/**',socket=>{if(socket.url().includes('/ws/chat/')){state.sockets.push(socket);socket.onMessage(()=>socket.send(JSON.stringify({event_type:'HEARTBEAT',revision:state.messages.length})));}});
+ await page.routeWebSocket('**/ws/**',socket=>{if(socket.url().includes('/ws/chat/')){state.sockets.push(socket);socket.onMessage(raw=>{const event=JSON.parse(String(raw));if(event.type==='typing')state.typing.push(event);else socket.send(JSON.stringify({event_type:'HEARTBEAT',revision:state.messages.length}));});}});
  await page.route('**/api/v1/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname.replace('/api/v1/','');let body:any={};try{body=req.postDataJSON()||{};}catch{}
   let result:any={};
@@ -98,4 +98,21 @@ test('live catch-up fetches multiple pages without skipping messages',async({pag
  await expect(page.getByText('Reply number 136',{exact:true})).toBeVisible();
  await expect(page.getByText('Reply number 50',{exact:true})).toHaveCount(1);
  await expect(page.getByText('Reply number 101',{exact:true})).toHaveCount(1);
+});
+
+
+test('typing is scoped to the selected thread and stops after send',async({page})=>{
+ const state=await setup(page);
+ await expect.poll(()=>state.sockets.length).toBeGreaterThan(0);
+ const socket=state.sockets.at(-1);
+ socket.send(JSON.stringify({event_type:'CHAT_TYPING',conversation_id:'someone-else',is_staff:true,is_typing:true}));
+ await expect(page.getByText('CrunchyBag team is typing...')).toHaveCount(0);
+ socket.send(JSON.stringify({event_type:'CHAT_TYPING',conversation_id:state.conversation.id,is_staff:true,is_typing:true}));
+ await expect(page.getByText('CrunchyBag team is typing...')).toBeVisible();
+ socket.send(JSON.stringify({event_type:'CHAT_TYPING',conversation_id:state.conversation.id,is_staff:true,is_typing:false}));
+ await expect(page.getByText('CrunchyBag team is typing...')).toHaveCount(0);
+ await page.getByRole('textbox',{name:'Message',exact:true}).fill('Hello');
+ await expect.poll(()=>state.typing.some((e:any)=>e.is_typing&&e.conversation_id===state.conversation.id)).toBe(true);
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect.poll(()=>state.typing.at(-1)?.is_typing).toBe(false);
 });
