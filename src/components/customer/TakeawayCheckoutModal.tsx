@@ -52,7 +52,8 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const { cart, currentOutlet, consumePurchasedCart, customerProfile, cartSyncing, cartSyncError } = useApp();
   const {authUser,isAuthenticated} = useAuth();
   const isSignedIn = isAuthenticated && !!authUser && authUser.is_active !== false;
-  const isGuestCheckout = !isSignedIn;
+  const isGuestModeFromSession = typeof window !== 'undefined' && sessionStorage.getItem('customer:is-guest-checkout') === 'yes';
+  const isGuestCheckout = !isSignedIn || isGuestModeFromSession;
 
   // 1. By default, DELIVERY is selected as requested!
   const [selectedFulfillment, setSelectedFulfillment] = useState<FulfillmentType>("DELIVERY");
@@ -167,16 +168,22 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const cleanPhone = (phone || '').trim();
   const cleanAddress = (deliveryAddress || '').trim();
   const canonicalPhone = (value: string) => {
-    let digits = value.replace(/\D/g, '');
-    if (digits.startsWith('977') && digits.length === 13) digits = digits.slice(3);
+    let digits = (value || '').replace(/\D/g, '');
+    if (digits.startsWith('977')) digits = digits.slice(3);
+    if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
     return /^9[78]\d{8}$/.test(digits) ? `+977${digits}` : '';
   };
-  const guestPhone = isGuestCheckout ? canonicalPhone(cleanPhone) : '';
+  const phoneFromInput = canonicalPhone(cleanPhone);
+  const fallbackPhone =
+    canonicalPhone(customerProfile.phone || '') ||
+    canonicalPhone((authUser as any)?.phone || (authUser as any)?.phone_number || '');
+  const effectivePhone = cleanPhone ? phoneFromInput : (fallbackPhone || phoneFromInput);
+  const guestPhone = isGuestCheckout ? effectivePhone : '';
 
   const payload = {outlet_id:Number(currentOutlet.id),items:cartLines(cart.items),fulfillment_type:selectedFulfillment,
     cart_line_ids:cart.items.map(item=>item.cartItemId),
     customer_name:cleanName || authUser?.name || authUser?.username || '',delivery_address:selectedFulfillment==='DELIVERY'?cleanAddress:'',
-    ...(isGuestCheckout ? {customer_phone:guestPhone} : {}),
+    ...(effectivePhone ? {customer_phone:effectivePhone} : {}),
     table_id:selectedFulfillment==='DINE_IN'?meta?.tables?.find((t:any)=>t.table_number===tableNumber)?.id || null:null,
     notes:[vehicleInfo?`Vehicle: ${vehicleInfo}`:'',notes].filter(Boolean).join(' — '),delivery_location:selectedFulfillment==='DELIVERY' ? deliveryLocation || {} : {}};
   const signature = JSON.stringify(payload);
@@ -184,12 +191,16 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const grandPayableTotal = Number(quote?.total_payable ?? cart.finalTotal);
   const pendingKey = `customer-checkout:${isSignedIn ? authUser.id : 'guest'}:${currentOutlet.id}`;
   const finishOrder = (order:any) => {
+    try { sessionStorage.removeItem('customer:is-guest-checkout'); } catch {}
     const pending=JSON.parse(sessionStorage.getItem(pendingKey)||'null');
     consumePurchasedCart(pending?.cartLineIds || []);
     sessionStorage.removeItem(pendingKey);
     if(isGuestCheckout && order.order_number) {
       saveGuestOrderNumber(String(order.order_number));
-      try { sessionStorage.setItem('customer:guest-order-phone', cleanPhone); } catch {}
+      try {
+        const rawPhone = cleanPhone || (effectivePhone ? effectivePhone.replace('+977', '') : '');
+        sessionStorage.setItem('customer:guest-order-phone', rawPhone);
+      } catch {}
     }
     customerRefresh();onClose();onOrderSuccess(String(order.id), String(order.order_number || ''));
   };
@@ -208,12 +219,12 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     return()=>{live=false;controller.abort();};
   },[isOpen,currentOutlet.id,authUser?.id,isSignedIn]);
   useEffect(()=>{
-    if(!isOpen||!cart.items.length||(isGuestCheckout&&!guestPhone))return;
+    if(!isOpen||!cart.items.length||!effectivePhone)return;
     const controller=new AbortController();let live=true;
     const timer=setTimeout(()=>apiClient.post<any>(customerPath('checkout/quote/'),JSON.parse(signature),{signal:controller.signal,skipAuth:isGuestCheckout})
       .then(data=>{if(live){setQuoted({signature,data});setQuoteError('');}}).catch(e=>{if(live)setQuoteError(extractErrorMessage(e));}),250);
     return()=>{live=false;clearTimeout(timer);controller.abort();};
-  },[isOpen,isSignedIn,signature,quoteVersion,guestPhone]);
+  },[isOpen,isSignedIn,signature,quoteVersion,effectivePhone,isGuestCheckout]);
   useEffect(()=>{
     if (!isOpen || addressInitialized.current || savedAddresses.loading) return;
     addressInitialized.current=true;
@@ -223,7 +234,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   },[isOpen,savedAddresses.addresses,savedAddresses.loading,customerProfile.address,authUser?.id]);
   const addressError = selectedFulfillment==='DELIVERY' && !cleanAddress ? 'Choose your delivery address.' : '';
   const nameError = !cleanName ? 'Enter your name.' : cleanName.length > 120 ? 'Use no more than 120 characters.' : '';
-  const phoneError = isGuestCheckout && !guestPhone ? 'Enter a valid 10-digit Nepali mobile number.' : '';
+  const phoneError = !effectivePhone ? 'Enter a valid 10-digit Nepali mobile number.' : '';
   const tableError = selectedFulfillment==='DINE_IN' && !payload.table_id ? 'Choose a table.' : '';
   useEffect(()=>{if(isOpen && cleanName && !nameError)trackEvent('name_entered');},[isOpen,cleanName,!!nameError]);
   useEffect(()=>{if(isOpen && cleanPhone)trackEvent('phone_entered');},[isOpen,cleanPhone]);
@@ -558,8 +569,8 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                   label="Phone Number"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  readOnly={!isGuestCheckout}
-                  placeholder={isGuestCheckout ? "98XXXXXXXX" : undefined}
+                  readOnly={!isGuestCheckout && Boolean((authUser as any)?.phone || (authUser as any)?.phone_number)}
+                  placeholder="98XXXXXXXX"
                   autoComplete="tel"
                   inputMode="tel"
                   error={touched ? phoneError : undefined}

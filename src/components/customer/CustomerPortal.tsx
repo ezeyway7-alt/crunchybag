@@ -607,10 +607,14 @@ export const CustomerPortal: React.FC = () => {
 
       {/* Customer Auth Modal */}
       <CustomerAuthModal
-        onSuccess={() => setIsAuthOpen(false)}
+        onSuccess={() => {
+          try { sessionStorage.removeItem('customer:is-guest-checkout'); } catch {}
+          setIsAuthOpen(false);
+        }}
         isOpen={isAuthOpen}
         onClose={() => {setIsAuthOpen(false);setResumeCheckout(false);sessionStorage.removeItem('customer:return-to-checkout');}}
         onContinueAsGuest={resumeCheckout ? () => {
+          try { sessionStorage.setItem('customer:is-guest-checkout', 'yes'); } catch {}
           sessionStorage.removeItem('customer:return-to-checkout');
           setResumeCheckout(false);
           setIsAuthOpen(false);
