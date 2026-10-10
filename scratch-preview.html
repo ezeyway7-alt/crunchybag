@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    background: #18181b;
+    color: white;
+    font-family: sans-serif;
+    display: flex;
+    gap: 40px;
+    padding: 60px;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .preview {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    background: #09090b;
+    border: 1px dashed #3f3f46;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #fbbf24;
+    border: 1px solid #fde68a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #09090b;
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h3>Refined 180° Curved Arch (Width 84px, R=30)</h3>
+  <div class="preview" style="height: 160px; background: #09090b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+    <!-- Symmetrical 180 Arch -->
+    <button style="background: none; border: none; padding: 0; cursor: pointer; outline: none;">
+      <svg width="84" height="46" viewBox="0 0 84 46" style="overflow: visible;">
+        <!-- Amber border -->
+        <path d="M 12 40 A 30 30 0 0 1 72 40" fill="none" stroke="#fbbf24" stroke-width="19" stroke-linecap="round" />
+        <!-- Dark fill -->
+        <path d="M 12 40 A 30 30 0 0 1 72 40" fill="none" stroke="#09090b" stroke-width="16.5" stroke-linecap="round" />
+        <!-- Text arc -->
+        <path id="arcRefined" d="M 12 40 A 30 30 0 0 1 72 40" fill="none" />
+        <text fill="#fde68a" font-size="8.8" font-weight="700" letter-spacing="0.03em" font-family="system-ui, -apple-system, sans-serif">
+          <textPath href="#arcRefined" startOffset="50%" text-anchor="middle">
+            <tspan fill="#34d399">● </tspan>Order by chat
+          </textPath>
+        </text>
+      </svg>
+    </button>
+    <div class="btn-circle">💬</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Nested Crown Arch (Sitting directly on the Top Border of Button)</h3>
+  <div class="preview" style="height: 160px; background: #09090b; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+    <button style="background: none; border: none; padding: 0; cursor: pointer; outline: none; margin-bottom: -14px; z-index: 5;">
+      <svg width="84" height="46" viewBox="0 0 84 46" style="overflow: visible;">
+        <!-- Amber border -->
+        <path d="M 12 40 A 30 30 0 0 1 72 40" fill="none" stroke="#fbbf24" stroke-width="19" stroke-linecap="round" />
+        <!-- Dark fill -->
+        <path d="M 12 40 A 30 30 0 0 1 72 40" fill="none" stroke="#09090b" stroke-width="16.5" stroke-linecap="round" />
+        <!-- Text arc -->
+        <path id="arcNested" d="M 12 40 A 30 30 0 0 1 72 40" fill="none" />
+        <text fill="#fde68a" font-size="8.8" font-weight="700" letter-spacing="0.03em" font-family="system-ui, -apple-system, sans-serif">
+          <textPath href="#arcNested" startOffset="50%" text-anchor="middle">
+            <tspan fill="#34d399">● </tspan>Order by chat
+          </textPath>
+        </text>
+      </svg>
+    </button>
+    <div class="btn-circle" style="z-index: 10;">💬</div>
+  </div>
+</div>
+
+</body>
+</html>
