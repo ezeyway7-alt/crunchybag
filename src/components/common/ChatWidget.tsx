@@ -1,11 +1,17 @@
 import {AttachmentPicker,ChatAttachment,DraftAttachment} from './ChatAttachments';
 import {pendingFile} from '../../lib/chatFiles';
 import React, {useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowLeft, MessageCircle, Send, X, RefreshCw} from 'lucide-react';
+import {ArrowLeft, MessageCircle, Send, X, ExternalLink, MapPin} from 'lucide-react';
 import {useAuth} from '../../context/AuthContext';
 import {useApp} from '../../context/AppContext';
 import {apiClient,extractErrorMessage,RequestOptions} from '../../lib/api';
 import {ChatMessage,Conversation,History,Inbox,connectChat,guestCredential,mergeMessages} from '../../lib/chat';
+
+function getGoogleMapsUrl(text?: string): string | null {
+  if (!text) return null;
+  const match = text.match(/https?:\/\/(?:www\.)?(?:google\.com\/maps[^\s]*|maps\.google\.com[^\s]*)/i);
+  return match ? match[0] : null;
+}
 
 type Pending={client_id:string;text:string;conversation_id:string;fileName?:string};
 export function ChatWidget(){
@@ -132,27 +138,144 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
     const url=path(`conversations/${thread.id}/messages/`);const data=await apiClient.get<History>(`${url}${url.includes('?')?'&':'?'}before=${messages[0].id}`,options.current);
     setMessages(old=>mergeMessages(old,data.messages));setMore(data.has_more);
   }catch(e){setError(extractErrorMessage(e));}finally{setLoading(false);}};
-  return <div className="ph-no-capture ph-sensitive fixed right-4 bottom-24 sm:bottom-6 z-[90] font-sans" data-ph-no-capture>
-    {!open?<button aria-label="Open messages" onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}} className="relative h-14 w-14 rounded-full bg-amber-400 text-zinc-950 shadow-xl shadow-black/40 flex items-center justify-center hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-white"><MessageCircle size={25}/>{unread>0&&<span className="absolute -top-1 -right-1 rounded-full bg-red-500 text-white text-xs px-1.5 py-0.5">{unread>99?'99+':unread}</span>}</button>:
-    <section role="dialog" aria-label={staff?'Customer messages':'Chat with CrunchyBag'} className="w-[calc(100vw-2rem)] sm:w-96 h-[min(620px,75dvh)] rounded-2xl border border-zinc-700 bg-zinc-950 text-zinc-100 shadow-2xl flex flex-col overflow-hidden">
-      <header className="flex items-center gap-3 p-4 border-b border-zinc-800 bg-zinc-900">
-        {staff&&thread?<button aria-label="Back to inbox" onClick={()=>{indicateTyping(false);setTypingId('');setDraft('');setFile(null);activeId.current='';setThread(null);setMessages([]);void refresh();}}><ArrowLeft size={20}/></button>:<MessageCircle className="text-amber-400"/>}
-        <div className="flex-1 min-w-0"><h2 className="font-semibold truncate">{staff?(thread?.customer_name||'Customer messages'):'Chat with CrunchyBag'}</h2><p className="text-xs text-zinc-400">{thread?.outlet_name||'Ordering help'} - {status}</p></div>
-        <button aria-label="Close messages" onClick={()=>{indicateTyping(false);setTypingId('');setOpen(false);}} className="p-2"><X size={20}/></button>
+
+  return <div className="ph-no-capture ph-sensitive fixed right-3 sm:right-4 bottom-20 sm:bottom-5 z-[90] font-sans" data-ph-no-capture>
+    {!open?<button
+      aria-label="Open messages"
+      onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
+      className="relative h-8 w-8 rounded-full bg-amber-400 text-zinc-950 shadow-lg shadow-black/30 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white"
+    >
+      <MessageCircle size={15}/>
+      {unread>0&&<span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-red-500 text-white text-[9px] font-bold px-0.5 flex items-center justify-center shadow-sm">{unread>99?'99+':unread}</span>}
+    </button>:
+    <section
+      role="dialog"
+      aria-label={staff?'Customer messages':'Chat with CrunchyBag'}
+      className="w-[calc(100vw-1.5rem)] sm:w-[350px] h-[min(560px,76dvh)] rounded-none border border-zinc-700 bg-zinc-950 text-zinc-100 shadow-2xl flex flex-col overflow-hidden"
+    >
+      <header className="flex items-center justify-between px-2.5 py-1.5 border-b border-zinc-800 bg-zinc-900/95 text-xs select-none">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {staff&&thread?(
+            <button
+              aria-label="Back to inbox"
+              onClick={()=>{indicateTyping(false);setTypingId('');setDraft('');setFile(null);activeId.current='';setThread(null);setMessages([]);void refresh();}}
+              className="p-0.5 text-zinc-400 hover:text-white shrink-0"
+            >
+              <ArrowLeft size={13}/>
+            </button>
+          ):(
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse"/>
+          )}
+          <div className="flex items-center gap-1 min-w-0 truncate text-[11px]">
+            <h2 className="font-semibold text-zinc-200 truncate">
+              {staff?(thread?.customer_name||'Customer messages'):'Chat with CrunchyBag'}
+            </h2>
+            <span className="text-zinc-600 shrink-0">•</span>
+            <span className="text-zinc-400 truncate text-[10px]">{thread?.outlet_name||'Main'}</span>
+            <span className="text-zinc-600 shrink-0">•</span>
+            <span className="text-emerald-400 text-[10px] font-medium shrink-0">
+              {status==='Connected'?'Live':status}
+            </span>
+          </div>
+        </div>
+        <button
+          aria-label="Close messages"
+          onClick={()=>{indicateTyping(false);setTypingId('');setOpen(false);}}
+          className="p-0.5 text-zinc-400 hover:text-white shrink-0 rounded-none transition-colors"
+        >
+          <X size={14}/>
+        </button>
       </header>
-      {error&&<div role="alert" className="p-3 text-sm bg-red-950/50 text-red-200">{error}<button aria-label="Retry connection" className="ml-2 underline" onClick={()=>{setRetry(n=>n+1);void refresh();}}>Retry</button></div>}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3" role="log" aria-live="polite">
-        {loading&&<p className="text-xs text-zinc-400">Loading messages...</p>}
-        {staff&&!thread?<>{!loading&&!threads.length&&<p className="text-zinc-400 text-sm">No conversations yet. Customer messages will appear here.</p>}{threads.map(item=><button key={item.id} onClick={()=>void choose(item)} className="w-full text-left p-3 rounded-xl bg-zinc-900 border border-zinc-800"><div className="flex justify-between gap-2"><strong className="truncate">{item.customer_name}{item.is_guest?'':' - Customer'}</strong>{item.unread_count>0&&<span className="text-xs bg-amber-400 text-black rounded-full px-2">{item.unread_count}</span>}</div><p className="text-xs text-zinc-500">{item.last_client_ip}</p><p className="text-sm text-zinc-400 truncate mt-1">{item.last_message?.preview||item.last_message?.text}</p></button>)}{moreThreads&&<button className="text-amber-400 text-sm" onClick={async()=>{try{const data=await apiClient.get<Inbox>(`${path('')}&before=${threads.at(-1)?.last_message_id}`,options.current);setThreads(old=>[...new Map([...old,...data.results].map(t=>[t.id,t])).values()]);setMoreThreads(data.has_more);}catch(e){setError(extractErrorMessage(e));}}}>Older conversations</button>}</>:
-        <>{!messages.length&&!loading&&<div className="rounded-xl p-4 bg-zinc-900"><p className="font-medium">How can we help with your order?</p><p className="text-sm text-zinc-400 mt-2">Ask about the menu, delivery or an existing order. Our team will reply here. Messages do not place an order automatically.</p>{!authenticated&&<p className="text-xs text-zinc-500 mt-2">Guest chat stays in this browser. Keep this browser to see replies.</p>}</div>}{more&&<button disabled={loading} onClick={()=>void older()} className="text-amber-400 text-xs">Load earlier messages</button>}
-        {messages.map(message=>{const mine=message.is_staff===staff;return <div key={message.id} className={`flex ${mine?'justify-end':'justify-start'}`}><div className={`max-w-[88%] rounded-2xl p-3 ${mine?'bg-amber-400 text-zinc-950 rounded-br-sm':'bg-zinc-800 rounded-bl-sm'}`}><p className="whitespace-pre-wrap break-words text-sm">{message.text}</p>{message.attachment&&<ChatAttachment message={message} accessPath={path(`conversations/${message.conversation_id}/messages/${message.id}/attachment/`)} options={options.current}/>}<p className={`text-[10px] mt-1 ${mine?'text-zinc-700':'text-zinc-400'}`}>{!mine&&message.is_staff?'CrunchyBag team - ':''}{new Date(message.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}{mine?` - ${(staff?thread?.customer_read_id:thread?.staff_read_id)!>=message.id?'Read':'Sent'}`:''}</p></div></div>})}
-        {pending&&pending.conversation_id===thread?.id&&<div className="ml-8 rounded-xl border border-amber-400/50 p-3 text-sm"><p className="whitespace-pre-wrap break-words">{pending.text}</p>{pending.fileName&&<p className="text-xs">Attachment: {pending.fileName}</p>}<button disabled={sending} onClick={()=>void send()} className="text-amber-400 text-xs mt-2">{sending?'Sending...':'Not confirmed - tap to retry'}</button>{!sending&&<button className="ml-3 text-xs underline" onClick={()=>savePending(null)}>Discard</button>}</div>}
+
+      {error&&<div role="alert" className="p-2 text-xs bg-red-950/60 border-b border-red-900/50 text-red-200 flex items-center justify-between">{error}<button aria-label="Retry connection" className="ml-2 underline font-medium text-amber-400 shrink-0" onClick={()=>{setRetry(n=>n+1);void refresh();}}>Retry</button></div>}
+
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-2.5 space-y-2" role="log" aria-live="polite">
+        {loading&&<p className="text-[10px] text-zinc-500 font-mono">Loading messages...</p>}
+        {staff&&!thread?<>{!loading&&!threads.length&&<p className="text-zinc-400 text-xs p-2">No conversations yet. Customer messages will appear here.</p>}{threads.map(item=><button key={item.id} onClick={()=>void choose(item)} className="w-full text-left p-2 rounded-none bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-colors"><div className="flex justify-between gap-2"><strong className="truncate text-xs">{item.customer_name}{item.is_guest?'':' - Customer'}</strong>{item.unread_count>0&&<span className="text-[10px] bg-amber-400 text-black font-semibold rounded-none px-1.5">{item.unread_count}</span>}</div><p className="text-[10px] text-zinc-500">{item.last_client_ip}</p><p className="text-xs text-zinc-400 truncate mt-0.5">{item.last_message?.preview||item.last_message?.text}</p></button>)}{moreThreads&&<button className="text-amber-400 text-xs underline p-1" onClick={async()=>{try{const data=await apiClient.get<Inbox>(`${path('')}&before=${threads.at(-1)?.last_message_id}`,options.current);setThreads(old=>[...new Map([...old,...data.results].map(t=>[t.id,t])).values()]);setMoreThreads(data.has_more);}catch(e){setError(extractErrorMessage(e));}}}>Older conversations</button>}</>:
+        <>{!messages.length&&!loading&&<div className="rounded-none p-2.5 bg-zinc-900/90 border border-zinc-800 text-xs"><p className="font-medium text-zinc-200">How can we help with your order?</p><p className="text-zinc-400 text-[11px] mt-1">Ask about the menu, delivery or an order. Our team will reply live here. Messages do not place an order automatically.</p>{!authenticated&&<p className="text-[10px] text-zinc-500 mt-1">Guest chat stays in this browser. Keep this browser to see replies.</p>}</div>}{more&&<button disabled={loading} onClick={()=>void older()} className="text-amber-400 text-[10px] underline block mx-auto py-1">Load earlier messages</button>}
+        {messages.map(message=>{
+          const mine=message.is_staff===staff;
+          const hasImage=message.attachment?.kind==='image';
+          const hasOnlyImage=hasImage&&!message.text;
+          const mapsUrl=getGoogleMapsUrl(message.text);
+          return <div key={message.id} className={`flex ${mine?'justify-end':'justify-start'}`}>
+            <div className={`max-w-[85%] rounded-none transition-all ${hasOnlyImage?'p-0.5 bg-zinc-900 border border-zinc-800':mine?'px-2.5 py-1.5 bg-amber-400 text-zinc-950 border border-amber-400/80 shadow-sm':'px-2.5 py-1.5 bg-zinc-900 text-zinc-100 border border-zinc-800 shadow-sm'}`}>
+              {message.text&&<p className="whitespace-pre-wrap break-words text-xs leading-relaxed">{message.text}</p>}
+              {mapsUrl&&(
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`mt-1 flex items-center gap-1.5 p-1 rounded-none border transition-colors ${
+                    mine
+                      ? 'bg-amber-300/40 border-amber-600/30 text-zinc-950 hover:bg-amber-300/60'
+                      : 'bg-zinc-800/80 border-zinc-700/60 text-zinc-200 hover:bg-zinc-800'
+                  }`}
+                >
+                  <div className="w-5 h-5 bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+                    <MapPin size={11}/>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-semibold block leading-tight">Live Location Pin</span>
+                    <span className="text-[9px] opacity-80 flex items-center gap-0.5">
+                      Open in Google Maps <ExternalLink size={8}/>
+                    </span>
+                  </div>
+                </a>
+              )}
+              {message.attachment&&<ChatAttachment message={message} accessPath={path(`conversations/${message.conversation_id}/messages/${message.id}/attachment/`)} options={options.current} mine={mine}/>}
+              <div className={`text-[9px] mt-0.5 flex items-center gap-1 ${hasOnlyImage?'px-1 py-0.5 text-zinc-400 justify-end':mine?'text-zinc-800 justify-end':'text-zinc-500 justify-start'}`}>
+                {!mine&&message.is_staff&&<span>CrunchyBag · </span>}
+                <span>{new Date(message.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
+                {mine&&<span>· {(staff?thread?.customer_read_id:thread?.staff_read_id)!>=message.id?'Read':'Sent'}</span>}
+              </div>
+            </div>
+          </div>;
+        })}
+        {pending&&pending.conversation_id===thread?.id&&<div className="ml-4 rounded-none border border-amber-400/60 bg-amber-400/5 p-2 text-xs"><p className="whitespace-pre-wrap break-words">{pending.text}</p>{pending.fileName&&<p className="text-[10px] text-zinc-400 mt-0.5">Attachment: {pending.fileName}</p>}<button disabled={sending} onClick={()=>void send()} className="text-amber-400 text-[11px] underline mt-1">{sending?'Sending...':'Not confirmed - tap to retry'}</button>{!sending&&<button className="ml-3 text-[11px] text-zinc-400 underline" onClick={()=>savePending(null)}>Discard</button>}</div>}
         <div ref={bottom}/></>}
       </div>
-      {thread&&typingId===thread.id&&<p role="status" className="shrink-0 px-4 py-2 text-xs text-amber-400">{staff?thread.customer_name:'CrunchyBag team'} is typing...</p>}
-      {thread&&<AttachmentPicker key={thread.id} disabled={sending||!!pending||loading} onFile={setFile} onError={setError}/>}
-      {thread&&file&&<DraftAttachment file={file} remove={()=>setFile(null)}/>}
-      {thread&&<form onSubmit={e=>{e.preventDefault();void send();}} className="border-t border-zinc-800 p-3 flex items-end gap-2"><textarea aria-label="Message" placeholder="Type your message..." maxLength={2000} rows={2} value={draft} disabled={sending||!!pending} onBlur={()=>indicateTyping(false)} onChange={e=>{setDraft(e.target.value);indicateTyping(!!e.target.value.trim());}} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();void send();}}} className="flex-1 min-w-0 resize-none rounded-xl bg-zinc-900 p-3 text-sm outline-none focus:ring-1 focus:ring-amber-400"/><button aria-label="Send message" disabled={sending||!!pending||(!draft.trim()&&!file)} className="p-3 rounded-xl bg-amber-400 text-black disabled:opacity-40"><Send size={20}/></button></form>}
+
+      {thread&&typingId===thread.id&&(
+        <p role="status" className="shrink-0 px-2.5 py-1 text-[11px] text-amber-400 border-t border-zinc-900 bg-zinc-950/90 flex items-center gap-1.5 animate-pulse">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400"/>
+          {staff?thread.customer_name:'CrunchyBag team'} is typing...
+        </p>
+      )}
+
+      {thread&&<div className="border-t border-zinc-800/90 bg-zinc-900/90 shrink-0">
+        {file&&<DraftAttachment file={file} remove={()=>setFile(null)}/>}
+        <form onSubmit={e=>{e.preventDefault();void send();}} className="p-1 flex items-center gap-1">
+          <AttachmentPicker
+            key={thread.id}
+            disabled={sending||!!pending||loading}
+            onFile={setFile}
+            onError={setError}
+            onLocation={locText=>{
+              setDraft(prev=>prev.trim()?`${prev.trim()}\n${locText}`:locText);
+            }}
+          />
+          <textarea
+            aria-label="Message"
+            placeholder="Type a message..."
+            maxLength={2000}
+            rows={1}
+            value={draft}
+            disabled={sending||!!pending}
+            onBlur={()=>indicateTyping(false)}
+            onChange={e=>{setDraft(e.target.value);indicateTyping(!!e.target.value.trim());}}
+            onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();void send();}}}
+            className="flex-1 min-w-0 resize-none rounded-none bg-zinc-950 border border-zinc-800/90 px-2 py-1 text-xs text-zinc-100 placeholder-zinc-500 outline-none focus:border-amber-400 max-h-20 leading-snug"
+          />
+          <button
+            aria-label="Send message"
+            disabled={sending||!!pending||(!draft.trim()&&!file)}
+            className="h-7 w-7 rounded-none bg-amber-400 text-zinc-950 flex items-center justify-center hover:bg-amber-300 disabled:opacity-30 disabled:hover:bg-amber-400 transition-colors shrink-0"
+          >
+            <Send size={13}/>
+          </button>
+        </form>
+      </div>}
     </section>}
   </div>;
 }
