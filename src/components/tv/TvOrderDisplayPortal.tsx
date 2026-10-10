@@ -119,6 +119,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [menuCarouselIndex, setMenuCarouselIndex] = useState(0);
   const [menuCarouselTransitionEnabled, setMenuCarouselTransitionEnabled] = useState(true);
+  const [menuItemsPerPage, setMenuItemsPerPage] = useState(4);
   const [displayMode, setDisplayMode] = useState<"menu" | "orders">("menu");
 
   // Auto-pagination / scroll page for preparing orders when there are many (8-16+)
@@ -137,10 +138,57 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
     return () => clearInterval(timer);
   }, []);
 
-  // Filter available products for sliding menu ad showcase
+  // Build a category-interleaved rotation so each TV page represents different categories.
   const showcaseProducts = useMemo(() => {
-    return products.filter((p) => p.isAvailable && p.images && p.images.length > 0);
-  }, [products]);
+    const availableProducts = products.filter((product) => product.isAvailable);
+    const productGroups = new Map<string, typeof availableProducts>();
+
+    for (const product of availableProducts) {
+      const group = productGroups.get(product.categoryId) || [];
+      group.push(product);
+      productGroups.set(product.categoryId, group);
+    }
+
+    const categoryIds = categories
+      .slice()
+      .sort((left, right) => left.displayOrder - right.displayOrder || left.name.localeCompare(right.name))
+      .map((category) => category.id);
+    const orderedCategoryIds = [
+      ...categoryIds.filter((id) => productGroups.has(id)),
+      ...Array.from(productGroups.keys()).filter((id) => !categoryIds.includes(id)),
+    ];
+    const orderedProducts: typeof availableProducts = [];
+    let remaining = availableProducts.length;
+
+    while (remaining > 0) {
+      for (const categoryId of orderedCategoryIds) {
+        const nextProduct = productGroups.get(categoryId)?.shift();
+        if (!nextProduct) continue;
+        orderedProducts.push(nextProduct);
+        remaining -= 1;
+      }
+    }
+
+    return orderedProducts;
+  }, [categories, products]);
+
+  const menuPages = useMemo(() => {
+    const pages = [];
+    for (let index = 0; index < showcaseProducts.length; index += menuItemsPerPage) {
+      pages.push(showcaseProducts.slice(index, index + menuItemsPerPage));
+    }
+    return pages;
+  }, [menuItemsPerPage, showcaseProducts]);
+
+  useEffect(() => {
+    const updateItemsPerPage = () => {
+      setMenuItemsPerPage(window.matchMedia("(min-width: 1280px)").matches ? 4 : window.matchMedia("(min-width: 640px)").matches ? 2 : 1);
+    };
+    updateItemsPerPage();
+    window.addEventListener("resize", updateItemsPerPage);
+    return () => window.removeEventListener("resize", updateItemsPerPage);
+  }, []);
+
   const slideImageLoads = useRef(new Map<string, Promise<boolean>>());
   const slideRequestId = useRef(0);
 
@@ -396,38 +444,40 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
   const currentSlideProduct = showcaseProducts[activeSlideIndex] || showcaseProducts[0];
   const currentAnimation = SLIDER_IN_ANIMATIONS[activeSlideIndex % SLIDER_IN_ANIMATIONS.length];
-  const menuCarouselClones = Math.min(4, showcaseProducts.length);
-  const menuCarouselProducts = [
-    ...showcaseProducts,
-    ...showcaseProducts.slice(0, menuCarouselClones),
-  ];
+  const menuCarouselPages = menuPages.length > 1
+    ? [...menuPages, menuPages[0]]
+    : menuPages;
 
   useEffect(() => {
-    if (displayMode !== "menu" || showcaseProducts.length <= 1) return;
+    if (displayMode !== "menu" || menuPages.length <= 1) return;
 
     const interval = window.setInterval(() => {
       setMenuCarouselIndex((index) => index + 1);
     }, 5000);
 
     return () => window.clearInterval(interval);
-  }, [displayMode, showcaseProducts.length]);
+  }, [displayMode, menuPages.length]);
 
   useEffect(() => {
     setMenuCarouselIndex(0);
-  }, [showcaseProducts.length]);
+  }, [menuPages.length, menuItemsPerPage]);
 
   const handleMenuCarouselTransitionEnd = () => {
-    if (menuCarouselIndex < showcaseProducts.length) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setMenuCarouselTransitionEnabled(false);
-      setMenuCarouselIndex(0);
-      window.requestAnimationFrame(() => setMenuCarouselTransitionEnabled(true));
-      return;
-    }
+    if (menuCarouselIndex < menuPages.length) return;
+    setMenuCarouselTransitionEnabled(false);
+    setMenuCarouselIndex(0);
+    window.requestAnimationFrame(() => {
+      setMenuCarouselTransitionEnabled(true);
+    });
+  };
+
+  useEffect(() => {
+    if (menuCarouselIndex < menuPages.length || menuPages.length <= 1) return;
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     setMenuCarouselTransitionEnabled(false);
     setMenuCarouselIndex(0);
     window.requestAnimationFrame(() => setMenuCarouselTransitionEnabled(true));
-  };
+  }, [menuCarouselIndex, menuPages.length]);
 
   if (displayMode === "menu") {
     return (
@@ -439,9 +489,9 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
             <span className="text-sm font-semibold uppercase tracking-[0.28em] text-zinc-300 sm:text-base">Our Menu</span>
           </div>
           <div className="flex items-center gap-5">
-            {showcaseProducts.length > 0 && (
+            {menuPages.length > 0 && (
               <span className="font-mono text-sm tabular-nums text-zinc-400 sm:text-base">
-                {`${(menuCarouselIndex % showcaseProducts.length) + 1} / ${showcaseProducts.length}`}
+                {`Page ${(menuCarouselIndex % menuPages.length) + 1} / ${menuPages.length}`}
               </span>
             )}
             <button
@@ -489,54 +539,64 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
           <main className="min-h-0 flex-1 overflow-hidden py-4 sm:py-6">
             <div
               className={`tv-menu-track flex h-full items-center ${menuCarouselTransitionEnabled ? "" : "tv-menu-track-reset"}`}
-              style={{ transform: `translateX(calc(var(--tv-menu-card-width) * -${menuCarouselIndex}))` }}
+              style={{ transform: `translateX(-${menuCarouselIndex * 100}%)` }}
               onTransitionEnd={handleMenuCarouselTransitionEnd}
             >
-              {menuCarouselProducts.map((product, index) => {
-                const category = categories.find((item) => item.id === product.categoryId);
-                const image = product.images[product.mainImageIndex ?? 0] || product.images[0];
-                const price = product.discountPercent
-                  ? Math.round(product.basePrice * (100 - product.discountPercent) / 100)
-                  : product.basePrice;
+              {menuCarouselPages.map((page, pageIndex) => (
+                <section key={`menu-page-${pageIndex}`} className="tv-menu-page grid h-full min-w-0 grid-cols-1 items-center gap-5 px-5 sm:grid-cols-2 sm:gap-7 sm:px-8 xl:grid-cols-4 xl:gap-5 2xl:gap-8">
+                  {page.map((product) => {
+                    const category = categories.find((item) => item.id === product.categoryId);
+                    const image = product.images[product.mainImageIndex ?? 0] || product.images[0];
+                    const price = product.discountPercent
+                      ? Math.round(product.basePrice * (100 - product.discountPercent) / 100)
+                      : product.basePrice;
 
-                return (
-                  <article
-                    key={`${product.id}-${index >= showcaseProducts.length ? "loop" : "item"}`}
-                    className="tv-menu-slide flex h-full min-w-0 flex-col justify-center px-5 sm:px-8"
-                  >
-                    <div className="tv-menu-image relative aspect-[1.08/1] overflow-hidden bg-zinc-900/70 xl:aspect-[0.72/1]">
-                      <img
-                        src={image}
-                        alt={product.name}
-                        className="h-full w-full object-cover"
-                        loading={index < 4 ? "eager" : "lazy"}
-                        decoding="async"
-                      />
-                      <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent" />
-                    </div>
-                    <div className="flex min-h-28 flex-col justify-center gap-2 px-1 pt-5 sm:pt-6">
-                      {category && (
-                        <p className="truncate text-xs font-semibold uppercase tracking-[0.2em] text-amber-400 sm:text-sm">
-                          {category.name}
-                        </p>
-                      )}
-                      <h2 className="line-clamp-2 text-2xl font-semibold leading-tight text-white sm:text-3xl 2xl:text-4xl">
-                        {product.name}
-                      </h2>
-                      <div className="flex items-baseline gap-3">
-                        <p className="font-mono text-2xl font-bold tabular-nums text-amber-400 sm:text-3xl 2xl:text-4xl">
-                          {formatNPR(price)}
-                        </p>
-                        {product.discountPercent ? (
-                          <span className="font-mono text-base tabular-nums text-zinc-500 line-through sm:text-lg">
-                            {formatNPR(product.basePrice)}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+                    return (
+                      <article
+                        key={product.id}
+                        className="flex min-w-0 flex-col justify-center"
+                      >
+                        <div className="tv-menu-image relative aspect-[1.08/1] overflow-hidden bg-zinc-900/70 xl:aspect-[0.72/1]">
+                          {image ? (
+                            <img
+                              src={image}
+                              alt={product.name}
+                              className="h-full w-full object-cover"
+                              loading={pageIndex === 0 ? "eager" : "lazy"}
+                              decoding="async"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center px-4 text-center text-sm font-semibold uppercase tracking-wider text-zinc-500">
+                              {product.name}
+                            </div>
+                          )}
+                          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent" />
+                        </div>
+                        <div className="flex min-h-28 flex-col justify-center gap-2 px-1 pt-5 sm:pt-6">
+                          {category && (
+                            <p className="truncate text-xs font-semibold uppercase tracking-[0.2em] text-amber-400 sm:text-sm">
+                              {category.name}
+                            </p>
+                          )}
+                          <h2 className="line-clamp-2 text-2xl font-semibold leading-tight text-white sm:text-3xl 2xl:text-4xl">
+                            {product.name}
+                          </h2>
+                          <div className="flex items-baseline gap-3">
+                            <p className="font-mono text-2xl font-bold tabular-nums text-amber-400 sm:text-3xl 2xl:text-4xl">
+                              {formatNPR(price)}
+                            </p>
+                            {product.discountPercent ? (
+                              <span className="font-mono text-base tabular-nums text-zinc-500 line-through sm:text-lg">
+                                {formatNPR(product.basePrice)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </section>
+              ))}
             </div>
           </main>
         ) : (

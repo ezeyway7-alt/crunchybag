@@ -200,8 +200,7 @@
 }
 
 .tv-menu-track {
-  --tv-menu-card-width: 100vw;
-  width: max-content;
+  width: 100%;
   transition: transform 750ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
@@ -210,8 +209,10 @@
   transition: none;
 }
 
-.tv-menu-slide {
-  flex: 0 0 var(--tv-menu-card-width);
+.tv-menu-page {
+  box-sizing: border-box;
+  flex: 0 0 100%;
+  width: 100%;
 }
 
 .tv-menu-image img {
@@ -226,18 +227,6 @@
   to {
     opacity: 1;
     transform: scale(1);
-  }
-}
-
-@media (min-width: 640px) {
-  .tv-menu-track {
-    --tv-menu-card-width: 50vw;
-  }
-}
-
-@media (min-width: 1280px) {
-  .tv-menu-track {
-    --tv-menu-card-width: 25vw;
   }
 }
 
