@@ -169,6 +169,31 @@ export const todayNepal = () =>
 export const activeOrder = (o: PosOrder) =>
   !["COMPLETED", "CANCELLED"].includes(o.status);
 
+export function isPosOrderAppendable(order?: Order | PosOrder | null): boolean {
+  if (!order) return false;
+  const raw: PosOrder | undefined = (order as any)._posOrder || (order as PosOrder);
+  if (!raw) return false;
+
+  // Cancelled or voided orders can never accept additional items
+  const status = raw.status || (order as Order).status;
+  if (status === "CANCELLED") return false;
+
+  // Billed / finalized orders cannot accept additional items
+  if (raw.billed_at) return false;
+  if ("settledAt" in order && order.settledAt) return false;
+  if ("isBilled" in order && order.isBilled) return false;
+
+  // Fully paid / settled orders cannot be appended without starting a new tab
+  const isPaid =
+    raw.settlement === "PAID" ||
+    ("paymentStatus" in order && order.paymentStatus === "PAID" && Number(raw.due_amount || 0) <= 0) ||
+    (Number(raw.due_amount || 0) <= 0 && Number(raw.paid_amount || 0) > 0);
+  if (isPaid) return false;
+
+  // Items can be added until billing or payment, including after kitchen completion
+  return true;
+}
+
 export function posOrderToOrder(
   posOrder: PosOrder,
   outletName?: string,
@@ -256,7 +281,10 @@ export function posOrderToOrder(
     splitPayments: [...splitPayments, ...(Number(posOrder.credit_amount) > 0 ? [{ method: "CREDIT" as PaymentMethod, amount: Number(posOrder.credit_amount) }] : [])],
     tableNumber: posOrder.table_number || undefined,
     deliveryAddress: posOrder.delivery_address || undefined,
-    _posOrder: posOrder,
+    _posOrder: {
+      ...posOrder,
+      can_append: isPosOrderAppendable(posOrder),
+    },
   } as Order & { _posOrder: PosOrder };
 }
 

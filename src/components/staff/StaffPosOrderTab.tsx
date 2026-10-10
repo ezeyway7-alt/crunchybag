@@ -60,7 +60,7 @@ import {
   usePosCommand,
   posOrderToOrder,
   printPosReceipt,
-  PosLine, backendOrder, todayNepal, toPosMethod, posPath, posError,
+  PosLine, backendOrder, todayNepal, toPosMethod, posPath, posError, isPosOrderAppendable,
 } from "../../lib/posApi";
 import { usePosMenu, usePosQuote, usePosOrderFeed, usePosReceipt } from "../../lib/posWorkspace";
 import { posStatistics } from "../../lib/posLegacy";
@@ -163,7 +163,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   const backendOngoingQuery = usePosOrderFeed(posSession, { open_tabs: true });
   const registerQuery = usePosOrderFeed(posSession, { ...(startDate ? { start_date: startDate } : {}), ...(endDate ? { end_date: endDate } : {}) });
   const orders: Order[] = useMemo(() => registerQuery.results.map(po => posOrderToOrder(po, currentOutlet.name)), [registerQuery.results, currentOutlet.name]);
-  const ongoingOrders: Order[] = useMemo(() => backendOngoingQuery.results.filter(po => po.can_append).map(po => posOrderToOrder(po, currentOutlet.name)), [backendOngoingQuery.results, currentOutlet.name]);
+  const ongoingOrders: Order[] = useMemo(() => backendOngoingQuery.results.filter(po => isPosOrderAppendable(po)).map(po => posOrderToOrder(po, currentOutlet.name)), [backendOngoingQuery.results, currentOutlet.name]);
   const targetOngoingOrder = (selectedOngoingOrderId ? [...ongoingOrders, ...orders].find(o => o.id === selectedOngoingOrderId) : ongoingOrders[0]) || null;
   const mergedOrders = orders;
   const findOrder = (id: string) => [...orders, ...ongoingOrders].find(o => o.id === id);
@@ -291,7 +291,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
   };
   const handleAddItemsToOngoingOrder = async () => {
     const order = backendOrder(targetOngoingOrder);
-    if (cannotSave || !order?.can_append || !selectedItems.length) return;
+    if (cannotSave || !isPosOrderAppendable(order) || !selectedItems.length) return;
     const result = await posCommand.run(`${order.id}/append/`, { items: lines, version: quote.quote!.order_version, expected_total: quote.quote!.total_payable });
     if (result) { setSelectedItems([]); addToast({ title: 'Round added', description: result.order_number, type: 'success' }); }
   };
@@ -315,7 +315,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
 
   // Initiate Adding Items from Table Row
   const handleStartAddingItemsToOrder = (order: Order) => {
-    if(!backendOrder(order)?.can_append){addToast({title:'This order cannot accept more items',description:'Items can be added until billing or payment, including after kitchen completion.',type:'info'});return;}
+    if(!isPosOrderAppendable(order)){addToast({title:'This order cannot accept more items',description:'Items can be added until billing or payment, including after kitchen completion.',type:'info'});return;}
     setPosMode("ADD_TO_ONGOING");
     setSelectedOngoingOrderId(order.id);
     setSelectedItems([]);
@@ -858,7 +858,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                   <button
                     type="button"
                     onClick={handleAddItemsToOngoingOrder}
-                    disabled={cannotSave || selectedItems.length === 0 || !backendOrder(targetOngoingOrder)?.can_append}
+                    disabled={cannotSave || selectedItems.length === 0 || !isPosOrderAppendable(targetOngoingOrder)}
                     className="h-11 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
@@ -1866,7 +1866,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                       <td className="p-2.5 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* Add Items to Ongoing Order Tab */}
-                          {backendOrder(order)?.can_append && (
+                          {isPosOrderAppendable(order) && (
                             <button
                               type="button"
                               onClick={() => handleStartAddingItemsToOrder(order)}
@@ -2236,7 +2236,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
               )}
 
               {/* Add more items to ongoing tab */}
-              {backendOrder(selectedOrderForDrawer)?.can_append && (
+              {isPosOrderAppendable(selectedOrderForDrawer) && (
                 <button
                   type="button"
                   onClick={() => {

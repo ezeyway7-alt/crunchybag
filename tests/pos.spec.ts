@@ -729,6 +729,31 @@ for (const status of ['ACCEPTED', 'PREPARING', 'READY', 'COMPLETED']) {
   });
 }
 
+test('POS unbilled COMPLETED order allows adding more items even when backend can_append is false', async ({ page }) => {
+  const state = await setup(page);
+  await addBurger(page); await fireOrder(page).click();
+  await expect.poll(() => state.orders.length).toBe(1);
+  state.orders[0].status = 'COMPLETED';
+  state.orders[0].can_append = false;
+  state.orders[0].billed_at = null;
+  state.orders[0].settlement = 'UNPAID';
+  state.orders[0].due_amount = '220.00';
+  await page.goto('/admin?tab=pos_orders');
+  await expect(page.getByRole('button', { name: 'Add', exact: true }).first()).toBeVisible();
+
+  await page.getByTitle('View Full Order Drawer').first().click();
+  const drawerAddBtn = page.getByRole('button', { name: 'Add More Items to Active Tab', exact: true });
+  await expect(drawerAddBtn).toBeVisible();
+  await drawerAddBtn.click();
+
+  await addBurger(page);
+  const addRoundBtn = page.getByRole('button', { name: 'Add Round to Tab', exact: true });
+  await expect(addRoundBtn).toBeEnabled();
+  await addRoundBtn.click();
+
+  await expect.poll(() => state.writes.filter(w => w.path.endsWith('/append/')).length).toBe(1);
+});
+
 test('dashboard totals use today POS orders without historical open tabs', async ({page}) => {
   test.setTimeout(60000);
   const state = await setup(page);

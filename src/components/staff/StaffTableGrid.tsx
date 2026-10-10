@@ -39,7 +39,7 @@ export const StaffTableGrid: React.FC<Props> = ({
   const tableOrderMap: Record<string, Order> = {};
   (posMeta?.tables || []).forEach((table: any) => {
     const order = orders.find((o) => {
-      if (o.status === "COMPLETED" || o.status === "CANCELLED") return false;
+      if (o.status === "CANCELLED") return false;
       const isSettled =
         (o.isBilled && o.paymentStatus === "PAID") ||
         (o as any)._posOrder?.settlement === "PAID";
