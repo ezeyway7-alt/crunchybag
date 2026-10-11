@@ -253,6 +253,33 @@ test('guest can place an order and track it with the saved order number and chec
   expect(trackingCalls.at(-1)).toEqual({order_number:'WEB-REAL-7',customer_phone:'9841234567'});
 });
 
+test('guest checkout recognizes local numbers starting with 977 and country-code formats',async({page})=>{
+  const state=await setup(page);
+  await openCheckout(page);
+  await page.getByRole('button',{name:'Continue as a guest'}).click();
+  await expect(page.getByAltText('Merchant payment QR')).toBeVisible();
+  await page.getByLabel('Full Name').fill('Guest Customer');
+  await receipt(page);
+  const phone=page.getByRole('textbox',{name:'Phone Number',exact:true});
+  const submit=page.getByRole('button',{name:/Submit Receipt & Place Order/});
+  for(const value of ['9771234567','+977 9771234567','9779771234567','09771234567']) {
+    await phone.fill('');
+    await expect(submit).toBeDisabled();
+    const quote=page.waitForRequest(request=>request.url().includes('/customer/checkout/quote/') && request.postDataJSON().customer_phone==='+9779771234567');
+    await phone.fill(value);
+    await quote;
+    await expect(submit).toBeEnabled();
+    await expect(page.getByText('Enter a valid 10-digit Nepali mobile number.',{exact:true})).toHaveCount(0);
+  }
+  await phone.fill('977123456');
+  await expect(submit).toBeDisabled();
+  await phone.fill('9771234567');
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect.poll(()=>state.created).toBe(1);
+  expect(state.lastPayload.customer_phone).toBe('+9779771234567');
+});
+
 test('returning customer can use mobile and PIN or password; favourites persist',async({page})=>{
   const state=await setup(page);await page.getByRole('button',{name:'User Account Profile'}).click();await page.getByRole('button',{name:'Sign In / Sign Up',exact:true}).click();
   await page.getByLabel('Mobile Phone Number',{exact:true}).fill('9800000000');await page.getByLabel('Account Password or PIN').fill('1234');

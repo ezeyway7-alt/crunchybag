@@ -169,7 +169,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const cleanAddress = (deliveryAddress || '').trim();
   const canonicalPhone = (value: string) => {
     let digits = (value || '').replace(/\D/g, '');
-    if (digits.startsWith('977')) digits = digits.slice(3);
+    if (digits.length === 13 && digits.startsWith('977')) digits = digits.slice(3);
     if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
     return /^9[78]\d{8}$/.test(digits) ? `+977${digits}` : '';
   };
