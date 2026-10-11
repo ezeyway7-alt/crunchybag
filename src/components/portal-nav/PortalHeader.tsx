@@ -14,12 +14,10 @@ import {
   Sun,
   User,
   Package,
-  QrCode,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import { useAuth } from "../../context/AuthContext";
 import { CrunchyLogo } from "../common/CrunchyLogo";
-import { QrOrderTrackAndReviewModal } from "../customer/QrOrderTrackAndReviewModal";
 
 export const PortalHeader: React.FC = () => {
   const {
@@ -45,7 +43,6 @@ export const PortalHeader: React.FC = () => {
   const { authUser, logout: authLogout } = useAuth();
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [isScanQrOpen, setIsScanQrOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   // Close profile menu when clicking outside or pressing Escape
@@ -295,23 +292,6 @@ export const PortalHeader: React.FC = () => {
                       <span>Track Order</span>
                     </a>
 
-                    {/* 3. Scan QR Slip & Rate/Review */}
-                    <button
-                      id="menu-scan-qr-slip-btn"
-                      onClick={() => {
-                        setIsProfileMenuOpen(false);
-                        setIsScanQrOpen(true);
-                      }}
-                      className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-amber-400 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <QrCode className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span>Track QR Slip & Review</span>
-                      </div>
-                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-amber-500/20 text-amber-500">
-                        Scan
-                      </span>
-                    </button>
                   </div>
 
                   {/* Separator + Logout — only for logged-in customers */}
@@ -357,11 +337,6 @@ export const PortalHeader: React.FC = () => {
         </div>
       </div>
 
-      {/* Scanned QR Slip Order Tracker & Rate/Review Modal */}
-      <QrOrderTrackAndReviewModal
-        isOpen={isScanQrOpen}
-        onClose={() => setIsScanQrOpen(false)}
-      />
     </header>
   );
 };

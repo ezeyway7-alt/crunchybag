@@ -668,3 +668,61 @@ test('checkout carries anonymous attribution without claiming verified payment',
   expect(events.some(e=>['order_success','payment_success'].includes(e.name))).toBe(false);
   expect(JSON.stringify(events)).not.toContain('+9779841234567');
 });
+
+
+for (const width of [390, 1280]) {
+  test(`menu filters stick below the header at ${width}px`, async ({page}) => {
+    await page.setViewportSize({width,height:720});
+    await setup(page);
+    await expect(page.getByText('Scan Slip & Rate',{exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'User Account Profile'}).click();
+    await expect(page.getByRole('link',{name:'Track Order',exact:true})).toHaveAttribute('href','/track');
+    await expect(page.getByText('Track QR Slip & Review',{exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'User Account Profile'}).click();
+    // Provide a long menu independent of the two-product API fixture.
+    await page.locator('#menu').evaluate(element => { element.style.minHeight='2400px'; });
+    await page.evaluate(()=>window.scrollTo(0,700));
+    await expect.poll(async()=>page.locator('#categories-rail').evaluate(element=>Math.round(element.getBoundingClientRect().top))).toBe(width<768?105:65);
+    await page.evaluate(()=>window.scrollTo(0,1000));
+    await expect.poll(async()=>page.locator('#categories-rail').evaluate(element=>Math.round(element.getBoundingClientRect().top))).toBe(width<768?105:65);
+    await expect(page.locator('#category-tab-all')).toBeInViewport();
+  });
+}
+
+test('completed tracking orders request a review and retain the server-saved result',async({page})=>{
+  await setup(page);
+  let review:any=null;
+  let status='READY';
+  let fail=true;
+  let submitted:any=null;
+  await page.route('**/api/v1/customer/guest-orders/track/',route=>route.fulfill({json:{
+    order_number:'W-11',outlet_id:1,outlet_name:'Web Outlet',status,fulfillment_type:'TAKEAWAY',rounds:[],history:[],review,
+  }}));
+  await page.route('**/api/v1/customer/order-review/',async route=>{
+    submitted=route.request().postDataJSON();
+    if(fail){fail=false;return route.fulfill({status:503,json:{detail:'Please try again.'}});}
+    review={rating:submitted.rating,comment:submitted.comment};
+    await route.fulfill({json:review});
+  });
+  await page.goto('/track?order_number=W-11');
+  await page.getByLabel('Checkout phone number').fill('9841234567');
+  await page.getByRole('button',{name:'Find order'}).click();
+  await expect(page.getByRole('heading',{name:'W-11'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'How was your order?'})).toHaveCount(0);
+  status='COMPLETED';
+  await page.getByRole('button',{name:'Find order'}).click();
+  await expect(page.getByRole('heading',{name:'How was your order?'})).toBeVisible();
+  await page.getByRole('combobox',{name:'Rating',exact:true}).selectOption('4');
+  await page.getByLabel('Review (optional)').fill('Fresh and tasty');
+  await page.getByRole('button',{name:'Submit review'}).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByLabel('Review (optional)')).toHaveValue('Fresh and tasty');
+  await page.getByRole('button',{name:'Submit review'}).click();
+  await expect(page.getByText('Thank you! Your review has been saved (4/5).')).toBeVisible();
+  expect(submitted).toEqual({order_number:'W-11',customer_phone:'9841234567',rating:4,comment:'Fresh and tasty'});
+  await page.reload();
+  await page.getByLabel('Checkout phone number').fill('9841234567');
+  await page.getByRole('button',{name:'Find order'}).click();
+  await expect(page.getByText('Thank you! Your review has been saved (4/5).')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Submit review'})).toHaveCount(0);
+});

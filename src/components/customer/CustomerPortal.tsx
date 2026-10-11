@@ -384,7 +384,7 @@ export const CustomerPortal: React.FC = () => {
           {/* Sticky Category Rail & Allergen/Dietary Filters */}
           <div
             id="categories-rail"
-            className="sticky top-[98px] md:top-16 z-30 bg-[#0A0A0B]/95 backdrop-blur-md py-2.5 -mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-zinc-800 space-y-2"
+            className="sticky top-[105px] md:top-[65px] z-30 bg-[#0A0A0B]/95 backdrop-blur-md py-2.5 -mx-4 sm:-mx-6 px-4 sm:px-6 border-b border-zinc-800 space-y-2"
           >
             {/* Row 1: Categories */}
             <div className="flex items-center justify-between gap-3">
@@ -492,21 +492,6 @@ export const CustomerPortal: React.FC = () => {
                 })}
               </div>
 
-              {/* Direct Quick Shortcut: Scan QR Tracker & Rate */}
-              <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedModalOrder(latestOrder);
-                    setIsQrReviewModalOpen(true);
-                  }}
-                  className="h-6.5 px-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 text-[11px] font-black flex items-center gap-1 border border-amber-500/30 transition-colors cursor-pointer"
-                  title="Scan printed QR slip to track & rate experience"
-                >
-                  <QrCode className="w-3 h-3" />
-                  <span>Scan Slip & Rate</span>
-                </button>
-              </div>
             </div>
           </div>
 

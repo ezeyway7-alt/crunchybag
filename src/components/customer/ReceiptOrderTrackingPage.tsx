@@ -6,6 +6,7 @@ import { customerPath, getSavedGuestOrders } from '../../lib/customerApi';
 import {useOutletEvents} from '../../lib/useOutletEvents';
 import {CrunchyLogo} from '../common/CrunchyLogo';
 import {ArrowLeft} from 'lucide-react';
+import {CompletedOrderReview} from './CompletedOrderReview';
 
 export const ReceiptOrderTrackingPage:React.FC=()=>{
   const params = new URLSearchParams(window.location.search);
@@ -15,13 +16,14 @@ export const ReceiptOrderTrackingPage:React.FC=()=>{
   const [lookupSubmitted,setLookupSubmitted]=useState(false);
   const [order,setOrder]=useState<any>(null),[error,setError]=useState('');
   const [savedOrders]=useState(getSavedGuestOrders);
+  const [verifiedPhone,setVerifiedPhone]=useState('');
   const sequence=useRef(0);
   const trackGuestOrder=async(number:string,phoneNumber:string):Promise<boolean>=>{
     const seq=++sequence.current;
     try{
       const row=await apiClient.post<any>(customerPath('guest-orders/track/'),{order_number:number,customer_phone:phoneNumber},{skipAuth:true});
       if(!row.order_number || !row.outlet_id)throw new Error('Order tracking is unavailable.');
-      if(seq===sequence.current){setOrder(row);setError('');return true;}
+      if(seq===sequence.current){setOrder(row);setVerifiedPhone(phoneNumber);setError('');return true;}
       return false;
     }catch(error:any){if(seq===sequence.current){if(error instanceof ApiError && error.status===404)setOrder(null);setError(extractErrorMessage(error));}return false;}
   };
@@ -96,6 +98,8 @@ export const ReceiptOrderTrackingPage:React.FC=()=>{
         <OrderRoundsPanel order={order}/>
         <p className="text-[11px] text-zinc-500">{error?'Last known status':live?'Live updates connected':'Connecting to live updates...'}</p>
       </section>}
+      {order?.status==='COMPLETED' && <CompletedOrderReview key={order.order_number} savedReview={order.review}
+        credentials={token ? {token} : {order_number:order.order_number,customer_phone:verifiedPhone}}/>}
     </div>
   </main>;
 };
