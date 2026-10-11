@@ -285,6 +285,16 @@ export const PortalHeader: React.FC = () => {
                       )}
                     </button>
 
+                    <a
+                      id="menu-track-order-link"
+                      href="/track"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-zinc-200 hover:bg-amber-500/10 hover:text-amber-400 transition-colors text-left cursor-pointer"
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-hidden="true" />
+                      <span>Track Order</span>
+                    </a>
+
                     {/* 3. Scan QR Slip & Rate/Review */}
                     <button
                       id="menu-scan-qr-slip-btn"

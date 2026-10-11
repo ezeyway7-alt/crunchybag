@@ -5,6 +5,7 @@ import {apiClient,ApiError} from '../../lib/api';
 import { customerPath, getSavedGuestOrders } from '../../lib/customerApi';
 import {useOutletEvents} from '../../lib/useOutletEvents';
 import {CrunchyLogo} from '../common/CrunchyLogo';
+import {ArrowLeft} from 'lucide-react';
 
 export const ReceiptOrderTrackingPage:React.FC=()=>{
   const params = new URLSearchParams(window.location.search);
@@ -65,6 +66,9 @@ export const ReceiptOrderTrackingPage:React.FC=()=>{
   return <main className="min-h-screen bg-[#09090b] text-zinc-100 px-4 py-6">
     <div className="max-w-md mx-auto space-y-4">
       <header className="flex justify-between items-center"><CrunchyLogo size="sm"/><span className="text-xs text-zinc-400">Order tracking</span></header>
+      <a href="/" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-amber-400 hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-400">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true"/>Back to website
+      </a>
       {error && <div role="alert" className="p-3 border border-rose-500/30 text-xs text-rose-300">{error}<button type="button" onClick={()=>void refresh()} className="ml-2 underline">Retry</button></div>}
       {!token && <form onSubmit={submitGuestLookup} className="bg-zinc-900 border border-zinc-800 p-4 space-y-3">
         <div><h1 className="font-bold text-lg">Track a guest order</h1><p className="text-xs text-zinc-400">Enter the order number and the phone used at checkout.</p></div>
