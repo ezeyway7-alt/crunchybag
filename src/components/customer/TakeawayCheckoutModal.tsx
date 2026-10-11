@@ -58,9 +58,19 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   // 1. By default, DELIVERY is selected as requested!
   const [selectedFulfillment, setSelectedFulfillment] = useState<FulfillmentType>("DELIVERY");
 
+  const getInitialPhone = () => {
+    const authPhone = (authUser as any)?.phone || (authUser as any)?.phone_number || customerProfile.phone || '';
+    if (authPhone) return authPhone;
+    try {
+      return sessionStorage.getItem('customer:guest-order-phone') || localStorage.getItem('crunchy:guest-phone') || '';
+    } catch {
+      return '';
+    }
+  };
+
   // Contact info
   const [name, setName] = useState(customerProfile.name || authUser?.name || authUser?.username || "");
-  const [phone, setPhone] = useState(customerProfile.phone || (authUser as any)?.phone || (authUser as any)?.phone_number || "");
+  const [phone, setPhone] = useState(getInitialPhone);
   const [notes, setNotes] = useState("");
 
   // Delivery address & location state
@@ -169,14 +179,22 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   const cleanAddress = (deliveryAddress || '').trim();
   const canonicalPhone = (value: string) => {
     let digits = (value || '').replace(/\D/g, '');
-    if (digits.length === 13 && digits.startsWith('977')) digits = digits.slice(3);
-    if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
-    return /^9[78]\d{8}$/.test(digits) ? `+977${digits}` : '';
+    if (digits.startsWith('00977')) digits = digits.slice(5);
+    else if (digits.startsWith('977')) digits = digits.slice(3);
+    else if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
+    return /^9\d{9}$/.test(digits) ? `+977${digits}` : '';
   };
   const phoneFromInput = canonicalPhone(cleanPhone);
   const fallbackPhone =
     canonicalPhone(customerProfile.phone || '') ||
-    canonicalPhone((authUser as any)?.phone || (authUser as any)?.phone_number || '');
+    canonicalPhone((authUser as any)?.phone || (authUser as any)?.phone_number || '') ||
+    (() => {
+      try {
+        return canonicalPhone(sessionStorage.getItem('customer:guest-order-phone') || localStorage.getItem('crunchy:guest-phone') || '');
+      } catch {
+        return '';
+      }
+    })();
   const effectivePhone = cleanPhone ? phoneFromInput : (fallbackPhone || phoneFromInput);
 
   const payload = {outlet_id:Number(currentOutlet.id),items:cartLines(cart.items),fulfillment_type:selectedFulfillment,
@@ -199,6 +217,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
       try {
         const rawPhone = cleanPhone || (effectivePhone ? effectivePhone.replace('+977', '') : '');
         sessionStorage.setItem('customer:guest-order-phone', rawPhone);
+        localStorage.setItem('crunchy:guest-phone', rawPhone);
       } catch {}
     }
     customerRefresh();onClose();onOrderSuccess(String(order.id), String(order.order_number || ''));
@@ -208,7 +227,16 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     trackEvent('checkout_start',cartMetadata(cart));
     addressInitialized.current=false;setDeliveryAddress('');setDeliveryLocation(undefined);setSelectedAddressId('');setSaveAddress(false);
     setIsLocatingCurrent(false);setGeoError('');
-    setName(authUser?.name || authUser?.username || customerProfile.name || '');setPhone((authUser as any)?.phone || (authUser as any)?.phone_number || customerProfile.phone || '');setError(null);setProofError('');setTouched(false);setProof(null);setMeta(null);
+    setName((prev) => prev || authUser?.name || authUser?.username || customerProfile.name || '');
+    const initialSavedPhone = (authUser as any)?.phone || (authUser as any)?.phone_number || customerProfile.phone || (() => {
+      try {
+        return sessionStorage.getItem('customer:guest-order-phone') || localStorage.getItem('crunchy:guest-phone') || '';
+      } catch {
+        return '';
+      }
+    })();
+    setPhone((prev) => (prev ? prev : initialSavedPhone));
+    setError(null);setProofError('');setTouched(false);setProof(null);setMeta(null);
     const controller=new AbortController();let live=true;
     apiClient.get<any>(`${customerPath('checkout/meta/')}?outlet_id=${currentOutlet.id}`,{signal:controller.signal,skipAuth:true})
       .then(result=>{if(live){setMeta(result);if(result?.fulfillment_modes && !result.fulfillment_modes.includes(selectedFulfillment))setSelectedFulfillment(result.fulfillment_modes[0] || 'TAKEAWAY');}})
@@ -567,7 +595,15 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
                 <Input
                   label="Phone Number"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPhone(val);
+                    try {
+                      const digits = val.replace(/\D/g, '');
+                      const raw = digits.length > 10 && digits.startsWith('977') ? digits.slice(3) : digits;
+                      if (raw) sessionStorage.setItem('customer:guest-order-phone', raw);
+                    } catch {}
+                  }}
                   readOnly={!isGuestCheckout && Boolean((authUser as any)?.phone || (authUser as any)?.phone_number)}
                   placeholder="98XXXXXXXX"
                   autoComplete="tel"

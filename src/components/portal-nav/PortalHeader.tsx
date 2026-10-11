@@ -187,17 +187,18 @@ export const PortalHeader: React.FC = () => {
               )}
             </button>
 
-            {/* Cart Icon */}
+            {/* Cart Button with Text and Icon */}
             <button
               id="header-cart-btn"
               onClick={() => setIsCartDrawerOpen(true)}
-              className="relative flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 transition-colors cursor-pointer"
+              className="relative flex items-center gap-1.5 h-9 sm:h-10 px-2.5 sm:px-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700 transition-colors cursor-pointer"
               aria-label="Shopping Cart"
               title="View Cart"
             >
-              <ShoppingBag className="h-4 w-4 font-bold" />
+              <ShoppingBag className="h-4 w-4 font-bold text-amber-500 shrink-0" />
+              <span className="text-xs sm:text-sm font-bold tracking-tight">Cart</span>
               {cart.items.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-amber-500 text-black text-[10px] font-black h-4 min-w-4 sm:h-4.5 sm:min-w-4.5 px-1 flex items-center justify-center border border-zinc-900">
+                <span className="bg-amber-500 text-black text-[10px] font-black h-4 min-w-4 sm:h-4.5 sm:min-w-4.5 px-1 flex items-center justify-center border border-zinc-900 ml-0.5">
                   {cart.items.reduce((sum, item) => sum + item.quantity, 0)}
                 </span>
               )}

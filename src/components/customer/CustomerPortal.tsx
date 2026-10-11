@@ -598,8 +598,13 @@ export const CustomerPortal: React.FC = () => {
         }}
         isOpen={isAuthOpen}
         onClose={() => {setIsAuthOpen(false);setResumeCheckout(false);sessionStorage.removeItem('customer:return-to-checkout');}}
-        onContinueAsGuest={resumeCheckout ? () => {
-          try { sessionStorage.setItem('customer:is-guest-checkout', 'yes'); } catch {}
+        onContinueAsGuest={resumeCheckout ? (guestPhone?: string) => {
+          try {
+            sessionStorage.setItem('customer:is-guest-checkout', 'yes');
+            if (guestPhone) {
+              sessionStorage.setItem('customer:guest-order-phone', guestPhone);
+            }
+          } catch {}
           sessionStorage.removeItem('customer:return-to-checkout');
           setResumeCheckout(false);
           setIsAuthOpen(false);

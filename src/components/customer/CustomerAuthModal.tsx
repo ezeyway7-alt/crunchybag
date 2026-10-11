@@ -13,7 +13,7 @@ interface CustomerAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
-  onContinueAsGuest?: () => void;
+  onContinueAsGuest?: (phone?: string) => void;
 }
 
 type AuthView = "LOGIN" | "SIGNUP_PHONE" | "SIGNUP_OTP" | "SIGNUP_PROFILE" | "OTP_LOGIN_PHONE" | "OTP_LOGIN_OTP" | "RESET_PASSWORD";
@@ -128,7 +128,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     const cleanPhone = phone.trim().replace(/\D/g, "");
     const cleanCred = credential;
 
-    if (!/^(?:977)?9[78]\d{8}$/.test(cleanPhone)) {
+    if (!/^(?:977)?9\d{9}$/.test(cleanPhone)) {
       setError("Please enter your 10-digit mobile number.");
       return;
     }
@@ -162,7 +162,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   const handleSendSignupOtp = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPhone = phone.trim().replace(/\D/g, "");
-    if (!/^(?:977)?9[78]\d{8}$/.test(cleanPhone)) {
+    if (!/^(?:977)?9\d{9}$/.test(cleanPhone)) {
       setError("Please enter a valid 10-digit mobile number.");
       return;
     }
@@ -325,7 +325,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   const handleSendOtpLogin = (e?: React.FormEvent) => {
     e?.preventDefault();
     const cleanPhone=phone.trim().replace(/\D/g,'');
-    if(!/^(?:977)?9[78]\d{8}$/.test(cleanPhone)){setError('Enter a valid Nepal mobile number.');return;}
+    if(!/^(?:977)?9\d{9}$/.test(cleanPhone)){setError('Enter a valid Nepal mobile number.');return;}
     void perform(async()=>{
       const result=await apiClient.post<any>(customerPath('auth/recovery-start/'),{phone:cleanPhone,outlet_id:/^\d+$/.test(String(currentOutlet?.id))?currentOutlet.id:undefined},{skipAuth:true});
       setChallenge(result.challenge_id);setOtpDigits(['','','','']);
@@ -457,7 +457,13 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 variant="secondary"
                 size="md"
                 disabled={busy}
-                onClick={onContinueAsGuest}
+                onClick={() => {
+                  const p = phone.trim();
+                  if (p) {
+                    try { sessionStorage.setItem('customer:guest-order-phone', p); } catch {}
+                  }
+                  onContinueAsGuest(p);
+                }}
                 className="w-full font-bold h-10 rounded-none border border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
               >
                 Continue as a guest
@@ -478,7 +484,13 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   inputMode="numeric"
                   placeholder="98XXXXXXXX"
                   value={phone}
-                  onChange={(e) => setPhone(localPhone(e.target.value))}
+                  onChange={(e) => {
+                    const val = localPhone(e.target.value);
+                    setPhone(val);
+                    if (val) {
+                      try { sessionStorage.setItem('customer:guest-order-phone', val); } catch {}
+                    }
+                  }}
                   autoComplete="tel"
                   className="flex-1 px-3 py-2.5 bg-transparent text-base sm:text-sm text-zinc-900 dark:text-white outline-none placeholder:text-zinc-400 font-medium rounded-none"
                   required
