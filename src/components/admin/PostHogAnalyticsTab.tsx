@@ -37,6 +37,8 @@ type Overview = {
       daily?: {date: string; visitors: number; sessions: number; page_views: number}[];
       top_events?: {event: string; events: number; visitors: number}[];
       top_pages?: {path: string; page_views: number; visitors: number}[];
+      chat_events?: {event:string;events:number;visitors:number}[];
+      chat_pages?: {path:string;opens:number;messages:number;failures:number;visitors:number}[];
       funnel?: {step: string; sessions: number}[];
       last_steps?: {event: string; sessions: number; visitors: number}[];
       friction?: {event: string; category: string; events: number; sessions: number}[];
@@ -47,6 +49,10 @@ type Overview = {
 
 const panel = 'bg-[#121214] border border-zinc-800 rounded-lg p-3';
 const actionLabels: Record<string, string> = {
+  chat_icon_click: 'Chat opens / icon clicks',
+  chat_message_sent: 'Chat messages sent',
+  chat_message_failed: 'Chat send failures',
+  chat_closed: 'Chat closes',
   login_started: 'Sign-in started',
   login_success: 'Signed in',
   login_failed: 'Sign-in failed',
@@ -88,12 +94,12 @@ function money(value: string) {
   return `NPR ${Number(value || 0).toLocaleString('en-NP', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 }
 
-function Metric({label, value}: {label: string; value: string}) {
+const Metric:React.FC<{label: string; value: string}> = ({label, value}) => {
   return <article className="min-w-0">
     <p className="text-[10px] leading-tight text-zinc-500">{label}</p>
     <p className="mt-0.5 break-words text-sm font-semibold tabular-nums text-zinc-100">{value}</p>
   </article>;
-}
+};
 
 function actionLabel(event: string, category = '') {
   const label = actionLabels[event] || event.replace(/_/g, ' ');
@@ -305,6 +311,27 @@ export function PostHogAnalyticsTab() {
           </div>
           <div className="grid items-start gap-3 lg:grid-cols-2">
             <div className="space-y-3">
+              <section aria-label="Chat activity" className={`${panel} space-y-3`}>
+                <h3 className="text-xs font-semibold">Chat activity</h3>
+                {!Array.isArray(visitors.chat_events) ? <p className="text-xs text-zinc-500">Chat reporting is not available in this snapshot yet.</p> : <>
+                  <div className="grid grid-cols-2 gap-3">
+                    {['chat_icon_click','chat_message_sent','chat_message_failed','chat_closed'].map(event=><Metric key={event} label={actionLabel(event)} value={(visitors.chat_events?.find(row=>row.event===event)?.events || 0).toLocaleString()}/>)}
+                  </div>
+                  {visitors.chat_events.length===0 && <p className="text-xs text-zinc-500">No chat activity recorded in this period.</p>}
+                  <p className="text-[10px] text-zinc-500">Customer activity only. Opens include both chat buttons and repeat clicks. Sent messages count successful confirmations; failed sends count attempts. Tracking starts with this update and respects browser privacy settings.</p>
+                  {!!visitors.chat_pages?.length && <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left whitespace-nowrap">
+                      <caption className="text-left font-semibold pb-2">Chat activity by page · top 25</caption>
+                      <thead className="text-zinc-500"><tr>{['Page','Opens','Messages','Failures','Visitors'].map(label=><th key={label} className="py-2 pr-3">{label}</th>)}</tr></thead>
+                      <tbody>{visitors.chat_pages.map(row=><tr key={row.path} className="border-t border-zinc-800"><td className="py-2 pr-3">{row.path}</td>{[row.opens,row.messages,row.failures,row.visitors].map((value,index)=><td key={index} className="py-2 pr-3 tabular-nums">{value.toLocaleString()}</td>)}</tr>)}</tbody>
+                    </table>
+                  </div>}
+                </>}
+              </section>
+              <div className={`${panel} space-y-2`}>
+                <h3 className="text-xs font-semibold">Page actions and clicks</h3>
+                {visitors.top_events?.length ? <div className="divide-y divide-zinc-800">{visitors.top_events.map(row=><div key={row.event} className="flex justify-between gap-3 py-1.5 text-xs"><span>{actionLabel(row.event)}</span><span className="shrink-0 text-zinc-400">{row.events} actions · {row.visitors} visitors</span></div>)}</div> : <p className="text-xs text-zinc-500">No page actions recorded in this period.</p>}
+              </div>
               <div className={`${panel} space-y-2`}>
                 <h3 className="text-xs font-semibold">Visitors by day · current month</h3>
                 {visitors.daily?.length ? <VisitorChart rows={visitors.daily}/> : <p className="text-xs text-zinc-500">No page views for this date.</p>}

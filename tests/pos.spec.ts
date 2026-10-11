@@ -816,14 +816,19 @@ test('PostHog dashboard updates from live notifications without a refresh loop',
     queries.push(route.request().url());
     return route.fulfill({json:{sales:{orders:1,cancelled:0,order_value:'200',paid_orders:0,received:'0',refunded:'0',net_received:'0'},
       analytics:{configured:true,can_open:true,replay_enabled:false,project_url:'https://us.posthog.com/project/1',linked_orders:1,pending_events:0,failed_events:0,sent_events:1,
-        visitors:ready?{available:true,updated_at:'2026-10-09T10:00:00Z',unique_visitors:7,sessions:8,page_views:9,daily:[],top_events:[],top_pages:[],funnel:[],last_steps:[],friction:[]}:{available:false,refreshing:true,message:'Updating visitor analytics...'}},scope:'Website orders for the selected Nepal day.'}});
+        visitors:ready?{available:true,updated_at:'2026-10-09T10:00:00Z',unique_visitors:7,sessions:8,page_views:9,daily:[],top_events:[{event:'chat_icon_click',events:8,visitors:3}],top_pages:[],chat_events:[{event:'chat_icon_click',events:8,visitors:3},{event:'chat_message_sent',events:4,visitors:2}],chat_pages:[{path:'/menu',opens:8,messages:4,failures:1,visitors:3}],funnel:[],last_steps:[],friction:[]}:{available:false,refreshing:true,message:'Updating visitor analytics...'}},scope:'Website orders for the selected Nepal day.'}});
   });
   await page.goto('/admin?tab=analytics');
   await expect(page.getByText('Website orders',{exact:true})).toBeVisible();
   await expect(page.getByText('Updating visitor counts...',{exact:false})).toBeVisible();
   await expect.poll(()=>!!socket).toBe(true);
   ready=true;socket.send(JSON.stringify({event_type:'ANALYTICS_READY',event_id:'ready-1'}));
-  await expect(page.getByText('Visitors',{exact:true}).locator('..')).toContainText('7');
+  await expect(page.getByRole('article').filter({has:page.getByText('Visitors',{exact:true})})).toContainText('7');
+  const chat=page.getByRole('region',{name:'Chat activity',exact:true});
+  await expect(chat.getByText('Chat opens / icon clicks',{exact:true}).locator('..')).toContainText('8');
+  await expect(chat.getByText('Chat messages sent',{exact:true}).locator('..')).toContainText('4');
+  await expect(chat.getByRole('row').filter({hasText:'/menu'})).toContainText('8');
+  await expect(page.getByRole('heading',{name:'Page actions and clicks'})).toBeVisible();
   await page.getByRole('button',{name:'Refresh analytics'}).click();
   await expect.poll(()=>queries.filter(url=>url.includes('refresh=true')).length).toBe(1);
   socket.send(JSON.stringify({event_type:'ANALYTICS_READY',event_id:'ready-2'}));

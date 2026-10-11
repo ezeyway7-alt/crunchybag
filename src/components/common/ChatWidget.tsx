@@ -1,5 +1,6 @@
 import {AttachmentPicker,ChatAttachment,DraftAttachment} from './ChatAttachments';
 import {pendingFile} from '../../lib/chatFiles';
+import {trackEvent} from '../../lib/journeyTracking';
 import React, {useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowLeft, MessageCircle, Send, X, ExternalLink, MapPin} from 'lucide-react';
 import {useAuth} from '../../context/AuthContext';
@@ -134,10 +135,11 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
       }
       savePending(message);setDraft('');setFile(null);
       const saved=await apiClient.post<ChatMessage>(path(`conversations/${thread.id}/messages/`),payload,options.current);
+      if(!staff)trackEvent('chat_message_sent',{category:message.fileName?'attachment':'text'},message.client_id);
       if(message.fileName)void pendingFile(`${storageKey}:${message.client_id}`,null).catch(()=>{});
       try{sessionStorage.removeItem(storageKey);}catch{};
       if(alive.current){if(activeId.current===message.conversation_id)setMessages(old=>mergeMessages(old,[saved]));savePending(null);void refresh();}}
-    catch(e){if(alive.current)setError(extractErrorMessage(e));}
+    catch(e){if(!staff)trackEvent('chat_message_failed');if(alive.current)setError(extractErrorMessage(e));}
     finally{busy.current=false;if(alive.current)setSending(false);}
   };
   const older=async()=>{if(!thread||!messages.length)return;setLoading(true);try{
@@ -150,7 +152,7 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
       <div className="relative w-[84px] h-10 select-none group touch-manipulation">
         <button
           type="button"
-          onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
+          onClick={()=>{if(!staff)trackEvent('chat_icon_click',{category:'order_by_chat'});setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
           className="absolute -top-[20.5px] left-0 w-[84px] h-[44px] p-0 m-0 border-0 bg-transparent z-10 hover:scale-105 active:scale-95 transition-all cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none"
           aria-label="Order by chat"
         >
@@ -170,8 +172,8 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
         </button>
         <button
           aria-label="Open messages"
-          onClick={()=>{setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
-          className="relative h-10 w-10 mx-auto rounded-full bg-amber-400 text-zinc-950 border border-amber-300 shadow-lg shadow-black/40 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white touch-manipulation z-0"
+          onClick={()=>{if(!staff)trackEvent('chat_icon_click',{category:'messages_icon'});setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
+          className="relative h-10 w-10 mx-auto rounded-full bg-amber-400 text-zinc-950 border border-amber-300 shadow-lg shadow-black/40 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white touch-manipulation z-20"
         >
           {/* Ambient wave animation around the chat icon */}
           <span className="absolute -inset-1 rounded-full bg-amber-400/35 animate-ping pointer-events-none -z-10" />
@@ -213,7 +215,7 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
         </div>
         <button
           aria-label="Close messages"
-          onClick={()=>{indicateTyping(false);setTypingId('');setOpen(false);}}
+          onClick={()=>{if(!staff)trackEvent('chat_closed');indicateTyping(false);setTypingId('');setOpen(false);}}
           className="p-0.5 text-zinc-400 hover:text-white shrink-0 rounded-none transition-colors"
         >
           <X size={14}/>

@@ -1,6 +1,6 @@
 import {test, expect, Page} from '@playwright/test';
 test.setTimeout(60000);
-async function setup(page:Page,signedIn=false,staff=false){
+async function setup(page:Page,signedIn=false,staff=false,analytics=false){
  await page.clock.setFixedTime(new Date('2026-10-10T06:00:00Z'));
  const user={id:91,username:staff?'Manager':'Customer',role:staff?'BRANCH_MANAGER':'CUSTOMER',is_active:true,outlet_id:2};
  const outlet={id:2,name:'Outlet Two',branch_code:'TWO',accepting_orders:true};
@@ -19,6 +19,7 @@ async function setup(page:Page,signedIn=false,staff=false){
     const file=form.get('file') as File;attachment={name:file.name,size:file.size,mime:file.type,kind:file.type.startsWith('audio/')?'audio':file.type.startsWith('image/')?'image':file.type.startsWith('video/')?'video':'file'};
   }
   let result:any={};
+  if(analytics&&path==='customer/tracking-config/') { await route.fulfill({json:{enabled:true,token:'phc_test',host:'https://us.i.posthog.com',replay:false}});return; }
   if(path==='auth/me/')result=user;
   else if(path.includes('branches'))result=[outlet];
   else if(path==='catalog/menu/')result={categories:[]};
@@ -178,4 +179,35 @@ test('recording stops the microphone and creates a reviewable voice attachment',
  await page.getByRole('button',{name:'Send message',exact:true}).click();
  await expect.poll(()=>state.messages.length).toBe(1);
  expect(state.messages[0].attachment.kind).toBe('audio');
+});
+
+
+test('chat analytics records opens, failures and confirmed sends without message content',async({page})=>{
+ await page.route(/\/posthog-js(?:\.js)?(?:\?|$)/,route=>route.fulfill({contentType:'application/javascript',body:`
+  window.captured=[];
+  export default {init(token,config){return {get_session_id:()=> 'test-session',stopSessionRecording(){},startSessionRecording(){},opt_out_capturing(){},opt_in_capturing(){},
+    capture(event,properties){const row=config.before_send({event,properties});if(row)window.captured.push(row);}};}};
+ `}));
+ const state=await setup(page,false,false,true);
+ const events=()=>page.evaluate(()=>(window as any).captured.filter(row=>row.event.startsWith('chat_')));
+ await expect.poll(async()=>(await events()).filter(row=>row.event==='chat_icon_click').length).toBe(1);
+ state.fail=true;
+ await page.getByRole('textbox',{name:'Message',exact:true}).fill('Private message 9841234567');
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Not confirmed - tap to retry'})).toBeVisible();
+ await expect.poll(async()=>(await events()).filter(row=>row.event==='chat_message_failed').length).toBe(1);
+ expect((await events()).filter(row=>row.event==='chat_message_sent')).toHaveLength(0);
+ state.fail=false;
+ await page.getByRole('button',{name:'Not confirmed - tap to retry'}).click();
+ await expect.poll(async()=>(await events()).filter(row=>row.event==='chat_message_sent').length).toBe(1);
+ await page.getByRole('button',{name:'Close messages'}).click();
+ // Click the visible arc above the circular message icon.
+ await page.getByRole('button',{name:'Order by chat',exact:true}).click({position:{x:42,y:5}});
+ await expect.poll(async()=>(await events()).filter(row=>row.event==='chat_icon_click').length).toBe(2);
+ const rows=await events();
+ expect(rows.find(row=>row.event==='chat_closed')).toBeTruthy();
+ expect(rows.filter(row=>row.event==='chat_icon_click').map(row=>row.properties.category)).toEqual(['messages_icon','order_by_chat']);
+ expect(rows.every(row=>row.properties.path==='/'&&row.properties.outlet_id)).toBe(true);
+ expect(JSON.stringify(rows)).not.toContain('Private message');
+ expect(JSON.stringify(rows)).not.toContain('9841234567');
 });
