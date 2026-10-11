@@ -219,6 +219,18 @@ test('guest signup resumes cart checkout and real tracking without required add-
 
 test('guest can place an order and track it with the saved order number and checkout phone',async({page})=>{
   const state=await setup(page);
+  // Django session auth must not override the phone supplied by a guest.
+  await page.context().addCookies([{name:'sessionid',value:'staff-session-without-phone',url:'http://127.0.0.1:4173'}]);
+  const guestRequests:string[]=[];
+  await page.route(/\/api\/v1\/customer\/checkout\/(?:quote\/)?$/,async route=>{
+    const headers=await route.request().allHeaders();
+    guestRequests.push(route.request().url());
+    if(headers.cookie?.includes('sessionid=') || headers.authorization) {
+      await route.fulfill({status:400,json:{customer_phone:['Enter a phone number for your order.']}});
+      return;
+    }
+    await route.fallback();
+  });
   const trackingCalls:any[]=[];
   await page.route('**/api/v1/customer/guest-orders/track/',async route=>{
     const body=route.request().postDataJSON();
@@ -242,6 +254,9 @@ test('guest can place an order and track it with the saved order number and chec
   await expect(page.getByRole('heading',{name:'WEB-REAL-7'})).toBeVisible();
   expect(state.created).toBe(1);
   expect(state.lastPayload.customer_phone).toBe('+9779841234567');
+  expect(guestRequests.some(url=>url.endsWith('/checkout/quote/'))).toBe(true);
+  expect(guestRequests.some(url=>url.endsWith('/checkout/'))).toBe(true);
+  expect((await page.context().cookies()).some(cookie=>cookie.name==='sessionid')).toBe(true);
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('crunchy_guest_orders')||'[]'))).toContain('WEB-REAL-7');
   expect(trackingCalls.at(-1)).toEqual({order_number:'WEB-REAL-7',customer_phone:'9841234567'});
 

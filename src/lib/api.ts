@@ -261,14 +261,15 @@ async function unobservedRequest<T = any>(
     }
   }
 
-  // Determine safe credentials mode (include cookies when on same origin)
+  // Include same-origin cookies by default, but honor explicit modes such as
+  // guest checkout's `omit` so Django session auth cannot override the guest.
   let credentialsMode: RequestCredentials = restOptions.credentials || "same-origin";
   if (typeof window !== "undefined") {
     const isSameOrigin =
       targetUrl.startsWith("/") ||
       targetUrl.startsWith(window.location.origin) ||
       (window.location.hostname.includes("crunchybag.com") && targetUrl.includes("crunchybag.com"));
-    if (isSameOrigin) {
+    if (isSameOrigin && !restOptions.credentials) {
       credentialsMode = "include";
     }
   }

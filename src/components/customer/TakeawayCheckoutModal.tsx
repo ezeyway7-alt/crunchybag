@@ -178,7 +178,6 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
     canonicalPhone(customerProfile.phone || '') ||
     canonicalPhone((authUser as any)?.phone || (authUser as any)?.phone_number || '');
   const effectivePhone = cleanPhone ? phoneFromInput : (fallbackPhone || phoneFromInput);
-  const guestPhone = isGuestCheckout ? effectivePhone : '';
 
   const payload = {outlet_id:Number(currentOutlet.id),items:cartLines(cart.items),fulfillment_type:selectedFulfillment,
     cart_line_ids:cart.items.map(item=>item.cartItemId),
@@ -221,7 +220,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
   useEffect(()=>{
     if(!isOpen||!cart.items.length||!effectivePhone)return;
     const controller=new AbortController();let live=true;
-    const timer=setTimeout(()=>apiClient.post<any>(customerPath('checkout/quote/'),JSON.parse(signature),{signal:controller.signal,skipAuth:isGuestCheckout})
+    const timer=setTimeout(()=>apiClient.post<any>(customerPath('checkout/quote/'),JSON.parse(signature),{signal:controller.signal,skipAuth:isGuestCheckout,credentials:isGuestCheckout?'omit':undefined})
       .then(data=>{if(live){setQuoted({signature,data});setQuoteError('');}}).catch(e=>{if(live)setQuoteError(extractErrorMessage(e));}),250);
     return()=>{live=false;clearTimeout(timer);controller.abort();};
   },[isOpen,isSignedIn,signature,quoteVersion,effectivePhone,isGuestCheckout]);
@@ -272,7 +271,7 @@ export const TakeawayCheckoutModal: React.FC<TakeawayCheckoutModalProps> = ({
       const requestKey=freshPending?.key || crypto.randomUUID();sessionStorage.setItem(pendingKey,JSON.stringify({key:requestKey,fingerprint,cartLineIds:payload.cart_line_ids}));
       const form=new FormData();form.append('payload',JSON.stringify({...body,analytics_context:trackingContext()}));form.append('receipt',proof);
       trackEvent('order_submit',{...cartMetadata(cart),attempt_id:requestKey});
-      const result=await apiClient.post<any>(customerPath('checkout/'),form,{headers:{'Idempotency-Key':requestKey},skipAuth:isGuestCheckout});
+      const result=await apiClient.post<any>(customerPath('checkout/'),form,{headers:{'Idempotency-Key':requestKey},skipAuth:isGuestCheckout,credentials:isGuestCheckout?'omit':undefined});
       setProof(null);finishOrder(result);
     }catch(e){trackEvent('order_failed',{error_category:e instanceof ApiError?`http_${e.status}`:'network',cart_value:grandPayableTotal});if(e instanceof ApiError&&e.status>=400&&e.status<500)sessionStorage.removeItem(pendingKey);if(e instanceof ApiError&&e.status===409){setQuoted(null);setQuoteVersion(v=>v+1);}setError(extractErrorMessage(e));}
     finally{lock.current=false;setIsSubmitting(false);}
