@@ -2,7 +2,7 @@ import {AttachmentPicker,ChatAttachment,DraftAttachment} from './ChatAttachments
 import {pendingFile} from '../../lib/chatFiles';
 import {trackEvent} from '../../lib/journeyTracking';
 import React, {useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowLeft, MessageCircle, Send, X, ExternalLink, MapPin} from 'lucide-react';
+import {ArrowLeft, Bell, MessageCircle, Send, X, ExternalLink, MapPin} from 'lucide-react';
 import {useAuth} from '../../context/AuthContext';
 import {useApp} from '../../context/AppContext';
 import {apiClient,extractErrorMessage,RequestOptions} from '../../lib/api';
@@ -21,6 +21,33 @@ function getFirstUrl(text?: string): string | null {
 }
 
 type Pending={client_id:string;text:string;conversation_id:string;fileName?:string};
+let chatAudioContext:AudioContext|undefined;
+function getChatAudioContext(){
+  const AudioContextClass=window.AudioContext||(window as unknown as {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;
+  if(!AudioContextClass)return;
+  chatAudioContext??=new AudioContextClass();
+  return chatAudioContext;
+}
+function unlockChatAudio(){
+  try{
+    const context=getChatAudioContext();
+    if(context?.state==='suspended')void context.resume().catch(error=>console.debug('Chat notification sound is unavailable:',error));
+  }catch(error){console.debug('Chat notification sound is unavailable:',error);}
+}
+function playChatNotificationSound(){
+  try{
+    const context=getChatAudioContext();
+    if(!context||context.state!=='running')return;
+    const now=context.currentTime;
+    [{frequency:880,delay:0,duration:.2},{frequency:1174.66,delay:.12,duration:.3}].forEach(({frequency,delay,duration})=>{
+      const oscillator=context.createOscillator(),gain=context.createGain();
+      oscillator.type='sine';oscillator.frequency.setValueAtTime(frequency,now+delay);
+      gain.gain.setValueAtTime(.001,now+delay);gain.gain.linearRampToValueAtTime(.16,now+delay+.02);
+      gain.gain.exponentialRampToValueAtTime(.0001,now+delay+duration);
+      oscillator.connect(gain);gain.connect(context.destination);oscillator.start(now+delay);oscillator.stop(now+delay+duration);
+    });
+  }catch(error){console.debug('Chat notification sound is unavailable:',error);}
+}
 export function ChatWidget(){
   const {authUser,authOutlet,isLoading}=useAuth();
   const {activePortal,currentOutlet}=useApp();
@@ -31,14 +58,17 @@ export function ChatWidget(){
 }
 const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;scope:string}> = ({staff,authenticated,outlet,scope}) => {
   const [open,setOpen]=useState(false),[started,setStarted]=useState(()=>staff || localStorage.getItem(`crunchy_chat_started:${scope}`)==='1');
+  const [inboxReady,setInboxReady]=useState(!staff);
   const [threads,setThreads]=useState<Conversation[]>([]),[thread,setThread]=useState<Conversation|null>(null);
   const [messages,setMessages]=useState<ChatMessage[]>([]),[more,setMore]=useState(false),[moreThreads,setMoreThreads]=useState(false);
   const [unread,setUnread]=useState(0),[draft,setDraft]=useState(''),[error,setError]=useState(''),[status,setStatus]=useState('Connecting...');
+  const [notificationPermission,setNotificationPermission]=useState<NotificationPermission| 'unsupported'>(()=>typeof Notification==='undefined'?'unsupported':Notification.permission);
   const [loading,setLoading]=useState(false),[sending,setSending]=useState(false),[retry,setRetry]=useState(0);
   const storageKey=`crunchy_chat_pending:${scope}`;
   const [pending,setPending]=useState<Pending|null>(()=>{try{return JSON.parse(sessionStorage.getItem(storageKey)||'null');}catch{return null;}});
   const [typingId,setTypingId]=useState('');
   const live=useRef<ReturnType<typeof connectChat>|null>(null), typingExpiry=useRef<ReturnType<typeof setTimeout>>(), localExpiry=useRef<ReturnType<typeof setTimeout>>(), lastTyping=useRef(0);
+  const knownThreadMessages=useRef(new Map<string,number>()),notifiedMessages=useRef(new Set<string>());
   const indicateTyping=(active:boolean)=>{
     clearTimeout(localExpiry.current);
     if(!active||Date.now()-lastTyping.current>1200){live.current?.sendTyping(activeId.current,active);lastTyping.current=active?Date.now():0;}
@@ -53,6 +83,24 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
   const savePending=(value:Pending|null)=>{if(!value&&pending?.fileName)void pendingFile(`${storageKey}:${pending.client_id}`,null).catch(()=>{});setPending(value);try{if(value)sessionStorage.setItem(storageKey,JSON.stringify(value));else sessionStorage.removeItem(storageKey);}catch{/* In-memory retries still work when storage is unavailable. */}};
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   useEffect(()=>{openRef.current=open;},[open]);
+  useEffect(()=>{
+    const unlock=()=>unlockChatAudio();
+    window.addEventListener('pointerdown',unlock,{once:true});window.addEventListener('keydown',unlock,{once:true});
+    return()=>{window.removeEventListener('pointerdown',unlock);window.removeEventListener('keydown',unlock);};
+  },[]);
+  const notifyIncoming=useCallback((message:ChatMessage)=>{
+    if(message.is_staff===staff)return;
+    const key=`${message.conversation_id}:${message.id}`;
+    if(notifiedMessages.current.has(key))return;
+    notifiedMessages.current.add(key);
+    if(document.visibilityState==='visible')playChatNotificationSound();
+    else if(typeof Notification!=='undefined'&&Notification.permission==='granted'){
+      try{
+        const notification=new Notification('New chat message',{body:'You have received a new message.',icon:'/favicon.ico',tag:`chat-${message.conversation_id}`});
+        notification.onclick=()=>{notification.close();window.focus();setOpen(true);};
+      }catch(error){console.warn('Could not show the chat browser notification:',error);}
+    }
+  },[staff]);
   const accept=useCallback((data:History,reset=false)=>{
     if(!alive.current)return;
     setThread(data.conversation);activeId.current=data.conversation.id;
@@ -62,9 +110,20 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
     if(reset)setMore(data.has_more);
     if(!staff)setUnread(data.conversation.unread_count);
   },[staff]);
-  const refresh=useCallback(async()=>{
+  const refresh=useCallback(async(notifyNewMessages=false)=>{
     try{
-      if(staff){const list=await apiClient.get<Inbox>(path(''),options.current);if(!alive.current)return;setThreads(list.results);setMoreThreads(list.has_more);setUnread(list.unread_count);}
+      if(staff){
+        const list=await apiClient.get<Inbox>(path(''),options.current);if(!alive.current)return;
+        for(const item of list.results){
+          const message=item.last_message;
+          const previous=knownThreadMessages.current.get(item.id)||0;
+          if(message){
+            if(notifyNewMessages&&item.id!==activeId.current&&message.id>previous)notifyIncoming(message);
+            knownThreadMessages.current.set(item.id,Math.max(previous,message.id));
+          }else if(!knownThreadMessages.current.has(item.id))knownThreadMessages.current.set(item.id,0);
+        }
+        setThreads(list.results);setMoreThreads(list.has_more);setUnread(list.unread_count);setInboxReady(true);
+      }
       const id=activeId.current;
       if(id){
         let moreNew=true;
@@ -73,11 +132,12 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
           const cursor=lastLoaded.current;
           const data=await apiClient.get<History & {has_newer?:boolean}>(`${url}${url.includes('?')?'&':'?'}after=${cursor}`,options.current);
           if(activeId.current!==id)return;
+          if(notifyNewMessages)data.messages.filter(message=>message.id>cursor).forEach(notifyIncoming);
           accept(data);moreNew=!!data.has_newer;
         }
       }
     }catch(e){if(alive.current)setError(extractErrorMessage(e));}
-  },[path,staff,accept]);
+  },[path,staff,accept,notifyIncoming]);
   useEffect(()=>{
     if(!started)return;
     let cancelled=false;setLoading(true);setError('');
@@ -91,14 +151,14 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
     })();return()=>{cancelled=true;};
   },[started,retry]);
   useEffect(()=>{
-    if(!started||(!staff&&!thread))return;
-    const connection=connectChat(path('socket-ticket/'),staff?{}:{conversation_id:thread!.id},options.current,()=>void refresh(),setStatus,event=>{
+    if(!started||(!staff&&!thread)||(staff&&!inboxReady))return;
+    const connection=connectChat(path('socket-ticket/'),staff?{}:{conversation_id:thread!.id},options.current,eventType=>void refresh(eventType==='CHAT_MESSAGE'),setStatus,event=>{
       if(event.conversation_id!==activeId.current||event.is_staff===staff)return;
       clearTimeout(typingExpiry.current);setTypingId(event.is_typing?event.conversation_id:'');
       if(event.is_typing)typingExpiry.current=setTimeout(()=>setTypingId(''),5000);
     });live.current=connection;
     return()=>{connection.sendTyping(activeId.current,false);connection();live.current=null;clearTimeout(typingExpiry.current);clearTimeout(localExpiry.current);};
-  },[started,staff,thread?.id,path,refresh,retry]);
+  },[started,staff,thread?.id,path,refresh,retry,inboxReady]);
   useEffect(()=>{
     const sync=()=>{if(document.visibilityState==='visible'&&started)void refresh();};
     window.addEventListener('online',sync);document.addEventListener('visibilitychange',sync);
@@ -146,13 +206,18 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
     const url=path(`conversations/${thread.id}/messages/`);const data=await apiClient.get<History>(`${url}${url.includes('?')?'&':'?'}before=${messages[0].id}`,options.current);
     setMessages(old=>mergeMessages(old,data.messages));setMore(data.has_more);
   }catch(e){setError(extractErrorMessage(e));}finally{setLoading(false);}};
+  const enableNotifications=async()=>{
+    if(typeof Notification==='undefined')return;
+    try{setNotificationPermission(await Notification.requestPermission());}
+    catch(e){console.warn('Could not request chat browser notifications:',e);setError('Could not enable browser notifications. Check your browser settings.');}
+  };
 
   return <div className="ph-no-capture ph-sensitive fixed right-1 sm:right-2 bottom-20 sm:bottom-5 z-[90] font-sans" data-ph-no-capture>
     {!open?(
       <div className="relative w-[84px] h-10 select-none group touch-manipulation">
         <button
           type="button"
-          onClick={()=>{if(!staff)trackEvent('chat_icon_click',{category:'order_by_chat'});setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
+          onClick={()=>{unlockChatAudio();if(!staff)trackEvent('chat_icon_click',{category:'order_by_chat'});setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
           className="absolute -top-[20.5px] left-0 w-[84px] h-[44px] p-0 m-0 border-0 bg-transparent z-10 hover:scale-105 active:scale-95 transition-all cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none"
           aria-label="Order by chat"
         >
@@ -172,7 +237,7 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
         </button>
         <button
           aria-label="Open messages"
-          onClick={()=>{if(!staff)trackEvent('chat_icon_click',{category:'messages_icon'});setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
+          onClick={()=>{unlockChatAudio();if(!staff)trackEvent('chat_icon_click',{category:'messages_icon'});setOpen(true);setStarted(true);try{localStorage.setItem(`crunchy_chat_started:${scope}`,'1');}catch{}}}
           className="relative h-10 w-10 mx-auto rounded-full bg-amber-400 text-zinc-950 border border-amber-300 shadow-lg shadow-black/40 flex items-center justify-center hover:bg-amber-300 hover:scale-105 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-white touch-manipulation z-20"
         >
           {/* Ambient wave animation around the chat icon */}
@@ -213,13 +278,23 @@ const ChatSession: React.FC<{staff:boolean;authenticated:boolean;outlet:string;s
             </span>
           </div>
         </div>
-        <button
-          aria-label="Close messages"
-          onClick={()=>{if(!staff)trackEvent('chat_closed');indicateTyping(false);setTypingId('');setOpen(false);}}
-          className="p-0.5 text-zinc-400 hover:text-white shrink-0 rounded-none transition-colors"
-        >
-          <X size={14}/>
-        </button>
+        <div className="flex items-center shrink-0">
+          {notificationPermission!=='unsupported'&&<button
+            type="button"
+            aria-label={notificationPermission==='granted'?'Notifications enabled':notificationPermission==='denied'?'Notifications blocked in browser settings':'Enable chat notifications'}
+            title={notificationPermission==='granted'?'Chat notifications enabled':notificationPermission==='denied'?'Allow notifications in your browser settings':'Enable chat notifications'}
+            disabled={notificationPermission==='granted'||notificationPermission==='denied'}
+            onClick={()=>void enableNotifications()}
+            className={`p-0.5 rounded-none transition-colors ${notificationPermission==='granted'?'text-emerald-400':notificationPermission==='denied'?'text-zinc-600':'text-zinc-400 hover:text-amber-400'}`}
+          ><Bell size={14}/></button>}
+          <button
+            aria-label="Close messages"
+            onClick={()=>{if(!staff)trackEvent('chat_closed');indicateTyping(false);setTypingId('');setOpen(false);}}
+            className="p-0.5 text-zinc-400 hover:text-white shrink-0 rounded-none transition-colors"
+          >
+            <X size={14}/>
+          </button>
+        </div>
       </header>
 
       {error&&<div role="alert" className="p-2 text-xs bg-red-950/60 border-b border-red-900/50 text-red-200 flex items-center justify-between">{error}<button aria-label="Retry connection" className="ml-2 underline font-medium text-amber-400 shrink-0" onClick={()=>{setRetry(n=>n+1);void refresh();}}>Retry</button></div>}

@@ -16,7 +16,7 @@ export function mergeMessages(old:ChatMessage[], fresh:ChatMessage[]) {
   return [...new Map([...old,...fresh].map(message=>[message.id,message])).values()].sort((a,b)=>a.id-b.id);
 }
 /** Short-lived signed tickets; reconnects always fetch a fresh REST snapshot. */
-export function connectChat(ticketPath:string, body:object, options:RequestOptions, changed:()=>void, status:(s:string)=>void, typing:(event:{conversation_id:string;is_staff:boolean;is_typing:boolean})=>void=()=>{}) {
+export function connectChat(ticketPath:string, body:object, options:RequestOptions, changed:(eventType?:'CHAT_MESSAGE'|'CHAT_READ')=>void, status:(s:string)=>void, typing:(event:{conversation_id:string;is_staff:boolean;is_typing:boolean})=>void=()=>{}) {
   let stopped=false, socket:WebSocket|undefined, timer:ReturnType<typeof setTimeout>|undefined;
   let heartbeat:ReturnType<typeof setInterval>|undefined, failures=0;
   const controller=new AbortController();
@@ -35,7 +35,7 @@ export function connectChat(ticketPath:string, body:object, options:RequestOptio
       socket.onmessage=event=>{lastSeen=Date.now();try{const data=JSON.parse(event.data);
         if(data.event_type==='CHAT_TYPING')typing(data);
         else if(data.event_type==='HEARTBEAT'){if(revision!==undefined&&revision!==data.revision)changed();revision=data.revision;}
-        else if(data.event_type==='CHAT_MESSAGE'||data.event_type==='CHAT_READ')changed();
+        else if(data.event_type==='CHAT_MESSAGE'||data.event_type==='CHAT_READ')changed(data.event_type);
       }catch{socket?.close();}};
       socket.onclose=()=>{clearInterval(heartbeat);if(Date.now()-openedAt>30000)failures=0;schedule();};
       socket.onerror=()=>socket?.close();

@@ -59,6 +59,47 @@ test('guest sends privately, receives reply via websocket and reads it',async({p
  await expect(page.getByRole('dialog',{name:'Chat with CrunchyBag'})).toHaveScreenshot('guest-chat.png',{maxDiffPixelRatio:.05});
 });
 
+test('guest, customer, and staff messages trigger sound and browser notifications',async({page,browser})=>{
+ const cases=[
+  {target:page,signedIn:false,staff:false},
+  {target:await browser.newPage(),signedIn:true,staff:false},
+  {target:await browser.newPage(),signedIn:true,staff:true},
+ ];
+ for(const {target,signedIn,staff} of cases){
+  await target.addInitScript(()=>{
+   (window as any).chatNotificationTest={sounds:0,notifications:[]};
+   class TestAudioContext {
+    state='running';currentTime=0;destination={};
+    createOscillator(){return {type:'',frequency:{setValueAtTime(){}},connect(){},start(){(window as any).chatNotificationTest.sounds++;},stop(){}};}
+    createGain(){return {gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){}};}
+    resume(){return Promise.resolve();}
+   }
+   class TestNotification {
+    static permission='default';
+    static async requestPermission(){this.permission='granted';return this.permission;}
+    onclick:(()=>void)|null=null;
+    constructor(title:string,options:NotificationOptions){(window as any).chatNotificationTest.notifications.push({title,options});}
+    close(){}
+   }
+   Object.defineProperty(window,'AudioContext',{value:TestAudioContext,configurable:true});
+   Object.defineProperty(window,'Notification',{value:TestNotification,configurable:true});
+  });
+  const state=await setup(target,signedIn,staff);
+  await expect.poll(()=>state.sockets.length).toBeGreaterThan(0);
+  state.messages.push({id:1,client_id:'incoming-1',conversation_id:state.conversation.id,is_staff:!staff,text:'Hello',created_at:'2026-10-10T06:00:00Z'});
+  state.conversation.last_message_id=1;
+  state.sockets.at(-1).send(JSON.stringify({event_type:'CHAT_MESSAGE'}));
+  await expect.poll(()=>target.evaluate(()=>(window as any).chatNotificationTest.sounds)).toBeGreaterThan(0);
+  await target.getByRole('button',{name:'Enable chat notifications'}).click();
+  await expect(target.getByRole('button',{name:'Notifications enabled'})).toBeVisible();
+  await target.evaluate(()=>Object.defineProperty(document,'visibilityState',{value:'hidden',configurable:true}));
+  state.messages.push({id:2,client_id:'incoming-2',conversation_id:state.conversation.id,is_staff:!staff,text:'Another message',created_at:'2026-10-10T06:00:00Z'});
+  state.conversation.last_message_id=2;
+  state.sockets.at(-1).send(JSON.stringify({event_type:'CHAT_MESSAGE'}));
+  await expect.poll(()=>target.evaluate(()=>(window as any).chatNotificationTest.notifications.length)).toBeGreaterThan(0);
+ }
+});
+
 test('failed send retries same client id and guest identity survives reload',async({page})=>{
  const state=await setup(page);state.fail=true;
  await page.getByRole('textbox',{name:'Message',exact:true}).fill('One question');await page.getByRole('button',{name:'Send message',exact:true}).click();
