@@ -1,7 +1,9 @@
 import {AdminAudienceTab} from './AdminAudienceTab';
+import {AdminSalesReportTab} from './AdminSalesReportTab';
 import {PostHogAnalyticsTab} from './PostHogAnalyticsTab';
 import React, { useState } from "react";
 import {
+  BarChart3,
   TrendingUp,
   Receipt,
   Clock,
@@ -106,6 +108,7 @@ export const AdminPortal: React.FC = () => {
   const displayOutlet = authOutlet?.name || currentOutlet?.name || "Kathmandu Branch";
 
   type TabType =
+    | "sales_reports"
     | "analytics"
     | "customers"
     | "overview"
@@ -121,6 +124,7 @@ export const AdminPortal: React.FC = () => {
     | "logs";
 
   const VALID_TABS: TabType[] = [
+    "sales_reports",
     "analytics", "customers",
     "overview",
     "pos_orders",
@@ -284,6 +288,7 @@ export const AdminPortal: React.FC = () => {
       badge: safeEmployees.length,
     },
     { id: "analytics", label: "Analytics", icon: TrendingUp },
+    { id: "sales_reports", label: "Sales Reports", icon: BarChart3 },
     { id: "customers", label: "Customers", icon: Users },
     {
       id: "organization",
@@ -780,6 +785,7 @@ export const AdminPortal: React.FC = () => {
               </div>
             )}
             {activeTab === "logs" && <SkeletonTable rows={10} columns={4} />}
+            {activeTab === "sales_reports" && <SkeletonChartCard />}
           </div>
         ) : (
           <>
@@ -840,6 +846,7 @@ export const AdminPortal: React.FC = () => {
         {/* TAB 10: ORGANIZATION */}
         {activeTab === "organization" && <AdminOrganizationTab />}
         {activeTab === "analytics" && <PostHogAnalyticsTab/>}
+        {activeTab === "sales_reports" && <AdminSalesReportTab/>}
         {activeTab === "customers" && <AdminAudienceTab mode="customers"/>}
 
         {/* TAB 11: ACTIVITY & AUDIT LOGS */}

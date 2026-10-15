@@ -211,7 +211,7 @@ test('recording stops the microphone and creates a reviewable voice attachment',
      stop(){this.state='inactive';this.ondataavailable?.({data:new Blob(['voice fixture'],{type:'audio/webm'})});this.onstop?.();}
    }
    (window as any).MediaRecorder=Recorder;
- });
+ });  
  const state=await setup(page);
  await page.getByRole('button',{name:'Record voice message',exact:true}).click();
  await page.getByRole('button',{name:'Stop recording',exact:true}).click();
