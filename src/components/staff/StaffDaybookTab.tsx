@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {BookOpen, Plus, Minus, Download, RefreshCw, ChevronLeft, ChevronRight, Ban} from 'lucide-react';
 import {useApp} from '../../context/AppContext';
+import {KhajaScheduleTab} from './KhajaScheduleTab';
 import {Modal} from '../common/Modal';
 import {apiClient, extractErrorMessage} from '../../lib/api';
 import {todayNepal} from '../../lib/posApi';
@@ -17,12 +18,12 @@ const blank=(date:string,direction:'IN'|'OUT'):Form=>({date,direction,amount:'',
 
 export const StaffDaybookTab:React.FC=()=>{
   const {currentOutlet}=useApp();
-  const [section,setSection]=useState<'daybook'|'staff'>('daybook');
+  const [section,setSection]=useState<'daybook'|'staff'|'khaja'>('daybook');
   return <div className="flex flex-col lg:flex-row gap-5">
     <nav aria-label="Daybook sections" className="flex lg:flex-col gap-1 lg:w-40 shrink-0">
-      {(['daybook','staff'] as const).map(value=><button key={value} aria-current={section===value?'page':undefined} onClick={()=>setSection(value)} className={`rounded px-3 py-2 text-sm text-left font-semibold ${section===value?'bg-amber-500 text-black':'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}>{value==='daybook'?'Daybook':'Staff Daybook'}</button>)}
+      {(['daybook','staff','khaja'] as const).map(value=><button key={value} aria-current={section===value?'page':undefined} onClick={()=>setSection(value)} className={`rounded px-3 py-2 text-sm text-left font-semibold ${section===value?'bg-amber-500 text-black':'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}>{value==='daybook'?'Daybook':value==='staff'?'Staff Daybook':'Khaja Schedule'}</button>)}
     </nav>
-    <div className="min-w-0 flex-1"><DaybookContent key={`${section}:${currentOutlet?.id}`} staffMode={section==='staff'}/></div>
+    <div className="min-w-0 flex-1">{section==='khaja'?<KhajaScheduleTab key={`khaja:${currentOutlet?.id}`}/>:<DaybookContent key={`${section}:${currentOutlet?.id}`} staffMode={section==='staff'}/>}</div>
   </div>;
 };
 

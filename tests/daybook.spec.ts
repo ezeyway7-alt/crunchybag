@@ -11,6 +11,7 @@ async function setup(page:Page) {
     {id:3,order_number:'W-02',customer:'Customer two',source:'WEBSITE',amount:'80.00',payment_method:'FONEPAY',transaction_id:'PAY-WEB',created_at:new Date().toISOString(),kind:'SALE'},
     {id:4,order_number:'POS-01',customer:'Customer one',source:'POS',amount:'20.00',payment_method:'CASH',transaction_id:'REF-CASH',created_at:new Date().toISOString(),kind:'REFUND'},
   ]};
+  state.khaja={products:[{id:'momo',name:'Veg Momo',category:'Snacks',archived:false},{id:'tea',name:'Milk Tea',category:'Drinks',archived:false},{id:'chowmein',name:'Chowmein',category:'Snacks',archived:false}],days:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((name,weekday)=>({name,weekday,revision:0,products:[],updated_at:null,updated_by:null}))};
   await page.addInitScript(({user,outlet})=>{
     localStorage.setItem('crunchy_access_token','test-token');
     localStorage.setItem('crunchy_auth_user',JSON.stringify(user));
@@ -37,6 +38,16 @@ async function setup(page:Page) {
     else if(path.endsWith('/catalog/menu/'))data={categories:[]};
     else if(path==='/api/v1/daybook/socket-ticket/')data={ticket:'signed',path:'/ws/daybook/1/'};
     else if(path==='/api/v1/daybook/staff/')data=[{id:2,name:'Asha',active:true},{id:3,name:'Bikash',active:true},{id:4,name:'Former staff',active:false}];
+    else if(path==='/api/v1/daybook/khaja-schedule/'){
+      if(req.method()==='POST'){
+        const body=req.postDataJSON();
+        state.writes.push({path,body});
+        const day=state.khaja.days[body.weekday];
+        day.products=state.khaja.products.filter((p:any)=>body.product_ids.includes(p.id));
+        day.revision++;day.updated_at=new Date().toISOString();day.updated_by=user.username;
+      }
+      data=state.khaja;
+    }
     else if(path.startsWith('/api/v1/daybook/')){
       if(req.method()==='POST'){
         const body=req.postDataJSON(),key=req.headers()['idempotency-key'];
@@ -187,4 +198,48 @@ test('staff daybook selects outlet staff, records Dr and Cr, and isolates balanc
   await page.getByRole('navigation',{name:'Daybook sections'}).getByRole('button',{name:'Daybook',exact:true}).click();
   await expect(page.getByText('Asha takes advance',{exact:true})).toBeVisible();
   await expect(page.getByTestId('daybook-closing')).toContainText('-400');
+});
+
+
+test('khaja weekly table supports multiple products, editing, clearing and reload',async({page})=>{
+  const state=await setup(page);
+  const open=()=>page.getByRole('navigation',{name:'Daybook sections'}).getByRole('button',{name:'Khaja Schedule',exact:true}).click();
+  await open();
+  const table=page.getByRole('table',{name:'Weekly khaja schedule'});
+  await expect(table.getByRole('row')).toHaveCount(8);
+  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  for(const day of days){
+    await page.getByRole('button',{name:`Edit ${day} khaja`,exact:true}).click();
+    await page.getByRole('checkbox',{name:/Veg Momo/}).check();
+    await page.getByRole('checkbox',{name:/Milk Tea/}).check();
+    await page.getByRole('button',{name:'Save day',exact:true}).click();
+    await expect(table.getByRole('row').filter({has:page.getByRole('rowheader',{name:day,exact:true})})).toContainText('Veg Momo');
+  }
+  await expect(page.getByText('7 of 7 days planned')).toBeVisible();
+  await page.getByRole('button',{name:'Edit Monday khaja',exact:true}).click();
+  await expect(page.getByRole('checkbox',{name:/Veg Momo/})).toBeChecked();
+  await page.getByRole('checkbox',{name:/Veg Momo/}).uncheck();
+  await page.getByRole('textbox',{name:'Search menu products'}).fill('chow');
+  await page.getByRole('checkbox',{name:/Chowmein/}).check();
+  await page.getByRole('button',{name:'Save day',exact:true}).click();
+  const monday=table.getByRole('row').filter({has:page.getByRole('rowheader',{name:'Monday',exact:true})});
+  await expect(monday).toContainText('Chowmein');
+  await expect(monday).toContainText('Milk Tea');
+  await expect(monday).not.toContainText('Veg Momo');
+  await page.getByRole('button',{name:'Edit Tuesday khaja',exact:true}).click();
+  await page.getByRole('button',{name:'Clear selections'}).click();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(page.getByText('7 of 7 days planned')).toBeVisible();
+  await page.getByRole('button',{name:'Edit Saturday khaja',exact:true}).click();
+  await page.getByRole('button',{name:'Clear selections'}).click();
+  await page.getByRole('button',{name:'Save day',exact:true}).click();
+  await expect(page.getByText('6 of 7 days planned')).toBeVisible();
+  await page.reload({waitUntil:'domcontentloaded'});await open();
+  await expect(monday).toContainText('Chowmein');
+  await expect(page.getByText('6 of 7 days planned')).toBeVisible();
+  expect(state.writes.filter((w:any)=>w.path.endsWith('/khaja-schedule/'))).toHaveLength(9);
+  await page.screenshot({path:test.info().outputPath('khaja-schedule.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.getByRole('button',{name:'Edit Sunday khaja',exact:true})).toBeAttached();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
