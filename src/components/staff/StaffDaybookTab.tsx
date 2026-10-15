@@ -17,7 +17,24 @@ const blank=(date:string,direction:'IN'|'OUT'):Form=>({date,direction,amount:'',
 
 export const StaffDaybookTab:React.FC=()=>{
   const {currentOutlet}=useApp();
+  const [section,setSection]=useState<'daybook'|'staff'>('daybook');
+  return <div className="flex flex-col lg:flex-row gap-5">
+    <nav aria-label="Daybook sections" className="flex lg:flex-col gap-1 lg:w-40 shrink-0">
+      {(['daybook','staff'] as const).map(value=><button key={value} aria-current={section===value?'page':undefined} onClick={()=>setSection(value)} className={`rounded px-3 py-2 text-sm text-left font-semibold ${section===value?'bg-amber-500 text-black':'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}>{value==='daybook'?'Daybook':'Staff Daybook'}</button>)}
+    </nav>
+    <div className="min-w-0 flex-1"><DaybookContent key={`${section}:${currentOutlet?.id}`} staffMode={section==='staff'}/></div>
+  </div>;
+};
+
+const DaybookContent:React.FC<{staffMode:boolean}>=({staffMode})=>{
+  const {currentOutlet}=useApp();
   const outlet=String(currentOutlet?.id||'');
+  const [staffId,setStaffId]=useState('');
+  const [staff,setStaff]=useState<{id:number;name:string;active:boolean}[]>([]);
+  const [staffError,setStaffError]=useState('');
+  const [staffLoading,setStaffLoading]=useState(staffMode);
+  useEffect(()=>{if(!staffMode)return;let cancelled=false;apiClient.get<typeof staff>(daybookPath(outlet,'staff/')).then(rows=>{if(!cancelled){setStaff(rows);setStaffError('');setStaffLoading(false);}}).catch(e=>{if(!cancelled){setStaffError(extractErrorMessage(e));setStaffLoading(false);}});return()=>{cancelled=true;};},[outlet,staffMode]);
+  const selectedStaff=staff.find(person=>String(person.id)===staffId);
   const [date,setDate]=useState(todayNepal),[direction,setDirection]=useState('ALL'),[method,setMethod]=useState('ALL');
   const [search,setSearch]=useState(''),[query,setQuery]=useState(''),[showVoided,setShowVoided]=useState(false),[page,setPage]=useState(1);
   const [data,setData]=useState<{scope:string;value:DaybookLedger}|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false),[notice,setNotice]=useState('');
@@ -26,8 +43,8 @@ export const StaffDaybookTab:React.FC=()=>{
   const [preview,setPreview]=useState<DaybookPreview|null>(null),[importLoading,setImportLoading]=useState(false),[importError,setImportError]=useState('');
   const [selected,setSelected]=useState<Set<number>>(new Set());
   const [voidEntry,setVoidEntry]=useState<DaybookEntry|null>(null),[voidReason,setVoidReason]=useState('');
-  const sequence=useRef(0),importSequence=useRef(0);
-  const scope=`${outlet}:${date}:${direction}:${method}:${query}:${showVoided}:${page}`;
+  const sequence=useRef(0),importSequence=useRef(0),importInitialized=useRef(false);
+  const scope=`${outlet}:${staffId}:${date}:${direction}:${method}:${query}:${showVoided}:${page}`;
   const ledger=data?.scope===scope?data.value:null;
   const command=useDaybookCommand(outlet);
   const blocked=command.busy||!!command.pending;
@@ -36,6 +53,7 @@ export const StaffDaybookTab:React.FC=()=>{
     const seq=++sequence.current;setLoading(true);
     try {
       const params=new URLSearchParams({date,direction,payment_method:method,search:query,include_voided:String(showVoided),page:String(page)});
+      if(staffMode){params.set('staff_only','true');if(staffId)params.set('staff_id',staffId);}
       const value=await apiClient.get<DaybookLedger>(`${daybookPath(outlet)}&${params}`);
       if(seq!==sequence.current)return;
       const last=Math.max(1,Math.ceil(value.count/value.page_size));
@@ -52,19 +70,21 @@ export const StaffDaybookTab:React.FC=()=>{
       if(seq!==importSequence.current)return;
       setPreview(result);
       const eligible=new Set(result.results.filter(row=>!row.imported).map(row=>row.id));
-      setSelected(old=>reset?eligible:new Set([...old].filter(id=>eligible.has(id))));
+      const selectAll=reset||!importInitialized.current;
+      importInitialized.current=true;
+      setSelected(old=>selectAll?eligible:new Set([...old].filter(id=>eligible.has(id))));
     }catch(e){if(seq===importSequence.current)setImportError(extractErrorMessage(e));}
     finally{if(seq===importSequence.current)setImportLoading(false);}
   };
   useEffect(()=>{const timer=setTimeout(()=>{setQuery(search);setPage(1);},250);return()=>clearTimeout(timer);},[search]);
   useEffect(()=>{void refresh();return()=>{sequence.current++;};},[scope]);
   useEffect(()=>{setModal(null);setPreview(null);setNotice('');setPage(1);importSequence.current++;},[outlet]);
-  useEffect(()=>{if(modal==='import'){setPreview(null);setSelected(new Set());void loadPreview();}return()=>{importSequence.current++;};},[modal,importDate,kind,outlet]);
+  useEffect(()=>{if(modal==='import'){importInitialized.current=false;setPreview(null);setSelected(new Set());void loadPreview();}return()=>{importSequence.current++;};},[modal,importDate,kind,outlet]);
   const live=useDaybookLive(outlet,()=>{void refresh();if(modal==='import')void loadPreview(false);});
-  const openEntry=(value:'IN'|'OUT')=>{setForm(blank(date,value));setNotice('');setModal('entry');};
+  const openEntry=(value:'IN'|'OUT')=>{setForm({...blank(date,value),...(staffMode?{category:value==='OUT'?'Staff wage / advance':'Staff return'}:{})});setNotice('');setModal('entry');};
   const openImport=(value:'SALE'|'REFUND')=>{setKind(value);setImportDate(todayNepal());setNotice('');setModal('import');};
   const finish=(result:any)=>{if(!result)return;setModal(null);setNotice(result.created!==undefined?`${result.created} payment entries imported; ${result.skipped} already recorded. Date: ${result.date}.`:`Entry saved for ${result.date}.`);void refresh();};
-  const submit=async(e:React.FormEvent)=>{e.preventDefault();finish(await command.run('',form));};
+  const submit=async(e:React.FormEvent)=>{e.preventDefault();finish(await command.run('',{...form,...(staffMode?{staff_id:Number(staffId)}:{})}));};
   const importSelected=async()=>{if(!preview||!selected.size||importLoading)return;finish(await command.run('import/',{date:importDate,kind,payment_ids:[...selected].sort((a,b)=>a-b)}));};
   const submitVoid=async(e:React.FormEvent)=>{e.preventDefault();if(voidEntry)finish(await command.run(`${voidEntry.id}/void/`,{reason:voidReason}));};
   const eligible=preview?.results.filter(row=>!row.imported)||[];
@@ -75,27 +95,34 @@ export const StaffDaybookTab:React.FC=()=>{
 
   return <div className="space-y-5 text-zinc-900 dark:text-zinc-100" data-testid="daybook-page">
     <header className="flex flex-wrap items-start justify-between gap-3">
-      <div><h1 className="flex items-center gap-2 text-xl font-bold"><BookOpen className="h-5 w-5 text-amber-500"/>Daybook</h1><p className="mt-1 text-sm text-zinc-500">{currentOutlet?.name} - Record money received and money paid out.</p></div>
-      <div className="flex flex-wrap gap-2"><button className={`${button} bg-emerald-600 text-white border-emerald-600`} disabled={blocked} onClick={()=>openEntry('IN')}><Plus size={16}/>Money in</button><button className={`${button} bg-rose-600 text-white border-rose-600`} disabled={blocked} onClick={()=>openEntry('OUT')}><Minus size={16}/>Money out</button><button className={`${button} bg-amber-500 text-black border-amber-500`} disabled={blocked} onClick={()=>openImport('SALE')}><Download size={16}/>Import today's sales</button></div>
+      <div><h1 className="flex items-center gap-2 text-xl font-bold"><BookOpen className="h-5 w-5 text-amber-500"/>{staffMode?'Staff Daybook':'Daybook'}</h1><p className="mt-1 text-sm text-zinc-500">{currentOutlet?.name} - {staffMode?'Track money each staff member takes and returns.':'Record money received and money paid out.'}</p></div>
+      <div className="flex flex-wrap gap-2"><button className={`${button} bg-emerald-600 text-white border-emerald-600`} disabled={blocked||(staffMode&&!selectedStaff?.active)} onClick={()=>openEntry('IN')}><Plus size={16}/>{staffMode?'Cr - Staff gives':'Money in'}</button><button className={`${button} bg-rose-600 text-white border-rose-600`} disabled={blocked||(staffMode&&!selectedStaff?.active)} onClick={()=>openEntry('OUT')}><Minus size={16}/>{staffMode?'Dr - Staff takes':'Money out'}</button>{!staffMode&&<button className={`${button} bg-amber-500 text-black border-amber-500`} disabled={blocked} onClick={()=>openImport('SALE')}><Download size={16}/>Import today's sales</button>}</div>
     </header>
+    {staffMode&&<div className="rounded border border-zinc-200 dark:border-zinc-800 p-4 space-y-2">
+      <label className={label}><span>Outlet staff</span><select aria-label="Outlet staff" className={input} value={staffId} onChange={e=>{setStaffId(e.target.value);setPage(1);setNotice('');}}><option value="">All staff - choose someone to record an entry</option>{staff.map(person=><option key={person.id} value={person.id}>{person.name}{person.active?'':' (inactive / previous staff)'}</option>)}</select></label>
+      <p className="text-xs text-zinc-500">Dr: money paid to / taken by staff. Cr: money received back from staff. Balance = Dr minus Cr; positive means net money taken. These cash movements also appear in the main Daybook.</p>
+      {staffError&&<p role="alert" className="text-sm text-rose-500">{staffError}</p>}
+      {staffLoading&&<p role="status" className="text-sm text-zinc-500">Loading outlet staff...</p>}
+      {!staffLoading&&!staff.length&&!staffError&&<p className="text-sm text-zinc-500">No staff available yet. Assign staff to this outlet in Staff & Access.</p>}
+    </div>}
     {(error||command.error) && <p role="alert" className="border border-rose-400/40 bg-rose-500/10 p-3 text-sm text-rose-500">{command.error||error}</p>}
     {command.pending&&!command.busy && <div role="alert" className="border border-amber-400/40 bg-amber-500/10 p-3 text-sm">The last request has not been confirmed. Retry it safely before adding another entry.<button className={`${button} ml-3`} onClick={async()=>finish(await command.retry())}>Retry pending entry</button></div>}
     {notice && <p role="status" className="p-3 text-sm bg-emerald-500/10 text-emerald-600">{notice}</p>}
     <div className="flex flex-wrap items-end gap-3 rounded border border-zinc-200 dark:border-zinc-800 p-3">
       <label className={label}><span>Daybook date (Nepal)</span><input type="date" aria-label="Daybook date" className={input} value={date} max={todayNepal()} onChange={e=>changeFilter(setDate,e.target.value||todayNepal())}/></label>
       <button className={button} onClick={()=>changeFilter(setDate,todayNepal())}>Today</button>
-      <label className={label}><span>Direction</span><select aria-label="Filter direction" className={input} value={direction} onChange={e=>changeFilter(setDirection,e.target.value)}><option value="ALL">All entries</option><option value="IN">Money in</option><option value="OUT">Money out</option></select></label>
+      <label className={label}><span>Direction</span><select aria-label="Filter direction" className={input} value={direction} onChange={e=>changeFilter(setDirection,e.target.value)}><option value="ALL">All entries</option><option value="IN">{staffMode?'Cr - Staff gives':'Money in'}</option><option value="OUT">{staffMode?'Dr - Staff takes':'Money out'}</option></select></label>
       <label className={label}><span>Payment method</span><select aria-label="Filter payment method" className={input} value={method} onChange={e=>changeFilter(setMethod,e.target.value)}><option value="ALL">All methods</option>{daybookMethods.map(m=><option key={m}>{m}</option>)}</select></label>
       <label className={`${label} grow`}><span>Search</span><input className={input} aria-label="Search daybook" placeholder="Person, category, note, or reference" value={search} onChange={e=>setSearch(e.target.value)}/></label>
       <button aria-label="Refresh daybook" className={button} disabled={loading} onClick={()=>void refresh()}><RefreshCw size={16}/></button>
     </div>
     {ledger && <>
-      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">{([['Opening balance','opening'],['Money in','income'],['Money out','expense'],['Closing balance','closing'],['Cash balance','cash_closing']] as const).map(([name,key])=><div key={key} className="border border-zinc-200 dark:border-zinc-800 rounded p-4"><p className="text-xs text-zinc-500">{name}</p><p className={`mt-1 text-lg font-bold font-mono ${key==='income'?'text-emerald-500':key==='expense'?'text-rose-500':''}`} data-testid={`daybook-${key}`}>{formatNPR(Number(ledger.summary[key]))}</p></div>)}</div>
-      <p className="text-xs text-zinc-500">Balances use recorded entries only. Opening balance carries forward earlier dates. Cash balance excludes digital payments. These are money movements, not profit. To record starting funds, use Money in with the Opening balance category.</p>
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">{([['Opening balance','opening'],['Money in','income'],['Money out','expense'],['Closing balance','closing'],['Cash balance','cash_closing']] as const).map(([name,key])=><div key={key} className="border border-zinc-200 dark:border-zinc-800 rounded p-4"><p className="text-xs text-zinc-500">{staffMode?({opening:'Opening staff balance',income:'Cr - Staff gives',expense:'Dr - Staff takes',closing:'Staff balance',cash_closing:'Cash staff balance'} as Record<string,string>)[key]:name}</p><p className={`mt-1 text-lg font-bold font-mono ${key==='income'?'text-emerald-500':key==='expense'?'text-rose-500':''}`} data-testid={`daybook-${key}`}>{formatNPR(Number(ledger.summary[key])*(staffMode&&['opening','closing','cash_closing'].includes(key)?-1:1)||0)}</p></div>)}</div>
+      <p className="text-xs text-zinc-500">{staffMode?'Staff balances carry forward earlier entries and exclude voided entries.':<>Balances use recorded entries only. Opening balance carries forward earlier dates. Cash balance excludes digital payments. These are money movements, not profit. To record starting funds, use Money in with the Opening balance category.</>}</p>
     </>}
     <section className="border border-zinc-200 dark:border-zinc-800 rounded overflow-hidden">
-      <div className="flex flex-wrap justify-between items-center gap-3 p-3 border-b border-zinc-200 dark:border-zinc-800"><h2 className="font-semibold">Entries {ledger?`(${ledger.count})`:''}</h2><div className="flex gap-4 items-center"><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showVoided} onChange={e=>{setShowVoided(e.target.checked);setPage(1);}}/>Show voided entries</label><button className="text-xs underline" disabled={blocked} onClick={()=>openImport('REFUND')}>Import refunds</button></div></div>
-      {!ledger?<p role="status" className="p-10 text-center text-zinc-500">{error?'Unable to load entries. Retry with Refresh daybook.':'Loading daybook...'}</p>:!ledger.results.length?<div className="p-10 text-center"><BookOpen className="mx-auto mb-3 text-zinc-400"/><h3 className="font-semibold">No entries for these filters</h3><p className="mt-1 text-sm text-zinc-500">Add money in, record money out, or select paid sales to import.</p></div>:<div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-500"><tr>{['Entry / time','Details','Payment','Money in','Money out','Recorded by',''].map((h,i)=><th key={i} className="p-3 whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{ledger.results.map(entry=><tr key={entry.id} className={`border-t border-zinc-200 dark:border-zinc-800 ${entry.voided_at?'opacity-55':''}`}>
+      <div className="flex flex-wrap justify-between items-center gap-3 p-3 border-b border-zinc-200 dark:border-zinc-800"><h2 className="font-semibold">Entries {ledger?`(${ledger.count})`:''}</h2><div className="flex gap-4 items-center"><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={showVoided} onChange={e=>{setShowVoided(e.target.checked);setPage(1);}}/>Show voided entries</label>{!staffMode&&<button className="text-xs underline" disabled={blocked} onClick={()=>openImport('REFUND')}>Import refunds</button>}</div></div>
+      {!ledger?<p role="status" className="p-10 text-center text-zinc-500">{error?'Unable to load entries. Retry with Refresh daybook.':'Loading daybook...'}</p>:!ledger.results.length?<div className="p-10 text-center"><BookOpen className="mx-auto mb-3 text-zinc-400"/><h3 className="font-semibold">No entries for these filters</h3><p className="mt-1 text-sm text-zinc-500">{staffMode?'Choose a staff member and record money taken or returned.':'Add money in, record money out, or select paid sales to import.'}</p></div>:<div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-500"><tr>{['Entry / time','Details','Payment',staffMode?'Cr - Staff gives':'Money in',staffMode?'Dr - Staff takes':'Money out','Recorded by',''].map((h,i)=><th key={i} className="p-3 whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{ledger.results.map(entry=><tr key={entry.id} className={`border-t border-zinc-200 dark:border-zinc-800 ${entry.voided_at?'opacity-55':''}`}>
         <td className="p-3 whitespace-nowrap"><span className="font-mono">DB-{entry.id}</span><span className="block text-xs text-zinc-500">{localTime(entry.created_at)}</span><span className="block text-xs text-zinc-500">{entry.source==='MANUAL'?'Manual':entry.source==='SALE'?'Imported sale':'Imported refund'}</span></td>
         <td className="p-3 min-w-56"><p className="font-semibold">{entry.category}{entry.voided_at&&<span className="ml-2 text-rose-500">Voided</span>}</p><p className="text-xs">{entry.party}</p><p className="text-xs text-zinc-500 break-words">{entry.description}</p>{entry.reference&&<p className="font-mono text-xs text-zinc-500 break-all">{entry.reference}</p>}{entry.voided_at&&<p className="mt-1 text-xs text-rose-500">{entry.void_reason} - {entry.voided_by}</p>}</td>
         <td className="p-3 text-xs">{entry.payment_method.replace('_',' ')}</td><td className={`p-3 font-mono whitespace-nowrap text-emerald-500 ${entry.voided_at?'line-through':''}`}>{entry.direction==='IN'?formatNPR(Number(entry.amount)):'-'}</td><td className={`p-3 font-mono whitespace-nowrap text-rose-500 ${entry.voided_at?'line-through':''}`}>{entry.direction==='OUT'?formatNPR(Number(entry.amount)):'-'}</td><td className="p-3 text-xs">{entry.recorded_by}</td><td className="p-3">{ledger.can_void&&!entry.voided_at&&<button aria-label={`Void entry DB-${entry.id}`} className={button} disabled={blocked} onClick={()=>{setVoidEntry(entry);setVoidReason('');setModal('void');}}><Ban size={15}/></button>}</td>
@@ -104,13 +131,13 @@ export const StaffDaybookTab:React.FC=()=>{
     </section>
     <p className="text-xs text-zinc-500">{live?'Live daybook updates connected':'Connecting to live updates...'} {ledger&&'Summary totals cover the whole selected day, regardless of search filters.'}</p>
 
-    <Modal isOpen={modal==='entry'} onClose={()=>{if(!command.busy)setModal(null);}} title={form.direction==='IN'?'Record money in':'Record money out'} maxWidth="lg">
+    <Modal isOpen={modal==='entry'} onClose={()=>{if(!command.busy)setModal(null);}} title={staffMode?`${form.direction==='IN'?'Cr - Staff gives':'Dr - Staff takes'} - ${selectedStaff?.name||''}`:form.direction==='IN'?'Record money in':'Record money out'} maxWidth="lg">
       <form onSubmit={submit} className="p-4 space-y-4">
-        <p className="text-xs text-zinc-500">{form.direction==='OUT'?'Use this for cash withdrawals, expenses, supplier payments, and other money paid out.':'Use this for actual receipts or starting funds. If a sale is recorded here manually, leave it unticked when importing sales.'}</p>
+        <p className="text-xs text-zinc-500">{staffMode?'Record the actual amount taken or returned by the selected staff member.':form.direction==='OUT'?'Use this for cash withdrawals, expenses, supplier payments, and other money paid out.':'Use this for actual receipts or starting funds. If a sale is recorded here manually, leave it unticked when importing sales.'}</p>
         <fieldset disabled={blocked} className="space-y-4">
           <div className="grid grid-cols-2 gap-3"><label className={label}><span>Date</span><input aria-label="Entry date" className={input} type="date" value={form.date} max={todayNepal()} required onChange={e=>update('date',e.target.value)}/></label><label className={label}><span>Amount (Rs)</span><input aria-label="Entry amount" className={input} type="number" min="0.01" max="9999999999.99" step="0.01" value={form.amount} required onChange={e=>update('amount',e.target.value)}/></label></div>
-          <div className="grid grid-cols-2 gap-3"><label className={label}><span>Category</span><select aria-label="Entry category" className={input} value={form.category} onChange={e=>update('category',e.target.value)}>{categories[form.direction].map(c=><option key={c}>{c}</option>)}</select></label><label className={label}><span>Payment method</span><select aria-label="Entry payment method" className={input} value={form.payment_method} onChange={e=>update('payment_method',e.target.value)}>{daybookMethods.map(m=><option key={m}>{m}</option>)}</select></label></div>
-          <label className={label}><span>{form.direction==='IN'?'Received from':'Paid to / taken by'} (optional)</span><input aria-label="Entry person" className={input} value={form.party} maxLength={150} onChange={e=>update('party',e.target.value)}/></label>
+          <div className="grid grid-cols-2 gap-3"><label className={label}><span>Category</span><select aria-label="Entry category" className={input} value={form.category} onChange={e=>update('category',e.target.value)}>{(staffMode?(form.direction==='IN'?['Staff return','Staff deposit','Other staff receipt']:['Staff wage / advance','Staff expense advance','Other staff payment']):categories[form.direction]).map(c=><option key={c}>{c}</option>)}</select></label><label className={label}><span>Payment method</span><select aria-label="Entry payment method" className={input} value={form.payment_method} onChange={e=>update('payment_method',e.target.value)}>{daybookMethods.map(m=><option key={m}>{m}</option>)}</select></label></div>
+          {!staffMode&&<label className={label}><span>{form.direction==='IN'?'Received from':'Paid to / taken by'} (optional)</span><input aria-label="Entry person" className={input} value={form.party} maxLength={150} onChange={e=>update('party',e.target.value)}/></label>}
           <label className={label}><span>Description / reason</span><textarea aria-label="Entry description" className={input} value={form.description} required maxLength={1000} onChange={e=>update('description',e.target.value)}/></label>
           <label className={label}><span>Receipt / reference (optional)</span><input aria-label="Entry reference" className={input} value={form.reference} maxLength={128} onChange={e=>update('reference',e.target.value)}/></label>
           <button type="submit" className={`${button} w-full bg-amber-500 text-black`}>{command.busy?'Saving...':'Save entry'}</button>

@@ -36,6 +36,7 @@ async function setup(page:Page) {
     else if(path.endsWith('/customer/orders/'))data={results:[]};
     else if(path.endsWith('/catalog/menu/'))data={categories:[]};
     else if(path==='/api/v1/daybook/socket-ticket/')data={ticket:'signed',path:'/ws/daybook/1/'};
+    else if(path==='/api/v1/daybook/staff/')data=[{id:2,name:'Asha',active:true},{id:3,name:'Bikash',active:true},{id:4,name:'Former staff',active:false}];
     else if(path.startsWith('/api/v1/daybook/')){
       if(req.method()==='POST'){
         const body=req.postDataJSON(),key=req.headers()['idempotency-key'];
@@ -67,13 +68,14 @@ async function setup(page:Page) {
         data={date:url.searchParams.get('date'),kind,results,count:results.length,truncated:false};
       }else{
         const date=url.searchParams.get('date')||today();
-        const active=state.entries.filter((e:any)=>!e.voided_at);
+        const scoped=state.entries.filter((e:any)=>(url.searchParams.get('staff_only')!=='true'||e.staff_id)&&(!url.searchParams.get('staff_id')||String(e.staff_id)===url.searchParams.get('staff_id')));
+        const active=scoped.filter((e:any)=>!e.voided_at);
         const sum=(rows:any[],direction:string)=>rows.filter(e=>e.direction===direction).reduce((n,e)=>n+Number(e.amount),0);
         const before=active.filter((e:any)=>e.date<date),day=active.filter((e:any)=>e.date===date);
         const opening=sum(before,'IN')-sum(before,'OUT'),income=sum(day,'IN'),expense=sum(day,'OUT');
         const cashBefore=before.filter((e:any)=>e.payment_method==='CASH'),cashDay=day.filter((e:any)=>e.payment_method==='CASH');
         const cashOpening=sum(cashBefore,'IN')-sum(cashBefore,'OUT'),cashIn=sum(cashDay,'IN'),cashOut=sum(cashDay,'OUT');
-        let rows=state.entries.filter((e:any)=>e.date===date&&(url.searchParams.get('include_voided')==='true'||!e.voided_at));
+        let rows=scoped.filter((e:any)=>e.date===date&&(url.searchParams.get('include_voided')==='true'||!e.voided_at));
         if(url.searchParams.get('direction')!=='ALL')rows=rows.filter((e:any)=>e.direction===url.searchParams.get('direction'));
         if(url.searchParams.get('payment_method')!=='ALL')rows=rows.filter((e:any)=>e.payment_method===url.searchParams.get('payment_method'));
         if(url.searchParams.get('search'))rows=rows.filter((e:any)=>JSON.stringify(e).toLowerCase().includes(url.searchParams.get('search')!.toLowerCase()));
@@ -159,4 +161,30 @@ test('live daybook updates preserve import selections without navigating',async(
   await expect(page.getByRole('checkbox',{name:'Select payment PAY-WEB',exact:true})).not.toBeChecked();
   await expect(page.getByRole('checkbox',{name:'Select payment PAY-CASH',exact:true})).toBeChecked();
   expect(navigations).toBe(0);
+});
+
+
+test('staff daybook selects outlet staff, records Dr and Cr, and isolates balances',async({page})=>{
+  const state=await setup(page);
+  await page.getByRole('navigation',{name:'Daybook sections'}).getByRole('button',{name:'Staff Daybook',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Dr - Staff takes',exact:true})).toBeDisabled();
+  await page.getByLabel('Outlet staff',{exact:true}).selectOption('2');
+  for(const [button,amount,note] of [['Dr - Staff takes','500','Asha takes advance'],['Cr - Staff gives','100','Asha returns change']]){
+    await page.getByRole('button',{name:button,exact:true}).click();
+    await page.getByLabel('Entry amount',{exact:true}).fill(amount);
+    await page.getByLabel('Entry description',{exact:true}).fill(note);
+    await page.getByRole('button',{name:'Save entry',exact:true}).click();
+    await expect(page.getByRole('table').getByText(note,{exact:true})).toBeVisible();
+  }
+  await expect(page.getByTestId('daybook-closing')).toContainText('400');
+  expect(state.writes.map((w:any)=>[w.body.staff_id,w.body.direction])).toEqual([[2,'OUT'],[2,'IN']]);
+  await page.screenshot({path:test.info().outputPath('staff-daybook.png'),fullPage:true});
+  await page.getByLabel('Outlet staff',{exact:true}).selectOption('3');
+  await expect(page.getByText('No entries for these filters',{exact:true})).toBeVisible();
+  await expect(page.getByTestId('daybook-closing')).toContainText('0');
+  await page.getByLabel('Outlet staff',{exact:true}).selectOption('4');
+  await expect(page.getByRole('button',{name:'Dr - Staff takes',exact:true})).toBeDisabled();
+  await page.getByRole('navigation',{name:'Daybook sections'}).getByRole('button',{name:'Daybook',exact:true}).click();
+  await expect(page.getByText('Asha takes advance',{exact:true})).toBeVisible();
+  await expect(page.getByTestId('daybook-closing')).toContainText('-400');
 });

@@ -5,7 +5,7 @@ import {useAuth} from '../context/AuthContext';
 
 export const daybookMethods=['CASH','CARD','FONEPAY','ESEWA','KHALTI','BANK_TRANSFER','CHEQUE','OTHER'];
 export const daybookPath=(outlet:string,path='')=>`/daybook/${path}?outlet_id=${encodeURIComponent(outlet)}`;
-export type DaybookEntry={id:number;date:string;direction:'IN'|'OUT';amount:string;payment_method:string;category:string;
+export type DaybookEntry={id:number;staff_id?:number|null;date:string;direction:'IN'|'OUT';amount:string;payment_method:string;category:string;
   party:string;description:string;reference:string;source:string;recorded_by:string;created_at:string;
   voided_at:string|null;voided_by:string|null;void_reason:string};
 export type DaybookLedger={date:string;results:DaybookEntry[];count:number;page:number;page_size:number;can_void:boolean;
