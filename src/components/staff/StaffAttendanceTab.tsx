@@ -17,7 +17,7 @@ const statuses:Record<Status,{label:string;short:string;color:string}>={
   SECOND_HALF:{label:'Second half present',short:'H2',color:'bg-sky-500/15 text-sky-700 dark:text-sky-400'},
   UNMARKED:{label:'Unmarked',short:'-',color:'text-zinc-400'},
 };
-const control='rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1.5 text-xs disabled:opacity-40';
+const control='border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-xs disabled:opacity-40';
 export const StaffAttendanceTab:React.FC=()=>{
   const {currentOutlet}=useApp();const outlet=String(currentOutlet?.id||'');
   const [period,setPeriod]=useState<{year:number;month:number}|null>(null);
@@ -71,7 +71,7 @@ export const StaffAttendanceTab:React.FC=()=>{
     {notice&&<p role="status" className="text-xs text-emerald-600">{notice}</p>}
     {!data?<p role="status" className="py-8 text-center text-sm text-zinc-500">{loading?'Loading attendance...':'Unable to load attendance. Select an outlet or refresh to retry.'}</p>:<>
       <div className="flex flex-wrap justify-between gap-2 text-xs"><span className="font-semibold">{data.month_name} {data.year} B.S. - {data.total_days} days</span><span className="text-zinc-500">Today: {data.today.year}/{String(data.today.month).padStart(2,'0')}/{String(data.today.day).padStart(2,'0')} B.S.</span></div>
-      <div className="max-h-[65vh] overflow-auto rounded border border-zinc-200 dark:border-zinc-800" tabIndex={0} role="region" aria-label="Scrollable attendance table">
+      <div className="max-h-[65vh] overflow-auto border border-zinc-200 dark:border-zinc-800" tabIndex={0} role="region" aria-label="Scrollable attendance table">
         <table className="border-collapse text-center text-[11px] whitespace-nowrap w-max min-w-full" aria-label="Monthly staff attendance">
           <thead className="sticky top-0 z-20 bg-zinc-100 dark:bg-zinc-900"><tr>
             <th scope="col" className="sticky left-0 z-30 bg-zinc-100 dark:bg-zinc-900 text-left px-2 py-2 min-w-32 max-w-40">Staff</th>
@@ -80,7 +80,7 @@ export const StaffAttendanceTab:React.FC=()=>{
           </tr></thead>
           <tbody>{rows.map(staff=><tr key={staff.id} className="border-t border-zinc-200 dark:border-zinc-800">
             <th scope="row" className="sticky left-0 z-10 bg-white dark:bg-zinc-950 text-left px-2 py-1 max-w-40"><button className="block w-full text-left truncate hover:text-amber-600" aria-label={`Mark attendance for ${staff.name}`} disabled={loading||!data.days.some(day=>!day.future&&(staff.active||staff.cells[String(day.day)]))} onClick={()=>open(staff)} title={staff.name}>{staff.name}</button>{!staff.active&&<span className="block text-[9px] text-zinc-500">Inactive / previous staff</span>}</th>
-            {data.days.map(day=>{const cell=staff.cells[String(day.day)],value=statuses[cell?.status||'UNMARKED'];return <td key={day.day} className={`p-0.5 ${day.today?'bg-amber-500/10':''}`}><button className={`w-7 h-7 rounded text-[10px] font-semibold ${value.color} disabled:opacity-30 hover:ring-1 hover:ring-amber-500`} disabled={loading||day.future||(!staff.active&&!cell)} aria-label={`${staff.name}, ${data.year}/${data.month}/${day.day} BS: ${value.label}`} title={cell?`${value.label} - ${cell.updated_by}`:day.future?'Future date':value.label} onClick={()=>open(staff,day.day)}>{value.short}</button></td>;})}
+            {data.days.map(day=>{const cell=staff.cells[String(day.day)],value=statuses[cell?.status||'UNMARKED'];return <td key={day.day} className={`p-0.5 ${day.today?'bg-amber-500/10':''}`}><button className={`w-7 h-7 text-[10px] font-semibold ${value.color} disabled:opacity-30 hover:ring-1 hover:ring-amber-500`} disabled={loading||day.future||(!staff.active&&!cell)} aria-label={`${staff.name}, ${data.year}/${data.month}/${day.day} BS: ${value.label}`} title={cell?`${value.label} - ${cell.updated_by}`:day.future?'Future date':value.label} onClick={()=>open(staff,day.day)}>{value.short}</button></td>;})}
             <td className="px-2 border-l border-zinc-200 dark:border-zinc-800">{data.total_days}</td><td className="px-2 font-semibold text-emerald-600">{staff.present}</td><td className="px-2 font-semibold text-rose-500">{staff.absent}</td><td className="px-2">{staff.half_days}</td><td className="px-2 text-zinc-500">{staff.unmarked}</td>
           </tr>)}
           {!rows.length&&<tr><td colSpan={data.total_days+6} className="p-8 text-left text-zinc-500">{search?'No staff match your search.':'No staff assigned to this outlet or attendance recorded for this month.'}</td></tr>}
