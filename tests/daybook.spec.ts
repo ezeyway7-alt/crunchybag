@@ -310,3 +310,22 @@ test('attendance defaults to BS month, marks statuses, filters and persists corr
   expect(await filters.evaluate(el=>getComputedStyle(el).flexWrap)).toBe('nowrap');
   await page.screenshot({path:test.info().outputPath('attendance-mobile.png'),fullPage:true});
 });
+
+
+test('daybook payment correction updates the method and cash totals',async({page})=>{
+  const state=await setup(page);
+  await manual(page,'in','100','Cash received');
+  await page.route('**/api/v1/payments/correct-method/**',async route=>{
+    const body=route.request().postDataJSON();
+    expect(body).toMatchObject({kind:'daybook',expected_method:'CASH',method:'ESEWA'});
+    state.entries.find((e:any)=>String(e.id)===body.target).payment_method=body.method;
+    await route.fulfill({json:{payment_method:body.method,order:null}});
+  });
+  await page.getByRole('button',{name:'Edit payment method',exact:true}).click();
+  await page.getByLabel('Corrected payment method').selectOption('ESEWA');
+  await page.getByLabel('Payment correction reason').fill('Wrong method at entry');
+  await page.getByRole('button',{name:'Save payment method',exact:true}).click();
+  await expect(page.getByRole('cell').filter({hasText:'ESEWA'})).toBeVisible();
+  await expect(page.getByTestId('daybook-cash_closing')).toContainText('0.00');
+  await expect(page.getByTestId('daybook-income')).toContainText('100');
+});

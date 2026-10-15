@@ -1,3 +1,4 @@
+import {PosPaymentMethodEdit} from '../common/PaymentMethodEdit';
 import { CustomerPicker } from "../common/CustomerPicker";
 import {useOrderReceipt} from "../../lib/orderReceipt";
 import {CompactOrderReceipt} from "../common/CompactOrderReceipt";
@@ -1348,6 +1349,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
                             </div>
                           );
                         })()}
+                        <PosPaymentMethodEdit order={ord} outlet={posSession.outlet} disabled={!posSession.meta?.permissions.billing}/>
                       </td>
 
                       {/* Action */}

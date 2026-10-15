@@ -10,10 +10,10 @@ async function setup(page: Page) {
     document.cookie = 'csrftoken=abcdefghijklmnopqrstuvwx12345678; path=/';
   }, { user, outlet });
   const supplier = { id: 'sup-1', name: 'Fresh Foods', phone: '9800000011', pan_number: '123456789', email: '', address: 'Kathmandu', is_active: true, opening_balance: '0.00' };
-  const state = { payments: [] as any[], keys: [] as string[], saved: {} as Record<string, any>, loseResponse: false, extra: [] as any[], reads: 0 };
+  const state = { method: 'CASH', payments: [] as any[], keys: [] as string[], saved: {} as Record<string, any>, loseResponse: false, extra: [] as any[], reads: 0 };
   const paid = () => state.payments.filter(row => !row.voided_at).reduce((sum, row) => sum + Number(row.amount), 0);
   const balance = () => 150 - paid();
-  const invoice = () => ({ id: 'bill-1', invoice_number: 'INV-RICE', supplier_name: supplier.name, purchase_date: '2026-10-01', total_amount: '200.00', subtotal: '200.00', paid_amount: Math.min(200, 50 + paid()).toFixed(2), due_amount: Math.max(0, balance()).toFixed(2), discount_amount: '0.00', payment_method: 'CASH', payment_status: balance() <= 0 ? 'PAID' : 'PARTIAL', notes: '', items: [{ id: 'line-1', item: 1, item_name: 'Rice', quantity: '2.000', unit: 'KG', unit_cost: '100.00', discount: '0.00', total_cost: '200.00' }] });
+  const invoice = () => ({ id: 'bill-1', invoice_number: 'INV-RICE', supplier_name: supplier.name, purchase_date: '2026-10-01', total_amount: '200.00', subtotal: '200.00', paid_amount: Math.min(200, 50 + paid()).toFixed(2), due_amount: Math.max(0, balance()).toFixed(2), discount_amount: '0.00', payment_method: state.method, payment_status: balance() <= 0 ? 'PAID' : 'PARTIAL', notes: '', items: [{ id: 'line-1', item: 1, item_name: 'Rice', quantity: '2.000', unit: 'KG', unit_cost: '100.00', discount: '0.00', total_cost: '200.00' }] });
   await page.routeWebSocket('**/ws/**', socket => { socket.onMessage(() => socket.send(JSON.stringify({ event_type: 'HEARTBEAT', revision: '1' }))); });
   await page.route('**/api/v1/**', async route => {
     const request = route.request(), url = new URL(request.url()), p = url.pathname.replace('/api/v1/', '');
@@ -83,4 +83,23 @@ test('adding a supplier from purchase selection persists it before a bill is sub
   await expect.poll(() => state.extra.length).toBe(1);
   await page.getByRole('button', { name: 'Suppliers', exact: true }).click();
   await expect(page.getByRole('button', { name: 'New vendor', exact: true })).toBeVisible();
+});
+
+
+test('purchase payment correction persists without changing paid or due amounts',async({page})=>{
+  const state=await setup(page);
+  await page.route('**/api/v1/payments/correct-method/**',async route=>{
+    const body=route.request().postDataJSON();
+    expect(body).toMatchObject({kind:'purchase',target:'bill-1',method:'FONEPAY',expected_method:'CASH'});
+    state.method=body.method;await route.fulfill({json:{payment_method:body.method}});
+  });
+  await page.getByRole('button',{name:'Bills History',exact:true}).click();
+  await page.getByRole('button',{name:'Edit payment method',exact:true}).click();
+  await page.getByLabel('Corrected payment method').selectOption('FONEPAY');
+  await page.getByLabel('Payment correction reason').fill('Paid by QR');
+  await page.getByRole('button',{name:'Save payment method',exact:true}).click();
+  const row=page.getByRole('row').filter({hasText:'INV-RICE'});
+  await expect(row).toContainText('FONEPAY');
+  await expect(row).toContainText('50.00');
+  await expect(row).toContainText('150.00');
 });

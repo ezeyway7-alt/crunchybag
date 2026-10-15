@@ -269,7 +269,7 @@ export function posOrderToOrder(
     estimatedPickupTime: "Ready at Counter",
     elapsedSeconds: Math.max(0, Math.floor((Date.now() - Date.parse(posOrder.created_at)) / 1000)),
     notes: posOrder.notes || "",
-    paymentMethod: fromPosMethod(posOrder.payment_method),
+    paymentMethod: fromPosMethod((()=>{const methods=new Set((posOrder.payments||[]).filter(p=>p.status==='SUCCESS').map(p=>p.method));if(Number(posOrder.credit_amount)>0)methods.add('CREDIT');return methods.size===1?[...methods][0]:methods.size>1?'SPLIT':posOrder.payment_method;})()),
     paymentStatus: isPaid ? "PAID" : "UNPAID",
     isBilled: isPaid,
     discountReason: posOrder.discount_reason,

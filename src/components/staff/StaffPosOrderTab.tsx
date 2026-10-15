@@ -1,3 +1,4 @@
+import {PosPaymentMethodEdit} from '../common/PaymentMethodEdit';
 import { CustomerPicker } from "../common/CustomerPicker";
 import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
 import {useOrderReceipt} from "../../lib/orderReceipt";
@@ -1826,6 +1827,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                             </div>
                           );
                         })()}
+                        <PosPaymentMethodEdit order={order} outlet={posSession.outlet} disabled={!posSession.meta?.permissions.billing}/>
                       </td>
 
                       {/* Refund / Void Status (Minimal text) */}

@@ -835,3 +835,35 @@ test('PostHog dashboard updates from live notifications without a refresh loop',
   await expect.poll(()=>queries.at(-1)?.includes('refresh=true')).toBe(false);
   await page.screenshot({path:test.info().outputPath('posthog-live-report.png'),fullPage:true});
 });
+
+
+test('POS shows the actual tender and edits it from billing and the order register',async({page})=>{
+  test.setTimeout(60000);
+  const state=await setup(page);
+  await addBurger(page);await expect(fireOrder(page)).toBeEnabled();await fireOrder(page).click();
+  await expect(page.getByRole('button',{name:'Close dialog'})).toBeVisible();
+  await page.getByRole('button',{name:'Close dialog'}).click();
+  const order=state.orders[0];
+  Object.assign(order,{paid_amount:order.total_payable,due_amount:'0.00',settlement:'PAID',payment_method:'CASH',payments:[{id:'PAY-EDIT',amount:order.total_payable,method:'ESEWA',status:'SUCCESS',reference:''}]});
+  await page.route('**/api/v1/payments/correct-method/**',async route=>{
+    const body=route.request().postDataJSON();expect(body.target).toBe('PAY-EDIT');
+    order.payments[0].method=body.method;order.payment_method=body.method;order.version++;
+    await route.fulfill({json:{payment_method:body.method,order}});
+  });
+  await page.reload({waitUntil:'domcontentloaded'});
+  let row=page.getByRole('row').filter({hasText:order.order_number});
+  await expect(row).toContainText('eSewa');
+  await row.getByRole('button',{name:'Edit payment method',exact:true}).click();
+  await page.getByLabel('Corrected payment method').selectOption('FONEPAY');
+  await page.getByLabel('Payment correction reason').fill('QR payment');
+  await page.getByRole('button',{name:'Save payment method',exact:true}).click();
+  await expect(row).toContainText('FonePay');
+  await page.goto('/admin?tab=billing');
+  row=page.getByRole('row').filter({hasText:order.order_number});
+  await row.getByRole('button',{name:'Edit payment method',exact:true}).click();
+  await page.getByLabel('Corrected payment method').selectOption('CARD');
+  await page.getByLabel('Payment correction reason').fill('Card terminal receipt');
+  await page.getByRole('button',{name:'Save payment method',exact:true}).click();
+  await expect(row).toContainText('CARD');
+  expect(order.paid_amount).toBe(order.total_payable);
+});

@@ -1,3 +1,4 @@
+import {PaymentMethodEdit} from '../../common/PaymentMethodEdit';
 import { usePurchaseRecords } from "../../../lib/usePurchaseRecords";
 import React, { useState, useMemo } from "react";
 import {
@@ -255,14 +256,14 @@ export const PurchaseBillsDatatable: React.FC = () => {
               <th className="py-2.5 px-2.5 text-right">Net</th>
               <th className="py-2.5 px-2.5 text-right">Paid</th>
               <th className="py-2.5 px-2.5 text-right">Due</th>
-              <th className="py-2.5 px-2.5 text-center">Status</th>
+              <th className="py-2.5 px-2.5 text-center">Method</th><th className="py-2.5 px-2.5 text-center">Status</th>
               <th className="py-2.5 px-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/30">
             {paginatedPurchases.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-8 text-center text-zinc-500 text-xs">
+                <td colSpan={11} className="py-8 text-center text-zinc-500 text-xs">
                   No purchase records found.
                 </td>
               </tr>
@@ -339,6 +340,7 @@ export const PurchaseBillsDatatable: React.FC = () => {
                         )}
                       </td>
 
+                      <td className="py-2 px-2.5 text-center">{purchase.paymentMethod}<PaymentMethodEdit outlet={String(currentOutlet?.id||'')} kind="purchase" payments={[{id:purchase.id,method:purchase.paymentMethod}]} onSaved={retryPurchases}/></td>
                       <td className="py-2 px-2.5 text-center whitespace-nowrap">
                         <span
                           className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded ${
@@ -388,7 +390,7 @@ export const PurchaseBillsDatatable: React.FC = () => {
                     {/* Expandable Line Items (Borderless & Clean) */}
                     {isExpanded && (
                       <tr className="bg-zinc-950/40">
-                        <td colSpan={10} className="p-3 pl-8">
+                        <td colSpan={11} className="p-3 pl-8">
                           <div className="bg-zinc-900/60 rounded-lg p-3 space-y-2">
                             <div className="flex items-center justify-between text-[11px] text-zinc-400">
                               <span className="font-semibold text-zinc-200">
