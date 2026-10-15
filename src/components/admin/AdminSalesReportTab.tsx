@@ -445,8 +445,8 @@ export function AdminSalesReportTab() {
             </div>
           </div>
 
-          {/* Highest-selling tables & Top best-selling items */}
-          <div className="grid gap-2.5 lg:grid-cols-2">
+          {/* Table sales, table order counts and best-selling items */}
+          <div className="grid gap-2.5 lg:grid-cols-3">
             <div className={panel}>
               <h2 className="text-sm font-semibold text-zinc-100">Highest-selling tables</h2>
               <p className="mb-2 text-[11px] text-zinc-500">Ranked by net sales · orders without a table excluded</p>
@@ -457,6 +457,20 @@ export function AdminSalesReportTab() {
                     label:`Table ${r.table__table_number}`,
                     value:Number(r.sales),
                     detail:`${r.orders} orders · ${money(r.average_order_value)} avg`
+                  }))}
+                />
+              </div>
+            </div>
+
+            <div className={panel} role="region" aria-label="Orders by table">
+              <h2 className="text-sm font-semibold text-zinc-100">Highest order counts by table</h2>
+              <p className="mb-2 text-[11px] text-zinc-500">Ranked by completed orders in the selected period</p>
+              <div className="max-h-64 overflow-auto">
+                <Bars
+                  rows={[...data.tables].sort((a,b)=>b.orders-a.orders || a.table_id-b.table_id).map(r=>({
+                    label:`Table ${r.table__table_number}`,
+                    value:r.orders,
+                    detail:`${r.orders} completed orders · ${money(r.sales)} net sales`
                   }))}
                 />
               </div>

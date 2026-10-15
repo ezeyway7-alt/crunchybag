@@ -29,7 +29,8 @@ test('sales report filters, live updates, errors and mobile layout', async({page
       const item={product_id:1,name:'Burger',quantity:8,item_sales:'1200.00'};
       data={summary:{...totals,average_daily_sales:'171.43',average_daily_orders:0.57},
         timeline:[{...totals,date:url.searchParams.get('start_date')}],
-        tables:[{...totals,table_id:1,table__table_number:'A1'}],top_items:[item],
+        tables:[{...totals,table_id:1,table__table_number:'A1'},
+          {...totals,table_id:2,table__table_number:'A2',orders:9,sales:'900.00'}],top_items:[item],
         channels:['POS','TABLE_QR','KIOSK','WEBSITE'].map(order_source=>({...totals,order_source,top_items:[item]})),
         hourly:Array.from({length:24},(_,hour)=>({...totals,hour,sales:hour===12?'700.00':'0.00',orders:hour===12?14:0,average_sales:hour===12?'100.00':'0.00',average_orders:hour===12?2:0}))};
     }
@@ -38,7 +39,10 @@ test('sales report filters, live updates, errors and mobile layout', async({page
   await page.goto('/admin?tab=sales_reports');
   const report=page.getByRole('region',{name:'Sales Reports'});
   await expect(report.getByRole('heading',{name:'Sales timeline'})).toBeVisible();
-  await expect(report.getByText('Table A1')).toBeVisible();
+  const tableOrders=report.getByRole('region',{name:'Orders by table'});
+  await expect(tableOrders.getByRole('listitem').first()).toContainText('Table A2');
+  await expect(tableOrders.getByRole('listitem').first()).toContainText('9 completed orders');
+  await expect(tableOrders.getByText('Table A1')).toBeVisible();
   await report.getByLabel('Choose month').fill('2026-02');
   await expect.poll(()=>requests.at(-1)?.searchParams.get('end_date')).toBe('2026-02-28');
   await expect.poll(()=>requests.at(-1)?.searchParams.get('start_date')).toBe('2026-02-01');
