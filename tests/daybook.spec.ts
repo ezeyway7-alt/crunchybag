@@ -11,6 +11,8 @@ async function setup(page:Page) {
     {id:3,order_number:'W-02',customer:'Customer two',source:'WEBSITE',amount:'80.00',payment_method:'FONEPAY',transaction_id:'PAY-WEB',created_at:new Date().toISOString(),kind:'SALE'},
     {id:4,order_number:'POS-01',customer:'Customer one',source:'POS',amount:'20.00',payment_method:'CASH',transaction_id:'REF-CASH',created_at:new Date().toISOString(),kind:'REFUND'},
   ]};
+  state.attendance={};
+  state.attendanceFail=false;
   state.khaja={products:[{id:'momo',name:'Veg Momo',category:'Snacks',archived:false},{id:'tea',name:'Milk Tea',category:'Drinks',archived:false},{id:'chowmein',name:'Chowmein',category:'Snacks',archived:false}],days:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((name,weekday)=>({name,weekday,revision:0,products:[],updated_at:null,updated_by:null}))};
   await page.addInitScript(({user,outlet})=>{
     localStorage.setItem('crunchy_access_token','test-token');
@@ -38,6 +40,25 @@ async function setup(page:Page) {
     else if(path.endsWith('/catalog/menu/'))data={categories:[]};
     else if(path==='/api/v1/daybook/socket-ticket/')data={ticket:'signed',path:'/ws/daybook/1/'};
     else if(path==='/api/v1/daybook/staff/')data=[{id:2,name:'Asha',active:true},{id:3,name:'Bikash',active:true},{id:4,name:'Former staff',active:false}];
+    else if(path==='/api/v1/daybook/attendance/'){
+      if(req.method()==='POST'){
+        if(state.attendanceFail){state.attendanceFail=false;await route.fulfill({status:400,json:{detail:'Attendance could not be saved'}});return;}
+        const body=req.postDataJSON();state.writes.push({path,body});
+        const key=`${body.year}:${body.month}:${body.staff_id}:${body.day}`;
+        data={status:body.status,revision:(state.attendance[key]?.revision||0)+1,updated_at:new Date().toISOString(),updated_by:user.username};
+        state.attendance[key]=data;
+      }else{
+        const year=Number(url.searchParams.get('year')||2083),month=Number(url.searchParams.get('month')||6);
+        const days=Array.from({length:30},(_,i)=>({day:i+1,date:`2026-10-${String(i+1).padStart(2,'0')}`,weekday:'Thu',today:year===2083&&month===6&&i===28,future:year>2083||(year===2083&&(month>6||(month===6&&i>28)))}));
+        data={year,month,month_name:'Ashwin',months:['Baisakh','Jestha','Ashadh','Shrawan','Bhadra','Ashwin','Kartik','Mangsir','Poush','Magh','Falgun','Chaitra'],min_year:1975,max_year:2100,today:{year:2083,month:6,day:29},days,total_days:30,
+          staff:[{id:2,name:'Asha'},{id:3,name:'Bikash'}].map(staff=>{
+            const cells=Object.fromEntries(days.filter(d=>state.attendance[`${year}:${month}:${staff.id}:${d.day}`]).map(d=>[String(d.day),state.attendance[`${year}:${month}:${staff.id}:${d.day}`]]));
+            const values=Object.values(cells) as any[],half_days=values.filter(c=>['FIRST_HALF','SECOND_HALF'].includes(c.status)).length;
+            const present=values.filter(c=>c.status==='PRESENT').length+half_days/2,absent=values.filter(c=>c.status==='ABSENT').length+half_days/2;
+            return {...staff,active:true,cells,present,absent,half_days,unmarked:days.filter(d=>!d.future).length-present-absent};
+          })};
+      }
+    }
     else if(path==='/api/v1/daybook/khaja-schedule/'){
       if(req.method()==='POST'){
         const body=req.postDataJSON();
@@ -242,4 +263,50 @@ test('khaja weekly table supports multiple products, editing, clearing and reloa
   await page.setViewportSize({width:390,height:844});
   await expect(page.getByRole('button',{name:'Edit Sunday khaja',exact:true})).toBeAttached();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});
+
+
+test('attendance defaults to BS month, marks statuses, filters and persists corrections',async({page})=>{
+  test.setTimeout(60000);
+  const state=await setup(page);
+  const open=()=>page.getByRole('navigation',{name:'Daybook sections'}).getByRole('button',{name:'Staff Attendance',exact:true}).click();
+  await open();
+  await expect(page.getByLabel('Nepali year',{exact:true})).toHaveValue('2083');
+  await expect(page.getByLabel('Nepali month',{exact:true})).toHaveValue('6');
+  await page.getByRole('button',{name:'Mark attendance for Asha',exact:true}).click();
+  await expect(page.getByLabel('Attendance Nepali date',{exact:true})).toHaveValue('29');
+  await page.getByRole('button',{name:'Save attendance',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Asha, 2083/6/29 BS: Present',exact:true})).toBeVisible();
+  for(const [day,status,label] of [[1,'ABSENT','Absent'],[2,'FIRST_HALF','First half present'],[3,'SECOND_HALF','Second half present']] as const){
+    await page.getByRole('button',{name:`Asha, 2083/6/${day} BS: Unmarked`,exact:true}).click();
+    await page.getByLabel('Attendance status',{exact:true}).selectOption(status);
+    await page.getByRole('button',{name:'Save attendance',exact:true}).click();
+    await expect(page.getByRole('button',{name:`Asha, 2083/6/${day} BS: ${label}`,exact:true})).toBeVisible();
+  }
+  const row=page.getByRole('table',{name:'Monthly staff attendance'}).getByRole('row').filter({has:page.getByRole('button',{name:'Mark attendance for Asha',exact:true})});
+  await expect(row.getByRole('cell').nth(31)).toHaveText('2');
+  await expect(row.getByRole('cell').nth(32)).toHaveText('2');
+  await expect(page.getByRole('button',{name:'Asha, 2083/6/30 BS: Unmarked',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Asha, 2083/6/1 BS: Absent',exact:true}).click();
+  await page.getByLabel('Attendance status',{exact:true}).selectOption('PRESENT');
+  state.attendanceFail=true;
+  await page.getByRole('button',{name:'Save attendance',exact:true}).click();
+  await expect(page.getByText('Attendance could not be saved',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Save attendance',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Asha, 2083/6/1 BS: Present',exact:true})).toBeVisible();
+  await page.getByLabel('Search attendance staff',{exact:true}).fill('asha');
+  await expect(page.getByRole('button',{name:'Mark attendance for Bikash',exact:true})).toHaveCount(0);
+  await page.getByLabel('Nepali month',{exact:true}).selectOption('5');
+  await expect(page.getByRole('button',{name:'Asha, 2083/5/1 BS: Unmarked',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Current month',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Asha, 2083/6/1 BS: Present',exact:true})).toBeVisible();
+  await page.reload({waitUntil:'domcontentloaded'});await open();
+  await expect(page.getByRole('button',{name:'Asha, 2083/6/1 BS: Present',exact:true})).toBeVisible();
+  await page.screenshot({path:test.info().outputPath('attendance-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.getByLabel('Search attendance staff',{exact:true})).toBeAttached();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  const filters=page.getByLabel('Attendance filters',{exact:true});
+  expect(await filters.evaluate(el=>getComputedStyle(el).flexWrap)).toBe('nowrap');
+  await page.screenshot({path:test.info().outputPath('attendance-mobile.png'),fullPage:true});
 });
