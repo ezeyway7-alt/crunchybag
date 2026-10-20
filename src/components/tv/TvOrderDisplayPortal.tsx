@@ -27,6 +27,7 @@ import { Order, OrderStatus } from "../../types";
 import { CrunchyLogo } from "../common/CrunchyLogo";
 import { Skeleton } from "../common/Skeleton";
 import { formatNPR } from "../../lib/utils";
+import { DashainTvHeader } from "./DashainTvHeader";
 
 interface CallingAnnouncement {
   id: string;
@@ -482,68 +483,36 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   if (displayMode === "menu") {
     return (
       <div className="tv-menu-screen flex h-screen w-screen select-none flex-col overflow-hidden bg-[#08090b] text-white">
-        <header className="flex shrink-0 items-center justify-between gap-4 px-8 py-5 sm:px-12">
-          <div className="flex items-center gap-5">
-            <CrunchyLogo size="md" className="h-9 w-auto sm:h-11" />
-            <span className="h-8 w-px bg-white/15" aria-hidden="true" />
-            <span className="text-sm font-semibold uppercase tracking-[0.28em] text-zinc-300 sm:text-base">Our Menu</span>
-          </div>
-          <div className="flex items-center gap-5">
-            {menuPages.length > 0 && (
-              <span className="font-mono text-sm tabular-nums text-zinc-400 sm:text-base">
-                {`Page ${(menuCarouselIndex % menuPages.length) + 1} / ${menuPages.length}`}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setDisplayMode("orders")}
-              className="text-xs font-semibold uppercase tracking-wider text-zinc-400 transition-colors hover:text-white sm:text-sm"
-            >
-              Order board
-            </button>
-            <button
-              id="tv-fullscreen-toggle"
-              type="button"
-              onClick={toggleFullscreen}
-              className="text-zinc-400 transition-colors hover:text-white"
-              title="Toggle TV fullscreen"
-              aria-label="Toggle TV fullscreen"
-            >
-              {isFullscreen ? <Minimize2 className="h-5 w-5 sm:h-6 sm:w-6" /> : <Maximize2 className="h-5 w-5 sm:h-6 sm:w-6" />}
-            </button>
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-zinc-400 transition-colors hover:text-white"
-                title="Exit TV display"
-                aria-label="Exit TV display"
-              >
-                <X className="h-5 w-5 sm:h-6 sm:w-6" />
-              </button>
-            )}
-          </div>
-        </header>
+        <DashainTvHeader
+          onSwitchToOrders={() => setDisplayMode("orders")}
+          onToggleFullscreen={toggleFullscreen}
+          isFullscreen={isFullscreen}
+          onClose={onClose}
+        />
 
         {isLoadingSkeleton ? (
-          <main className="grid min-h-0 flex-1 grid-cols-1 gap-8 px-8 py-6 sm:grid-cols-2 sm:px-12 xl:grid-cols-4">
+          <main className="grid min-h-0 flex-1 grid-cols-1 items-center gap-6 px-6 py-4 sm:grid-cols-2 sm:px-10 xl:grid-cols-4 xl:gap-6">
             {[1, 2, 3, 4].map((item) => (
-              <div key={item} className="flex flex-col gap-6">
-                <Skeleton className="aspect-[1.08/1] w-full bg-zinc-900" />
+              <div key={item} className="flex flex-col gap-4">
+                <Skeleton className="aspect-[1.12/1] w-full rounded-2xl bg-zinc-900" />
+                <Skeleton className="h-5 w-1/3 bg-zinc-900" />
                 <Skeleton className="h-8 w-4/5 bg-zinc-900" />
-                <Skeleton className="h-7 w-2/5 bg-zinc-900" />
+                <Skeleton className="h-8 w-2/5 bg-zinc-900" />
               </div>
             ))}
           </main>
         ) : showcaseProducts.length > 0 ? (
-          <main className="min-h-0 flex-1 overflow-hidden py-4 sm:py-6">
+          <main className="min-h-0 flex-1 overflow-hidden px-4 sm:px-8 xl:px-10 py-2 sm:py-3 flex flex-col justify-center">
             <div
               className={`tv-menu-track flex h-full items-center ${menuCarouselTransitionEnabled ? "" : "tv-menu-track-reset"}`}
               style={{ transform: `translateX(-${menuCarouselIndex * 100}%)` }}
               onTransitionEnd={handleMenuCarouselTransitionEnd}
             >
               {menuCarouselPages.map((page, pageIndex) => (
-                <section key={`menu-page-${pageIndex}`} className="tv-menu-page grid h-full min-w-0 grid-cols-1 items-center gap-5 px-5 sm:grid-cols-2 sm:gap-7 sm:px-8 xl:grid-cols-4 xl:gap-5 2xl:gap-8">
+                <section
+                  key={`menu-page-${pageIndex}`}
+                  className="tv-menu-page grid h-full min-w-0 grid-cols-1 items-center gap-4 px-3 sm:grid-cols-2 sm:gap-6 sm:px-6 xl:grid-cols-4 xl:gap-5 2xl:gap-7"
+                >
                   {page.map((product) => {
                     const category = categories.find((item) => item.id === product.categoryId);
                     const image = product.images[product.mainImageIndex ?? 0] || product.images[0];
@@ -554,9 +523,9 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                     return (
                       <article
                         key={product.id}
-                        className="flex min-w-0 flex-col justify-center"
+                        className="flex min-w-0 max-h-[82vh] flex-col justify-center rounded-2xl transition-transform"
                       >
-                        <div className="tv-menu-image relative aspect-[1.08/1] overflow-hidden bg-zinc-900/70 xl:aspect-[0.72/1]">
+                        <div className="tv-menu-image relative aspect-[1.12/1] sm:aspect-[1.15/1] xl:aspect-[1.08/1] 2xl:aspect-[1.05/1] max-h-[44vh] 2xl:max-h-[48vh] w-full overflow-hidden rounded-2xl bg-zinc-900/80 shadow-2xl border border-white/5">
                           {image ? (
                             <img
                               src={image}
@@ -570,23 +539,23 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                               {product.name}
                             </div>
                           )}
-                          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent" />
+                          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/55 to-transparent" />
                         </div>
-                        <div className="flex min-h-28 flex-col justify-center gap-2 px-1 pt-5 sm:pt-6">
+                        <div className="flex min-h-[5.5rem] sm:min-h-[6.5rem] flex-col justify-start gap-1.5 px-1 pt-3 sm:pt-4">
                           {category && (
-                            <p className="truncate text-xs font-semibold uppercase tracking-[0.2em] text-amber-400 sm:text-sm">
+                            <p className="truncate text-[11px] sm:text-xs font-bold uppercase tracking-[0.2em] text-amber-400">
                               {category.name}
                             </p>
                           )}
-                          <h2 className="line-clamp-2 text-2xl font-semibold leading-tight text-white sm:text-3xl 2xl:text-4xl">
+                          <h2 className="line-clamp-2 text-xl font-bold leading-snug text-white sm:text-2xl 2xl:text-[1.75rem] min-h-[2.8rem] sm:min-h-[3.6rem] flex items-start">
                             {product.name}
                           </h2>
-                          <div className="flex items-baseline gap-3">
-                            <p className="font-mono text-2xl font-bold tabular-nums text-amber-400 sm:text-3xl 2xl:text-4xl">
+                          <div className="flex items-baseline gap-2.5 mt-auto">
+                            <p className="font-mono text-2xl font-black tabular-nums text-amber-400 sm:text-3xl 2xl:text-4xl">
                               {formatNPR(price)}
                             </p>
                             {product.discountPercent ? (
-                              <span className="font-mono text-base tabular-nums text-zinc-500 line-through sm:text-lg">
+                              <span className="font-mono text-sm tabular-nums text-zinc-500 line-through sm:text-base">
                                 {formatNPR(product.basePrice)}
                               </span>
                             ) : null}
@@ -607,11 +576,6 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
             </div>
           </main>
         )}
-
-        <footer className="flex shrink-0 items-center justify-between px-8 pb-5 pt-3 text-xs uppercase tracking-[0.16em] text-zinc-500 sm:px-12 sm:text-sm">
-          <span>{currentOutlet?.name || "Freshly made, just for you"}</span>
-          <span>Fresh favourites, all day</span>
-        </footer>
       </div>
     );
   }
