@@ -16,156 +16,191 @@ export const DashainTvHeader: React.FC<DashainTvHeaderProps> = ({
   onClose,
 }) => {
   return (
-    <header className="relative flex shrink-0 items-center justify-between gap-4 px-6 py-3 sm:px-10 sm:py-4 z-20 border-b border-amber-500/15 bg-gradient-to-b from-[#140b08]/90 via-[#0c0a0c]/80 to-transparent">
+    <header className="relative flex shrink-0 items-center justify-between gap-4 px-6 py-3 sm:px-10 sm:py-4 z-30 overflow-visible border-b border-amber-500/20 bg-gradient-to-b from-[#140b08]/95 via-[#0c0a0c]/85 to-transparent">
       {/* Ambient festive golden-red atmospheric glow in the header sky */}
       <div
         className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
         aria-hidden="true"
       >
-        <div className="dashain-halo absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 h-44 w-[750px] rounded-full bg-gradient-to-r from-amber-500/20 via-red-600/25 to-yellow-500/20 blur-3xl" />
-        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+        <div className="dashain-halo absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 h-48 w-[850px] rounded-full bg-gradient-to-r from-amber-500/25 via-red-600/30 to-yellow-500/25 blur-3xl" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
       </div>
 
       {/* LEFT: Crunchy Brand Logo */}
-      <div className="flex items-center gap-3 shrink-0">
-        <CrunchyLogo size="md" className="h-9 w-auto sm:h-11 drop-shadow-[0_2px_10px_rgba(245,158,11,0.25)]" />
+      <div className="flex items-center gap-3 shrink-0 z-10">
+        <CrunchyLogo size="md" className="h-9 w-auto sm:h-11 drop-shadow-[0_2px_12px_rgba(245,158,11,0.3)]" />
       </div>
 
       {/* CENTER: 3D Animated Dashain Sky with Flying Kites & Festive Celebration */}
-      <div className="relative flex flex-1 items-center justify-center min-w-0 max-w-4xl h-14 sm:h-16 px-2 overflow-visible">
-        {/* Floating 3D Flying Kite 1 (Left Forefront - Traditional Crimson & Marigold Changa) */}
+      <div className="relative flex flex-1 items-center justify-center min-w-0 max-w-5xl h-14 sm:h-16 px-2 overflow-visible z-30">
+        {/* Floating 3D Flying Kite 1 (Left Forefront - Traditional Crimson, Gold & Emerald Changa) */}
+        {/* Overflowing significantly below the header into the screen foreground */}
         <div
-          className="dashain-kite-1 pointer-events-none absolute left-3 sm:left-12 md:left-20 -top-2 sm:-top-3 w-16 h-20 sm:w-20 sm:h-24 z-10 filter drop-shadow-[0_8px_16px_rgba(220,38,38,0.45)]"
+          className="dashain-kite-1 pointer-events-none absolute left-2 sm:left-6 md:left-12 lg:left-16 -top-1 sm:-top-2 w-24 h-52 sm:w-28 sm:h-60 md:w-32 md:h-68 z-40 filter drop-shadow-[0_20px_28px_rgba(0,0,0,0.85)] drop-shadow-[0_4px_16px_rgba(220,38,38,0.55)]"
           aria-hidden="true"
         >
-          <svg viewBox="0 0 70 95" className="w-full h-full overflow-visible">
-            {/* Thread / Dhago curving down */}
+          <svg viewBox="0 0 80 220" className="w-full h-full overflow-visible">
+            {/* Long Trailing Thread / Dhago curving far down */}
             <path
-              d="M 35 38 Q 30 75 10 95"
+              d="M 40 40 Q 25 100 12 160 T 4 220"
               fill="none"
-              stroke="rgba(254, 240, 138, 0.55)"
-              strokeWidth="0.9"
-              strokeDasharray="2 1"
+              stroke="rgba(254, 240, 138, 0.65)"
+              strokeWidth="1"
+              strokeDasharray="3 2"
             />
             {/* Diamond Kite Body */}
             <g>
               {/* Top-Left: Crimson Red */}
-              <polygon points="35,2 3,35 35,35" fill="#dc2626" />
+              <polygon points="40,4 4,40 40,40" fill="#dc2626" />
               {/* Top-Right: Marigold Orange */}
-              <polygon points="35,2 67,35 35,35" fill="#f59e0b" />
-              {/* Bottom-Left: Golden Yellow */}
-              <polygon points="3,35 35,68 35,35" fill="#fbbf24" />
+              <polygon points="40,4 76,40 40,40" fill="#f59e0b" />
+              {/* Bottom-Left: Golden Amber */}
+              <polygon points="4,40 40,76 40,40" fill="#fbbf24" />
               {/* Bottom-Right: Emerald Green */}
-              <polygon points="67,35 35,68 35,35" fill="#059669" />
+              <polygon points="76,40 40,76 40,40" fill="#059669" />
 
               {/* Central Bamboo Spine (ठाडो सिन्का) */}
-              <line x1="35" y1="1" x2="35" y2="69" stroke="#78350f" strokeWidth="1.8" strokeLinecap="round" />
+              <line x1="40" y1="2" x2="40" y2="78" stroke="#78350f" strokeWidth="2.2" strokeLinecap="round" />
               {/* Curved Bamboo Bow (धनुष सिन्का) */}
-              <path d="M 3 35 Q 35 14 67 35" fill="none" stroke="#92400e" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M 4 40 Q 40 16 76 40" fill="none" stroke="#92400e" strokeWidth="2.2" strokeLinecap="round" />
 
               {/* Auspicious Center Medallion */}
-              <circle cx="35" cy="35" r="5" fill="#fffbeb" stroke="#f59e0b" strokeWidth="1" />
-              <circle cx="35" cy="35" r="2.2" fill="#dc2626" />
+              <circle cx="40" cy="40" r="5.5" fill="#fffbeb" stroke="#f59e0b" strokeWidth="1.2" />
+              <circle cx="40" cy="40" r="2.5" fill="#dc2626" />
 
-              {/* Bottom Corner Accent */}
-              <polygon points="30,68 40,68 35,74" fill="#dc2626" />
+              {/* Bottom Tail Reinforcement Triangle */}
+              <polygon points="34,76 46,76 40,84" fill="#dc2626" />
             </g>
 
-            {/* Fluttering Ribbon Tails */}
+            {/* Long Flowing Ribbon Tails with Flutter Ties (Overflowing Far Down Below) */}
             <g className="dashain-tail">
+              {/* Main Golden Ribbon */}
               <path
-                d="M 35 73 Q 32 82 38 88 T 34 98"
+                d="M 40 82 Q 28 112 50 142 T 26 182 T 44 218"
                 fill="none"
                 stroke="#f59e0b"
-                strokeWidth="2.4"
+                strokeWidth="3.2"
                 strokeLinecap="round"
               />
+              {/* Twin Emerald Ribbon */}
               <path
-                d="M 35 73 Q 39 81 33 87 T 37 99"
+                d="M 40 82 Q 52 110 30 140 T 54 180 T 36 216"
                 fill="none"
                 stroke="#10b981"
-                strokeWidth="2"
+                strokeWidth="2.6"
                 strokeLinecap="round"
               />
+
+              {/* Traditional Bow Ties along the tail */}
+              {/* Bow 1 at y=112 (Emerald Green) */}
+              <polygon points="34,110 44,114 36,118" fill="#10b981" />
+              <polygon points="44,110 34,114 42,118" fill="#10b981" />
+              <circle cx="39" cy="114" r="1.8" fill="#facc15" />
+
+              {/* Bow 2 at y=146 (Crimson Red) */}
+              <polygon points="35,144 47,148 37,152" fill="#ef4444" />
+              <polygon points="47,144 35,148 45,152" fill="#ef4444" />
+              <circle cx="41" cy="148" r="1.8" fill="#fef08a" />
+
+              {/* Bow 3 at y=182 (Saffron Orange) */}
+              <polygon points="32,180 44,184 34,188" fill="#f97316" />
+              <polygon points="44,180 32,184 42,188" fill="#f97316" />
+              <circle cx="38" cy="184" r="1.8" fill="#ffffff" />
             </g>
           </svg>
         </div>
 
         {/* Floating 3D Flying Kite 2 (Right Forefront - Royal Cyan & Saffron Changa) */}
+        {/* Overflowing significantly below the header into the screen foreground */}
         <div
-          className="dashain-kite-2 pointer-events-none absolute right-3 sm:right-12 md:right-20 -top-1 sm:-top-2 w-14 h-18 sm:w-18 sm:h-22 z-10 filter drop-shadow-[0_8px_16px_rgba(2,132,199,0.45)]"
+          className="dashain-kite-2 pointer-events-none absolute right-2 sm:right-6 md:right-12 lg:right-16 -top-0 sm:-top-1 w-22 h-48 sm:w-26 sm:h-56 md:w-30 md:h-64 z-40 filter drop-shadow-[0_20px_28px_rgba(0,0,0,0.85)] drop-shadow-[0_4px_16px_rgba(2,132,199,0.55)]"
           aria-hidden="true"
         >
-          <svg viewBox="0 0 70 95" className="w-full h-full overflow-visible">
-            {/* Thread / Dhago */}
+          <svg viewBox="0 0 80 220" className="w-full h-full overflow-visible">
+            {/* Long Trailing Thread / Dhago */}
             <path
-              d="M 35 38 Q 42 75 60 95"
+              d="M 40 40 Q 55 100 68 160 T 76 220"
               fill="none"
-              stroke="rgba(254, 240, 138, 0.55)"
-              strokeWidth="0.9"
-              strokeDasharray="2 1"
+              stroke="rgba(254, 240, 138, 0.65)"
+              strokeWidth="1"
+              strokeDasharray="3 2"
             />
             {/* Diamond Kite Body */}
             <g>
               {/* Top-Left: Sky Blue */}
-              <polygon points="35,2 3,35 35,35" fill="#0284c7" />
+              <polygon points="40,4 4,40 40,40" fill="#0284c7" />
               {/* Top-Right: Saffron Orange */}
-              <polygon points="35,2 67,35 35,35" fill="#ea580c" />
+              <polygon points="40,4 76,40 40,40" fill="#ea580c" />
               {/* Bottom-Left: Purple */}
-              <polygon points="3,35 35,68 35,35" fill="#7c3aed" />
+              <polygon points="4,40 40,76 40,40" fill="#7c3aed" />
               {/* Bottom-Right: Sunburst Gold */}
-              <polygon points="67,35 35,68 35,35" fill="#facc15" />
+              <polygon points="76,40 40,76 40,40" fill="#facc15" />
 
               {/* Bamboo Spine */}
-              <line x1="35" y1="1" x2="35" y2="69" stroke="#78350f" strokeWidth="1.6" strokeLinecap="round" />
+              <line x1="40" y1="2" x2="40" y2="78" stroke="#78350f" strokeWidth="2" strokeLinecap="round" />
               {/* Curved Bamboo Bow */}
-              <path d="M 3 35 Q 35 14 67 35" fill="none" stroke="#92400e" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M 4 40 Q 40 16 76 40" fill="none" stroke="#92400e" strokeWidth="2" strokeLinecap="round" />
 
               {/* Center Accent */}
-              <circle cx="35" cy="35" r="4.5" fill="#fff7ed" stroke="#ea580c" strokeWidth="1" />
-              <circle cx="35" cy="35" r="2" fill="#0284c7" />
+              <circle cx="40" cy="40" r="5" fill="#fff7ed" stroke="#ea580c" strokeWidth="1.2" />
+              <circle cx="40" cy="40" r="2.2" fill="#0284c7" />
 
               {/* Bottom Triangle */}
-              <polygon points="30,68 40,68 35,73" fill="#ea580c" />
+              <polygon points="34,76 46,76 40,83" fill="#ea580c" />
             </g>
 
-            {/* Fluttering Ribbon Tail */}
+            {/* Long Fluttering Ribbon Tail (Overflowing Far Down Below) */}
             <g className="dashain-tail-rev">
               <path
-                d="M 35 72 Q 40 80 32 86 T 38 98"
+                d="M 40 82 Q 54 110 32 140 T 56 180 T 36 216"
                 fill="none"
                 stroke="#e11d48"
-                strokeWidth="2.2"
+                strokeWidth="3"
                 strokeLinecap="round"
               />
               <path
-                d="M 35 72 Q 31 79 38 85 T 32 97"
+                d="M 40 82 Q 28 112 50 142 T 28 182 T 48 218"
                 fill="none"
                 stroke="#facc15"
-                strokeWidth="1.8"
+                strokeWidth="2.4"
                 strokeLinecap="round"
               />
+
+              {/* Bow 1 at y=110 (Crimson Rose) */}
+              <polygon points="37,108 47,112 39,116" fill="#e11d48" />
+              <polygon points="47,108 37,112 45,116" fill="#e11d48" />
+              <circle cx="42" cy="112" r="1.6" fill="#fef08a" />
+
+              {/* Bow 2 at y=144 (Cyan Teal) */}
+              <polygon points="33,142 45,146 35,150" fill="#06b6d4" />
+              <polygon points="45,142 33,146 43,150" fill="#06b6d4" />
+              <circle cx="39" cy="146" r="1.6" fill="#ffffff" />
+
+              {/* Bow 3 at y=180 (Purple) */}
+              <polygon points="36,178 48,182 38,186" fill="#9333ea" />
+              <polygon points="48,178 36,182 46,186" fill="#9333ea" />
+              <circle cx="42" cy="182" r="1.6" fill="#facc15" />
             </g>
           </svg>
         </div>
 
         {/* Floating 3D Flying Kite 3 (Distant High Sky - Purple & Gold Mini Changa) */}
         <div
-          className="dashain-kite-3 pointer-events-none absolute left-1/4 -top-3 sm:-top-4 w-10 h-14 sm:w-12 sm:h-16 hidden sm:block opacity-85 filter drop-shadow-[0_4px_10px_rgba(124,58,237,0.35)]"
+          className="dashain-kite-3 pointer-events-none absolute left-1/4 -top-3 sm:-top-4 w-12 h-20 sm:w-14 sm:h-24 hidden sm:block opacity-90 filter drop-shadow-[0_6px_14px_rgba(124,58,237,0.4)]"
           aria-hidden="true"
         >
-          <svg viewBox="0 0 70 95" className="w-full h-full overflow-visible">
+          <svg viewBox="0 0 70 120" className="w-full h-full overflow-visible">
             <polygon points="35,2 3,35 35,35" fill="#9333ea" />
             <polygon points="35,2 67,35 35,35" fill="#fbbf24" />
             <polygon points="3,35 35,68 35,35" fill="#ec4899" />
             <polygon points="67,35 35,68 35,35" fill="#06b6d4" />
-            <line x1="35" y1="1" x2="35" y2="69" stroke="#581c87" strokeWidth="1.4" />
-            <path d="M 3 35 Q 35 15 67 35" fill="none" stroke="#581c87" strokeWidth="1.4" />
+            <line x1="35" y1="1" x2="35" y2="69" stroke="#581c87" strokeWidth="1.6" />
+            <path d="M 3 35 Q 35 15 67 35" fill="none" stroke="#581c87" strokeWidth="1.6" />
             <path
-              d="M 35 72 Q 38 79 32 85 T 36 94"
+              d="M 35 72 Q 42 85 28 98 T 38 116"
               fill="none"
               stroke="#fbbf24"
-              strokeWidth="1.6"
+              strokeWidth="2"
               strokeLinecap="round"
               className="dashain-tail"
             />
@@ -173,7 +208,7 @@ export const DashainTvHeader: React.FC<DashainTvHeaderProps> = ({
         </div>
 
         {/* Floating Marigold (Sayapatri) Petals & Festive Sparkles */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden="true">
           {/* Marigold Petal 1 */}
           <span className="dashain-petal-1 absolute left-10 top-2 text-amber-400 text-xs sm:text-sm select-none">
             🍂
@@ -195,7 +230,7 @@ export const DashainTvHeader: React.FC<DashainTvHeaderProps> = ({
         </div>
 
         {/* FESTIVE CENTERPIECE: Happy Dashain / शुभ विजया दशमी */}
-        <div className="relative flex flex-col items-center justify-center text-center px-4 py-1 z-10">
+        <div className="relative flex flex-col items-center justify-center text-center px-4 py-1 z-20">
           {/* Top Line: Auspicious Greeting in Devanagari */}
           <div className="flex items-center justify-center gap-2">
             <span className="text-amber-400 text-xs sm:text-sm animate-pulse">✨</span>
@@ -213,7 +248,7 @@ export const DashainTvHeader: React.FC<DashainTvHeaderProps> = ({
       </div>
 
       {/* RIGHT: Essential TV Display Controls */}
-      <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+      <div className="flex items-center gap-3 sm:gap-4 shrink-0 z-10">
         <button
           type="button"
           onClick={onSwitchToOrders}
