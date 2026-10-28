@@ -27,7 +27,11 @@ import { Order, OrderStatus } from "../../types";
 import { CrunchyLogo } from "../common/CrunchyLogo";
 import { Skeleton } from "../common/Skeleton";
 import { formatNPR } from "../../lib/utils";
-import { DashainTvHeader } from "./DashainTvHeader";
+import { TiharTvHeader } from "./TiharTvHeader";
+import { TiharBottomDiyas } from "./TiharBottomDiyas";
+import { TiharRocketFireworks } from "./TiharRocketFireworks";
+import { TiharBananaPlants } from "./TiharBananaPlants";
+import { TiharHeaderToran } from "./TiharHeaderToran";
 
 interface CallingAnnouncement {
   id: string;
@@ -482,8 +486,18 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
   if (displayMode === "menu") {
     return (
-      <div className="tv-menu-screen flex h-screen w-screen select-none flex-col overflow-hidden bg-[#08090b] text-white">
-        <DashainTvHeader
+      <div className="tv-menu-screen relative flex h-screen w-screen select-none flex-col overflow-hidden bg-[#08090b] text-white">
+        {/* Continuous Festive Rocket Fireworks Soaring and Bursting Overhead Across Middle & Scatter Area (z-[45]) */}
+        <TiharRocketFireworks />
+
+        {/* Traditional Doorway Toran Flower Garland (z-15: LESS than banana plants, menu, and diyas) */}
+        <TiharHeaderToran />
+
+        {/* Auspicious Big Banana Plants (z-25: IN FRONT OF the flower garland toran) */}
+        <TiharBananaPlants />
+
+        {/* Tihar & Chhath Grand Header with Shubhakamana & Controls (z-35) */}
+        <TiharTvHeader
           onSwitchToOrders={() => setDisplayMode("orders")}
           onToggleFullscreen={toggleFullscreen}
           isFullscreen={isFullscreen}
@@ -491,7 +505,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
         />
 
         {isLoadingSkeleton ? (
-          <main className="grid min-h-0 flex-1 grid-cols-1 items-center gap-6 px-6 py-4 sm:grid-cols-2 sm:px-10 xl:grid-cols-4 xl:gap-6">
+          <main className="grid min-h-0 flex-1 grid-cols-1 items-center gap-6 px-6 py-4 sm:grid-cols-2 sm:px-10 xl:grid-cols-4 xl:gap-6 relative z-20">
             {[1, 2, 3, 4].map((item) => (
               <div key={item} className="flex flex-col gap-4">
                 <Skeleton className="aspect-[1.12/1] w-full rounded-2xl bg-zinc-900" />
@@ -502,7 +516,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
             ))}
           </main>
         ) : showcaseProducts.length > 0 ? (
-          <main className="min-h-0 flex-1 overflow-hidden px-4 sm:px-8 xl:px-10 py-2 sm:py-3 flex flex-col justify-center">
+          <main className="min-h-0 flex-1 overflow-hidden px-4 sm:px-8 xl:px-10 py-2 sm:py-3 pb-6 sm:pb-8 flex flex-col justify-center relative z-20">
             <div
               className={`tv-menu-track flex h-full items-center ${menuCarouselTransitionEnabled ? "" : "tv-menu-track-reset"}`}
               style={{ transform: `translateX(-${menuCarouselIndex * 100}%)` }}
@@ -569,13 +583,16 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
             </div>
           </main>
         ) : (
-          <main className="flex flex-1 items-center justify-center px-8 text-center">
+          <main className="flex flex-1 items-center justify-center px-8 text-center relative z-20">
             <div>
               <h1 className="text-3xl font-semibold text-white sm:text-5xl">Our menu is getting ready</h1>
               <p className="mt-4 text-lg text-zinc-400 sm:text-2xl">Available items with photos will appear here.</p>
             </div>
           </main>
         )}
+
+        {/* Traditional Lighting Clay Diyos at Bottom-Left & Bottom-Right Corners */}
+        <TiharBottomDiyas />
       </div>
     );
   }
