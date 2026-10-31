@@ -6,14 +6,14 @@ import { AppProvider, useApp } from "./context/AppContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { PortalHeader } from "./components/portal-nav/PortalHeader";
 import { CustomerPortal } from "./components/customer/CustomerPortal";
-import { StaffPortal } from "./components/staff/StaffPortal";
-import { KDSPortal } from "./components/kds/KDSPortal";
-import { AdminPortal } from "./components/admin/AdminPortal";
-import { WaiterPortal } from "./components/staff/WaiterPortal";
-import { RiderPortal } from "./components/staff/RiderPortal";
-import { KioskPortal } from "./components/kiosk/KioskPortal";
-import { TableQrPortal } from "./components/customer/TableQrPortal";
-import { TvOrderDisplayPortal } from "./components/tv/TvOrderDisplayPortal";
+const StaffPortal = React.lazy(() => import("./components/staff/StaffPortal").then(module => ({ default: module.StaffPortal })));
+const KDSPortal = React.lazy(() => import("./components/kds/KDSPortal").then(module => ({ default: module.KDSPortal })));
+const AdminPortal = React.lazy(() => import("./components/admin/AdminPortal").then(module => ({ default: module.AdminPortal })));
+const WaiterPortal = React.lazy(() => import("./components/staff/WaiterPortal").then(module => ({ default: module.WaiterPortal })));
+const RiderPortal = React.lazy(() => import("./components/staff/RiderPortal").then(module => ({ default: module.RiderPortal })));
+const KioskPortal = React.lazy(() => import("./components/kiosk/KioskPortal").then(module => ({ default: module.KioskPortal })));
+const TableQrPortal = React.lazy(() => import("./components/customer/TableQrPortal").then(module => ({ default: module.TableQrPortal })));
+const TvOrderDisplayPortal = React.lazy(() => import("./components/tv/TvOrderDisplayPortal").then(module => ({ default: module.TvOrderDisplayPortal })));
 import { UnifiedLoginModal } from "./components/auth/UnifiedLoginModal";
 import { ToastContainer } from "./components/common/ToastContainer";
 
@@ -317,7 +317,9 @@ export default function App() {
   return (
     <AuthProvider>
       <AppProvider>
-        <AppContent />
+        <React.Suspense fallback={<div role="status" className="p-8 text-zinc-300">Loading?</div>}>
+          <AppContent />
+        </React.Suspense>
         <ChatWidget />
       </AppProvider>
     </AuthProvider>

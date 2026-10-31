@@ -26,3 +26,5 @@ Sitemap: https://crunchybag.com/sitemap.xml
 Sitemap: https://crunchybag.com/sitemap-menu.xml
 Sitemap: https://crunchybag.com/sitemap-combos.xml
 Sitemap: https://crunchybag.com/sitemap-delivery.xml
+Sitemap: https://crunchybag.com/sitemap-categories.xml
+Sitemap: https://crunchybag.com/sitemap-blog.xml

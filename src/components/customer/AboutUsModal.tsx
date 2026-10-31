@@ -21,40 +21,24 @@ interface AboutUsModalProps {
 // Configurable backend schema placeholder:
 // In the future, this object can be fetched directly from GET /api/cms/about
 export const ABOUT_US_DATA = {
-  headline: "Crispy Perfection Handcrafted in Kathmandu",
-  tagline: "Imadol's premier destination for artisan fried chicken, smash burgers, and signature shakes.",
+  headline: "Crunchy Bag — Dhungesadhu Chowk, Imadol",
+  tagline: "Burgers, fried chicken, chicken 65 pakoda, fries, sandwiches and more.",
   story: [
-    "Crunchy Bag was founded with a single obsession: to bring world-class crispy fried chicken and juicy artisanal smash burgers to Kathmandu Valley, prepared with uncompromising freshness and authentic Himalayan spices.",
-    "Every piece of chicken is marinated for 18 hours in our secret herbal brine, hand-breaded in small batches with our signature 12-spice crunch coating, and flash-fried to golden perfection in 100% clean vegetable oil.",
-    "From our central outlet and kitchen in Imadol, Lalitpur to our lightning-fast 20-30 minute delivery fleet across Lalitpur, Kathmandu, and Bhaktapur, we treat every order as a signature culinary experience.",
+    "Crunchy Bag serves food from one restaurant and kitchen at Dhungesadhu Chowk, Imadol, Lalitpur.",
+    "Delivery and takeaway run 24/7 across Kathmandu, Lalitpur and Bhaktapur. Dine-in is available from 5 AM to 11 PM daily.",
+    "Our website lists the current menu and prices. Preparation usually takes 7–15 minutes depending on order size, with additional time for delivery. There is no minimum order.",
   ],
   pillars: [
-    {
-      icon: Flame,
-      title: "18-Hour Secret Marinade",
-      desc: "Deep flavour penetration with tender Himalayan herb brining. Never frozen, always juicy.",
-    },
-    {
-      icon: ChefHat,
-      title: "Hand-Breaded Small Batches",
-      desc: "Fried fresh upon order with our proprietary crunch crust that stays crispy even during delivery.",
-    },
-    {
-      icon: Award,
-      title: "100% Fresh Local Poultry",
-      desc: "Ethically raised chickens sourced directly from certified farms across Kavre & Chitwan.",
-    },
-    {
-      icon: HeartHandshake,
-      title: "Strict Food Hygiene",
-      desc: "ISO-aligned food safety protocols with hospital-grade stainless steel kitchen assembly.",
-    },
+    { icon: Flame, title: "Burgers & Chicken", desc: "Browse chicken and aloo tikki burgers, fried chicken and sandwiches." },
+    { icon: ChefHat, title: "Pakoda & Snacks", desc: "Explore chicken 65 pakoda, vegetable pakoda, fries and crispy sides." },
+    { icon: Clock, title: "24/7 Delivery & Takeaway", desc: "Order day or night. Check live dish availability before confirming." },
+    { icon: MapPin, title: "One Imadol Restaurant", desc: "Visit Dhungesadhu Chowk for collection or dine-in from 5 AM to 11 PM." },
   ],
   stats: [
-    { value: "50,000+", label: "Happy Customers Served" },
-    { value: "18 hrs", label: "Heritage Spice Brining" },
-    { value: "30 mins", label: "Average Delivery Time" },
-    { value: "4.9 ★", label: "Kathmandu Foodie Rating" },
+    { value: "24/7", label: "Delivery & Takeaway" },
+    { value: "5 AM–11 PM", label: "Dine-in" },
+    { value: "7–15 min", label: "Usual Preparation" },
+    { value: "None", label: "Minimum Order" },
   ],
 };
 
@@ -166,7 +150,7 @@ export const AboutUsModal: React.FC<AboutUsModalProps> = ({
               <span>Crunchy Bag - Imadol Outlet &amp; Kitchen</span>
             </div>
             <p className="text-zinc-500 dark:text-zinc-400 text-[11px]">
-              Imadol, Lalitpur, Nepal • Open Daily 10:00 AM – 11:30 PM • Hotline: 9761503339
+              Dhungesadhu Chowk, Imadol • Delivery &amp; takeaway 24/7 • Dine-in 5 AM–11 PM
             </p>
           </div>
           {onExploreMenu && (

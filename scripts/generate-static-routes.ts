@@ -3,6 +3,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { BLOG_ARTICLES, BlogArticle } from '../src/data/blogData';
 import { productPages, escapeHtml } from './product-pages';
+import { categoryPages } from './category-pages';
+import { informationPages } from './information-pages';
+import { LEGACY_FOOD_PATHS } from '../src/data/seo/categories';
+import { BLOG_MENU_LINKS } from '../src/data/seo/blogLinks';
+import { restaurantSchema } from '../src/data/seo/site';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,408 +28,25 @@ interface RouteSEO {
   contentHtml?: string;
 }
 
-// 1. Comprehensive Kathmandu Valley Local Delivery Hubs within 10km Radius of Imadol
-const DELIVERY_HUBS = [
-  // Lalitpur Core & Immediate Neighborhoods (0 - 6 km radius from Imadol)
-  {
-    slug: 'imadol',
-    name: 'Imadol',
-    title: 'Food Delivery in Imadol Lalitpur | Crunchy Bag Central Outlet',
-    landmarks: ['Krishna Mandir Imadol', 'Bojhpokhari', 'Tikathali Crossroad', 'Sital Heights', 'Mahalaxmi Municipality Office'],
-  },
-  {
-    slug: 'gwarko',
-    name: 'Gwarko',
-    title: 'Food Delivery in Gwarko Lalitpur | Crunchy Bag',
-    landmarks: ['Gwarko Flyover Chowk', 'B&B Hospital Area', 'KIST Medical College Road', 'Imadol Entrance', 'Lalitpur Ring Road'],
-  },
-  {
-    slug: 'balkumari',
-    name: 'Balkumari',
-    title: 'Food Delivery in Balkumari Lalitpur | Crunchy Bag',
-    landmarks: ['Balkumari Bridge', 'CCRC College Area', 'Ring Road Lalitpur', 'Kharibot', 'Tyanglaphant'],
-  },
-  {
-    slug: 'tikathali',
-    name: 'Tikathali',
-    title: 'Food Delivery in Tikathali Lalitpur | Crunchy Bag',
-    landmarks: ['Tikathali Chowk', 'Pawan Prakriti School', 'Bojhpokhari Link Road', 'Mahalaxmi Ward 4', 'Sanagaun Crossing'],
-  },
-  {
-    slug: 'lubhu',
-    name: 'Lubhu',
-    title: 'Food Delivery in Lubhu Lalitpur | Crunchy Bag',
-    landmarks: ['Lubhu Bus Park', 'Mahalaxmi Ward 7', 'Govishwar Mahadev', 'Lamatar Road Junction', 'Lubhu Textile Market'],
-  },
-  {
-    slug: 'sanagaun',
-    name: 'Sanagaun & Siddhipur',
-    title: 'Food Delivery in Sanagaun & Siddhipur Lalitpur | Crunchy Bag',
-    landmarks: ['Siddhipur Chowk', 'Sanagaun Bus Stop', 'Chyasing Tol', 'Mahalaxmi Ward 6', 'Balkumari Temple Siddhipur'],
-  },
-  {
-    slug: 'kumaripati',
-    name: 'Kumaripati',
-    title: 'Food Delivery in Kumaripati Lalitpur | Crunchy Bag',
-    landmarks: ['Kumaripati Shopping Street', 'United Academy Area', 'Jawalakhel Border', 'Mahalaxmisthan Road', 'Bluebird Mall Patan'],
-  },
-  {
-    slug: 'jawalakhel',
-    name: 'Jawalakhel',
-    title: 'Food Delivery in Jawalakhel Lalitpur | Crunchy Bag',
-    landmarks: ['Jawalakhel Chowk Roundabout', 'Central Zoo Gate', 'St. Xavier’s School Area', 'Staff College Road', 'Damkal Chowk'],
-  },
-  {
-    slug: 'pulchowk',
-    name: 'Pulchowk',
-    title: 'Food Delivery in Pulchowk Lalitpur | Crunchy Bag',
-    landmarks: ['Labim Mall Area', 'Pulchowk Engineering Campus', 'UN House Lalitpur', 'Sajha Petrol Pump', 'Harihar Bhawan'],
-  },
-  {
-    slug: 'patan',
-    name: 'Patan & Mangal Bazaar',
-    title: 'Food Delivery in Patan & Mangal Bazaar Lalitpur | Crunchy Bag',
-    landmarks: ['Patan Durbar Square', 'Mangal Bazaar', 'Patan Dhoka', 'Sundhara Patan', 'Chyasal Stadium Area'],
-  },
-  {
-    slug: 'jhamsikhel',
-    name: 'Jhamsikhel',
-    title: 'Food Delivery in Jhamsikhel Lalitpur | Crunchy Bag',
-    landmarks: ['Restaurant Street', 'St. Mary’s School Area', 'Sanepa Crossing', 'Dhobighat Road', 'Bhanimandal'],
-  },
-  {
-    slug: 'sanepa',
-    name: 'Sanepa',
-    title: 'Food Delivery in Sanepa Lalitpur | Crunchy Bag',
-    landmarks: ['Sanepa Chowk', 'British School Area', 'Jhamsikhel Border', 'Star Hospital Area', 'Sagarmatha Complex'],
-  },
-  {
-    slug: 'kupandole',
-    name: 'Kupandole',
-    title: 'Food Delivery in Kupandole Lalitpur | Crunchy Bag',
-    landmarks: ['Kupandole Heights', 'Kandevsthan', 'Bagmati Bridge Crossing', 'Hotel Himalaya Area', 'Pulchowk Road'],
-  },
-  {
-    slug: 'lagankhel',
-    name: 'Lagankhel',
-    title: 'Food Delivery in Lagankhel Lalitpur | Crunchy Bag',
-    landmarks: ['Lagankhel Bus Park', 'Patan Hospital Area', 'Batuk Bhairab', 'Prayag Pokhari', 'Kumaripati Border'],
-  },
-  {
-    slug: 'satdobato',
-    name: 'Satdobato',
-    title: 'Food Delivery in Satdobato Lalitpur | Crunchy Bag',
-    landmarks: ['Satdobato Chowk', 'International Swimming Complex', 'ANFA Complex', 'Ring Road Lalitpur', 'Chapagaun Bus Park'],
-  },
-  {
-    slug: 'hattiban',
-    name: 'Hattiban',
-    title: 'Food Delivery in Hattiban Lalitpur | Crunchy Bag',
-    landmarks: ['Little Angels’ College Area', 'Classic Tower', 'Khumaltar Border', 'Cityscape Apartments', 'Harisiddhi Road'],
-  },
-  {
-    slug: 'khumaltar',
-    name: 'Khumaltar',
-    title: 'Food Delivery in Khumaltar Lalitpur | Crunchy Bag',
-    landmarks: ['NARC Complex', 'Radio Nepal Tower Area', 'Khumaltar Chowk', 'Agriculture Research Center', 'Hattiban Border'],
-  },
-  {
-    slug: 'dhapakhel',
-    name: 'Dhapakhel',
-    title: 'Food Delivery in Dhapakhel Lalitpur | Crunchy Bag',
-    landmarks: ['Nagdaha Lake Area', 'Sumeru Hospital', 'Dhapakhel Height', 'GEMS School Area', 'Harisiddhi Crossing'],
-  },
-  {
-    slug: 'harisiddhi',
-    name: 'Harisiddhi',
-    title: 'Food Delivery in Harisiddhi Lalitpur | Crunchy Bag',
-    landmarks: ['Nepal Cancer Hospital', 'Harisiddhi Temple Chowk', 'Godavari Road', 'Lalitpur Ward 28', 'Hattiban Border'],
-  },
-  {
-    slug: 'nakkhu',
-    name: 'Nakkhu',
-    title: 'Food Delivery in Nakkhu Lalitpur | Crunchy Bag',
-    landmarks: ['Nakkhu Bridge', 'Nepal Mediciti Hospital Area', 'Bhaisepati Road', 'Ring Road Nakkhu', 'Bagmati Corridor'],
-  },
-  {
-    slug: 'ekantakuna',
-    name: 'Ekantakuna',
-    title: 'Food Delivery in Ekantakuna Lalitpur | Crunchy Bag',
-    landmarks: ['Yatayat Karyalaya Lalitpur', 'Ring Road Ekantakuna', 'Bhaisepati Crossing', 'Alka Hospital Area', 'Nakkhu Turn'],
-  },
-  {
-    slug: 'bhaisepati',
-    name: 'Bhaisepati',
-    title: 'Food Delivery in Bhaisepati Lalitpur | Crunchy Bag',
-    landmarks: ['Minister Quarters Area', 'Radio Nepal Colony', 'Bhaisepati Awas', 'Nakkhu Khola Border', 'Saibu Chowk'],
-  },
-
-  // Kathmandu East & South (Adjacent to Imadol within 10km)
-  {
-    slug: 'koteshwor',
-    name: 'Koteshwor',
-    title: 'Food Delivery in Koteshwor Kathmandu | Crunchy Bag',
-    landmarks: ['Koteshwor Chowk', 'Bhatbhateni Superstore Koteshwor', 'Mahadevsthan', 'Jadibuti Road', 'Narephphant'],
-  },
-  {
-    slug: 'tinkune',
-    name: 'Tinkune',
-    title: 'Food Delivery in Tinkune Kathmandu | Crunchy Bag',
-    landmarks: ['Tinkune Park Island', 'Subidhanagar', 'Airport Cargo Gate', 'Gairigaon', 'Bridge to Balkumari'],
-  },
-  {
-    slug: 'jadibuti',
-    name: 'Jadibuti',
-    title: 'Food Delivery in Jadibuti Kathmandu | Crunchy Bag',
-    landmarks: ['Jadibuti Chowk', 'Manohara Bridge', 'Pepsicola Crossing', 'Airport Border', 'Koteshwor East'],
-  },
-  {
-    slug: 'pepsicola',
-    name: 'Pepsicola & Townplanning',
-    title: 'Food Delivery in Pepsicola Kathmandu | Crunchy Bag',
-    landmarks: ['Townplanning Chowk', 'Sun City Apartments', 'Manohara Corridor', 'Kageshwori Gate', 'Jadibuti North'],
-  },
-  {
-    slug: 'minbhawan',
-    name: 'Minbhawan',
-    title: 'Food Delivery in Minbhawan Kathmandu | Crunchy Bag',
-    landmarks: ['Civil Hospital Area', 'Nepal Commerce Campus', 'Shantinagar Road', 'New Baneshwor Border', 'Tinkune Link'],
-  },
-  {
-    slug: 'shantinagar',
-    name: 'Shantinagar',
-    title: 'Food Delivery in Shantinagar Kathmandu | Crunchy Bag',
-    landmarks: ['Shantinagar Gate', 'Bagmati Corridor Futsal', 'Minbhawan Link', 'Tinkune West', 'Cargo Road Border'],
-  },
-  {
-    slug: 'shankhamul',
-    name: 'Shankhamul',
-    title: 'Food Delivery in Shankhamul Kathmandu | Crunchy Bag',
-    landmarks: ['Shankhamul Bridge Crossing', 'Shankhamul Ghat', 'Park Area', 'Lalitpur Chyasal Link', 'New Baneshwor South'],
-  },
-  {
-    slug: 'baneshwor',
-    name: 'Baneshwor',
-    title: 'Food Delivery in Baneshwor Kathmandu | Crunchy Bag',
-    landmarks: ['New Baneshwor Chowk', 'Shankhamul Bridge', 'Civil Hospital Area', 'Minbhawan', 'Eyeplex Mall'],
-  },
-  {
-    slug: 'new-baneshwor',
-    name: 'New Baneshwor',
-    title: 'Food Delivery in New Baneshwor | Crunchy Bag',
-    landmarks: ['Federal Parliament Complex', 'Devi Nagar', 'Shankhamul Road', 'Aloknagar', 'Madhya Baneshwor'],
-  },
-  {
-    slug: 'old-baneshwor',
-    name: 'Old Baneshwor',
-    title: 'Food Delivery in Old Baneshwor Kathmandu | Crunchy Bag',
-    landmarks: ['Apex College Area', 'Battisputali Crossing', 'Sinamangal Road', 'Baneshwor Campus', 'Maitidevi Border'],
-  },
-  {
-    slug: 'sinamangal',
-    name: 'Sinamangal',
-    title: 'Food Delivery in Sinamangal Kathmandu | Crunchy Bag',
-    landmarks: ['KMC Teaching Hospital Area', 'Airport Cargo Complex', 'Airport East Gate', 'Old Baneshwor Border', 'Manohara Corridor'],
-  },
-  {
-    slug: 'thapathali',
-    name: 'Thapathali',
-    title: 'Food Delivery in Thapathali Kathmandu | Crunchy Bag',
-    landmarks: ['Norvic International Hospital', 'Trade Tower', 'Thapathali Campus', 'Bagmati Bridge', 'Maitighar South'],
-  },
-  {
-    slug: 'maitighar',
-    name: 'Maitighar & Babarmahal',
-    title: 'Food Delivery in Maitighar & Babarmahal Kathmandu | Crunchy Bag',
-    landmarks: ['Maitighar Mandala', 'Supreme Court Area', 'Babarmahal Revisited', 'District Court Area', 'St. Xavier’s College'],
-  },
-  {
-    slug: 'tripureshwor',
-    name: 'Tripureshwor',
-    title: 'Food Delivery in Tripureshwor Kathmandu | Crunchy Bag',
-    landmarks: ['Dashrath Stadium Area', 'World Trade Center', 'Teku Border', 'Bagmati Bridge', 'Sundhara Link'],
-  },
-  {
-    slug: 'sundhara',
-    name: 'Sundhara & New Road',
-    title: 'Food Delivery in Sundhara & New Road Kathmandu | Crunchy Bag',
-    landmarks: ['Dharahara Plaza', 'Civil Mall Area', 'CTC Mall', 'Bishal Bazaar New Road', 'Basantapur Gate'],
-  },
-  {
-    slug: 'putalisadak',
-    name: 'Putalisadak & Anamnagar',
-    title: 'Food Delivery in Putalisadak & Anamnagar | Crunchy Bag',
-    landmarks: ['Star Mall Putalisadak', 'Shankar Dev Campus', 'Singha Durbar East Gate', 'Bhatbhateni Anamnagar', 'Dilli Bazar Crossing'],
-  },
-  {
-    slug: 'dilli-bazar',
-    name: 'Dilli Bazar & Kamalpokhari',
-    title: 'Food Delivery in Dilli Bazar & Kamalpokhari | Crunchy Bag',
-    landmarks: ['City Center Kamalpokhari', 'Charhaley Chowk', 'Charkhal Area', 'Kanya Campus', 'Gyaneshwor Crossing'],
-  },
-  {
-    slug: 'naxal',
-    name: 'Naxal & Baluwatar',
-    title: 'Food Delivery in Naxal & Baluwatar Kathmandu | Crunchy Bag',
-    landmarks: ['Bhatbhateni Superstore Naxal', 'Marriott Hotel Area', 'Bhagwati Bahal', 'PM Residence Baluwatar', 'Police Headquarters'],
-  },
-  {
-    slug: 'gaushala',
-    name: 'Gaushala & Battisputali',
-    title: 'Food Delivery in Gaushala & Battisputali | Crunchy Bag',
-    landmarks: ['Pashupatinath Temple Area', 'Tilganga Eye Hospital', 'Dwarika’s Hotel Area', 'Pingalasthan', 'Airport West Gate'],
-  },
-  {
-    slug: 'chabahil',
-    name: 'Chabahil',
-    title: 'Food Delivery in Chabahil Kathmandu | Crunchy Bag',
-    landmarks: ['Chabahil Stupa Chowk', 'KL Tower', 'Mitrapark', 'Pashupati Area North', 'Gopikrishna Cinema Road'],
-  },
-  {
-    slug: 'bouddha',
-    name: 'Bouddha',
-    title: 'Food Delivery in Bouddha Kathmandu | Crunchy Bag',
-    landmarks: ['Boudhanath Stupa Gate', 'Tusal', 'Fulbari', 'Pimaling Area', 'Hyatt Regency Gate'],
-  },
-  {
-    slug: 'durbar-marg',
-    name: 'Durbar Marg',
-    title: 'Food Delivery in Durbar Marg Kathmandu | Crunchy Bag',
-    landmarks: ['Narayanhiti Palace Museum Gate', 'Kings Way', 'Hotel Annapurna Area', 'Sherpa Mall', 'Durbarmarg Roundabout'],
-  },
-  {
-    slug: 'thamel',
-    name: 'Thamel',
-    title: 'Food Delivery in Thamel Kathmandu | Crunchy Bag',
-    landmarks: ['Chaksibari Marg', 'Mandala Street', 'Kwahiti', 'Narsingh Chowk', 'Paknajol'],
-  },
-  {
-    slug: 'lazimpat',
-    name: 'Lazimpat',
-    title: 'Food Delivery in Lazimpat Kathmandu | Crunchy Bag',
-    landmarks: ['Hotel Radisson Area', 'Shangri-La Road', 'British Embassy Area', 'French Embassy Road', 'Uttardhoka'],
-  },
-  {
-    slug: 'kalanki',
-    name: 'Kalanki',
-    title: 'Food Delivery in Kalanki Kathmandu | Crunchy Bag',
-    landmarks: ['Kalanki Chowk Underpass', 'Khasibazaar', 'LRI School Area', 'Makalu Petrol Pump', 'Ring Road West'],
-  },
-  {
-    slug: 'kirtipur',
-    name: 'Kirtipur',
-    title: 'Food Delivery in Kirtipur | Crunchy Bag',
-    landmarks: ['Tribhuvan University Gate', 'Nayabazar Kirtipur', 'TU Memorial Park', 'Panga Crossing', 'Ring Road Balkhu Border'],
-  },
-
-  // Bhaktapur Bordering Hubs (Manohara River corridor within 10km)
-  {
-    slug: 'lokanthali',
-    name: 'Lokanthali',
-    title: 'Food Delivery in Lokanthali Bhaktapur | Crunchy Bag',
-    landmarks: ['Manohara Bridge', 'Araniko Highway Lokanthali', 'Kaushaltar West', 'Balkot Junction', 'Jadibuti Link'],
-  },
-  {
-    slug: 'kaushaltar',
-    name: 'Kaushaltar',
-    title: 'Food Delivery in Kaushaltar Bhaktapur | Crunchy Bag',
-    landmarks: ['Kaushaltar Chowk', 'Bhatbhateni Superstore Bhaktapur', 'Balkot Turn', 'Lokanthali East', 'Gatthaghar West'],
-  },
-  {
-    slug: 'balkot',
-    name: 'Balkot',
-    title: 'Food Delivery in Balkot Bhaktapur | Crunchy Bag',
-    landmarks: ['Rose Village Area', 'Mahalaxmi Municipality Border', 'Balkot Health Post', 'Kaushaltar South', 'Sirutar Link Road'],
-  },
-  {
-    slug: 'gatthaghar',
-    name: 'Gatthaghar',
-    title: 'Food Delivery in Gatthaghar Bhaktapur | Crunchy Bag',
-    landmarks: ['Nagarik Community Hospital', 'Sanothimi Junction', 'German Homes', 'Madhyapur Thimi West', 'Araniko Highway'],
-  },
-  {
-    slug: 'thimi',
-    name: 'Thimi & Madhyapur',
-    title: 'Food Delivery in Thimi & Madhyapur | Crunchy Bag',
-    landmarks: ['Sankhadhar Chowk', 'Radhe Radhe', 'Madhyapur Hospital', 'Bode Road', 'Purano Thimi'],
-  },
-  {
-    slug: 'radhe-radhe',
-    name: 'Radhe Radhe',
-    title: 'Food Delivery in Radhe Radhe Bhaktapur | Crunchy Bag',
-    landmarks: ['Bhatbhateni Superstore Thimi', 'Easy Home Area', 'Madhyapur Hospital Road', 'Sallaghari West', 'Araniko Highway'],
-  },
-  {
-    slug: 'sallaghari',
-    name: 'Sallaghari',
-    title: 'Food Delivery in Sallaghari Bhaktapur | Crunchy Bag',
-    landmarks: ['Sallaghari Pine Forest Chowk', 'Chonga Ganesh', 'Suryabinayak Border', 'Dr. Iwamura Hospital Area', 'Bhaktapur Gate'],
-  },
-  {
-    slug: 'bhaktapur',
-    name: 'Bhaktapur City',
-    title: 'Online Food Delivery in Bhaktapur | Crunchy Bag',
-    landmarks: ['Sallaghari Chowk', 'Chyamhasingh', 'Bhaktapur Durbar Square Entrance', 'Suryabinayak', 'Kamalbinayak'],
-  },
-  {
-    slug: 'kathmandu',
-    name: 'Kathmandu Valley',
-    title: 'Online Food Delivery in Kathmandu Valley | Crunchy Bag',
-    landmarks: ['Durbar Marg', 'New Road', 'Thamel', 'Lazimpat', 'Baluwatar', 'Baneshwor'],
-  },
-  {
-    slug: 'lalitpur',
-    name: 'Lalitpur City',
-    title: 'Online Food Delivery in Lalitpur | Crunchy Bag',
-    landmarks: ['Jhamsikhel', 'Kupondole', 'Sanepa', 'Pulchowk', 'Jawalakhel', 'Lagankhel'],
-  },
-];
-
-// These are delivery areas, not additional physical outlets.
-function generateDeliveryHubHtml(hub: typeof DELIVERY_HUBS[0]): string {
-  return `<main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300">
-    <nav><a href="/">Crunchy Bag</a> / <a href="/delivery">Delivery</a></nav>
-    <h1>Crunchy Bag delivery enquiries for ${escapeHtml(hub.name)}</h1>
-    <p>Our only restaurant and kitchen is in Imadol, Lalitpur.${hub.slug === 'imadol' ? ' Visit us for dine-in or takeaway.' : ` Contact this outlet for delivery enquiries to ${escapeHtml(hub.name)}.`}</p>
-    <h2>Planning an order to ${escapeHtml(hub.name)}</h2>
-    <p>Provide your full address and a nearby landmark when ordering. Contact the Imadol outlet to confirm coverage, delivery charges and an estimated arrival time before placing your order.</p>
-    <p>Local landmarks include ${hub.landmarks.map(escapeHtml).join(', ')}.</p>
-    <p><a href="/menu">See the current menu and prices</a></p>
-    <p><a href="tel:+9779761503339">Call +977 9761503339</a> or <a href="https://share.google/wJPKlrcMJueR0EmvX">find our Imadol restaurant on Google Maps</a>.</p>
-  </main>`;
-}
-
 const STATIC_ROUTES: RouteSEO[] = [
   // Core Storefront Pages
   {
     path: '/menu',
     title: 'Full Online Food Menu | Crunchy Bag Kathmandu',
     h1: 'Explore Our Full Online Menu & Food Specialties',
-    description: 'Browse our complete menu of crispy fried chicken, smash burgers, authentic pakodas, fries, grilled sandwiches and drinks in Kathmandu Valley.',
+    description: 'Browse burgers, fried chicken, chicken 65 pakoda, fries, sandwiches, momo and drinks. Delivery and takeaway run 24/7 across Kathmandu Valley. No minimum order.',
   },
   {
     path: '/combos',
     title: 'Special Value Combos & Deals | Crunchy Bag Kathmandu',
     h1: 'Best Value Combos, Family Bags & Feast Packages',
-    description: 'Save big with Crunchy Bag special combo deals, Beast Combos, Duo packages, and Family Bags with fast food delivery across Kathmandu.',
-  },
-  {
-    path: '/delivery',
-    title: 'Food Delivery in Kathmandu Valley | Crunchy Bag',
-    h1: 'Food Delivery from Crunchy Bag, Imadol',
-    description: 'Contact our Imadol restaurant to confirm delivery coverage, charges and arrival time for your address in Kathmandu Valley.',
-    contentHtml: `<main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300">
-      <h1>Food delivery from Crunchy Bag, Imadol</h1>
-      <p>We operate one restaurant in Imadol, Lalitpur. Call <a href="tel:+9779761503339">+977 9761503339</a> to confirm delivery availability, fees and arrival time for your address.</p>
-      <p><a href="/menu">Browse our current food menu</a></p>
-      <h2>Delivery area enquiries</h2><ul>${DELIVERY_HUBS.map(hub => `<li><a href="/delivery/${hub.slug}">${hub.name}</a></li>`).join('')}</ul>
-    </main>`,
+    description: 'Compare current chicken combos, duo combos and family bags from Crunchy Bag. View included dishes and prices for 24/7 delivery and takeaway.',
   },
   {
     path: '/reserve',
     title: 'Book a Table Online | Crunchy Bag Restaurant Lalitpur',
     h1: 'Table Reservations & Dine-in Hospitality in Imadol',
-    description: 'Reserve your dining table online at Crunchy Bag central restaurant in Imadol, Lalitpur, Nepal. Fast booking and instant confirmation.',
+    description: 'Plan a dine-in visit to Crunchy Bag at Dhungesadhu Chowk, Imadol, Lalitpur. Dine-in hours are 5 AM to 11 PM daily.',
   },
   {
     path: '/orders',
@@ -449,44 +71,6 @@ const STATIC_ROUTES: RouteSEO[] = [
     title: 'Kitchen Order Status Screen | Crunchy Bag TV Display',
     h1: 'Live Kitchen Display & Customer Pickup Screen',
     description: 'Real-time order preparation and ready-for-pickup queue display for Crunchy Bag Kathmandu dine-in and takeout guests.',
-  },
-
-  // Food Categories
-  {
-    path: '/burger',
-    title: 'Gourmet Smash Burgers | Crunchy Bag Kathmandu',
-    h1: 'Handcrafted Chicken & Veggie Burgers in Kathmandu',
-    description: 'Savor juicy chicken burgers, crispy fried chicken burgers, and golden aloo tikki burgers crafted on warm toasted buns with signature sauces.',
-  },
-  {
-    path: '/fried-chicken',
-    title: 'Artisanal Crispy Fried Chicken | Crunchy Bag Nepal',
-    h1: 'Pressure-Fried Golden Crispy Chicken & Tenders',
-    description: 'Experience Kathmandu Valley’s crunchiest fried chicken, marinated in Himalayan herbs and pressure-fried to seal in maximum flavor and tenderness.',
-  },
-  {
-    path: '/pakoda',
-    title: 'Nepali Spiced Pakodas & Snacks | Crunchy Bag',
-    h1: 'Authentic Crispy Chicken 65, Paneer & Veg Pakodas',
-    description: 'Enjoy traditional spiced Chicken 65 pakodas, paneer pakodas, gobi pakodas, and onion fritters served fresh with spicy mint chutney.',
-  },
-  {
-    path: '/fries',
-    title: 'Crispy French Fries & Potatoes | Crunchy Bag',
-    h1: 'Golden Salted French Fries & Seasoned Potato Bites',
-    description: 'Crispy golden French fries and herb-tossed potato bites served piping hot with creamy mayonnaise, cheese dip, and spicy ketchup.',
-  },
-  {
-    path: '/sandwich',
-    title: 'Fresh Grilled Sandwiches | Crunchy Bag Kathmandu',
-    h1: 'Toasted Chicken & Fresh Vegetable Grilled Sandwiches',
-    description: 'Grilled sandwiches packed with tender chicken, garden-fresh vegetables, melted cheese, and chef dressings, served toasted to perfection.',
-  },
-  {
-    path: '/drink',
-    title: 'Cold Coffee, Shakes & Beverages | Crunchy Bag',
-    h1: 'Handcrafted Cold Coffee, Oreo Shakes & Sweet Lassi',
-    description: 'Cool down with iced cold coffee blended with Oreo, thick chocolate milkshakes, traditional Nepali yogurt lassi, and chilled sodas.',
   },
 
   // Legal & Information Pages (Rendered with Full Authentic Text, Not Copied Homepage)
@@ -522,7 +106,7 @@ const STATIC_ROUTES: RouteSEO[] = [
         </section>
 
         <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
-          <p><strong>Crunchy Bag Restaurant:</strong> Imadol, Lalitpur 44700, Nepal (<a href="https://share.google/wJPKlrcMJueR0EmvX" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
+          <p><strong>Crunchy Bag Restaurant:</strong> Imadol, Lalitpur 44700, Nepal (<a href="https://maps.app.goo.gl/f7iDReKabgGHSvrv7" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
           <p><strong>Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300">9761503339</a> | <strong>Email:</strong> hello@crunchybag.com</p>
           <p><a href="/" class="text-amber-500 hover:underline">&larr; Return to Crunchy Bag Home</a></p>
         </footer>
@@ -561,108 +145,8 @@ const STATIC_ROUTES: RouteSEO[] = [
         </section>
 
         <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
-          <p><strong>Data Controller:</strong> Crunchy Bag Restaurant, Imadol, Lalitpur 44700, Nepal (<a href="https://share.google/wJPKlrcMJueR0EmvX" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
+          <p><strong>Data Controller:</strong> Crunchy Bag Restaurant, Imadol, Lalitpur 44700, Nepal (<a href="https://maps.app.goo.gl/f7iDReKabgGHSvrv7" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
           <p><strong>Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300">9761503339</a> | <strong>Email:</strong> hello@crunchybag.com</p>
-          <p><a href="/" class="text-amber-500 hover:underline">&larr; Return to Crunchy Bag Home</a></p>
-        </footer>
-      </main>
-    `,
-  },
-  {
-    path: '/about',
-    title: 'About Us | Crunchy Bag Restaurant Kathmandu',
-    h1: 'The Story & Culinary Passion Behind Crunchy Bag',
-    description: 'Learn about Crunchy Bag’s mission to serve Nepal’s crispiest fried chicken, gourmet smash burgers, and hygienic comfort food with friendly hospitality.',
-    contentHtml: `
-      <main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300">
-        <header class="space-y-2 border-b border-zinc-800 pb-4">
-          <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">About Crunchy Bag Restaurant</h1>
-          <p class="text-sm text-amber-500 font-semibold">Crafting Nepal’s Premier Crispy Fried Chicken & Smash Burgers</p>
-        </header>
-
-        <section class="space-y-4 text-xs leading-relaxed text-zinc-300">
-          <p>Founded with a passion for uncompromising crunch and bold flavors, Crunchy Bag is Kathmandu Valley’s premier fast-food kitchen. Located in Imadol, Lalitpur, we set out with a simple promise: to elevate comfort dining in Nepal through freshly sourced local poultry, authentic Himalayan herb marinades, and proprietary pressure-frying culinary technology.</p>
-          <p>Unlike standard fast food, every portion of our crispy fried chicken, hand-smashed burger patties, and local pakoda snacks is prepared fresh to order. We pride ourselves on clean kitchen hygiene, cashless digital innovation with eSewa and FonePay, and ultra-fast thermal delivery across 35+ Kathmandu Valley neighborhoods.</p>
-        </section>
-
-        <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
-          <p><strong>Central Kitchen &amp; Outlet:</strong> Imadol, Lalitpur 44700, Nepal (<a href="https://share.google/wJPKlrcMJueR0EmvX" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
-          <p><strong>Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300">9761503339</a> | <strong>Hours:</strong> 10:00 AM – 11:30 PM Daily</p>
-          <p><a href="/" class="text-amber-500 hover:underline">&larr; Return to Crunchy Bag Home</a></p>
-        </footer>
-      </main>
-    `,
-  },
-  {
-    path: '/faq',
-    title: 'Help Center & Frequently Asked Questions | Crunchy Bag',
-    h1: 'Ordering FAQ, Delivery Times & Payment Support',
-    description: 'Find answers to common questions about Crunchy Bag delivery fees, delivery radius, eSewa and FonePay payments, and order customization.',
-    contentHtml: `
-      <main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300">
-        <header class="space-y-2 border-b border-zinc-800 pb-4">
-          <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Ordering FAQ & Customer Support</h1>
-          <p class="text-xs text-zinc-400">Everything you need to know about ordering online, delivery timings, and digital payments.</p>
-        </header>
-
-        <section class="space-y-4 text-xs leading-relaxed text-zinc-300">
-          <div>
-            <h2 class="font-bold text-white text-sm">Where does Crunchy Bag deliver?</h2>
-            <p>We deliver across Kathmandu, Lalitpur, and Bhaktapur, covering over 35 neighborhoods including Durbar Marg, Thamel, Baneshwor, Koteshwor, Imadol, Balkumari, Jhamsikhel, Sanepa, and Chabahil.</p>
-          </div>
-          <div>
-            <h2 class="font-bold text-white text-sm">What are your operating hours?</h2>
-            <p>Our kitchen operates daily from 10:00 AM to 11:30 PM, Monday through Sunday.</p>
-          </div>
-          <div>
-            <h2 class="font-bold text-white text-sm">Which digital payment methods do you accept?</h2>
-            <p>We natively accept eSewa digital wallet online, FonePay QR code scan on delivery, and Cash on Delivery (COD).</p>
-          </div>
-          <div>
-            <h2 class="font-bold text-white text-sm">How long does food delivery take?</h2>
-            <p>Central Kathmandu deliveries take 20 to 30 minutes; Lalitpur and east valley hubs take approximately 30 to 45 minutes.</p>
-          </div>
-        </section>
-
-        <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
-          <p><strong>Hotline Support:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300">9761503339</a> | <strong>Email:</strong> hello@crunchybag.com</p>
-          <p><strong>Location:</strong> Imadol, Lalitpur (<a href="https://share.google/wJPKlrcMJueR0EmvX" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
-          <p><a href="/" class="text-amber-500 hover:underline">&larr; Return to Crunchy Bag Home</a></p>
-        </footer>
-      </main>
-    `,
-  },
-  {
-    path: '/contact',
-    title: 'Contact Us & Store Directions | Crunchy Bag Kathmandu',
-    h1: 'Get in Touch with Crunchy Bag Customer Support',
-    description: 'Contact Crunchy Bag for order inquiries, party catering, and store locations at Imadol, Lalitpur, Kathmandu Valley, Nepal.',
-    contentHtml: `
-      <main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300">
-        <header class="space-y-2 border-b border-zinc-800 pb-4">
-          <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Contact Crunchy Bag Restaurant</h1>
-          <p class="text-xs text-zinc-400">Reach our team for dining reservations, bulk catering orders, delivery support, and corporate feedback.</p>
-        </header>
-
-        <section class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs leading-relaxed text-zinc-300">
-          <div class="p-4 bg-[#14161C] border border-zinc-800 space-y-2">
-            <h2 class="font-bold text-white text-sm">Central Outlet &amp; Kitchen</h2>
-            <p><strong>Address:</strong> Imadol, Lalitpur 44700, Nepal</p>
-            <p><strong>Hotline / Order:</strong> <a href="tel:9761503339" class="font-mono text-amber-400">9761503339</a></p>
-            <p><strong>Email:</strong> hello@crunchybag.com</p>
-            <p><strong>Hours:</strong> 10:00 AM – 11:30 PM Daily</p>
-          </div>
-          <div class="p-4 bg-[#14161C] border border-zinc-800 space-y-2">
-            <h2 class="font-bold text-white text-sm">Direct Online Channels</h2>
-            <p><strong>Website:</strong> https://crunchybag.com</p>
-            <p><strong>Google Maps:</strong> <a href="https://share.google/wJPKlrcMJueR0EmvX" target="_blank" rel="noopener noreferrer" class="text-amber-400 hover:underline">Imadol, Lalitpur Hub Directions</a></p>
-            <p><strong>Catering &amp; Parties:</strong> Contact hotline at least 3 hours in advance</p>
-            <p><strong>Payment Support:</strong> Instant eSewa &amp; FonePay QR resolution</p>
-          </div>
-        </section>
-
-        <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
-          <p>© 2026 Crunchy Bag Restaurant. All rights reserved. • Designed &amp; Developed by <a href="https://brandwave.com.np" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Brandwave</a></p>
           <p><a href="/" class="text-amber-500 hover:underline">&larr; Return to Crunchy Bag Home</a></p>
         </footer>
       </main>
@@ -699,7 +183,7 @@ function renderBlogListingHtml(): string {
           The Crunchy Culinary Journal
         </div>
         <h1 class="text-2xl sm:text-4xl font-bold text-white tracking-tight">Stories, Food Science &amp; Kathmandu Kitchen Secrets</h1>
-        <p class="text-xs sm:text-sm text-zinc-400">From our 18-hour cold brining technique in Imadol to Himalayan Timur peppercorn sourcing across Kavre and Chitwan, explore the passion behind Nepal’s premier crunch.</p>
+        <p class="text-xs sm:text-sm text-zinc-400">Compare burgers, fried chicken and pakoda, or plan a late-night delivery from our Imadol restaurant.</p>
       </header>
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -708,8 +192,8 @@ function renderBlogListingHtml(): string {
 
       <!-- Consistent NAP Footer -->
       <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-2">
-        <p><strong>Central Kitchen &amp; Outlet:</strong> Imadol, Lalitpur 44700, Nepal (<a href="https://share.google/wJPKlrcMJueR0EmvX" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
-        <p><strong>Direct Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300 hover:underline">9761503339</a> | <strong>Hours:</strong> 10:00 AM – 11:30 PM Daily (Mon–Sun)</p>
+        <p><strong>Central Kitchen &amp; Outlet:</strong> Imadol, Lalitpur 44700, Nepal (<a href="https://maps.app.goo.gl/f7iDReKabgGHSvrv7" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
+        <p><strong>Direct Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300 hover:underline">9761503339</a> | <strong>Hours:</strong> Delivery & takeaway 24/7; dine-in 5 AM to 11 PM daily</p>
         <p><a href="/" class="text-amber-500 hover:underline">&larr; Return to Crunchy Bag Home</a></p>
       </footer>
     </main>
@@ -734,10 +218,10 @@ function renderBlogDetailHtml(article: BlogArticle): string {
         <div>
           <h3 class="text-sm font-bold text-white">${article.relatedDish.name}</h3>
           <p class="text-xs text-zinc-400">${article.relatedDish.description}</p>
-          <p class="text-xs font-mono text-amber-400 font-bold">NPR ${article.relatedDish.price}</p>
+          <p class="text-xs font-mono text-amber-400 font-bold">See the menu for current prices and options.</p>
         </div>
       </div>
-      <p><a href="/menu" class="text-xs font-bold text-amber-500 hover:underline">${article.relatedDish.actionLabel} &rarr;</a></p>
+      <p><a href="${BLOG_MENU_LINKS[article.slug]?.path || '/menu'}" class="text-xs font-bold text-amber-500 hover:underline">${BLOG_MENU_LINKS[article.slug]?.label || 'Browse the current menu'} &rarr;</a></p>
     </div>
   `
     : '';
@@ -776,6 +260,7 @@ function renderBlogDetailHtml(article: BlogArticle): string {
         </section>
 
         ${relatedDishHtml}
+        <nav aria-label="Order food from this guide"><a href="${BLOG_MENU_LINKS[article.slug]?.path || '/menu'}">${BLOG_MENU_LINKS[article.slug]?.label || 'Browse the current menu'}</a> · <a href="/takeaway">24/7 takeaway</a> · <a href="/delivery">Delivery information</a></nav>
 
         <div class="pt-4 border-t border-zinc-800">
           <div class="text-xs text-zinc-500 mb-2 font-bold uppercase">Topics:</div>
@@ -784,41 +269,29 @@ function renderBlogDetailHtml(article: BlogArticle): string {
       </article>
 
       <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-2">
-        <p><strong>Central Kitchen &amp; Outlet:</strong> Imadol, Lalitpur 44700, Nepal (<a href="https://share.google/wJPKlrcMJueR0EmvX" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
-        <p><strong>Direct Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300 hover:underline">9761503339</a> | <strong>Hours:</strong> 10:00 AM – 11:30 PM Daily (Mon–Sun)</p>
+        <p><strong>Central Kitchen &amp; Outlet:</strong> Imadol, Lalitpur 44700, Nepal (<a href="https://maps.app.goo.gl/f7iDReKabgGHSvrv7" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
+        <p><strong>Direct Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300 hover:underline">9761503339</a> | <strong>Hours:</strong> Delivery & takeaway 24/7; dine-in 5 AM to 11 PM daily</p>
         <p><a href="/blogs" class="text-amber-500 hover:underline">&larr; Return to Culinary Blogs Directory</a></p>
       </footer>
     </main>
   `;
 }
 
-// Append all 19 Delivery Hubs to STATIC_ROUTES with 100% Unique Localized Content
-for (const hub of DELIVERY_HUBS) {
-  STATIC_ROUTES.push({
-    path: `/delivery/${hub.slug}`,
-    title: hub.title,
-    h1: `Crunchy Bag delivery enquiries for ${hub.name}`,
-    description: `Contact Crunchy Bag in Imadol, Lalitpur about food delivery to ${hub.name}. Confirm coverage, delivery charges and arrival time with our outlet.`,
-    contentHtml: generateDeliveryHubHtml(hub),
-  });
-}
-
-// Append Blogs Listing Portal
 STATIC_ROUTES.push({
   path: '/blogs',
   title: 'Culinary Journal & Food Guides in Kathmandu | Crunchy Bag Blogs',
-  h1: 'Stories, Food Science & Kathmandu Kitchen Secrets',
-  description: 'Explore kitchen secrets, Himalayan spice sourcing, and crispy fried chicken food guides in Kathmandu from Crunchy Bag culinary team.',
-  image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=1200&q=80',
+  h1: 'Food Guides & 24-Hour Ordering in Kathmandu Valley',
+  description: 'Read practical guides to burgers, fried chicken, pakoda and 24-hour food ordering in Kathmandu, Lalitpur and Bhaktapur.',
+  image: BLOG_ARTICLES[0]?.image,
   contentHtml: renderBlogListingHtml(),
 });
 
 STATIC_ROUTES.push({
   path: '/blog',
   title: 'Culinary Journal & Food Guides in Kathmandu | Crunchy Bag Blogs',
-  h1: 'Stories, Food Science & Kathmandu Kitchen Secrets',
-  description: 'Explore kitchen secrets, Himalayan spice sourcing, and crispy fried chicken food guides in Kathmandu from Crunchy Bag culinary team.',
-  image: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=1200&q=80',
+  h1: 'Food Guides & 24-Hour Ordering in Kathmandu Valley',
+  description: 'Read practical guides to burgers, fried chicken, pakoda and 24-hour food ordering in Kathmandu, Lalitpur and Bhaktapur.',
+  image: BLOG_ARTICLES[0]?.image,
   contentHtml: renderBlogListingHtml(),
 });
 
@@ -838,9 +311,9 @@ for (const article of BLOG_ARTICLES) {
     datePublished: article.isoDate,
     dateModified: article.isoDate,
     author: {
-      '@type': 'Person',
+      '@type': article.authorType || 'Person',
       name: article.author,
-      jobTitle: article.authorRole,
+      ...(article.authorType === 'Organization' ? { url: 'https://crunchybag.com/about' } : { jobTitle: article.authorRole }),
     },
     publisher: {
       '@type': 'Organization',
@@ -887,15 +360,23 @@ async function generateStaticRoutes() {
   }
 
   const catalog = await productPages();
-  STATIC_ROUTES.push(...catalog.routes);
-  const baseHtml = fs.readFileSync(distIndexPath, 'utf-8');
+  const categories = categoryPages(catalog.categories);
+  STATIC_ROUTES.push(...catalog.routes, ...categories.routes);
+  for (const [alias, canonicalPath] of Object.entries(LEGACY_FOOD_PATHS)) {
+    const target = categories.routes.find(route => route.path === canonicalPath);
+    if (target) STATIC_ROUTES.push({ ...target, path: alias, canonicalPath });
+  }
+  STATIC_ROUTES.push(...informationPages(categories.links));
+  const baseHtml = fs.readFileSync(distIndexPath, 'utf-8').replace(/<script id="restaurant-schema" type="application\/ld\+json">[\s\S]*?<\/script>/, `<script id="restaurant-schema" type="application/ld+json">${JSON.stringify(restaurantSchema(catalog.categories)).replace(/</g, '\\u003c')}</script>`);
+  fs.writeFileSync(distIndexPath, baseHtml);
+  fs.writeFileSync(path.join(distDir, '404.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, follow"><title>Page not found | Crunchy Bag</title></head><body><main><h1>Page not found</h1><p>This page is unavailable. Find your food in the current menu or contact our Imadol restaurant.</p><nav><a href="/">Crunchy Bag</a> · <a href="/menu">Food menu</a> · <a href="/delivery">Delivery information</a> · <a href="/contact">Contact</a></nav></main></body></html>`);
   console.log(`[Static Pre-render] Generating ${STATIC_ROUTES.length} routes...`);
 
   let generatedCount = 0;
 
   for (const route of STATIC_ROUTES) {
     const canonicalPath = route.canonicalPath || route.path.replace(/^\/blogs\//, '/blog/').replace(/^\/blog$/, '/blogs');
-    route.noIndex = ['/orders', '/profile', '/table-qr', '/tv'].includes(route.path);
+    route.noIndex = route.noIndex || ['/orders', '/profile', '/table-qr', '/tv'].includes(route.path);
     let pageHtml = baseHtml;
 
     // 1. Substitute title tag
@@ -960,7 +441,9 @@ async function generateStaticRoutes() {
 
     // Breadcrumbs describe this page's ancestry, never unrelated sibling pages.
     const crumbs = [{ '@type': 'ListItem', position: 1, name: 'Crunchy Bag', item: 'https://crunchybag.com/' },
-      ...(canonicalPath.startsWith('/product/') ? [{ '@type': 'ListItem', position: 2, name: 'Menu', item: 'https://crunchybag.com/menu' }] : [])];
+      ...(/^\/(product|menu)\//.test(canonicalPath) ? [{ '@type': 'ListItem', position: 2, name: 'Menu', item: 'https://crunchybag.com/menu' }] : []),
+      ...(canonicalPath.startsWith('/delivery/') ? [{ '@type': 'ListItem', position: 2, name: 'Delivery', item: 'https://crunchybag.com/delivery' }] : []),
+      ...(canonicalPath.startsWith('/blog/') ? [{ '@type': 'ListItem', position: 2, name: 'Blogs', item: 'https://crunchybag.com/blogs' }] : [])];
     crumbs.push({ '@type': 'ListItem', position: crumbs.length + 1, name: route.h1, item: `https://crunchybag.com${canonicalPath}` });
     pageHtml = pageHtml.replace('</head>', `<script id="route-breadcrumbs" type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: crumbs }).replace(/</g, '\\u003c')}</script></head>`);
 
@@ -987,14 +470,15 @@ async function generateStaticRoutes() {
     }
 
     if (route.path === '/menu') {
-      pageHtml = pageHtml.replace('</main>', `<nav aria-label="Dishes"><ul>${catalog.links}</ul></nav></main>`);
+      pageHtml = pageHtml.replace('</main>', `<nav aria-label="Food categories"><ul>${categories.links}</ul></nav><nav aria-label="Dishes"><ul>${catalog.links}</ul></nav></main>`);
     }
     if (route.noIndex) {
       pageHtml = pageHtml.replace(/(<meta name="(?:robots|googlebot)" content=")[^"]*/g, '$1noindex, follow');
     }
     // Keep informational page content visible after React mounts, too.
     const payload = JSON.stringify({ path: route.path, title: route.title, description: route.description,
-      canonical: `https://crunchybag.com${canonicalPath}`, contentHtml: route.contentHtml, noIndex: route.noIndex }).replace(/</g, '\\u003c');
+      canonical: `https://crunchybag.com${canonicalPath}`, contentHtml: route.contentHtml, noIndex: route.noIndex,
+      schema: route.schemaJson ? JSON.parse(route.schemaJson) : undefined }).replace(/</g, '\\u003c');
     pageHtml = pageHtml.replace('</head>', `<script id="static-route-data" type="application/json">${payload}</script></head>`);
 
     // 9. Write output into dist/[route]/index.html
@@ -1011,6 +495,8 @@ async function generateStaticRoutes() {
     route.path !== '/blog' && !route.path.startsWith('/blogs/')).map(route => route.path)];
   const sitemap = (paths: string[]) => `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${[...new Set(paths)].map(url => `  <url><loc>https://crunchybag.com${escapeHtml(url)}</loc>${STATIC_ROUTES.find(route => route.path === url)?.image ? `<image:image><image:loc>${escapeHtml(STATIC_ROUTES.find(route => route.path === url)!.image)}</image:loc></image:image>` : ''}</url>`).join('\n')}\n</urlset>\n`;
   fs.writeFileSync(path.join(distDir, 'sitemap.xml'), sitemap(canonicalPaths));
+  fs.writeFileSync(path.join(distDir, 'sitemap-categories.xml'), sitemap(categories.routes.map(route => route.path)));
+  fs.writeFileSync(path.join(distDir, 'sitemap-blog.xml'), sitemap(canonicalPaths.filter(url => url === '/blogs' || url.startsWith('/blog/'))));
   for (const [name, prefix] of [['menu', '/product/'], ['delivery', '/delivery'], ['combos', '/combos']]) {
     fs.writeFileSync(path.join(distDir, `sitemap-${name}.xml`), sitemap(canonicalPaths.filter(url => url.startsWith(prefix))));
   }

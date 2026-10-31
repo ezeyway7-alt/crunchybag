@@ -9,3 +9,5 @@ coverage/
 
 playwright-report/
 test-results/
+artifacts/seo-public-catalog.json
+artifacts/crunchybag-seo-source.zip

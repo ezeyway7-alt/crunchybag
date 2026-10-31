@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test, expect, Page } from '@playwright/test';
 import { BLOG_ARTICLES } from '../src/data/blogData';
+import { categoryPages } from '../scripts/category-pages';
 
 const productId = 'prod-cold-coffee-469955c644d4';
 const productUrl = '/product/cold-coffee-469955c644d4';
@@ -95,4 +96,85 @@ test('brand icons and product metadata are present without JavaScript', () => {
   expect(schema.url).toBe(`https://crunchybag.com${productUrl}`);
   expect(html).toContain('Base price: NPR');
   expect(fs.readFileSync('dist/sitemap-menu.xml', 'utf8')).toContain('<image:loc>');
+});
+
+test('category generation excludes private dishes and empty or archived categories', () => {
+  const publicDish = { id: 'public', name: 'Public drink', base_price: '100.00' };
+  const privateDish = { id: 'private', name: 'Staff-only drink', is_web_visible: false };
+  const generated = categoryPages([
+    { id: 'drinks', name: 'Drinks', products: [publicDish, privateDish] },
+    { id: 'hidden', name: 'Hidden', products: [privateDish] },
+    { id: 'archived', name: 'Archived', is_archived: true, products: [publicDish] },
+  ]);
+  expect(generated.routes).toHaveLength(1);
+  expect(generated.routes[0].contentHtml).toContain('Public drink');
+  expect(generated.routes[0].contentHtml).not.toContain('Staff-only drink');
+  const schema = JSON.parse(generated.routes[0].schemaJson);
+  expect(schema.mainEntity.itemListElement).toHaveLength(1);
+  expect(generated.links).not.toContain('Archived');
+});
+
+test('category pages have crawlable products and dedicated collection schema before JavaScript', () => {
+  const sitemap = fs.readFileSync('dist/sitemap-categories.xml', 'utf8');
+  const urls = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(match => new URL(match[1]));
+  expect(urls.length).toBeGreaterThan(0);
+  for (const url of urls) {
+    const html = fs.readFileSync(path.join('dist', url.pathname, 'index.html'), 'utf8');
+    expect(html).toContain(`href="${url.href}"`);
+    expect(html).toContain('href="/product/');
+    expect(html).toContain('"@type":"CollectionPage"');
+    expect(html).not.toContain('content="noindex');
+  }
+});
+
+test('category navigation, direct loading and back navigation preserve the selected food page', async ({ page }) => {
+  await mockStore(page);
+  await page.goto('/menu');
+  await page.getByRole('link', { name: 'Drinks', exact: true }).click();
+  await expect(page).toHaveURL(/\/menu\/drinks$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Drinks Menu');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://crunchybag.com/menu/drinks');
+  await page.goBack();
+  await expect(page).toHaveURL(/\/menu$/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://crunchybag.com/menu');
+  await page.goto('/menu/drinks/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Drinks Menu');
+  await expect(page.getByRole('link', { name: 'Cold Coffee', exact: true })).toBeVisible();
+  await expect(page.locator('#dynamic-route-schema')).toHaveCount(1);
+});
+
+test('takeaway content and metadata survive storefront mounting', async ({ page }) => {
+  await mockStore(page);
+  await page.goto('/takeaway/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('24/7 Food Takeaway from Crunchy Bag, Imadol');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://crunchybag.com/takeaway');
+  await expect(page.locator('#app-landing-summary')).toContainText('7–15 minutes');
+  await expect(page.locator('#app-landing-summary')).toContainText('5 AM–11 PM');
+  await expect(page.locator('#app-landing-summary')).toContainText('no minimum order');
+});
+
+test('business schema separates dine-in hours from 24-hour services', () => {
+  const home = fs.readFileSync('dist/index.html', 'utf8');
+  const schema = JSON.parse(home.match(/id="restaurant-schema" type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]);
+  expect(schema.address.streetAddress).toBe('Dhungesadhu Chowk, Imadol');
+  expect(schema.openingHoursSpecification[0]).toMatchObject({ opens: '05:00', closes: '23:00' });
+  expect(schema.hasOfferCatalog.itemListElement[0].itemOffered.hoursAvailable).toMatchObject({ opens: '00:00', closes: '23:59' });
+  expect(schema.areaServed.map((area: any) => area.name)).toEqual(['Kathmandu', 'Lalitpur', 'Bhaktapur']);
+  expect(fs.readFileSync('dist/404.html', 'utf8')).toContain('noindex, follow');
+});
+
+test('pakoda and sandwich collections contain the relevant dishes and preserve legacy canonical links', () => {
+  const categories = [{ id: 'snacks', name: 'Snacks', products: [
+    { id: 'pakoda-test', name: 'Chicken 65 Pakoda', base_price: '100' },
+    { id: 'sandwich-test', name: 'Chicken Grilled Sandwich', base_price: '120' },
+    { id: 'fries-test', name: 'French Fries', base_price: '80' },
+  ] }];
+  const generated = categoryPages(categories);
+  const pakoda = generated.routes.find(route => route.path === '/menu/pakoda')!;
+  expect(JSON.parse(pakoda.schemaJson).mainEntity.itemListElement.map((item: any) => item.name)).toEqual(['Chicken 65 Pakoda']);
+  const sandwich = generated.routes.find(route => route.path === '/menu/sandwiches')!;
+  expect(JSON.parse(sandwich.schemaJson).mainEntity.itemListElement.map((item: any) => item.name)).toEqual(['Chicken Grilled Sandwich']);
+  const legacy = fs.readFileSync('dist/pakoda/index.html', 'utf8');
+  expect(legacy).toContain('rel="canonical" href="https://crunchybag.com/menu/pakoda"');
+  expect(fs.readFileSync('dist/sitemap.xml', 'utf8')).not.toContain('<loc>https://crunchybag.com/pakoda</loc>');
 });

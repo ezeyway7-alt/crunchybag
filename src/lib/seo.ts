@@ -19,9 +19,9 @@ export interface SEOMetadata {
 }
 
 const DEFAULT_METADATA: SEOMetadata = {
-  title: 'Crunchy Bag | Food Delivery, Fried Chicken & Burgers in Imadol, Lalitpur',
+  title: 'Crunchy Bag | 24/7 Food Delivery in Kathmandu, Lalitpur & Bhaktapur',
   description:
-    "Online food delivery in Imadol, Lalitpur. Order crispy fried chicken, smash burgers, pakodas and family combos from Crunchy Bag. Fast delivery across Lalitpur & Kathmandu.",
+    "Order burgers, fried chicken, chicken 65 pakoda and more with 24/7 delivery in Kathmandu, Lalitpur and Bhaktapur. No minimum order. Crunchy Bag, Imadol.",
   canonical: 'https://crunchybag.com/',
   image: 'https://crunchybag.com/crunchy_logo.png',
   noIndex: false,
@@ -84,15 +84,14 @@ export function updatePageSEO(meta: SEOMetadata) {
   }
 
   // 6. Update Robots (for internal or staff routes that should never be indexed)
-  if (merged.noIndex) {
-    setMetaTag("meta[name='robots']", 'content', 'noindex, nofollow');
-  } else {
-    setMetaTag("meta[name='robots']", 'content', 'index, follow, max-image-preview:large');
-  }
+  const robots = merged.noIndex ? 'noindex, follow' : 'index, follow, max-image-preview:large';
+  setMetaTag("meta[name='robots']", 'content', robots);
+  setMetaTag("meta[name='googlebot']", 'content', robots);
 
   // 7. Update OG Image
   if (merged.image) {
     setMetaTag("meta[property='og:image']", 'content', merged.image);
+    setMetaTag("meta[property='og:image:secure_url']", 'content', merged.image);
     setMetaTag("meta[name='twitter:image']", 'content', merged.image);
   }
 

@@ -28,9 +28,9 @@ export const BlogsPortalPage: React.FC<BlogsPortalPageProps> = ({ onNavigate }) 
     updatePageSEO({
       title: "Culinary Journal & Food Guides in Kathmandu | Crunchy Bag Blogs",
       description:
-        "Explore kitchen secrets, Himalayan spice sourcing, and crispy fried chicken food guides in Kathmandu from Crunchy Bag culinary team.",
+        "Read practical guides to burgers, fried chicken, pakoda and 24-hour food ordering in Kathmandu, Lalitpur and Bhaktapur.",
       canonical: "https://crunchybag.com/blogs",
-      image: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=1200&q=80",
+      image: BLOG_ARTICLES[0]?.image || "https://crunchybag.com/crunchy_logo.png",
       type: "website",
     });
   }, []);
@@ -50,13 +50,7 @@ export const BlogsPortalPage: React.FC<BlogsPortalPageProps> = ({ onNavigate }) 
     }
   };
 
-  const categories = [
-    "All",
-    "Kitchen Secrets",
-    "Food Guides",
-    "Local Sourcing",
-    "Delivery Tips",
-  ];
+  const categories = ["All", ...new Set(BLOG_ARTICLES.map(article => article.category))];
 
   const filteredArticles = BLOG_ARTICLES.filter((article) => {
     const matchesCategory =
@@ -101,7 +95,7 @@ export const BlogsPortalPage: React.FC<BlogsPortalPageProps> = ({ onNavigate }) 
             Stories, Food Science &amp; Kathmandu Kitchen Secrets
           </h1>
           <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
-            From our 18-hour cold brining technique in Imadol to Himalayan Timur peppercorn sourcing across Kavre and Chitwan, explore the passion behind Nepal’s premier crunch.
+            Compare burgers, fried chicken and pakoda, or plan a late-night delivery from our Imadol restaurant.
           </p>
         </div>
 
@@ -328,7 +322,7 @@ export const BlogsPortalPage: React.FC<BlogsPortalPageProps> = ({ onNavigate }) 
               Hungry after reading our food stories?
             </h3>
             <p className="text-xs sm:text-sm text-zinc-400 max-w-xl">
-              Taste the difference of 18-hour cold brining, mountain Timur spice, and artisan smash burgers with instant online eSewa checkout.
+              Browse the live menu for burgers, fried chicken, chicken 65 pakoda and more. Delivery and takeaway run 24/7.
             </p>
           </div>
 

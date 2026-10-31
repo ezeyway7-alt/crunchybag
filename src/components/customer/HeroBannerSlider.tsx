@@ -112,7 +112,8 @@ export const HeroBannerSlider: React.FC<HeroBannerSliderProps> = ({ onSelectCate
                     src={slide.image}
                     alt={slide.title}
                     className="w-full h-full object-cover group-hover/slider:scale-105 transition-transform duration-700 brightness-[0.88] contrast-[1.05]"
-                    loading="lazy"
+                    loading={index === 0 ? "eager" : "lazy"}
+                    fetchPriority={index === 0 ? "high" : "auto"}
                   />
                   <div
                     className={`absolute inset-0 bg-gradient-to-r ${slide.bgGradient} opacity-20 mix-blend-multiply`}

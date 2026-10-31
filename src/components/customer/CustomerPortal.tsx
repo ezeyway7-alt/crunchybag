@@ -1,5 +1,7 @@
+import { SEO_SITE } from '../../data/seo/site';
 import {trackEvent} from '../../lib/journeyTracking';
 import { productSEO } from '../../lib/productSEO';
+import { categoryPath, categoryMetadata, FOOD_COLLECTIONS, matchesFoodCollection, LEGACY_FOOD_PATHS } from '../../data/seo/categories';
 import { BlogsPortalPage } from "./BlogsPortalPage";
 import { BlogDetailPage } from "./BlogDetailPage";
 import { readStaticInformation, StaticInformationPage } from "./StaticInformationPage";
@@ -74,6 +76,8 @@ export const CustomerPortal: React.FC = () => {
     setIsSearchModalOpen,
   } = useApp();
 
+  const menuCategories = [...categories, ...FOOD_COLLECTIONS.filter(collection => products.some(product => product.isWebVisible !== false && matchesFoodCollection(collection.id, product.name))).map(collection => ({ ...collection, iconName: 'Utensils', displayOrder: 100, isArchived: false }))];
+
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedDietaryFilter, setSelectedDietaryFilter] = useState<DietaryFilterType>("all");
   const [isCategoryLoading, setIsCategoryLoading] = useState(false);
@@ -90,7 +94,13 @@ export const CustomerPortal: React.FC = () => {
       } else {
         url.searchParams.set("category", catId);
       }
-      window.history.replaceState({}, "", url.toString());
+      const category = menuCategories.find(item => item.id === catId);
+      if (category || catId === 'all') {
+        url.pathname = category ? categoryPath(category) : '/menu';
+        url.searchParams.delete('category');
+      }
+      window.history.pushState({}, "", url.toString());
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
     setTimeout(() => setIsCategoryLoading(false), 200);
   };
@@ -125,16 +135,18 @@ export const CustomerPortal: React.FC = () => {
   const blogSlug = isBlogDetailRoute
     ? currentRoutePath.replace(/^\/(?:blogs?)\//, "").replace(/\/+$/, "")
     : "";
+  const routeCategory = menuCategories.find(category => categoryPath(category) === (LEGACY_FOOD_PATHS[currentRoutePath] || currentRoutePath));
+  const categorySEO = routeCategory ? categoryMetadata(routeCategory) : null;
 
   useEffect(() => {
     if (isBlogDetailRoute || isBlogsPortalRoute || /^\/(product|item)\//.test(currentRoutePath)) return;
     const routeData = document.getElementById('static-route-data');
     const initial = routeData?.textContent ? JSON.parse(routeData.textContent) : null;
-    updatePageSEO(initial?.path === currentRoutePath ? initial : {
+    updatePageSEO(initial?.path === currentRoutePath ? initial : categorySEO || {
       canonical: `https://crunchybag.com${currentRoutePath}`,
       ...(currentRoutePath === '/menu' ? {title: 'Menu | Crunchy Bag, Imadol'} : {}),
     });
-  }, [currentRoutePath]);
+  }, [currentRoutePath, routeCategory?.id]);
 
   // Modals
   const [activeProductForConfig, setActiveProductForConfig] = useState<Product | null>(null);
@@ -148,8 +160,8 @@ export const CustomerPortal: React.FC = () => {
         window.dispatchEvent(new PopStateEvent('popstate'));
       }
       updatePageSEO({
-        title: `${product.name} (NPR ${product.basePrice}) | Crunchy Bag Kathmandu`,
-        description: product.description || `Order ${product.name} online from Crunchy Bag Kathmandu with fast delivery & instant eSewa.`,
+        title: `${product.name} | Crunchy Bag, Imadol`,
+        description: product.description || `Order ${product.name} from Crunchy Bag in Imadol, Lalitpur. View current prices and options.`,
         image: product.images?.[0] || "https://crunchybag.com/crunchy_logo.png",
         canonical: `https://crunchybag.com${cleanPath}`,
         schema: productSEO(product, `https://crunchybag.com${cleanPath}`),
@@ -188,8 +200,12 @@ export const CustomerPortal: React.FC = () => {
 
     if (catParam) {
       setSelectedCategory(catParam);
+    } else if (routeCategory) {
+      setSelectedCategory(routeCategory.id);
+    } else if (path.replace(/\/+$/, '') === '/menu') {
+      setSelectedCategory('all');
     } else if (pageParam === "combos" || pageParam === "special" || path.includes("/combos")) {
-      setSelectedCategory("cat-special-combo-12ad6cad202d");
+      setSelectedCategory(categories.find(category => /offer|combo/i.test(category.name))?.id || 'all');
     } else if (path.includes("/burger")) {
       setSelectedCategory("cat-burgers-97a60a528a81");
     } else if (path.includes("/fried-chicken")) {
@@ -218,7 +234,7 @@ export const CustomerPortal: React.FC = () => {
     } else {
       setActiveProductForConfig(null);
     }
-  }, [products, currentRoutePath]);
+  }, [products, currentRoutePath, routeCategory?.id]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const { isAuthenticated, authUser } = useAuth();
   const [resumeCheckout, setResumeCheckout] = useState(() => sessionStorage.getItem('customer:return-to-checkout') === 'yes');
@@ -283,6 +299,8 @@ export const CustomerPortal: React.FC = () => {
             v.name.toLowerCase().includes("meal") ||
             v.name.toLowerCase().includes("double")
         );
+    } else if (selectedCategory.startsWith('collection:')) {
+      categoryMatch = matchesFoodCollection(selectedCategory, p.name);
     } else {
       categoryMatch = p.categoryId === selectedCategory;
     }
@@ -374,9 +392,12 @@ export const CustomerPortal: React.FC = () => {
       ) : customerActiveTab === "menu" ? (
         <main id="menu" className="max-w-7xl mx-auto px-4 sm:px-6 pt-0 pb-8 space-y-6">
           {/* Semantic SEO Primary Headline for Search Engines & Screen Readers */}
-          <h1 className="sr-only">
-            Crunchy – Crispy Fried Chicken, Gourmet Smash Burgers & Food Delivery in Kathmandu with eSewa
-          </h1>
+          <header className="pt-5 space-y-2">
+            <h1 className="text-2xl font-bold">{categorySEO?.h1 || (currentRoutePath === '/' ? 'Crunchy Bag — 24/7 Food Delivery in Kathmandu Valley' : 'Crunchy Bag Menu — Imadol, Lalitpur')}</h1>
+            <p className="text-sm text-zinc-400">{categorySEO?.description || 'Order burgers, fried chicken, chicken 65 pakoda, fries and sandwiches. Delivery and takeaway run 24/7 across Kathmandu, Lalitpur and Bhaktapur.'}</p>
+            <p className="text-sm text-amber-300">{SEO_SITE.serviceHours} No minimum order.</p><p className="text-sm text-zinc-400">{SEO_SITE.firstOrderOffer}</p>
+            <nav aria-label="Ordering information" className="flex flex-wrap gap-4 text-sm text-amber-400"><a href="/delivery">Delivery areas</a><a href="/takeaway">Takeaway & pickup</a><a href="/blogs">Food guides</a></nav>
+          </header>
 
           {/* Hero Promotional Banner Slider */}
           <HeroBannerSlider onSelectCategory={(catId) => setSelectedCategory(catId)} />
@@ -445,12 +466,14 @@ export const CustomerPortal: React.FC = () => {
                     ))}
                   </>
                 ) : (
-                  categories.filter(c => !c.isArchived).map((category) => {
+                  menuCategories.filter(c => !c.isArchived).map((category) => {
                     const isActive = selectedCategory === category.id;
                     return (
-                      <button
+                      <a
                         key={category.id}
-                        onClick={() => handleCategorySelect(category.id)}
+                        href={categoryPath(category)}
+                        aria-current={isActive ? 'page' : undefined}
+                        onClick={(event) => { if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); handleCategorySelect(category.id); } }}
                         className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
                           isActive
                             ? "bg-amber-500 text-black border-amber-500 font-black shadow-sm"
@@ -459,7 +482,7 @@ export const CustomerPortal: React.FC = () => {
                       >
                         {getCategoryIcon(category.iconName)}
                         <span>{category.name}</span>
-                      </button>
+                      </a>
                     );
                   })
                 )}

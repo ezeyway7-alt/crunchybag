@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getBlogBySlug, getRelatedBlogs, BlogArticle } from "../../data/blogData";
 import { updatePageSEO } from "../../lib/seo";
+import { BLOG_MENU_LINKS } from '../../data/seo/blogLinks';
 
 interface BlogDetailPageProps {
   slug?: string;
@@ -44,6 +45,7 @@ export const BlogDetailPage: React.FC<BlogDetailPageProps> = ({ slug: propSlug, 
   }, [article]);
 
   const [copied, setCopied] = useState(false);
+  const menuLink = article ? BLOG_MENU_LINKS[article.slug] : undefined;
 
   // SEO Synchronization on Mount & Slug change
   useEffect(() => {
@@ -76,9 +78,9 @@ export const BlogDetailPage: React.FC<BlogDetailPageProps> = ({ slug: propSlug, 
           datePublished: article.isoDate,
           dateModified: article.isoDate,
           author: {
-            "@type": "Person",
+            "@type": article.authorType || "Person",
             name: article.author,
-            jobTitle: article.authorRole,
+            ...(article.authorType === 'Organization' ? { url: 'https://crunchybag.com/about' } : { jobTitle: article.authorRole }),
           },
           publisher: {
             "@type": "Organization",
@@ -298,6 +300,7 @@ export const BlogDetailPage: React.FC<BlogDetailPageProps> = ({ slug: propSlug, 
         </div>
 
         {/* Featured Dish Pairing Callout (Direct Order CTA) */}
+        {menuLink && <nav aria-label="Order food from this guide" className="p-5 border border-amber-500/40 text-amber-400"><a href={menuLink.path}>{menuLink.label}</a><span className="mx-3">·</span><a href="/takeaway">24/7 takeaway</a><span className="mx-3">·</span><a href="/delivery">Delivery information</a></nav>}
         {article.relatedDish && (
           <div className="p-5 sm:p-6 bg-[#121214] border border-amber-500/40 rounded-xs shadow-md space-y-4">
             <div className="flex items-center gap-2">
@@ -318,18 +321,17 @@ export const BlogDetailPage: React.FC<BlogDetailPageProps> = ({ slug: propSlug, 
                   <h3 className="text-base font-black text-white">{article.relatedDish.name}</h3>
                   <p className="text-xs text-zinc-400 line-clamp-2">{article.relatedDish.description}</p>
                   <p className="text-xs font-mono font-bold text-amber-400">
-                    NPR {article.relatedDish.price}
+                    See the menu for current prices and options.
                   </p>
                 </div>
               </div>
 
               <a
-                href="/menu"
-                onClick={(e) => navigateTo(e, "/menu")}
+                href={menuLink?.path || '/menu'}
                 className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs border border-black shadow-xs transition-colors shrink-0 flex items-center gap-1.5"
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
-                <span>{article.relatedDish.actionLabel}</span>
+                <span>{menuLink?.label || 'Browse the current menu'}</span>
               </a>
             </div>
           </div>
@@ -353,11 +355,11 @@ export const BlogDetailPage: React.FC<BlogDetailPageProps> = ({ slug: propSlug, 
           <div className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
             <span>
-              Prepared fresh daily at <strong>Crunchy Bag – Imadol, Lalitpur</strong>. Express delivery across Kathmandu Valley.
+              Order from <strong>Crunchy Bag — Dhungesadhu Chowk, Imadol</strong>. Delivery and takeaway 24/7 across Kathmandu Valley.
             </span>
           </div>
           <a
-            href="https://share.google/wJPKlrcMJueR0EmvX"
+            href="https://maps.app.goo.gl/f7iDReKabgGHSvrv7"
             target="_blank"
             rel="noopener noreferrer"
             className="text-amber-500 hover:underline font-mono text-[11px] shrink-0"

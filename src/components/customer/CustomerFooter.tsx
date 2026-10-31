@@ -1,3 +1,4 @@
+import { SEO_SITE } from '../../data/seo/site';
 import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -41,15 +42,15 @@ const SINGLE_OUTLET: OutletLocation = {
   id: "imadol",
   name: "Crunchy Bag - Imadol Outlet & Kitchen",
   area: "Imadol, Lalitpur",
-  address: "Imadol, Lalitpur, Nepal",
-  phone: "9761503339",
-  hours: "10:00 AM – 11:30 PM",
-  lat: 27.6620,
-  lng: 85.3410,
+  address: SEO_SITE.address,
+  phone: SEO_SITE.phone,
+  hours: SEO_SITE.serviceHours,
+  lat: SEO_SITE.latitude,
+  lng: SEO_SITE.longitude,
   status: "Open Now",
 };
 
-export const GOOGLE_MAPS_LOCATION_URL = "https://share.google/wJPKlrcMJueR0EmvX";
+export const GOOGLE_MAPS_LOCATION_URL = SEO_SITE.mapsUrl;
 
 export const CustomerFooter: React.FC = () => {
   const { openLoginModal } = useAuth();
@@ -201,7 +202,7 @@ export const CustomerFooter: React.FC = () => {
 
                     <div className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300">
                       <Clock className="h-4 w-4 text-amber-500 shrink-0" />
-                      <span>Open Daily: {SINGLE_OUTLET.hours}</span>
+                      <span>{SINGLE_OUTLET.hours}</span>
                     </div>
 
                     <div className="flex items-center gap-2.5 text-zinc-700 dark:text-zinc-300">
@@ -214,6 +215,8 @@ export const CustomerFooter: React.FC = () => {
                       </a>
                     </div>
                   </div>
+
+                  <p className="text-xs text-zinc-400"><a href={`tel:${SEO_SITE.additionalPhone}`}>{SEO_SITE.additionalPhone}</a> · <a href={`https://wa.me/${SEO_SITE.phone.slice(1)}`}>WhatsApp 9761503339</a> · <a href={`https://wa.me/${SEO_SITE.additionalPhone.slice(1)}`}>WhatsApp 9768382318</a></p>
                 </div>
 
                 {/* Action Buttons */}
@@ -256,7 +259,7 @@ export const CustomerFooter: React.FC = () => {
                 <CrunchyLogo size="md" />
               </div>
               <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-xs">
-                Handcrafted crispy fried chicken, smash burgers, and shakes in Kathmandu with eSewa instant checkout and live dispatch tracking.
+                Burgers, fried chicken, chicken 65 pakoda, fries and drinks from Dhungesadhu Chowk, Imadol. Delivery and takeaway available 24/7.
               </p>
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#60BB46]">
                 <ShieldCheck className="w-3.5 h-3.5" />
@@ -337,17 +340,18 @@ export const CustomerFooter: React.FC = () => {
               </h5>
               <ul className="space-y-1.5 text-zinc-600 dark:text-zinc-400">
                 <li>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomerActiveTab("menu");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
+                  <a
+                    href="/menu"
                     className="hover:text-amber-500 transition-colors cursor-pointer"
                   >
                     Full Food Menu
-                  </button>
+                  </a>
                 </li>
+                <li><a href="/takeaway" className="hover:text-amber-500">Takeaway in Imadol</a></li>
+                <li><a href="/delivery" className="hover:text-amber-500">Delivery coverage</a></li>
+                <li><a href="/delivery/kathmandu" className="hover:text-amber-500">Kathmandu delivery enquiries</a></li>
+                <li><a href="/delivery/lalitpur" className="hover:text-amber-500">Lalitpur delivery enquiries</a></li>
+                <li><a href="/delivery/bhaktapur" className="hover:text-amber-500">Bhaktapur delivery enquiries</a></li>
                 <li>
                   <button
                     type="button"

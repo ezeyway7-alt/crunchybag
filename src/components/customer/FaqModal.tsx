@@ -1,3 +1,4 @@
+import { BUSINESS_FAQS } from '../../data/seo/faqs';
 import React, { useState } from "react";
 import { HelpCircle, ChevronDown, Sparkles, MessageCircle, Phone } from "lucide-react";
 import { Modal } from "../common/Modal";
@@ -7,32 +8,7 @@ interface FaqModalProps {
   onClose: () => void;
 }
 
-export const FAQS_DATA = [
-  {
-    q: "How do I order food online from Crunchy Bag in Kathmandu?",
-    a: "Select your favorite dishes from our online menu, choose delivery or takeaway, and complete instant payment using your eSewa digital wallet. Your order is sent directly to our kitchen team for immediate cooking.",
-  },
-  {
-    q: "What payment methods are supported on Crunchy?",
-    a: "Crunchy supports 100% secure digital payments via eSewa with real-time transaction verification.",
-  },
-  {
-    q: "Where is Crunchy Bag located?",
-    a: "Our central restaurant and kitchen is located in Imadol, Lalitpur, Nepal. We offer dine-in, takeaway counter service, and express delivery across Lalitpur, Kathmandu, and Bhaktapur.",
-  },
-  {
-    q: "How long does delivery take?",
-    a: "Average delivery time is 20 to 35 minutes across Lalitpur and Kathmandu Valley, with live GPS countdown tracking.",
-  },
-  {
-    q: "Can I customize the spice level or request boneless chicken?",
-    a: "Yes! When clicking on any fried chicken or burger product card, an item customizer opens where you can choose spice levels (Mild, Medium, Himalayan Extra Hot), add dips, and select extra toppings.",
-  },
-  {
-    q: "Do you cater for bulk orders or private events?",
-    a: "Yes, we accept party buckets and bulk catering for corporate events and celebrations across Kathmandu Valley. Please contact our hotline at 9761503339 at least 3 hours in advance.",
-  },
-];
+export const FAQS_DATA = BUSINESS_FAQS;
 
 export const FaqModal: React.FC<FaqModalProps> = ({ isOpen, onClose }) => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);

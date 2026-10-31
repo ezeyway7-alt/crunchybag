@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { updatePageSEO } from '../../lib/seo';
 
 export function readStaticInformation(path: string) {
-  if (!/^\/(delivery(?:\/|$)|about$|contact$|faq$|terms$|privacy$)/.test(path)) return null;
+  if (!/^\/(delivery(?:\/|$)|takeaway$|about$|contact$|faq$|terms$|privacy$)/.test(path)) return null;
   const element = document.getElementById('static-route-data');
   if (!element?.textContent) return null;
   try {
