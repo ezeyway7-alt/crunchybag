@@ -83,15 +83,15 @@ export const CustomerFooter: React.FC = () => {
         center: [SINGLE_OUTLET.lat, SINGLE_OUTLET.lng],
         zoom: 15,
         zoomControl: false,
-        attributionControl: false,
+        attributionControl: true,
         scrollWheelZoom: false,
       });
 
       L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
         {
           maxZoom: 19,
-          subdomains: "abcd",
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         }
       ).addTo(map);
 

@@ -25,6 +25,7 @@ const introductions: Record<string, string> = {
   pakoda: 'Compare chicken 65 pakoda, classic chicken pakoda, vegetable pakoda, onion pakoda and paneer pakoda. View current prices and portions, then order for 24/7 takeaway or delivery.',
   sandwiches: 'Browse chicken and vegetarian sandwiches from Crunchy Bag at Dhungesadhu Chowk, Imadol. Compare fillings and current prices for delivery or takeaway, available 24/7.',
   momo: 'Choose chicken or vegetable momo from the current Crunchy Bag menu. Open a dish for its description, price and available options before ordering delivery or takeaway.',
+  sausages: 'View chicken sausage prices and available options from Crunchy Bag, Imadol. Order with fries, a drink or other snacks for 24/7 takeaway and Kathmandu Valley delivery.',
   burgers: 'Compare burgers and sandwiches from Crunchy Bag in Imadol, Lalitpur. Open each dish to check its filling, portion options and current price before ordering for takeaway or enquiring about delivery.',
   'fried-chicken': 'Browse our fried chicken menu and compare the available portions. Choose a dish to see its current price and options, then add sides or drinks from the menu.',
   drinks: 'Find a drink to accompany your meal or order on its own. Check each item for its current size options, ingredients and price.',
@@ -38,6 +39,7 @@ export const FOOD_COLLECTIONS = [
   { id: 'collection:pakoda', name: 'Pakoda', match: 'pakoda' },
   { id: 'collection:sandwiches', name: 'Sandwiches', match: 'sandwich' },
   { id: 'collection:momo', name: 'Momo', match: 'momo' },
+  { id: 'collection:sausages', name: 'Sausages', match: 'sausage' },
 ] as const;
 
 export function matchesFoodCollection(id: string, name: string) {
@@ -49,9 +51,10 @@ export function categoryMetadata(category: { id: string; name: string }) {
   const path = categoryPath(category);
   return {
     path,
-    title: `${category.name} Menu & Delivery | Crunchy Bag, Lalitpur`,
+    title: `${category.name} Prices & Delivery | Crunchy Bag, Lalitpur`,
     h1: `${category.name} Menu`,
-    description: introductions[categorySlug(category)] || `Browse ${category.name} at Crunchy Bag, Imadol, Lalitpur. View dishes, prices and ordering options for takeaway and delivery enquiries.`,
+    description: `${category.name} prices and portions at Crunchy Bag, Imadol. Order online for 24/7 delivery in Kathmandu, Lalitpur and Bhaktapur, or takeaway.`,
+    intro: introductions[categorySlug(category)] || `Browse ${category.name} at Crunchy Bag, Imadol, Lalitpur. View dishes, prices and ordering options for takeaway and delivery.`,
     canonical: `https://crunchybag.com${path}`,
   };
 }

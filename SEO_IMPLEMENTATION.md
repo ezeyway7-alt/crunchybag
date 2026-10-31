@@ -2,7 +2,7 @@
 
 ## Implemented locally
 
-- Public catalog generates individual products, seven current categories and three food collections (Pakoda, Sandwiches and Momo). Empty, archived and staff-only collections are excluded. Legacy food URLs point to the appropriate canonical collection. Existing product URLs remain available.
+- Public catalog generates individual products, seven current categories and four food collections (Pakoda, Sandwiches, Momo and Sausages). Empty, archived and staff-only collections are excluded. Legacy food URLs point to the appropriate canonical collection. Existing product URLs remain available.
 - Shared category routing drives real navigation links, selected products, page headings and metadata. Browser Back and direct category loads are covered by browser tests.
 - CollectionPage / ItemList schema, canonical URLs, category and blog sitemaps, contextual breadcrumbs, category-to-product and related-product links.
 - Takeaway and delivery pages use owner-confirmed 24/7 service, 5 AM–11 PM dine-in, no minimum order and usual 7–15 minute preparation. Travel time is explicitly additional. Delivery fees use the applicable Yango / Pathao route rate, confirmed before ordering.
@@ -43,3 +43,13 @@ The sitemap root contains all canonical, indexable generated URLs. Category and 
 - https://developers.google.com/search/docs/essentials/spam-policies
 
 Ranking positions, indexing dates and rich-result appearance cannot be guaranteed. Publishing and Search Console / Business Profile changes have not been performed by these local edits.
+
+
+## Price search coverage update
+
+- Product titles and descriptions now explicitly identify prices and ordering options, using one shared helper for generated HTML and live storefront navigation.
+- Actual catalog variants and modifier charges appear in generated product HTML. Base prices are labelled as base prices; missing amounts are not invented and extras are not treated as included.
+- Food categories include an expandable price/portion comparison below the products. It is absent from the homepage. Initial generated HTML and the live category view both contain the guide.
+- Added the Sausages food collection from existing public menu products. Category descriptions identify 24/7 delivery in Kathmandu, Lalitpur and Bhaktapur.
+- No new spice levels, best-in-Nepal claims or keyword-variation pages were added. Unverified recipe and spice facts require real catalog data.
+- The previously reported server routing fixes remain separate and are being handled by the owner. This update does not apply live Nginx changes.

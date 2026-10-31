@@ -1,5 +1,7 @@
 import {trackEvent} from '../../lib/journeyTracking';
 import { productSEO } from '../../lib/productSEO';
+import { productMetadata } from '../../lib/menuPricing';
+import { CategoryPriceGuide } from './CategoryPriceGuide';
 import { categoryPath, categoryMetadata, FOOD_COLLECTIONS, matchesFoodCollection, LEGACY_FOOD_PATHS } from '../../data/seo/categories';
 import { BlogsPortalPage } from "./BlogsPortalPage";
 import { BlogDetailPage } from "./BlogDetailPage";
@@ -159,8 +161,7 @@ export const CustomerPortal: React.FC = () => {
         window.dispatchEvent(new PopStateEvent('popstate'));
       }
       updatePageSEO({
-        title: `${product.name} | Crunchy Bag, Imadol`,
-        description: product.description || `Order ${product.name} from Crunchy Bag in Imadol, Lalitpur. View current prices and options.`,
+        ...productMetadata(product),
         image: product.images?.[0] || "https://crunchybag.com/crunchy_logo.png",
         canonical: `https://crunchybag.com${cleanPath}`,
         schema: productSEO(product, `https://crunchybag.com${cleanPath}`),
@@ -392,7 +393,7 @@ export const CustomerPortal: React.FC = () => {
         <main id="menu" className="max-w-7xl mx-auto px-4 sm:px-6 pt-0 pb-8 space-y-6">
           {categorySEO && <header className="pt-5 space-y-2">
             <h1 className="text-2xl font-bold">{categorySEO.h1}</h1>
-            <p className="text-sm text-zinc-400">{categorySEO.description}</p>
+            <p className="text-sm text-zinc-400">{categorySEO.intro}</p>
           </header>}
 
           {/* Hero Promotional Banner Slider */}
@@ -566,6 +567,7 @@ export const CustomerPortal: React.FC = () => {
               </div>
             </div>
           )}
+          {routeCategory && <CategoryPriceGuide name={routeCategory.name} products={displayedProducts} />}
         </main>
       ) : customerActiveTab === "profile" ? <CustomerProfilePage /> : (
         <LiveOrderTracker

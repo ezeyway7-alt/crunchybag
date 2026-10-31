@@ -3,6 +3,7 @@ import path from 'node:path';
 import { test, expect, Page } from '@playwright/test';
 import { BLOG_ARTICLES } from '../src/data/blogData';
 import { categoryPages } from '../scripts/category-pages';
+import { menuPrice, productMetadata, productPriceSummary } from '../src/lib/menuPricing';
 
 const productId = 'prod-cold-coffee-469955c644d4';
 const productUrl = '/product/cold-coffee-469955c644d4';
@@ -177,4 +178,51 @@ test('pakoda and sandwich collections contain the relevant dishes and preserve l
   const legacy = fs.readFileSync('dist/pakoda/index.html', 'utf8');
   expect(legacy).toContain('rel="canonical" href="https://crunchybag.com/menu/pakoda"');
   expect(fs.readFileSync('dist/sitemap.xml', 'utf8')).not.toContain('<loc>https://crunchybag.com/pakoda</loc>');
+});
+
+test('price summaries preserve actual variant prices and required extra charges without inventing missing amounts', () => {
+  const product = { name: 'Chicken Cheese Burger', base_price: '200', variants: [{ name: 'Double', price: '300' }], modifier_groups: [{
+    name: 'Cheese', min_selections: 1, options: [{ name: 'Extra cheese', price_delta: '25' }, { name: 'No cheese', price_delta: '-10' }, { name: 'Unknown price' }],
+  }] };
+  const summary = productPriceSummary(product);
+  expect(summary.base).toBe('NPR 200');
+  expect(summary.variants).toEqual([{ name: 'Double', price: 'NPR 300' }]);
+  expect(summary.groups[0].required).toBe(true);
+  expect(summary.groups[0].options).toEqual([{ name: 'Extra cheese', adjustment: '+NPR 25' }, { name: 'No cheese', adjustment: '-NPR 10' }]);
+  expect(menuPrice(null)).toBeNull();
+  expect(menuPrice('invalid')).toBeNull();
+  expect(productMetadata(product).title).toContain('Chicken Cheese Burger Price');
+  expect(productMetadata(product).description).toContain('listed base price NPR 200');
+});
+
+test('price comparison remains off the homepage and expands on a category page', async ({ page }) => {
+  await mockStore(page);
+  await page.goto('/');
+  await expect(page.getByText('Compare drinks prices, portions & extras', { exact: true })).toHaveCount(0);
+  await expect(page.locator('#menu > header')).toHaveCount(0);
+  await page.goto('/menu/drinks/');
+  await page.getByText('Compare drinks prices, portions & extras', { exact: true }).click();
+  await expect(page.getByRole('table')).toContainText('Cold Coffee');
+  await expect(page.getByRole('table')).toContainText('NPR 200');
+  await expect(page.getByRole('table')).not.toContainText('undefined');
+});
+
+test('homepage and contact location maps load keyless tiles and display attribution', async ({ page }) => {
+  await mockStore(page);
+  const tileRequests: string[] = [];
+  await page.route('https://tile.openstreetmap.org/**', async route => {
+    tileRequests.push(route.request().url());
+    await route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#ddd"/></svg>' });
+  });
+  for (const url of ['/', '/contact/']) {
+    tileRequests.length = 0;
+    await page.goto(url);
+    const map = page.locator('footer .leaflet-container');
+    await map.scrollIntoViewIfNeeded();
+    await expect(map.locator('.leaflet-tile-loaded').first()).toBeVisible();
+    await expect(map.locator('.leaflet-control-attribution a[href="https://www.openstreetmap.org/copyright"]')).toBeVisible();
+    expect(tileRequests.length).toBeGreaterThan(0);
+    expect(tileRequests.every(url => !new URL(url).search)).toBe(true);
+    await expect(map.locator('img[src*="cartocdn"]')).toHaveCount(0);
+  }
 });

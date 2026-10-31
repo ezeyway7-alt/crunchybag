@@ -1,6 +1,7 @@
 import { categoryMetadata, categoryPath, FOOD_COLLECTIONS, matchesFoodCollection } from '../src/data/seo/categories';
 import { productPath } from '../src/lib/productRoutes';
 import { escapeHtml } from './product-pages';
+import { productPriceSummary } from '../src/lib/menuPricing';
 
 export function categoryPages(categories: any[]) {
   const activeCategories = categories.filter(category => !category.is_archived);
@@ -12,6 +13,10 @@ export function categoryPages(categories: any[]) {
     const meta = categoryMetadata(category);
     const products = category.products.filter((product: any) => product.is_web_visible !== false);
     const items = products.map((product: any) => `<li><a href="${productPath(product)}">${escapeHtml(product.name)}</a>${product.description ? `<p>${escapeHtml(product.description)}</p>` : ''}<p>Base price: NPR ${escapeHtml(product.base_price)}. Options may change the total.</p></li>`).join('');
+    const priceGuide = `<details><summary>Compare ${escapeHtml(category.name.toLowerCase())} prices, portions &amp; extras</summary><table><caption>Listed base prices in Nepalese rupees. Portion choices and extras may change the total.</caption><thead><tr><th scope="col">Food</th><th scope="col">Base price</th><th scope="col">Portion options</th></tr></thead><tbody>${products.map((product: any) => {
+      const price = productPriceSummary(product);
+      return `<tr><th scope="row"><a href="${productPath(product)}">${escapeHtml(price.name)}</a></th><td>${escapeHtml(price.base || 'Check item')}</td><td>${escapeHtml(price.variants.map((variant: any) => `${variant.name}: ${variant.price}`).join('; ') || 'See item for available choices')}</td></tr>`;
+    }).join('')}</tbody></table><p>Check the selected options and delivery charge before confirming your order.</p></details>`;
     return {
       ...meta,
       schemaJson: JSON.stringify({
@@ -21,7 +26,7 @@ export function categoryPages(categories: any[]) {
           '@type': 'ListItem', position: index + 1, name: product.name, url: `https://crunchybag.com${productPath(product)}`,
         })) },
       }),
-      contentHtml: `<main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300"><nav><a href="/">Home</a> / <a href="/menu">Menu</a></nav><h1>${escapeHtml(meta.h1)}</h1><p>${escapeHtml(meta.description)}</p><ul>${items}</ul><h2>Takeaway and delivery</h2><p>Our restaurant is in Imadol, Lalitpur. <a href="/takeaway">Plan a pickup</a> or <a href="/delivery">check delivery coverage</a> before ordering.</p><nav aria-label="Food categories"><ul>${links}</ul></nav></main>`,
+      contentHtml: `<main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300"><nav><a href="/">Home</a> / <a href="/menu">Menu</a></nav><h1>${escapeHtml(meta.h1)}</h1><p>${escapeHtml(meta.intro)}</p><ul>${items}</ul>${priceGuide}<h2>Takeaway and delivery</h2><p>Our restaurant is in Imadol, Lalitpur. <a href="/takeaway">Plan a pickup</a> or <a href="/delivery">check delivery coverage</a> before ordering.</p><nav aria-label="Food categories"><ul>${links}</ul></nav></main>`,
     };
   });
   return { links, routes };

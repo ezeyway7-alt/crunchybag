@@ -2,6 +2,7 @@ import { productSEO } from '../src/lib/productSEO';
 import fs from 'node:fs';
 import { productPath } from '../src/lib/productRoutes';
 import { categoryPath } from '../src/data/seo/categories';
+import { productMetadata, productPriceSummary } from '../src/lib/menuPricing';
 
 export const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
@@ -27,14 +28,16 @@ export async function productPages() {
     const category = snapshot.categories.find((entry: any) => entry.products?.some((item: any) => String(item.id) === String(product.id)));
     const related = (category?.products || []).filter((item: any) => String(item.id) !== String(product.id) && item.is_web_visible !== false).slice(0, 4);
     const description = product.description || `Order ${product.name} from Crunchy Bag in Imadol, Lalitpur.`;
+    const pricing = productPriceSummary(product);
+    const choices = pricing.variants.length ? `<h2>Portions and prices</h2><ul>${pricing.variants.map((variant: any) => `<li>${escapeHtml(variant.name)}: ${escapeHtml(variant.price)}</li>`).join('')}</ul>` : '';
+    const extras = pricing.groups.length ? `<h2>Choices and extras</h2>${pricing.groups.map((group: any) => `<h3>${escapeHtml(group.name)}${group.required ? ' (selection required)' : ''}</h3><ul>${group.options.map((option: any) => `<li>${escapeHtml(option.name)}: ${escapeHtml(option.adjustment)}</li>`).join('')}</ul>`).join('')}` : '';
     const rawImage = product.images?.[product.main_image_index || 0] || product.images?.[0];
     const image = rawImage ? new URL(rawImage, 'https://crunchybag.com').href : undefined;
     const route = {
       path: canonicalPath,
       canonicalPath,
-      title: `${product.name} | Crunchy Bag, Imadol`,
+      ...productMetadata(product),
       h1: product.name,
-      description,
       image,
       schemaJson: JSON.stringify(productSEO(product, `https://crunchybag.com${canonicalPath}`)),
       contentHtml: `<main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-6 text-zinc-300">
@@ -42,7 +45,8 @@ export async function productPages() {
         <h1>${escapeHtml(product.name)}</h1>
         ${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(product.name)}" width="480" />` : ''}
         <p>${escapeHtml(description)}</p>
-        <p>Base price: NPR ${escapeHtml(product.base_price)}. Required choices and extras may change the total.</p>
+        <p>Base price: ${escapeHtml(pricing.base || 'See current ordering options')}. Required choices and extras may change the total.</p>
+        ${choices}${extras}
         <p>Prepared at Crunchy Bag, Imadol, Lalitpur. Current options, availability and prices are shown when ordering.</p>
         <a href="/menu">Browse the full menu</a>
         ${related.length ? `<h2>More from ${escapeHtml(category.name)}</h2><ul>${related.map((item: any) => `<li><a href="${productPath(item)}">${escapeHtml(item.name)}</a></li>`).join('')}</ul>` : ''}
