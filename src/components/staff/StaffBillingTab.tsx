@@ -482,6 +482,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
           </div>
 
 <CustomerPicker outlet={posSession.outlet} onSelect={customer => { setCustomerName(customer.name); setCustomerPhone(customer.phone); }} />
+{quote.quote?.loyalty && <p role="status" className="text-xs text-emerald-400">{quote.quote.loyalty.percent}% discount applied - {quote.quote.loyalty.name}</p>}
           {/* Customer Info & Credit Sale (Khata) Phone Verification Strip */}
           <div
             className={`p-2 border flex flex-wrap items-center justify-between gap-2 text-[11px] transition-colors ${

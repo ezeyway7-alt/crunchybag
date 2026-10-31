@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '../../lib/api';
 import { posPath } from '../../lib/posApi';
 
-type Customer = { id?: number; name: string; phone: string };
+type Customer = { id?: number; name: string; phone: string; discount_percent?: string; discount_remark?: string };
 export function CustomerPicker({ outlet, personalCustomer, onSelect }: {
   outlet?: string; personalCustomer?: Customer; onSelect: (customer: Customer) => void;
 }) {
@@ -39,7 +39,7 @@ export function CustomerPicker({ outlet, personalCustomer, onSelect }: {
       <div className="max-h-48 overflow-auto">
         {loading && <p role="status" className="p-2 text-zinc-400">Searching…</p>}
         {error && <p role="alert" className="p-2 text-amber-400">{error}</p>}
-        {!loading && rows.map(row => <button type="button" key={row.id ?? (row.phone || row.name)} onClick={() => choose(row)} className="block w-full p-2 text-left text-white hover:bg-zinc-800">{row.name || 'Guest'} · {row.phone}</button>)}
+        {!loading && rows.map(row => <button type="button" key={row.id ?? (row.phone || row.name)} onClick={() => choose(row)} className="block w-full p-2 text-left text-white hover:bg-zinc-800">{row.name || 'Guest'} · {row.phone}{Number(row.discount_percent || 0) > 0 && <small className="block text-emerald-400">{row.discount_percent}% - {row.discount_remark || "Predefined customer discount"}</small>}</button>)}
         {!loading && !error && !rows.length && <p className="p-2 text-zinc-400">No matching customer.</p>}
         {!loading && !error && !!query.trim() && !rows.length && <button type="button" className="w-full p-2 text-left text-amber-400" onClick={() => choose(/^[+\d\s().-]+$/.test(query.trim()) ? { name: '', phone: query.trim() } : { name: query.trim(), phone: '' })}>Use new customer: {query.trim()}</button>}
       </div>

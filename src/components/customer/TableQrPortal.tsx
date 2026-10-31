@@ -1022,7 +1022,7 @@ export const TableQrPortal: React.FC<TableQrPortalProps> = ({ onClose }) => {
                 </div>
               ))}
               <div className="pt-2 border-t border-zinc-800 flex items-center justify-between text-xs font-bold text-white">
-                <span>Round Total{serverQuote.quote?.loyalty && <small className="block text-emerald-400">Loyalty {serverQuote.quote.loyalty.percent}% applied</small>}</span>
+                <span>Round Total{serverQuote.quote?.loyalty && <small className="block text-emerald-400">{serverQuote.quote.loyalty.percent}% discount applied - {serverQuote.quote.loyalty.name}</small>}</span>
                 <span className="font-mono text-amber-400 text-sm font-black">
                   Rs. {serverQuote.quote?.total_payable ?? cart.finalTotal}
                 </span>

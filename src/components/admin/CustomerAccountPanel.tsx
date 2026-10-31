@@ -9,7 +9,8 @@ type Snapshot = { number: string; customer_name: string; customer_phone: string;
   amount: string; method: string; reference: string; notes: string; recorded_by: string; remaining_due: string;
   allocations: { order_number: string; amount: string; receipt_id: number }[] };
 type Account = {
-  customer: { id: number; name: string; phone: string; email: string; sources: string[]; registered: boolean };
+  can_manage_discount: boolean;
+  customer: { discount_percent: string; discount_remark: string; id: number; name: string; phone: string; email: string; sources: string[]; registered: boolean };
   summary: { orders: number; order_total: string; received: string; refunded: string; due: string; credit: string };
   can_receive: boolean; methods: string[];
   orders: { id: number; order_number: string; source: string; status: string; date: string; total: string; paid: string; due: string; credit: string; refunded: string;
@@ -45,6 +46,7 @@ export const CustomerAccountPanel: React.FC<{ outlet: string; contactId: number;
   const [tab, setTab] = useState<'orders' | 'payments' | 'credit' | 'receipts'>('orders');
   const [amount, setAmount] = useState(''), [scope, setScope] = useState('CREDIT'), [method, setMethod] = useState('CASH');
   const [date, setDate] = useState(today), [reference, setReference] = useState(''), [notes, setNotes] = useState('');
+  const [discountPercent, setDiscountPercent] = useState('0'), [discountRemark, setDiscountRemark] = useState('');
   const sending = useRef(false), initialized = useRef(false);
   const storageKey = `customer-receive:${authStorage.getUser()?.id}:${outlet}:${contactId}`;
   const [pending, setPending] = useState<Pending | null>(() => { try { return JSON.parse(sessionStorage.getItem(storageKey) || 'null'); } catch { return null; } });
@@ -52,7 +54,7 @@ export const CustomerAccountPanel: React.FC<{ outlet: string; contactId: number;
     const abort = new AbortController(); setLoadError('');
     apiClient.get<Account>(endpoint(), { signal: abort.signal }).then(data => {
       if (abort.signal.aborted) return;
-      setAccount(data);
+      setAccount(data); setDiscountPercent(data.customer.discount_percent); setDiscountRemark(data.customer.discount_remark);
       if (!initialized.current) { initialized.current = true; setScope(Number(data.summary.credit) ? 'CREDIT' : 'ALL'); setMethod(data.methods[0] || 'CASH'); }
     }).catch(e => { if (!abort.signal.aborted) setLoadError(extractErrorMessage(e)); });
     return () => abort.abort();
@@ -83,6 +85,17 @@ export const CustomerAccountPanel: React.FC<{ outlet: string; contactId: number;
   const available = Number(scope === 'CREDIT' ? account.summary.credit : account.summary.due);
   return <section className="space-y-4" aria-label="Customer account">
     {back}<header><h1 className="text-xl font-bold">{account.customer.name}</h1><p className="text-sm text-zinc-400">{[account.customer.phone || 'No phone saved', account.customer.email, account.customer.registered ? 'Registered customer' : 'Guest customer'].filter(Boolean).join(' · ')}</p><p className="text-xs text-zinc-500 mt-1">{account.customer.sources.join(' · ')} · {account.summary.orders} orders</p></header>
+    {account.can_manage_discount && <form className="rounded border border-zinc-700 p-4 space-y-3" onSubmit={async event => {
+      event.preventDefault(); setBusy(true); setError(''); setSuccess('');
+      try { const data = await apiClient.patch<Account>(endpoint(), {discount_percent: discountPercent, discount_remark: discountRemark}); setAccount(data); setSuccess('Customer discount saved. Applies automatically to new, unbilled orders.'); onChanged(); }
+      catch (e) { setError(extractErrorMessage(e)); } finally { setBusy(false); }
+    }}>
+      <h2 className="font-semibold">Predefined customer discount</h2>
+      <p className="text-xs text-zinc-400">Matched by saved phone in this outlet. The largest eligible discount applies; discounts do not stack. Billed orders keep their saved totals.</p>
+      <label className="block text-xs">Discount percentage<input className={input} type="number" min="0" max="100" step="0.01" required value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} /></label>
+      <label className="block text-xs">Automatic remark<input className={input} maxLength={180} value={discountRemark} placeholder="Predefined customer discount" onChange={e => setDiscountRemark(e.target.value)} /></label>
+      <button className={primary} disabled={busy || !!loadError}>Save customer discount</button>
+    </form>}
     {loadError && <p role="alert" className="text-rose-400">{loadError} <button onClick={onChanged}>Retry</button></p>}
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">{[['Order value', account.summary.order_total], ['Received', account.summary.received], ['Refunded', account.summary.refunded], ['Outstanding', account.summary.due], ['Credit / Khata', account.summary.credit]].map(([label, value]) => <div key={label} className="rounded border border-zinc-800 bg-zinc-900/40 p-3"><p className="text-xs text-zinc-400">{label}</p><p className={`text-lg font-bold mt-1 ${label === 'Outstanding' ? 'text-rose-400' : ''}`}>{money(value)}</p></div>)}</div>
     <p className="text-xs text-zinc-500">Credit is included in outstanding, not an additional charge. Cancelled orders create no amount due. Received amounts are shown before refunds.</p>

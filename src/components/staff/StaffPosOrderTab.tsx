@@ -919,6 +919,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                 </div>
 
 <CustomerPicker outlet={posSession.outlet} onSelect={customer => { setCustomerName(customer.name); setCustomerPhone(customer.phone); }} />
+{quote.quote?.loyalty && <p role="status" className="text-xs text-emerald-400">{quote.quote.loyalty.percent}% discount applied - {quote.quote.loyalty.name}</p>}
                 {/* Customer Phone & Name */}
                 <div className="space-y-1.5">
                   <div className={`grid ${fulfillmentType === "DINE_IN" ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
