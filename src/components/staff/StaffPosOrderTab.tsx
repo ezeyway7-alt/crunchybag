@@ -1,3 +1,4 @@
+import { OrderTypeEdit } from "../common/OrderTypeEdit";
 import { EditableCustomerField } from "../common/EditableCustomerField";
 import {PosPaymentMethodEdit} from '../common/PaymentMethodEdit';
 import { CustomerPicker } from "../common/CustomerPicker";
@@ -1723,6 +1724,7 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                             </span>
                           )}
                         </div>
+                      <div className="mt-1"><OrderTypeEdit order={order} outlet={posSession.outlet} meta={posSession.meta}/></div>
                       </td>
 
                       {/* Items Summary */}

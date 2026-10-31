@@ -259,6 +259,7 @@ async function setup(page: Page) {
             Number(result.paid_amount),
           ),
         };
+      else if (path.endsWith('/fulfillment/')) { result.fulfillment_type = body.fulfillment_type; result.table_id = body.table_id; result.table_number = state.tables.find((table:any)=>table.id===body.table_id)?.table_number || null; result.version++; }
       else if (path.endsWith('/transition/')) { result.status = body.status; result.version++; }
       else if (path.endsWith('/round/')) {
         result.rounds ||= [{number:1,status:result.status,created_at:result.created_at}];
@@ -866,4 +867,51 @@ test('POS shows the actual tender and edits it from billing and the order regist
   await page.getByRole('button',{name:'Save payment method',exact:true}).click();
   await expect(row).toContainText('CARD');
   expect(order.paid_amount).toBe(order.total_payable);
+});
+
+
+test('POS bill opens and quotes the selected order while the register reload is pending', async ({ page }) => {
+  await setup(page);
+  await addBurger(page);
+  await expect(fireOrder(page)).toBeEnabled();
+  await fireOrder(page).click();
+  await page.getByRole('button', {name: 'Close dialog'}).click();
+  const bill = page.getByRole('button', {name: 'Bill', exact: true}).first();
+  await expect(bill).toBeVisible();
+  let release: () => void = () => {};
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/v1/orders/pos/?**', async route => {
+    if (route.request().method() === 'GET') await blocked;
+    await route.fallback();
+  });
+  try {
+    await bill.click();
+    await expect(page.getByLabel('Amount applied')).toHaveValue('220', {timeout: 4000});
+    await expect(page.getByRole('button', {name: 'Confirm Settlement & Print Tax Invoice', exact: true})).toBeEnabled();
+  } finally { release(); }
+});
+
+
+test('POS corrects an order table and billing can change its type', async ({page}) => {
+  const state = await setup(page);
+  state.tables.push({id: 1, table_number: 'Window 1', capacity: 4, section: '', active_order_id: null});
+  await addBurger(page);
+  await expect(fireOrder(page)).toBeEnabled(); await fireOrder(page).click();
+  await page.getByRole('button', {name: 'Close dialog'}).click();
+  await page.getByRole('button', {name: 'Change table / type', exact: true}).first().click();
+  const dialog = page.getByRole('form', {name: 'Order correction'});
+  await dialog.getByRole('combobox', {name: 'Order type', exact: true}).selectOption('DINE_IN');
+  await dialog.getByRole('combobox', {name: 'Table', exact: true}).selectOption('1');
+  await dialog.getByLabel('Reason', {exact: true}).fill('Wrong table selected');
+  await dialog.getByRole('button', {name: 'Save correction'}).click();
+  await expect(dialog).not.toBeVisible();
+  expect(state.orders[0].table_id).toBe(1);
+  await page.getByRole('button', {name: 'Bill', exact: true}).first().click();
+  await page.getByRole('button', {name: 'Change table / type', exact: true}).first().click();
+  await dialog.getByRole('combobox', {name: 'Order type', exact: true}).selectOption('TAKEAWAY');
+  await dialog.getByLabel('Reason', {exact: true}).fill('Customer wants takeaway');
+  await dialog.getByRole('button', {name: 'Save correction'}).click();
+  await expect(dialog).not.toBeVisible();
+  expect(state.orders[0].fulfillment_type).toBe('TAKEAWAY');
+  expect(state.orders[0].table_id).toBeNull();
 });

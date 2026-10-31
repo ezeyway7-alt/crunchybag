@@ -1,3 +1,4 @@
+import { OrderTypeEdit } from "../common/OrderTypeEdit";
 import { EditableCustomerField } from "../common/EditableCustomerField";
 import {PosPaymentMethodEdit} from '../common/PaymentMethodEdit';
 import { CustomerPicker } from "../common/CustomerPicker";
@@ -30,7 +31,7 @@ import {
 import { useApp } from "../../context/AppContext";
 import { Order, PaymentMethod, SplitPaymentEntry } from "../../types";
 import { usePosSession, usePosCommand, posOrderToOrder, printPosReceipt, backendOrder, todayNepal, toPosMethod, fromPosMethod, posError } from "../../lib/posApi";
-import { usePosOrderFeed, usePosQuote, usePosReceipt } from "../../lib/posWorkspace";
+import { usePosOrderFeed, usePosQuote, usePosReceipt, usePosDetail } from "../../lib/posWorkspace";
 import { posStatistics } from "../../lib/posLegacy";
 import { formatNPR, formatTimer } from "../../lib/utils";
 import { Modal } from "../common/Modal";
@@ -104,10 +105,19 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
   // Hovered split index for tooltip
   const [hoveredSplitIndex, setHoveredSplitIndex] = useState<number | null>(null);
 
+  // Open the selected bill without waiting for every register page to load.
+  const selectedBackendId = /^(?:pos-)?(\d+)$/.exec(selectedOrderId)?.[1];
+  const selectedDetail = usePosDetail(posSession, selectedBackendId ? Number(selectedBackendId) : null);
+  const selectedSnapshot = initialSelectedOrder?.outletId === posSession.outlet && initialSelectedOrder.id === selectedOrderId
+    ? initialSelectedOrder : null;
+
   // Target Active Order for Workbench
   const activeOrder = useMemo(() => {
     if (selectedOrderId) {
-      return allOrders.find((o) => o.id === selectedOrderId || o.orderNumber === selectedOrderId) || null;
+      const listed = allOrders.find((o) => o.id === selectedOrderId || o.orderNumber === selectedOrderId);
+      const detail = selectedDetail.order ? posOrderToOrder(selectedDetail.order, currentOutlet.name) : null;
+      return [listed, detail, selectedSnapshot].filter((order): order is Order => !!order)
+        .sort((a, b) => (backendOrder(b)?.version ?? 0) - (backendOrder(a)?.version ?? 0))[0] || null;
     }
     // Default to first open/unbilled order
     const firstUnsettled = allOrders.find(
@@ -116,7 +126,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
         (o.isBilled === false || o.paymentStatus === "UNPAID")
     );
     return firstUnsettled || allOrders[0] || null;
-  }, [allOrders, selectedOrderId]);
+  }, [allOrders, selectedOrderId, selectedDetail.order, selectedSnapshot, currentOutlet.name]);
 
   // Only a real order/version change resets settlement fields; context rerenders do not.
   useEffect(() => {
@@ -1236,6 +1246,7 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
                               • <Phone className="w-2.5 h-2.5 text-zinc-400" /> <EditableCustomerField value={ord.customerPhone || ""} label="Customer phone" phone disabled={!posSession.meta?.permissions.orders || posCommand.busy || posCommand.hasPending} onSave={async value => { const source = backendOrder(ord); if (!source) throw new Error("Order unavailable"); const result = await posCommand.run(`${source.id}/customer/`, {version: source.version, customer_phone: value}); if (!result) throw new Error("Could not save. Check the order and retry."); }} />
                             </span>
                         </div>
+                      <div className="mt-1"><OrderTypeEdit order={ord} outlet={posSession.outlet} meta={posSession.meta}/></div>
                       </td>
 
                       {/* Items Summary */}

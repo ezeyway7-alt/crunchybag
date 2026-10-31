@@ -174,10 +174,11 @@ export function usePosOrderFeed(session: PosSession, filters: Record<string, str
         for (let page = 1; live; page++) {
           const data = await apiClient.get<{ results: PosOrder[]; count: number }>(`${posPath(session.outlet)}&page_size=100&page=${page}&${query}`, { signal: abort.signal });
           results.push(...data.results);
+          if (live) setState({ scope, results: [...results], error: '', loading: results.length < data.count && data.results.length > 0 });
           if (results.length >= data.count || !data.results.length) break;
         }
         if (live) setState({ scope, results, error: '', loading: false });
-      } catch(e) { if (live) setState({ scope, results: [], error: posError(e), loading: false }); }
+      } catch(e) { if (live) setState(previous => ({ scope, results: previous.scope === scope ? previous.results : [], error: posError(e), loading: false })); }
     }, 150);
     return () => { live = false; clearTimeout(timer); abort.abort(); };
   }, [session.enabled, !!session.meta, scope, session.revision]);
