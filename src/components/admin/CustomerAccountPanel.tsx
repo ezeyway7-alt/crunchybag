@@ -1,3 +1,4 @@
+import { EditableCustomerField } from "../common/EditableCustomerField";
 import React, { useEffect, useRef, useState } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { apiClient, ApiError, extractErrorMessage } from '../../lib/api';
@@ -9,7 +10,7 @@ type Snapshot = { number: string; customer_name: string; customer_phone: string;
   amount: string; method: string; reference: string; notes: string; recorded_by: string; remaining_due: string;
   allocations: { order_number: string; amount: string; receipt_id: number }[] };
 type Account = {
-  can_manage_discount: boolean;
+  can_edit_identity: boolean; can_manage_discount: boolean;
   customer: { discount_percent: string; discount_remark: string; id: number; name: string; phone: string; email: string; sources: string[]; registered: boolean };
   summary: { orders: number; order_total: string; received: string; refunded: string; due: string; credit: string };
   can_receive: boolean; methods: string[];
@@ -82,9 +83,13 @@ export const CustomerAccountPanel: React.FC<{ outlet: string; contactId: number;
   const printPayment = (snapshot: Snapshot) => { try { printCollection(snapshot); } catch (e) { setError(extractErrorMessage(e)); } };
   const back = <button className={button} onClick={onBack}>← Back to customers</button>;
   if (!account) return <section className="space-y-3">{back}<p role={loadError ? 'alert' : 'status'}>{loadError || 'Loading customer account…'}</p>{loadError && <button onClick={onChanged}>Retry</button>}</section>;
+  const editIdentity = async (field: 'name'|'phone', value: string) => {
+    const updated = await apiClient.patch<Account>(endpoint('identity/'), {[field]: value, expected_name: account.customer.name === 'Guest' ? '' : account.customer.name, expected_phone: account.customer.phone});
+    setAccount(updated); onChanged();
+  };
   const available = Number(scope === 'CREDIT' ? account.summary.credit : account.summary.due);
   return <section className="space-y-4" aria-label="Customer account">
-    {back}<header><h1 className="text-xl font-bold">{account.customer.name}</h1><p className="text-sm text-zinc-400">{[account.customer.phone || 'No phone saved', account.customer.email, account.customer.registered ? 'Registered customer' : 'Guest customer'].filter(Boolean).join(' · ')}</p><p className="text-xs text-zinc-500 mt-1">{account.customer.sources.join(' · ')} · {account.summary.orders} orders</p></header>
+    {back}<header><h1 className="text-xl font-bold"><EditableCustomerField value={account.customer.name} label="Customer name" maxLength={150} disabled={!account.can_edit_identity} onSave={value=>editIdentity("name",value)}/></h1><div className="text-sm"><EditableCustomerField value={account.customer.phone} label="Customer phone" phone disabled={!account.can_edit_identity} onSave={value=>editIdentity("phone",value)}/></div><p className="text-sm text-zinc-400">{[account.customer.phone || 'No phone saved', account.customer.email, account.customer.registered ? 'Registered customer' : 'Guest customer'].filter(Boolean).join(' · ')}</p><p className="text-xs text-zinc-500 mt-1">{account.customer.sources.join(' · ')} · {account.summary.orders} orders</p></header>
     {account.can_manage_discount && <form className="rounded border border-zinc-700 p-4 space-y-3" onSubmit={async event => {
       event.preventDefault(); setBusy(true); setError(''); setSuccess('');
       try { const data = await apiClient.patch<Account>(endpoint(), {discount_percent: discountPercent, discount_remark: discountRemark}); setAccount(data); setSuccess('Customer discount saved. Applies automatically to new, unbilled orders.'); onChanged(); }

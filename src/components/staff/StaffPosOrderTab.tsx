@@ -1,3 +1,4 @@
+import { EditableCustomerField } from "../common/EditableCustomerField";
 import {PosPaymentMethodEdit} from '../common/PaymentMethodEdit';
 import { CustomerPicker } from "../common/CustomerPicker";
 import {OrderRoundsPanel} from '../common/OrderRoundsPanel';
@@ -1675,14 +1676,14 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                         className="p-2.5 min-w-[140px] cursor-pointer hover:bg-zinc-100/70 dark:hover:bg-zinc-800/40 transition-colors"
                         title="Click to view full order details & map location"
                       >
-                        <p className="font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-[150px]">
-                          {order.customerName}
+                        <p className="font-bold text-zinc-900 dark:text-zinc-100 max-w-[220px]">
+                          <EditableCustomerField value={order.customerName || ""} label="Customer name" disabled={!posSession.meta?.permissions.orders || posCommand.busy || posCommand.hasPending} onSave={async value => { const source = backendOrder(order); if (!source) throw new Error("Order unavailable"); const result = await posCommand.run(`${source.id}/customer/`, {version: source.version, customer_name: value}); if (!result) throw new Error("Could not save. Check the order and retry."); }} />
                         </p>
                         {order.fulfillmentType === "DELIVERY" && (
                           <div className="flex items-center gap-1.5 mt-0.5 group/addr">
                             <MapPin className="w-3 h-3 text-amber-500 shrink-0" />
                             <p
-                              className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate max-w-[130px]"
+                              className="text-[11px] text-zinc-500 dark:text-zinc-400 max-w-[220px]"
                               title={deliveryInfo(order).address || "Delivery destination"}
                             >
                               {deliveryInfo(order).address?.split('\n')[0] || "Online Delivery"}
@@ -1716,9 +1717,9 @@ export const StaffPosOrderTab: React.FC<Props> = ({ onOpenBillingForOrder }) => 
                               ? "🛵 Online"
                               : "🛍️ Takeaway"}
                           </span>
-                          {order.customerPhone && (
+                          {(
                             <span className="font-mono text-[9px] text-zinc-400">
-                              {order.customerPhone}
+                              <EditableCustomerField value={order.customerPhone || ""} label="Customer phone" phone disabled={!posSession.meta?.permissions.orders || posCommand.busy || posCommand.hasPending} onSave={async value => { const source = backendOrder(order); if (!source) throw new Error("Order unavailable"); const result = await posCommand.run(`${source.id}/customer/`, {version: source.version, customer_phone: value}); if (!result) throw new Error("Could not save. Check the order and retry."); }} />
                             </span>
                           )}
                         </div>

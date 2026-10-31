@@ -1,3 +1,4 @@
+import { EditableCustomerField } from "../common/EditableCustomerField";
 import {PosPaymentMethodEdit} from '../common/PaymentMethodEdit';
 import { CustomerPicker } from "../common/CustomerPicker";
 import {useOrderReceipt} from "../../lib/orderReceipt";
@@ -1225,28 +1226,15 @@ export const StaffBillingTab: React.FC<Props> = ({ initialSelectedOrder }) => {
 
                       {/* Customer & Channel */}
                       <td className="p-2">
-                        <p className="font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-[130px]">
-                          {ord.customerName}
+                        <p className="font-bold text-zinc-900 dark:text-zinc-100 max-w-[220px]">
+                          <EditableCustomerField value={ord.customerName || ""} label="Customer name" disabled={!posSession.meta?.permissions.orders || posCommand.busy || posCommand.hasPending} onSave={async value => { const source = backendOrder(ord); if (!source) throw new Error("Order unavailable"); const result = await posCommand.run(`${source.id}/customer/`, {version: source.version, customer_name: value}); if (!result) throw new Error("Could not save. Check the order and retry."); }} />
                         </p>
                         <div className="flex items-center gap-1 text-[10px] text-zinc-400">
                           <span>{ord.fulfillmentType}</span>
                           {ord.tableNumber && <span>• {ord.tableNumber}</span>}
-                          {ord.customerPhone ? (
-                            <span className="font-mono flex items-center gap-0.5 text-zinc-600 dark:text-zinc-300">
-                              • <Phone className="w-2.5 h-2.5 text-zinc-400" /> {ord.customerPhone}
+                          <span className="font-mono flex items-center gap-0.5 text-zinc-600 dark:text-zinc-300">
+                              • <Phone className="w-2.5 h-2.5 text-zinc-400" /> <EditableCustomerField value={ord.customerPhone || ""} label="Customer phone" phone disabled={!posSession.meta?.permissions.orders || posCommand.busy || posCommand.hasPending} onSave={async value => { const source = backendOrder(ord); if (!source) throw new Error("Order unavailable"); const result = await posCommand.run(`${source.id}/customer/`, {version: source.version, customer_phone: value}); if (!result) throw new Error("Could not save. Check the order and retry."); }} />
                             </span>
-                          ) : (
-                            (ord.paymentMethod === "CREDIT" ||
-                              Boolean(
-                                ord.splitPayments?.some(
-                                  (sp) => sp.method === "CREDIT" && sp.amount > 0
-                                )
-                              )) && (
-                              <span className="text-[9px] font-bold text-rose-500 flex items-center gap-0.5">
-                                • <AlertTriangle className="w-2.5 h-2.5" /> No Mobile!
-                              </span>
-                            )
-                          )}
                         </div>
                       </td>
 
