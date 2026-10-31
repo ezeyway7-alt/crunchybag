@@ -58,6 +58,19 @@ test('product links support click, back, forward and direct legacy URLs', async 
   await page.goto(`/product/${productId}`);
   await expect(page).toHaveURL(new RegExp(`${productUrl}$`));
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `https://crunchybag.com${productUrl}`);
+
+  // Query parameter product navigation
+  await page.goto(`/?product=${productId}`);
+  await expect(page).toHaveURL(new RegExp(`${productUrl}$`));
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `https://crunchybag.com${productUrl}`);
+
+  // Query parameter location navigation
+  await page.goto('/?location=gwarko');
+  await expect(page).toHaveURL(/\/delivery\/gwarko$/);
+
+  // Query parameter page navigation
+  await page.goto('/?page=menu');
+  await expect(page).toHaveURL(/\/menu$/);
 });
 
 test('blog navigation creates valid article tags and a single article schema', async ({ page }) => {

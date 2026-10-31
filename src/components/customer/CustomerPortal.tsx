@@ -197,6 +197,28 @@ export const CustomerPortal: React.FC = () => {
     }
     const catParam = params.get("category");
     const pageParam = params.get("page");
+    const locationParam = params.get("location");
+
+    // Handle old query link for location: /?location=gwarko -> /delivery/gwarko
+    if (locationParam) {
+      const locSlug = locationParam.trim().toLowerCase();
+      const targetSlug = locSlug === "maharajgunj" ? "kathmandu" : locSlug;
+      const targetPath = `/delivery/${encodeURIComponent(targetSlug)}`;
+      window.history.replaceState({}, "", targetPath);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      setCurrentRoutePath(targetPath);
+      return;
+    }
+
+    // Handle old query link for page: /?page=menu -> /menu
+    if (pageParam) {
+      const pageSlug = pageParam.trim().toLowerCase();
+      const targetPath = pageSlug === "special" ? "/combos" : `/${encodeURIComponent(pageSlug)}`;
+      window.history.replaceState({}, "", targetPath);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      setCurrentRoutePath(targetPath);
+      return;
+    }
 
     if (catParam) {
       setSelectedCategory(catParam);
@@ -223,11 +245,21 @@ export const CustomerPortal: React.FC = () => {
     if (prodParam) {
       let cleanProdId: string;
       try { cleanProdId = decodeURIComponent(prodParam); } catch { return; }
+      if (cleanProdId.includes("{") || cleanProdId === "product_id") {
+        updatePageSEO({ title: "Page not found | Crunchy Bag", noIndex: true, canonical: "https://crunchybag.com/404" });
+        return;
+      }
       const found = products.find(
         (p) => matchesProductRoute(p, cleanProdId)
       );
       if (found) {
         handleOpenProduct(found);
+        if (params.has("product") || params.has("item") || params.has("combo")) {
+          const cleanPath = productPath(found);
+          window.history.replaceState({}, "", cleanPath);
+          window.dispatchEvent(new PopStateEvent("popstate"));
+          setCurrentRoutePath(cleanPath);
+        }
       } else {
         updatePageSEO({title: 'Product not found | Crunchy Bag', noIndex: true, canonical: `https://crunchybag.com${path}`});
       }

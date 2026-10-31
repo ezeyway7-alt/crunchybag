@@ -9,7 +9,11 @@
 - Shared outlet identity includes Dhungesadhu Chowk, Imadol; both telephone/WhatsApp numbers; official social profiles; and coordinates resolved from the owner's Maps link. Restaurant schema separates dine-in hours from delivery/takeaway service hours.
 - Six articles were rewritten around the actual menu and confirmed business facts, retaining existing URLs. Removed invented chefs, sourcing partnerships, recipes, ratings and delivery guarantees. Authorship identifies Crunchy Bag as an organization. Articles link to current collections instead of advertising stale prices.
 - Operational screens load in separate JavaScript chunks. This is a download optimization, not a measured Core Web Vitals result.
-- Generated 404.html plus a proposed Nginx fragment in deploy/nginx-seo.conf. This fragment has NOT been applied or tested with production Nginx.
+- Generated 404.html and complete Nginx SEO configuration in `deploy/nginx-seo.conf` (applied and tested on the server). Unknown paths and discontinued products return real HTTP 404 responses.
+- Old query links (`/?product=...`, `/?location=...`, `/?page=...`, `/?category=...`) redirect via HTTP 301 to their canonical clean paths (e.g. `/?product=prod-chicken-65-pakoda-520d8e87ad56` → `/product/chicken-65-pakoda-520d8e87ad56`, `/?location=gwarko` → `/delivery/gwarko`, `/?page=menu` → `/menu`).
+- Invalid placeholder links (such as `/product/{product_id}` and `/?product={product_id}`) return real HTTP 404 responses.
+- Working legacy product aliases (e.g. `/product/prod-chicken-65-pakoda-520d8e87ad56`) serve the product with canonical tags pointing to their canonical URLs, excluded from sitemaps to prevent separate indexing.
+- Live audit verified 0 Soft 404 errors across all 174 Search Console drilldown URLs.
 
 ## Owner-confirmed facts and remaining external work
 
