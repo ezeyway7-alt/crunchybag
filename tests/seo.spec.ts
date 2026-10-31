@@ -226,3 +226,15 @@ test('homepage and contact location maps load keyless tiles and display attribut
     await expect(map.locator('img[src*="cartocdn"]')).toHaveCount(0);
   }
 });
+
+test('legal-page email links remain direct mailto links with Cloudflare opt-out markup', async ({ page }) => {
+  await mockStore(page);
+  for (const path of ['terms', 'privacy']) {
+    const html = fs.readFileSync(`dist/${path}/index.html`, 'utf8');
+    expect(html).toContain('<!--email_off--><a href="mailto:hello@crunchybag.com">hello@crunchybag.com</a><!--/email_off-->');
+    expect(html).not.toContain('/cdn-cgi/l/email-protection');
+    await page.goto(`/${path}/`);
+    await expect(page.locator('#app-landing-summary a[href="mailto:hello@crunchybag.com"]').first()).toBeVisible();
+    await expect(page.locator('#app-landing-summary a[href*="email-protection"]')).toHaveCount(0);
+  }
+});

@@ -107,7 +107,7 @@ const STATIC_ROUTES: RouteSEO[] = [
 
         <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
           <p><strong>Crunchy Bag Restaurant:</strong> Imadol, Lalitpur 44700, Nepal (<a href="https://maps.app.goo.gl/f7iDReKabgGHSvrv7" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
-          <p><strong>Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300">9761503339</a> | <strong>Email:</strong> hello@crunchybag.com</p>
+          <p><strong>Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300">9761503339</a> | <strong>Email:</strong> <!--email_off--><a href="mailto:hello@crunchybag.com">hello@crunchybag.com</a><!--/email_off--></p>
           <p><a href="/" class="text-amber-500 hover:underline">&larr; Return to Crunchy Bag Home</a></p>
         </footer>
       </main>
@@ -140,13 +140,13 @@ const STATIC_ROUTES: RouteSEO[] = [
           </div>
           <div>
             <h2 class="font-bold text-white text-sm">4. Data Deletion Requests</h2>
-            <p>Customers can request deletion of their account history and contact data anytime by emailing hello@crunchybag.com or calling 9761503339.</p>
+            <p>Customers can request deletion of their account history and contact data anytime by emailing <!--email_off--><a href="mailto:hello@crunchybag.com">hello@crunchybag.com</a><!--/email_off--> or calling 9761503339.</p>
           </div>
         </section>
 
         <footer class="pt-6 border-t border-zinc-800 text-xs text-zinc-500 space-y-1">
           <p><strong>Data Controller:</strong> Crunchy Bag Restaurant, Imadol, Lalitpur 44700, Nepal (<a href="https://maps.app.goo.gl/f7iDReKabgGHSvrv7" target="_blank" rel="noopener noreferrer" class="text-amber-500 hover:underline">Google Maps</a>)</p>
-          <p><strong>Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300">9761503339</a> | <strong>Email:</strong> hello@crunchybag.com</p>
+          <p><strong>Hotline:</strong> <a href="tel:9761503339" class="font-mono text-zinc-300">9761503339</a> | <strong>Email:</strong> <!--email_off--><a href="mailto:hello@crunchybag.com">hello@crunchybag.com</a><!--/email_off--></p>
           <p><a href="/" class="text-amber-500 hover:underline">&larr; Return to Crunchy Bag Home</a></p>
         </footer>
       </main>

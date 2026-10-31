@@ -28,3 +28,27 @@ Only reload if validation succeeds. Test the homepage, `/menu/pakoda`, `/menu/sa
 In Search Console, submit `https://crunchybag.com/sitemap.xml`, then inspect the homepage and representative category/product/city pages. Update the Google Business Profile to explain 24/7 delivery/takeaway separately from 5 AM–11 PM dine-in hours. Both phone numbers, map pin and official social profiles are in `src/data/seo/site.ts`.
 
 See `SEO_IMPLEMENTATION.md` for the full implementation and remaining external checks.
+
+## Ahrefs canonical/sitemap redirect correction
+
+The October 31 crawl found 135 slashless sitemap URLs returning 301 to a trailing-slash URL. Those trailing-slash pages declare the slashless URL as canonical. Keep the existing slashless canonical format and serve its generated HTML directly.
+
+In the active public `location /` block, replace the directory-first `try_files` line with:
+
+```nginx
+try_files $uri/index.html $uri =404;
+```
+
+The order matters: `/menu/pakoda/index.html` must be found before Nginx tests `/menu/pakoda` as a directory. Keep existing API/media/assets/private-route handling and any query-URL fixes. Do not add a second `location /` block. An explicit server-level trailing-slash rewrite or CDN redirect rule must also be removed for public pages if one is configured.
+
+Run `sudo nginx -t` and reload only after it succeeds. Then verify:
+
+```sh
+curl -I https://crunchybag.com/menu/pakoda
+curl -I https://crunchybag.com/delivery/kathmandu
+curl -I https://crunchybag.com/seo-nonexistent-check
+```
+
+The first two must return 200 directly, with no slash redirect; the unknown URL must return 404. If Cloudflare cached a previous redirect or HTML response, purge the affected URLs and check again. No sitemap URL migration is needed.
+
+The Terms and Privacy email addresses now use Cloudflare's `email_off` markup and real `mailto:` links. Build and deploy the updated HTML, clear cached Terms/Privacy pages if needed, then rerun the crawl. The `/cdn-cgi/l/email-protection` path should no longer be linked by these pages; do not redirect that Cloudflare-managed endpoint to the homepage.
