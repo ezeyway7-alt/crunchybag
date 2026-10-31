@@ -1,3 +1,4 @@
+import { AddMemberForm } from "./AddMemberForm";
 import { CustomerAccountPanel } from "./CustomerAccountPanel";
 import React,{useEffect,useState} from 'react';
 import {useApp} from '../../context/AppContext';
@@ -6,18 +7,19 @@ import {useOutletEvents} from '../../lib/useOutletEvents';
 import {Input} from '../common/Input';
 import {Button} from '../common/Button';
 
-const channelName:Record<string,string>={WEBSITE:'Web',TABLE_QR:'Table QR',KIOSK:'Kiosk',POS:'POS'};
+const channelName:Record<string,string>={MEMBER:'Member',WEBSITE:'Web',TABLE_QR:'Table QR',KIOSK:'Kiosk',POS:'POS'};
 const date=(value:string)=>value?new Date(value).toLocaleString('en-GB',{timeZone:'Asia/Kathmandu',dateStyle:'medium',timeStyle:'short'}):'-';
 export const AdminAudienceTab:React.FC<{mode:'analytics'|'customers'}>=({mode})=>{
   const {currentOutlet}=useApp();const outlet=String(currentOutlet?.id||'');
   const [days,setDays]=useState('30'),[search,setSearch]=useState(''),[query,setQuery]=useState(''),[page,setPage]=useState(1),[revision,setRevision]=useState(0);
+  const [adding,setAdding]=useState(false);
   const [selected,setSelected]=useState<{outlet:string,id:number}|null>(null);
   const [state,setState]=useState<{scope:string,data:any,error:string}>({scope:'',data:null,error:''});
   const scope=`${mode}:${outlet}:${days}:${query}:${page}`;
   const valid=/^\d+$/.test(outlet);
   const live=useOutletEvents(outlet,valid,()=>setRevision(n=>n+1),undefined,'analytics');
   useEffect(()=>{const timer=setTimeout(()=>{setQuery(search);setPage(1);},300);return()=>clearTimeout(timer);},[search]);
-  useEffect(()=>{setPage(1);},[outlet,mode]);
+  useEffect(()=>{setPage(1);setAdding(false);},[outlet,mode]);
   useEffect(()=>{
     if(!valid)return;let active=true;const abort=new AbortController();
     const path=mode==='analytics'?`analytics/?outlet_id=${outlet}&days=${days}`:`directory/?outlet_id=${outlet}&page=${page}&search=${encodeURIComponent(query)}`;
@@ -28,8 +30,9 @@ export const AdminAudienceTab:React.FC<{mode:'analytics'|'customers'}>=({mode})=
   if(mode==='customers' && selected?.outlet===outlet) return <CustomerAccountPanel key={`${outlet}:${selected.id}`} outlet={outlet} contactId={selected.id} revision={revision} onBack={()=>setSelected(null)} onChanged={()=>setRevision(n=>n+1)}/>;
   return <section className="space-y-4" aria-label={mode==='analytics'?'Website Analytics':'Customers'}>
     <header className="flex flex-wrap justify-between items-center gap-3"><div><h1 className="text-lg font-bold">{mode==='analytics'?'Website Analytics':'Customers'}</h1><p className="text-xs text-zinc-500 mt-1">{currentOutlet?.name} - {live?'Connected':'Connecting'}</p></div>
-      {mode==='analytics'?<select aria-label="Traffic period" value={days} onChange={e=>setDays(e.target.value)} className="bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>:<Input aria-label="Search customers" placeholder="Search name, mobile or email" value={search} onChange={e=>setSearch(e.target.value)} className="text-xs w-full sm:w-72"/>}
+      {mode==='analytics'?<select aria-label="Traffic period" value={days} onChange={e=>setDays(e.target.value)} className="bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs"><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option></select>:<div className="flex flex-wrap items-center gap-2">{data?.can_add_member&&<Button size="sm" onClick={()=>setAdding(value=>!value)} disabled={adding}>+ Add member</Button>}<Input aria-label="Search customers" placeholder="Search name, mobile or email" value={search} onChange={e=>setSearch(e.target.value)} className="text-xs w-full sm:w-72"/></div>}
     </header>
+    {adding&&mode==='customers'&&valid&&<AddMemberForm key={outlet} outlet={outlet} canDiscount={!!data?.can_manage_discount} onCancel={()=>setAdding(false)} onCreated={id=>{setAdding(false);setRevision(n=>n+1);setSelected({outlet,id});}}/>}
     {!valid&&<p className="text-sm text-zinc-400">Select an outlet to view its data.</p>}
     {error&&<div role="alert" className="text-sm text-rose-400">{error}<button onClick={()=>setRevision(n=>n+1)} className="ml-3 underline">Retry</button></div>}
     {valid&&!data&&!error&&<p role="status" className="text-sm text-zinc-500">Loading...</p>}
