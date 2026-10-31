@@ -1,4 +1,3 @@
-import { SEO_SITE } from '../../data/seo/site';
 import {trackEvent} from '../../lib/journeyTracking';
 import { productSEO } from '../../lib/productSEO';
 import { categoryPath, categoryMetadata, FOOD_COLLECTIONS, matchesFoodCollection, LEGACY_FOOD_PATHS } from '../../data/seo/categories';
@@ -391,16 +390,16 @@ export const CustomerPortal: React.FC = () => {
         />
       ) : customerActiveTab === "menu" ? (
         <main id="menu" className="max-w-7xl mx-auto px-4 sm:px-6 pt-0 pb-8 space-y-6">
-          {/* Semantic SEO Primary Headline for Search Engines & Screen Readers */}
-          <header className="pt-5 space-y-2">
-            <h1 className="text-2xl font-bold">{categorySEO?.h1 || (currentRoutePath === '/' ? 'Crunchy Bag — 24/7 Food Delivery in Kathmandu Valley' : 'Crunchy Bag Menu — Imadol, Lalitpur')}</h1>
-            <p className="text-sm text-zinc-400">{categorySEO?.description || 'Order burgers, fried chicken, chicken 65 pakoda, fries and sandwiches. Delivery and takeaway run 24/7 across Kathmandu, Lalitpur and Bhaktapur.'}</p>
-            <p className="text-sm text-amber-300">{SEO_SITE.serviceHours} No minimum order.</p><p className="text-sm text-zinc-400">{SEO_SITE.firstOrderOffer}</p>
-            <nav aria-label="Ordering information" className="flex flex-wrap gap-4 text-sm text-amber-400"><a href="/delivery">Delivery areas</a><a href="/takeaway">Takeaway & pickup</a><a href="/blogs">Food guides</a></nav>
-          </header>
+          {categorySEO && <header className="pt-5 space-y-2">
+            <h1 className="text-2xl font-bold">{categorySEO.h1}</h1>
+            <p className="text-sm text-zinc-400">{categorySEO.description}</p>
+          </header>}
 
           {/* Hero Promotional Banner Slider */}
-          <HeroBannerSlider onSelectCategory={(catId) => setSelectedCategory(catId)} />
+          <div>
+            {!categorySEO && <h1 className="sr-only">Crunchy Bag — Food Menu, Imadol, Lalitpur</h1>}
+            <HeroBannerSlider onSelectCategory={(catId) => setSelectedCategory(catId)} />
+          </div>
 
           {/* Sticky Category Rail & Allergen/Dietary Filters */}
           <div

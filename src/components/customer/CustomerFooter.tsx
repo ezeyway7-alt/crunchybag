@@ -261,6 +261,7 @@ export const CustomerFooter: React.FC = () => {
               <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-xs">
                 Burgers, fried chicken, chicken 65 pakoda, fries and drinks from Dhungesadhu Chowk, Imadol. Delivery and takeaway available 24/7.
               </p>
+              <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-xs">No minimum order. {SEO_SITE.firstOrderOffer}</p>
               <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#60BB46]">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span>eSewa Verified Gateway</span>
