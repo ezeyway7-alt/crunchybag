@@ -12,7 +12,7 @@ npm run lint
 npm run build
 ```
 
-Dependencies have not changed. A standard build fetches the current public menu and emits the complete `dist` tree, including category, product, blog, delivery and takeaway pages. Do not set SEO_CATALOG_FILE in production unless deliberately using a fresh, verified public menu snapshot. Nginx already serves `/opt/crunchybag/dist`; a frontend-only build needs no service restart.
+For the SEO update alone, dependencies have not changed. For the daybook Excel export, also follow the dependency installation instructions below. A standard build fetches the current public menu and emits the complete `dist` tree, including category, product, blog, delivery and takeaway pages. Do not set SEO_CATALOG_FILE in production unless deliberately using a fresh, verified public menu snapshot. Nginx already serves `/opt/crunchybag/dist`; a frontend-only build needs no service restart.
 
 For real 404 responses and legacy-food redirects, review `deploy/nginx-seo.conf` against your active `/etc/nginx/sites-available/crunchybag.com` configuration (confirm the active file path first). It is a server-block fragment, not a complete config. Replace the existing broad SPA `location /` and retain the API, WebSocket, backend-admin, media, static assets and TLS blocks. Do not blindly overwrite the active configuration.
 
@@ -64,4 +64,13 @@ Deploy the matching frontend and Django backend changes together. Daybook and St
 
 Sales reports retain the existing top-item fields and add complete `all_items` lists overall and per channel, used by View all buttons. TV menu pages now show two rows (eight items on wide screens), with compact branding and footer and no festival decorations. Existing menu rotation, order display, and announcements remain available.
 
-No database migration or dependency update is needed for these changes. Restart the Django application through the existing deployment process, and build the frontend with `npm run lint` and `npm run build`. Verify a multi-day ledger balance, an attendance range spanning months, expanded sales lists, and TV display at the actual screen resolution.
+No database migration is needed for these changes. Excel export requires `xlsx`, declared in `package.json` and `package-lock.json`. Deploy both dependency files along with the source, then install dependencies before building:
+
+```sh
+cd /opt/crunchybag
+npm ci --include=dev
+npm run lint
+npm run build
+```
+
+If the build reports that it cannot resolve `xlsx`, verify that both updated dependency files reached the VPS and rerun the install above. Do not externalize `xlsx` in Vite; the browser bundle needs it for Excel export. Restart the Django application through the existing deployment process. Verify a multi-day ledger balance, an attendance range spanning months, expanded sales lists, and TV display at the actual screen resolution.
