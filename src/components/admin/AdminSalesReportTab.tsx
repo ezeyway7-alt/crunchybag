@@ -10,8 +10,8 @@ type Report = {
   summary:Totals & {average_daily_sales:string; average_daily_orders:number};
   timeline:(Totals & {date:string})[];
   tables:(Totals & {table_id:number; table__table_number:string})[];
-  channels:(Totals & {order_source:string; top_items:Item[]})[];
-  top_items:Item[];
+  channels:(Totals & {order_source:string; all_items?:Item[]; top_items:Item[]})[];
+  all_items?:Item[]; top_items:Item[];
   hourly:(Totals & {hour:number; average_orders:number; average_sales:string})[];
 };
 
@@ -238,6 +238,8 @@ function Timeline({rows}:{rows:Report['timeline']}) {
 export function AdminSalesReportTab() {
   const {currentOutlet}=useApp();
   const outlet=String(currentOutlet?.id||'');
+  const [expanded,setExpanded]=useState<Record<string,boolean>>({});
+  const toggle=(key:string)=>setExpanded(old=>({...old,[key]:!old[key]}));
   const [dates,setDates]=useState(()=>({start:shift(today(),-6),end:today()}));
   const [applied,setApplied]=useState(dates);
   const [revision,setRevision]=useState(0);
@@ -477,10 +479,11 @@ export function AdminSalesReportTab() {
             </div>
 
             <div className={panel}>
-              <h2 className="text-sm font-semibold text-zinc-100">Top 7 best-selling items</h2>
+              <h2 className="text-sm font-semibold text-zinc-100">{expanded.items?'All best-selling items':'Top 7 best-selling items'}</h2>
+              {(data.all_items?.length||0)>7&&<button className="text-xs text-amber-400 underline" onClick={()=>toggle('items')}>{expanded.items?'Show top 7':'View all'}</button>}
               <p className="mb-2 text-[11px] text-zinc-500">Ranked by units sold across all channels</p>
               <Bars
-                rows={data.top_items.map(r=>({
+                rows={(expanded.items ? data.all_items || data.top_items : data.top_items).map(r=>({
                   label:r.name,
                   value:r.quantity,
                   detail:`${money(r.item_sales)} item sales`
@@ -497,9 +500,10 @@ export function AdminSalesReportTab() {
               {data.channels.map(c=>(
                 <div key={c.order_source} className={panel}>
                   <h3 className="mb-2 text-xs font-semibold text-amber-400 uppercase tracking-wider">{names[c.order_source] || c.order_source}</h3>
+                  {(c.all_items?.length||0)>5&&<button className="mb-2 text-xs text-amber-400 underline" onClick={()=>toggle(c.order_source)}>{expanded[c.order_source]?'Show top 5':'View all'}</button>}
                   <Bars
                     currency
-                    rows={c.top_items.map(r=>({
+                    rows={(expanded[c.order_source] ? c.all_items || c.top_items : c.top_items).map(r=>({
                       label:r.name,
                       value:Number(r.item_sales),
                       detail:`${r.quantity} units sold`

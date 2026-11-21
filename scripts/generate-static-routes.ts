@@ -1,7 +1,9 @@
+import { productPath } from '../src/lib/productRoutes';
+import { COMBO_GUIDE_HTML, RESERVATION_GUIDE_HTML } from '../src/data/seo/orderingGuides';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { BLOG_ARTICLES, BlogArticle } from '../src/data/blogData';
+import { BLOG_ARTICLES, BlogArticle, getRelatedBlogs } from '../src/data/blogData';
 import { productPages, escapeHtml } from './product-pages';
 import { categoryPages } from './category-pages';
 import { informationPages } from './information-pages';
@@ -38,12 +40,14 @@ const STATIC_ROUTES: RouteSEO[] = [
   },
   {
     path: '/combos',
+    contentHtml: `<main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 text-zinc-300"><h1>Combo meals and family bags</h1>${COMBO_GUIDE_HTML}</main>`,
     title: 'Special Value Combos & Deals | Crunchy Bag Kathmandu',
     h1: 'Best Value Combos, Family Bags & Feast Packages',
     description: 'Compare current chicken combos, duo combos and family bags from Crunchy Bag. View included dishes and prices for 24/7 delivery and takeaway.',
   },
   {
     path: '/reserve',
+    contentHtml: `<main id="app-landing-summary" class="max-w-4xl mx-auto px-4 py-8 space-y-4 text-zinc-300"><h1>Plan a dine-in visit to Crunchy Bag</h1>${RESERVATION_GUIDE_HTML}</main>`,
     title: 'Book a Table Online | Crunchy Bag Restaurant Lalitpur',
     h1: 'Table Reservations & Dine-in Hospitality in Imadol',
     description: 'Plan a dine-in visit to Crunchy Bag at Dhungesadhu Chowk, Imadol, Lalitpur. Dine-in hours are 5 AM to 11 PM daily.',
@@ -260,6 +264,7 @@ function renderBlogDetailHtml(article: BlogArticle): string {
         </section>
 
         ${relatedDishHtml}
+        <nav aria-label="Related food guides"><h2>Related food guides</h2><ul>${getRelatedBlogs(article.slug, 3).map(guide => `<li><a href="/blog/${guide.slug}">${escapeHtml(guide.title)}</a></li>`).join('')}</ul></nav>
         <nav aria-label="Order food from this guide"><a href="${BLOG_MENU_LINKS[article.slug]?.path || '/menu'}">${BLOG_MENU_LINKS[article.slug]?.label || 'Browse the current menu'}</a> · <a href="/takeaway">24/7 takeaway</a> · <a href="/delivery">Delivery information</a></nav>
 
         <div class="pt-4 border-t border-zinc-800">
@@ -367,7 +372,9 @@ async function generateStaticRoutes() {
     if (target) STATIC_ROUTES.push({ ...target, path: alias, canonicalPath });
   }
   STATIC_ROUTES.push(...informationPages(categories.links));
-  const baseHtml = fs.readFileSync(distIndexPath, 'utf-8').replace(/<script id="restaurant-schema" type="application\/ld\+json">[\s\S]*?<\/script>/, `<script id="restaurant-schema" type="application/ld+json">${JSON.stringify(restaurantSchema(catalog.categories)).replace(/</g, '\\u003c')}</script>`);
+  let baseHtml = fs.readFileSync(distIndexPath, 'utf-8').replace(/<script id="restaurant-schema" type="application\/ld\+json">[\s\S]*?<\/script>/, `<script id="restaurant-schema" type="application/ld+json">${JSON.stringify(restaurantSchema(catalog.categories)).replace(/</g, '\\u003c')}</script>`);
+  const helpLinks = `<nav aria-label="Restaurant information" class="max-w-4xl mx-auto px-4 py-6 flex flex-wrap gap-4 text-sm"><a href="/about">About Crunchy Bag</a><a href="/reserve">Plan a dine-in visit</a><a href="/faq">Ordering FAQ</a><a href="/terms">Terms of service</a><a href="/privacy">Privacy policy</a><a href="/blogs">Food guides</a></nav>`;
+  baseHtml = baseHtml.replace('</main>', `${helpLinks}</main>`);
   fs.writeFileSync(distIndexPath, baseHtml);
   fs.writeFileSync(path.join(distDir, '404.html'), `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, follow"><title>Page not found | Crunchy Bag</title></head><body><main><h1>Page not found</h1><p>This page is unavailable. Find your food in the current menu or contact our Imadol restaurant.</p><nav><a href="/">Crunchy Bag</a> · <a href="/menu">Food menu</a> · <a href="/delivery">Delivery information</a> · <a href="/contact">Contact</a></nav></main></body></html>`);
   console.log(`[Static Pre-render] Generating ${STATIC_ROUTES.length} routes...`);
@@ -469,6 +476,8 @@ async function generateStaticRoutes() {
       );
     }
 
+    pageHtml = pageHtml.replace('</main>', `${helpLinks}</main>`);
+    if (route.path === '/combos') pageHtml = pageHtml.replace('</main>', `<h2>Current combo choices</h2><ul>${catalog.categories.flatMap((category: any) => category.products || []).filter((product: any) => product.is_web_visible !== false && product.is_combo_package).map((product: any) => `<li><a href="${productPath(product)}">${escapeHtml(product.name)}</a></li>`).join('')}</ul></main>`);
     if (route.path === '/menu') {
       pageHtml = pageHtml.replace('</main>', `<nav aria-label="Food categories"><ul>${categories.links}</ul></nav><nav aria-label="Dishes"><ul>${catalog.links}</ul></nav></main>`);
     }

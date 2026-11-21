@@ -251,3 +251,39 @@ test('legal-page email links remain direct mailto links with Cloudflare opt-out 
     await expect(page.locator('#app-landing-summary a[href*="email-protection"]')).toHaveCount(0);
   }
 });
+
+
+test('Ahrefs flagged pages have useful content, concise metadata and incoming links', () => {
+  const xml = fs.readFileSync('dist/sitemap.xml', 'utf8');
+  const paths = [...xml.matchAll(/<loc>(.*?)<\/loc>/g)].map(match => new URL(match[1]).pathname);
+  const pages = paths.map(route => ({route, html: fs.readFileSync(path.join('dist', route, 'index.html'), 'utf8')}));
+  for (const target of ['/privacy', '/terms', '/faq', '/about', '/reserve', ...BLOG_ARTICLES.map(article => `/blog/${article.slug}`)]) {
+    const incoming = pages.filter(page => page.route !== target && page.html.includes(`href="${target}"`));
+    expect(incoming.length, target).toBeGreaterThanOrEqual(2);
+  }
+  for (const page of pages.filter(page => page.route.startsWith('/product/') || page.route.startsWith('/blog/'))) {
+    const description = page.html.match(/<meta name="description" content="([^"]*)"/)?.[1]?.replace(/&[^;]+;/g, 'x') || '';
+    expect(description.length, page.route).toBeGreaterThanOrEqual(110);
+    expect(description.length, page.route).toBeLessThanOrEqual(160);
+  }
+  for (const article of BLOG_ARTICLES) expect(article.metaTitle.length, article.slug).toBeLessThanOrEqual(70);
+  for (const route of ['/combos', '/reserve']) {
+    const main = pages.find(page => page.route === route)!.html.match(/<main[\s\S]*?<\/main>/)?.[0] || '';
+    const words = main.replace(/<[^>]+>/g, ' ').trim().split(/\s+/);
+    expect(words.length, route).toBeGreaterThan(200);
+  }
+});
+
+
+test('audit links and reservation guidance remain available after React mounts', async ({page}) => {
+  await mockStore(page);
+  await page.goto('/');
+  const footer = page.getByRole('navigation', {name: 'Footer Legal and Policy Links'});
+  for (const route of ['/privacy', '/terms', '/faq', '/about', '/reserve']) await expect(footer.locator(`a[href="${route}"]`)).toBeVisible();
+  await footer.locator('a[href="/reserve"]').click();
+  await expect(page).toHaveURL(/\/reserve\/?$/);
+  await expect(page.getByRole('heading', {name: 'Ask the restaurant about a table'})).toBeVisible();
+  await expect(page.locator('a[href="tel:+9779761503339"]').first()).toBeVisible();
+  await page.goto('/combos');
+  await expect(page.getByRole('heading', {name: 'Choosing a combo for your order'})).toBeVisible();
+});

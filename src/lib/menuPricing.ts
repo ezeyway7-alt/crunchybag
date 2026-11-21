@@ -29,6 +29,6 @@ export function productMetadata(product: any) {
   const { name, base } = productPriceSummary(product);
   return {
     title: `${name} Price & Options | Crunchy Bag, Imadol`,
-    description: `${name}${base ? ` listed base price ${base}` : ''} at Crunchy Bag, Imadol, Lalitpur. Compare portions and extras. Delivery and takeaway 24/7; final total depends on selections.`,
+    description: `${name}${base ? ` listed base price ${base}` : ''} at Crunchy Bag, Imadol. View options; extras affect the total. Delivery & takeaway 24/7.`,
   };
 }

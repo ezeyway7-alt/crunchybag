@@ -1,3 +1,4 @@
+import { COMBO_GUIDE_HTML } from "../../data/seo/orderingGuides";
 import {trackEvent} from '../../lib/journeyTracking';
 import { productSEO } from '../../lib/productSEO';
 import { productMetadata } from '../../lib/menuPricing';
@@ -633,6 +634,7 @@ export const CustomerPortal: React.FC = () => {
         onOrderSuccess={handleOrderSuccess}
       />
 
+      {currentRoutePath === "/combos" && <div dangerouslySetInnerHTML={{__html: COMBO_GUIDE_HTML}}/>}
       {/* Instant Search Modal */}
       <InstantSearchModal
         isOpen={isSearchModalOpen}

@@ -52,3 +52,16 @@ curl -I https://crunchybag.com/seo-nonexistent-check
 The first two must return 200 directly, with no slash redirect; the unknown URL must return 404. If Cloudflare cached a previous redirect or HTML response, purge the affected URLs and check again. No sitemap URL migration is needed.
 
 The Terms and Privacy email addresses now use Cloudflare's `email_off` markup and real `mailto:` links. Build and deploy the updated HTML, clear cached Terms/Privacy pages if needed, then rerun the crawl. The `/cdn-cgi/l/email-protection` path should no longer be linked by these pages; do not redirect that Cloudflare-managed endpoint to the homepage.
+
+## Follow-up for the 5:50 PM Ahrefs CSV exports
+
+See [AHREFS_FOLLOWUP.md](./AHREFS_FOLLOWUP.md) for the exact local fixes, release commands, optional IndexNow preparation/submission, live HTTP checks and remaining account work. Direct slashless 200 responses and a real unknown-path 404 were confirmed in read-only live checks during this follow-up; no further Nginx change is currently indicated for the sampled routes. The new source changes are not deployed by this task.
+
+
+## Daybook ranges, full sales item lists, and TV menu
+
+Deploy the matching frontend and Django backend changes together. Daybook and Staff Daybook now query inclusive `start_date`/`end_date` ranges with period balances and a View all option. Attendance accepts the same range fields, including ranges across Nepali months; each cell retains its actual Nepali edit date. The recurring Khaja weekly schedule is unchanged. Excel export uses supported API page sizes and Nepal-safe date iteration.
+
+Sales reports retain the existing top-item fields and add complete `all_items` lists overall and per channel, used by View all buttons. TV menu pages now show two rows (eight items on wide screens), with compact branding and footer and no festival decorations. Existing menu rotation, order display, and announcements remain available.
+
+No database migration or dependency update is needed for these changes. Restart the Django application through the existing deployment process, and build the frontend with `npm run lint` and `npm run build`. Verify a multi-day ledger balance, an attendance range spanning months, expanded sales lists, and TV display at the actual screen resolution.

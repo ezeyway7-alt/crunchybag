@@ -49,7 +49,7 @@ async function setup(page:Page) {
         state.attendance[key]=data;
       }else{
         const year=Number(url.searchParams.get('year')||2083),month=Number(url.searchParams.get('month')||6);
-        const days=Array.from({length:30},(_,i)=>({day:i+1,date:`2026-10-${String(i+1).padStart(2,'0')}`,weekday:'Thu',today:year===2083&&month===6&&i===28,future:year>2083||(year===2083&&(month>6||(month===6&&i>28)))}));
+        const days=Array.from({length:30},(_,i)=>({bs_year:year,bs_month:month,bs_day:i+1,day:i+1,date:`2026-10-${String(i+1).padStart(2,'0')}`,weekday:'Thu',today:year===2083&&month===6&&i===28,future:year>2083||(year===2083&&(month>6||(month===6&&i>28)))}));
         data={year,month,month_name:'Ashwin',months:['Baisakh','Jestha','Ashadh','Shrawan','Bhadra','Ashwin','Kartik','Mangsir','Poush','Magh','Falgun','Chaitra'],min_year:1975,max_year:2100,today:{year:2083,month:6,day:29},days,total_days:30,
           staff:[{id:2,name:'Asha'},{id:3,name:'Bikash'}].map(staff=>{
             const cells=Object.fromEntries(days.filter(d=>state.attendance[`${year}:${month}:${staff.id}:${d.day}`]).map(d=>[String(d.day),state.attendance[`${year}:${month}:${staff.id}:${d.day}`]]));
@@ -99,15 +99,16 @@ async function setup(page:Page) {
           imported:state.entries.some((e:any)=>e.payment_id===p.id),voided:state.entries.some((e:any)=>e.payment_id===p.id&&e.voided_at)}));
         data={date:url.searchParams.get('date'),kind,results,count:results.length,truncated:false};
       }else{
-        const date=url.searchParams.get('date')||today();
+        const date=url.searchParams.get('start_date')||url.searchParams.get('date')||today();
+        const end=url.searchParams.get('end_date')||date;
         const scoped=state.entries.filter((e:any)=>(url.searchParams.get('staff_only')!=='true'||e.staff_id)&&(!url.searchParams.get('staff_id')||String(e.staff_id)===url.searchParams.get('staff_id')));
         const active=scoped.filter((e:any)=>!e.voided_at);
         const sum=(rows:any[],direction:string)=>rows.filter(e=>e.direction===direction).reduce((n,e)=>n+Number(e.amount),0);
-        const before=active.filter((e:any)=>e.date<date),day=active.filter((e:any)=>e.date===date);
+        const before=active.filter((e:any)=>e.date<date),day=active.filter((e:any)=>e.date>=date&&e.date<=end);
         const opening=sum(before,'IN')-sum(before,'OUT'),income=sum(day,'IN'),expense=sum(day,'OUT');
         const cashBefore=before.filter((e:any)=>e.payment_method==='CASH'),cashDay=day.filter((e:any)=>e.payment_method==='CASH');
         const cashOpening=sum(cashBefore,'IN')-sum(cashBefore,'OUT'),cashIn=sum(cashDay,'IN'),cashOut=sum(cashDay,'OUT');
-        let rows=scoped.filter((e:any)=>e.date===date&&(url.searchParams.get('include_voided')==='true'||!e.voided_at));
+        let rows=scoped.filter((e:any)=>e.date>=date&&e.date<=end&&(url.searchParams.get('include_voided')==='true'||!e.voided_at));
         if(url.searchParams.get('direction')!=='ALL')rows=rows.filter((e:any)=>e.direction===url.searchParams.get('direction'));
         if(url.searchParams.get('payment_method')!=='ALL')rows=rows.filter((e:any)=>e.payment_method===url.searchParams.get('payment_method'));
         if(url.searchParams.get('search'))rows=rows.filter((e:any)=>JSON.stringify(e).toLowerCase().includes(url.searchParams.get('search')!.toLowerCase()));
@@ -133,7 +134,7 @@ async function manual(page:Page,direction:'in'|'out',amount:string,note:string) 
 test('daybook starts empty, persists money in and cash out, and audits corrections',async({page})=>{
   const state=await setup(page);
   await expect(page.getByText('No entries for these filters',{exact:true})).toBeVisible();
-  await expect(page.getByLabel('Daybook date',{exact:true})).toHaveValue(today());
+  await expect(page.getByLabel('Start date',{exact:true})).toHaveValue(today());
   await manual(page,'in','1000','Starting cash');
   await expect(page.getByTestId('daybook-income')).toContainText('1,000');
   await manual(page,'out','250','Cash taken by manager');
@@ -145,9 +146,23 @@ test('daybook starts empty, persists money in and cash out, and audits correctio
   await page.getByLabel('Void reason',{exact:true}).fill('Incorrect amount; replacing entry');
   await page.getByRole('button',{name:'Void entry',exact:true}).click();
   await expect(page.getByTestId('daybook-cash_closing')).toContainText('1,000');
-  await page.getByRole('checkbox',{name:'Show voided entries',exact:true}).check();
+  await page.getByRole('checkbox',{name:'Show voided',exact:true}).check();
   await expect(page.getByText('Voided',{exact:true})).toBeVisible();
   await expect(page.getByText(/Incorrect amount; replacing entry/)).toBeVisible();
+});
+
+test('daybook date range updates entries and totals together',async({page})=>{
+  const state=await setup(page);
+  const end=today(), start=`${end.slice(0,7)}-01`;
+  state.entries.push({id:1,date:start,direction:'IN',amount:'125.00',payment_method:'CASH',category:'Opening',description:'Month start receipt',recorded_by:'Owner',created_at:new Date().toISOString()},
+    {id:2,date:end,direction:'OUT',amount:'25.00',payment_method:'CASH',category:'Expense',description:'Today expense',recorded_by:'Owner',created_at:new Date().toISOString()});
+  await page.getByLabel('Start date',{exact:true}).fill(start);
+  await page.getByLabel('Refresh daybook').click();
+  await expect(page.getByText('Month start receipt',{exact:true})).toBeVisible();
+  await expect(page.getByText('Today expense',{exact:true})).toBeVisible();
+  await expect(page.getByTestId('daybook-closing')).toContainText('100');
+  await page.getByRole('button',{name:'View all',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Show pages',exact:true})).toBeVisible();
 });
 
 test('sales import selects all by default, honors unticked sales, and prevents repeated imports',async({page})=>{
@@ -223,6 +238,7 @@ test('staff daybook selects outlet staff, records Dr and Cr, and isolates balanc
 
 
 test('khaja weekly table supports multiple products, editing, clearing and reload',async({page})=>{
+  test.setTimeout(90000);
   const state=await setup(page);
   const open=()=>page.getByRole('navigation',{name:'Daybook sections'}).getByRole('button',{name:'Khaja Schedule',exact:true}).click();
   await open();

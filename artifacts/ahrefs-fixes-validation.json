@@ -1,0 +1,469 @@
+{
+  "validation": "TypeScript, live-catalog production build and 17 SEO tests passed. Local fixes only; production deployment pending.",
+  "live_checks": {
+    "/menu/pakoda": 200,
+    "/delivery/kathmandu": 200,
+    "/privacy": 200,
+    "/seo-nonexistent-check": 404,
+    "/indexnow-key.txt": 404
+  },
+  "affected_pages": [
+    {
+      "url": "https://crunchybag.com/combos",
+      "issue": "low-word-count",
+      "description_length": 140,
+      "title_length": 52,
+      "incoming_link_pages": 2,
+      "main_word_count": 270
+    },
+    {
+      "url": "https://crunchybag.com/reserve",
+      "issue": "low-word-count",
+      "description_length": 114,
+      "title_length": 53,
+      "incoming_link_pages": 135,
+      "main_word_count": 251
+    },
+    {
+      "url": "https://crunchybag.com/product/chicken-65-pakoda-520d8e87ad56",
+      "issue": "meta-description-too-l",
+      "description_length": 132,
+      "title_length": 55,
+      "incoming_link_pages": 11
+    },
+    {
+      "url": "https://crunchybag.com/product/chocolates-lassi-7c42ba780d8a",
+      "issue": "meta-description-too-l",
+      "description_length": 131,
+      "title_length": 54,
+      "incoming_link_pages": 15
+    },
+    {
+      "url": "https://crunchybag.com/product/banana-lassi-b96882709e23",
+      "issue": "meta-description-too-l",
+      "description_length": 127,
+      "title_length": 50,
+      "incoming_link_pages": 15
+    },
+    {
+      "url": "https://crunchybag.com/product/classic-chicken-pakoda-ec85493d7b6a",
+      "issue": "meta-description-too-l",
+      "description_length": 137,
+      "title_length": 60,
+      "incoming_link_pages": 11
+    },
+    {
+      "url": "https://crunchybag.com/product/black-cold-coffee-f742f8896b3d",
+      "issue": "meta-description-too-l",
+      "description_length": 131,
+      "title_length": 55,
+      "incoming_link_pages": 15
+    },
+    {
+      "url": "https://crunchybag.com/product/chocolates-milkshake-9f23d39dc91c",
+      "issue": "meta-description-too-l",
+      "description_length": 135,
+      "title_length": 58,
+      "incoming_link_pages": 15
+    },
+    {
+      "url": "https://crunchybag.com/product/crunchy-duo-combo-49a6969348ad",
+      "issue": "meta-description-too-l",
+      "description_length": 135,
+      "title_length": 55,
+      "incoming_link_pages": 8
+    },
+    {
+      "url": "https://crunchybag.com/product/new-item-e3e0dadb97b5",
+      "issue": "meta-description-too-l",
+      "description_length": 129,
+      "title_length": 52,
+      "incoming_link_pages": 9
+    },
+    {
+      "url": "https://crunchybag.com/product/crunchy-chicken-f491544bf086",
+      "issue": "meta-description-too-l",
+      "description_length": 136,
+      "title_length": 59,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/product/chicken-cheese-burger-60a1cf465291",
+      "issue": "meta-description-too-l",
+      "description_length": 136,
+      "title_length": 59,
+      "incoming_link_pages": 9
+    },
+    {
+      "url": "https://crunchybag.com/product/chicken-grilled-sandwich-1adee98feada",
+      "issue": "meta-description-too-l",
+      "description_length": 139,
+      "title_length": 62,
+      "incoming_link_pages": 7
+    },
+    {
+      "url": "https://crunchybag.com/product/chicken-nuggets-70784a4b21e0",
+      "issue": "meta-description-too-l",
+      "description_length": 130,
+      "title_length": 53,
+      "incoming_link_pages": 10
+    },
+    {
+      "url": "https://crunchybag.com/product/green-sauce-a1543aa62586",
+      "issue": "meta-description-too-l",
+      "description_length": 125,
+      "title_length": 49,
+      "incoming_link_pages": 7
+    },
+    {
+      "url": "https://crunchybag.com/product/crunchy-loaded-combo-228c7d8f1f37",
+      "issue": "meta-description-too-l",
+      "description_length": 137,
+      "title_length": 58,
+      "incoming_link_pages": 7
+    },
+    {
+      "url": "https://crunchybag.com/product/mayonnaise-4c73818c1f15",
+      "issue": "meta-description-too-l",
+      "description_length": 124,
+      "title_length": 48,
+      "incoming_link_pages": 6
+    },
+    {
+      "url": "https://crunchybag.com/product/cocktail-sauce-831c6b40e4fe",
+      "issue": "meta-description-too-l",
+      "description_length": 128,
+      "title_length": 52,
+      "incoming_link_pages": 7
+    },
+    {
+      "url": "https://crunchybag.com/product/chicken-lover-combo-a0ca41c51584",
+      "issue": "meta-description-too-l",
+      "description_length": 137,
+      "title_length": 57,
+      "incoming_link_pages": 8
+    },
+    {
+      "url": "https://crunchybag.com/product/crunchy-chicken-combo-bdb9434dbe9c",
+      "issue": "meta-description-too-l",
+      "description_length": 139,
+      "title_length": 59,
+      "incoming_link_pages": 8
+    },
+    {
+      "url": "https://crunchybag.com/product/cheese-sauce-787f318cff69",
+      "issue": "meta-description-too-l",
+      "description_length": 126,
+      "title_length": 50,
+      "incoming_link_pages": 7
+    },
+    {
+      "url": "https://crunchybag.com/product/aloo-tikki-burger-f1168a550eab",
+      "issue": "meta-description-too-l",
+      "description_length": 131,
+      "title_length": 55,
+      "incoming_link_pages": 9
+    },
+    {
+      "url": "https://crunchybag.com/product/crunchy-family-bag-f182f11d777e",
+      "issue": "meta-description-too-l",
+      "description_length": 137,
+      "title_length": 56,
+      "incoming_link_pages": 8
+    },
+    {
+      "url": "https://crunchybag.com/product/chicken-sausages-ac11c6da19b6",
+      "issue": "meta-description-too-l",
+      "description_length": 131,
+      "title_length": 54,
+      "incoming_link_pages": 5
+    },
+    {
+      "url": "https://crunchybag.com/product/chicken-momo-0cbd9a128523",
+      "issue": "meta-description-too-l",
+      "description_length": 127,
+      "title_length": 50,
+      "incoming_link_pages": 5
+    },
+    {
+      "url": "https://crunchybag.com/product/classic-pakoda-087973d01a13",
+      "issue": "meta-description-too-l",
+      "description_length": 132,
+      "title_length": 56,
+      "incoming_link_pages": 7
+    },
+    {
+      "url": "https://crunchybag.com/product/aloo-tikki-cheese-burger-41d20abbe3b9",
+      "issue": "meta-description-too-l",
+      "description_length": 139,
+      "title_length": 62,
+      "incoming_link_pages": 9
+    },
+    {
+      "url": "https://crunchybag.com/product/crunchy-fried-chicken-4pcs-135e4b6b87a1",
+      "issue": "meta-description-too-l",
+      "description_length": 141,
+      "title_length": 64,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/product/crunchy-fried-chicken-0a5da9922717",
+      "issue": "meta-description-too-l",
+      "description_length": 141,
+      "title_length": 64,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/product/chicken-meatballs-c78e48cb7e0b",
+      "issue": "meta-description-too-l",
+      "description_length": 132,
+      "title_length": 55,
+      "incoming_link_pages": 10
+    },
+    {
+      "url": "https://crunchybag.com/product/onion-pakoda-cca533c5d602",
+      "issue": "meta-description-too-l",
+      "description_length": 127,
+      "title_length": 50,
+      "incoming_link_pages": 3
+    },
+    {
+      "url": "https://crunchybag.com/product/plain-sandwich-6d0889e4b609",
+      "issue": "meta-description-too-l",
+      "description_length": 131,
+      "title_length": 52,
+      "incoming_link_pages": 3
+    },
+    {
+      "url": "https://crunchybag.com/product/mix-lassi-8f8be215f3a5",
+      "issue": "meta-description-too-l",
+      "description_length": 124,
+      "title_length": 47,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/milk-shake-63d7db029b2a",
+      "issue": "meta-description-too-l",
+      "description_length": 125,
+      "title_length": 48,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/french-friess-5f06b09954d9",
+      "issue": "meta-description-too-l",
+      "description_length": 128,
+      "title_length": 51,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/lassi-1eaa30d4ec44",
+      "issue": "meta-description-too-l",
+      "description_length": 126,
+      "title_length": 49,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/tandoori-mayonnaise-37fb4562e3c1",
+      "issue": "meta-description-too-l",
+      "description_length": 133,
+      "title_length": 57,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/mix-milkshake-435bd56cacf1",
+      "issue": "meta-description-too-l",
+      "description_length": 128,
+      "title_length": 51,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/crispy-potatoes-6e8f133152fa",
+      "issue": "meta-description-too-l",
+      "description_length": 130,
+      "title_length": 53,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/cold-coffee-469955c644d4",
+      "issue": "meta-description-too-l",
+      "description_length": 126,
+      "title_length": 49,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/veg-grilled-sandwich-619d917e99a0",
+      "issue": "meta-description-too-l",
+      "description_length": 135,
+      "title_length": 58,
+      "incoming_link_pages": 3
+    },
+    {
+      "url": "https://crunchybag.com/product/dry-fruits-lassi-8ef7fa6334f6",
+      "issue": "meta-description-too-l",
+      "description_length": 131,
+      "title_length": 54,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/veg-cheese-grilled-sandwich-e9e2378c460d",
+      "issue": "meta-description-too-l",
+      "description_length": 142,
+      "title_length": 65,
+      "incoming_link_pages": 3
+    },
+    {
+      "url": "https://crunchybag.com/product/fresh-fruit-juice-b9c810c592c2",
+      "issue": "meta-description-too-l",
+      "description_length": 132,
+      "title_length": 55,
+      "incoming_link_pages": 2
+    },
+    {
+      "url": "https://crunchybag.com/product/crunchy-starter-combo-b641d8d27fe4",
+      "issue": "meta-description-too-l",
+      "description_length": 139,
+      "title_length": 59,
+      "incoming_link_pages": 3
+    },
+    {
+      "url": "https://crunchybag.com/product/paneer-pakoda-2e4d08e69b67",
+      "issue": "meta-description-too-l",
+      "description_length": 131,
+      "title_length": 51,
+      "incoming_link_pages": 3
+    },
+    {
+      "url": "https://crunchybag.com/blog/ultimate-nepali-spiced-pakoda-guide",
+      "issue": "meta-description-too-s",
+      "description_length": 141,
+      "title_length": 51,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/blog/guide-to-ordering-with-esewa",
+      "issue": "meta-description-too-s",
+      "description_length": 143,
+      "title_length": 55,
+      "incoming_link_pages": 5
+    },
+    {
+      "url": "https://crunchybag.com/blog/secret-to-kathmandus-crispiest-chicken",
+      "issue": "meta-description-too-s",
+      "description_length": 142,
+      "title_length": 70,
+      "incoming_link_pages": 5
+    },
+    {
+      "url": "https://crunchybag.com/blog/himalayan-timur-spices-sourcing",
+      "issue": "meta-description-too-s",
+      "description_length": 152,
+      "title_length": 50,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/blog/perfect-burger-anatomy-kathmandu",
+      "issue": "meta-description-too-s",
+      "description_length": 142,
+      "title_length": 69,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/privacy",
+      "issue": "orphan-page-(has-no-in",
+      "description_length": 131,
+      "title_length": 47,
+      "incoming_link_pages": 135
+    },
+    {
+      "url": "https://crunchybag.com/faq",
+      "issue": "orphan-page-(has-no-in",
+      "description_length": 131,
+      "title_length": 57,
+      "incoming_link_pages": 135
+    },
+    {
+      "url": "https://crunchybag.com/terms",
+      "issue": "orphan-page-(has-no-in",
+      "description_length": 131,
+      "title_length": 43,
+      "incoming_link_pages": 135
+    },
+    {
+      "url": "https://crunchybag.com/blog/ultimate-nepali-spiced-pakoda-guide",
+      "issue": "page-has-only-one-dofo",
+      "description_length": 141,
+      "title_length": 51,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/blog/guide-to-ordering-with-esewa",
+      "issue": "page-has-only-one-dofo",
+      "description_length": 143,
+      "title_length": 55,
+      "incoming_link_pages": 5
+    },
+    {
+      "url": "https://crunchybag.com/blog/inside-imadol-kitchen-thermal-delivery",
+      "issue": "page-has-only-one-dofo",
+      "description_length": 151,
+      "title_length": 55,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/blog/secret-to-kathmandus-crispiest-chicken",
+      "issue": "page-has-only-one-dofo",
+      "description_length": 142,
+      "title_length": 70,
+      "incoming_link_pages": 5
+    },
+    {
+      "url": "https://crunchybag.com/blog/himalayan-timur-spices-sourcing",
+      "issue": "page-has-only-one-dofo",
+      "description_length": 152,
+      "title_length": 50,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/blog/perfect-burger-anatomy-kathmandu",
+      "issue": "page-has-only-one-dofo",
+      "description_length": 142,
+      "title_length": 69,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/about",
+      "issue": "page-has-only-one-dofo",
+      "description_length": 129,
+      "title_length": 53,
+      "incoming_link_pages": 135
+    },
+    {
+      "url": "https://crunchybag.com/reserve",
+      "issue": "page-has-only-one-dofo",
+      "description_length": 114,
+      "title_length": 53,
+      "incoming_link_pages": 135
+    },
+    {
+      "url": "https://crunchybag.com/blog/ultimate-nepali-spiced-pakoda-guide",
+      "issue": "title-too-long",
+      "description_length": 141,
+      "title_length": 51,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/blog/inside-imadol-kitchen-thermal-delivery",
+      "issue": "title-too-long",
+      "description_length": 151,
+      "title_length": 55,
+      "incoming_link_pages": 4
+    },
+    {
+      "url": "https://crunchybag.com/blog/himalayan-timur-spices-sourcing",
+      "issue": "title-too-long",
+      "description_length": 152,
+      "title_length": 50,
+      "incoming_link_pages": 4
+    }
+  ]
+}

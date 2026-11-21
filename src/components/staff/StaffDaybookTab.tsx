@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {BookOpen, Plus, Minus, Download, RefreshCw, ChevronLeft, ChevronRight, Ban} from 'lucide-react';
+import {BookOpen, Plus, Minus, Download, RefreshCw, ChevronLeft, ChevronRight, Ban, FileSpreadsheet} from 'lucide-react';
 import {useApp} from '../../context/AppContext';
 import {StaffAttendanceTab} from './StaffAttendanceTab';
 import {KhajaScheduleTab} from './KhajaScheduleTab';
@@ -18,6 +18,142 @@ const categories={IN:['Sales received','Customer payment','Capital deposit','Ope
 type Form={date:string;direction:'IN'|'OUT';amount:string;payment_method:string;category:string;party:string;description:string;reference:string};
 const blank=(date:string,direction:'IN'|'OUT'):Form=>({date,direction,amount:'',payment_method:'CASH',category:direction==='IN'?'Other income':'Cash withdrawal',party:'',description:'',reference:''});
 
+// ─── Excel export helper ──────────────────────────────────────────────────────
+async function exportDaybookExcel(opts:{
+  outlet:string;
+  startDate:string;
+  endDate:string;
+  direction:string;
+  method:string;
+  query:string;
+  showVoided:boolean;
+  staffMode:boolean;
+  staffId:string;
+  outletName:string;
+}) {
+  // Dynamically import xlsx so it doesn't bloat the initial bundle
+  const XLSX = await import('xlsx');
+
+  // Build list of dates between startDate and endDate inclusive
+  const dateList: string[] = [];
+  const cur = new Date(opts.startDate + 'T00:00:00Z');
+  const end = new Date(opts.endDate + 'T00:00:00Z');
+  while (cur <= end) {
+    dateList.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+
+  // Fetch ALL pages for every date in the range
+  const allEntries: DaybookEntry[] = [];
+  for (const d of dateList) {
+    let page = 1;
+    while (true) {
+      const params = new URLSearchParams({
+        date: d,
+        direction: opts.direction,
+        payment_method: opts.method,
+        search: opts.query,
+        include_voided: String(opts.showVoided),
+        page: String(page),
+        page_size: '100',
+      });
+      if (opts.staffMode) {
+        params.set('staff_only', 'true');
+        if (opts.staffId) params.set('staff_id', opts.staffId);
+      }
+      const data = await apiClient.get<DaybookLedger>(`${daybookPath(opts.outlet)}&${params}`);
+      allEntries.push(...data.results);
+      if (page * data.page_size >= data.count) break;
+      page++;
+    }
+  }
+
+  // ── Sheet 1: Raw Entries ──────────────────────────────────────────────────
+  const entriesData = allEntries.map(e => ({
+    'Entry ID': `DB-${e.id}`,
+    'Date': e.date,
+    'Time (Nepal)': localTime(e.created_at),
+    'Direction': e.direction,
+    'Category': e.category,
+    'Party': e.party || '',
+    'Description': e.description,
+    'Reference': e.reference || '',
+    'Payment Method': e.payment_method.replace(/_/g, ' '),
+    'Money In / Dr (NPR)': e.direction === 'IN' && !e.voided_at ? Number(e.amount) : '',
+    'Money Out / Cr (NPR)': e.direction === 'OUT' && !e.voided_at ? Number(e.amount) : '',
+    'Recorded By': e.recorded_by,
+    'Source': e.source,
+    'Voided': e.voided_at ? 'Yes' : 'No',
+    'Void Reason': e.void_reason || '',
+    'Voided By': e.voided_by || '',
+  }));
+
+  const ws1 = XLSX.utils.json_to_sheet(
+    entriesData.length
+      ? entriesData
+      : [{'Entry ID': 'No entries found for this date range.', 'Date':'','Time (Nepal)':'','Direction':'','Category':'','Party':'','Description':'','Reference':'','Payment Method':'','Money In / Dr (NPR)':'','Money Out / Cr (NPR)':'','Recorded By':'','Source':'','Voided':'','Void Reason':'','Voided By':''}]
+  );
+  ws1['!cols'] = [
+    {wch:10},{wch:12},{wch:10},{wch:10},{wch:22},{wch:20},{wch:30},
+    {wch:18},{wch:16},{wch:20},{wch:20},{wch:16},{wch:14},{wch:8},{wch:20},{wch:14},
+  ];
+
+  // ── Sheet 2: Daily Summary ────────────────────────────────────────────────
+  // Group active (non-voided) entries by date
+  const dayMap = new Map<string, {totalIn:number;totalOut:number}>();
+  for (const e of allEntries) {
+    if (e.voided_at) continue;
+    if (!dayMap.has(e.date)) dayMap.set(e.date, {totalIn:0,totalOut:0});
+    const day = dayMap.get(e.date)!;
+    if (e.direction === 'IN') day.totalIn += Number(e.amount);
+    else day.totalOut += Number(e.amount);
+  }
+
+  // Sort ascending, compute running balance
+  const sortedDates = [...dayMap.keys()].sort();
+  let running = 0;
+  const summaryRows = sortedDates.map(date => {
+    const {totalIn, totalOut} = dayMap.get(date)!;
+    const net = totalIn - totalOut;
+    running += net;
+    return {
+      'Date': date,
+      'Total Money In / Dr (NPR)': totalIn,
+      'Total Money Out / Cr (NPR)': totalOut,
+      'Net for Day (NPR)': net,
+      'Running Closing Balance (NPR)': running,
+    };
+  });
+
+  // Grand totals row
+  const grandIn  = summaryRows.reduce((s,r)=>s+r['Total Money In / Dr (NPR)'],0);
+  const grandOut = summaryRows.reduce((s,r)=>s+r['Total Money Out / Cr (NPR)'],0);
+  summaryRows.push({
+    'Date': 'GRAND TOTAL',
+    'Total Money In / Dr (NPR)': grandIn,
+    'Total Money Out / Cr (NPR)': grandOut,
+    'Net for Day (NPR)': grandIn - grandOut,
+    'Running Closing Balance (NPR)': running,
+  });
+
+  const ws2 = XLSX.utils.json_to_sheet(
+    summaryRows.length > 1
+      ? summaryRows
+      : [{'Date':'No data for selected range.','Total Money In / Dr (NPR)':'','Total Money Out / Cr (NPR)':'','Net for Day (NPR)':'','Running Closing Balance (NPR)':''}]
+  );
+  ws2['!cols'] = [{wch:16},{wch:26},{wch:26},{wch:20},{wch:30}];
+
+  // ── Workbook ──────────────────────────────────────────────────────────────
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws1, 'Entries');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Daily Summary');
+
+  const safe = (s:string)=>s.replace(/[/\\?%*:|"<>]/g,'_');
+  const filename = `Daybook_${safe(opts.outletName)}_${opts.startDate}_to_${opts.endDate}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+// ─── Top-level tab wrapper ────────────────────────────────────────────────────
 export const StaffDaybookTab:React.FC=()=>{
   const {currentOutlet}=useApp();
   const [section,setSection]=useState<'daybook'|'staff'|'khaja'|'attendance'>('daybook');
@@ -29,6 +165,7 @@ export const StaffDaybookTab:React.FC=()=>{
   </div>;
 };
 
+// ─── Main daybook content ─────────────────────────────────────────────────────
 const DaybookContent:React.FC<{staffMode:boolean}>=({staffMode})=>{
   const {currentOutlet}=useApp();
   const outlet=String(currentOutlet?.id||'');
@@ -38,7 +175,14 @@ const DaybookContent:React.FC<{staffMode:boolean}>=({staffMode})=>{
   const [staffLoading,setStaffLoading]=useState(staffMode);
   useEffect(()=>{if(!staffMode)return;let cancelled=false;apiClient.get<typeof staff>(daybookPath(outlet,'staff/')).then(rows=>{if(!cancelled){setStaff(rows);setStaffError('');setStaffLoading(false);}}).catch(e=>{if(!cancelled){setStaffError(extractErrorMessage(e));setStaffLoading(false);}});return()=>{cancelled=true;};},[outlet,staffMode]);
   const selectedStaff=staff.find(person=>String(person.id)===staffId);
-  const [date,setDate]=useState(todayNepal),[direction,setDirection]=useState('ALL'),[method,setMethod]=useState('ALL');
+
+  // ── Date range (default: today → today) ───────────────────────────────────
+  const [startDate,setStartDate]=useState(todayNepal);
+  const [endDate,setEndDate]=useState(todayNepal);
+  const isRange=startDate!==endDate;
+
+  const [showAll,setShowAll]=useState(false);
+  const [direction,setDirection]=useState('ALL'),[method,setMethod]=useState('ALL');
   const [search,setSearch]=useState(''),[query,setQuery]=useState(''),[showVoided,setShowVoided]=useState(false),[page,setPage]=useState(1);
   const [data,setData]=useState<{scope:string;value:DaybookLedger}|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false),[notice,setNotice]=useState('');
   const [modal,setModal]=useState<'entry'|'import'|'void'|null>(null),[form,setForm]=useState<Form>(()=>blank(todayNepal(),'IN'));
@@ -46,18 +190,33 @@ const DaybookContent:React.FC<{staffMode:boolean}>=({staffMode})=>{
   const [preview,setPreview]=useState<DaybookPreview|null>(null),[importLoading,setImportLoading]=useState(false),[importError,setImportError]=useState('');
   const [selected,setSelected]=useState<Set<number>>(new Set());
   const [voidEntry,setVoidEntry]=useState<DaybookEntry|null>(null),[voidReason,setVoidReason]=useState('');
+  const [exporting,setExporting]=useState(false),[exportError,setExportError]=useState('');
   const sequence=useRef(0),importSequence=useRef(0),importInitialized=useRef(false);
-  const scope=`${outlet}:${staffId}:${date}:${direction}:${method}:${query}:${showVoided}:${page}`;
+
+  const viewDate=startDate;
+  const scope=`${outlet}:${staffId}:${viewDate}:${endDate}:${direction}:${method}:${query}:${showVoided}:${page}:${showAll}`;
   const ledger=data?.scope===scope?data.value:null;
   const command=useDaybookCommand(outlet);
   const blocked=command.busy||!!command.pending;
+
   const refresh=async()=>{
-    if(!/^\d+$/.test(outlet)||!date)return;
+    if(!/^\d+$/.test(outlet)||!viewDate)return;
     const seq=++sequence.current;setLoading(true);
     try {
-      const params=new URLSearchParams({date,direction,payment_method:method,search:query,include_voided:String(showVoided),page:String(page)});
+      const params=new URLSearchParams({start_date:startDate,end_date:endDate,direction,payment_method:method,search:query,include_voided:String(showVoided),page:String(showAll?1:page),page_size:showAll?'100':'25'});
       if(staffMode){params.set('staff_only','true');if(staffId)params.set('staff_id',staffId);}
-      const value=await apiClient.get<DaybookLedger>(`${daybookPath(outlet)}&${params}`);
+      let value=await apiClient.get<DaybookLedger>(`${daybookPath(outlet)}&${params}`);
+      if(showAll){
+        const results=[...value.results];
+        const size=value.page_size;
+        for(let next=2;(next-1)*size<value.count;next++){
+          if(seq!==sequence.current)return;
+          params.set('page',String(next));
+          const batch=await apiClient.get<DaybookLedger>(`${daybookPath(outlet)}&${params}`);
+          results.push(...batch.results);
+        }
+        value={...value,results,page:1,page_size:Math.max(1,value.count)};
+      }
       if(seq!==sequence.current)return;
       const last=Math.max(1,Math.ceil(value.count/value.page_size));
       if(page>last){setPage(last);return;}
@@ -65,6 +224,7 @@ const DaybookContent:React.FC<{staffMode:boolean}>=({staffMode})=>{
     }catch(e){if(seq===sequence.current)setError(extractErrorMessage(e));}
     finally{if(seq===sequence.current)setLoading(false);}
   };
+
   const loadPreview=async(reset=true)=>{
     if(!importDate)return;
     const seq=++importSequence.current;setImportLoading(true);setImportError('');
@@ -79,12 +239,14 @@ const DaybookContent:React.FC<{staffMode:boolean}>=({staffMode})=>{
     }catch(e){if(seq===importSequence.current)setImportError(extractErrorMessage(e));}
     finally{if(seq===importSequence.current)setImportLoading(false);}
   };
+
   useEffect(()=>{const timer=setTimeout(()=>{setQuery(search);setPage(1);},250);return()=>clearTimeout(timer);},[search]);
   useEffect(()=>{void refresh();return()=>{sequence.current++;};},[scope]);
   useEffect(()=>{setModal(null);setPreview(null);setNotice('');setPage(1);importSequence.current++;},[outlet]);
   useEffect(()=>{if(modal==='import'){importInitialized.current=false;setPreview(null);setSelected(new Set());void loadPreview();}return()=>{importSequence.current++;};},[modal,importDate,kind,outlet]);
   const live=useDaybookLive(outlet,()=>{void refresh();if(modal==='import')void loadPreview(false);});
-  const openEntry=(value:'IN'|'OUT')=>{setForm({...blank(date,value),...(staffMode?{category:value==='OUT'?'Staff wage / advance':'Staff return'}:{})});setNotice('');setModal('entry');};
+
+  const openEntry=(value:'IN'|'OUT')=>{setForm({...blank(viewDate,value),...(staffMode?{category:value==='OUT'?'Staff wage / advance':'Staff return'}:{})});setNotice('');setModal('entry');};
   const openImport=(value:'SALE'|'REFUND')=>{setKind(value);setImportDate(todayNepal());setNotice('');setModal('import');};
   const finish=(result:any)=>{if(!result)return;setModal(null);setNotice(result.created!==undefined?`${result.created} payment entries imported; ${result.skipped} already recorded. Date: ${result.date}.`:`Entry saved for ${result.date}.`);void refresh();};
   const submit=async(e:React.FormEvent)=>{e.preventDefault();finish(await command.run('',{...form,...(staffMode?{staff_id:Number(staffId)}:{})}));};
@@ -96,114 +258,209 @@ const DaybookContent:React.FC<{staffMode:boolean}>=({staffMode})=>{
   const update=(key:keyof Form,value:string)=>setForm(old=>({...old,[key]:value}));
   const changeFilter=(setter:(value:string)=>void,value:string)=>{setter(value);setPage(1);};
 
+  // Date range handlers with guard
+  const handleStartDate=(v:string)=>{
+    const val=v||todayNepal();
+    setStartDate(val);setPage(1);
+    if(val>endDate)setEndDate(val);
+  };
+  const handleEndDate=(v:string)=>{
+    const val=v||todayNepal();
+    setEndDate(val);setPage(1);
+    if(val<startDate)setStartDate(val);
+  };
+  const setToday=()=>{const t=todayNepal();setStartDate(t);setEndDate(t);setPage(1);};
+
+  const handleExport=async()=>{
+    if(exporting)return;
+    setExporting(true);setExportError('');
+    try {
+      await exportDaybookExcel({outlet,startDate,endDate,direction,method,query,showVoided,staffMode,staffId,outletName:currentOutlet?.name||'Outlet'});
+    }catch(e){
+      setExportError(extractErrorMessage(e)||'Export failed. Please try again.');
+    }finally{
+      setExporting(false);
+    }
+  };
+
   return <div className="space-y-2.5 text-zinc-900 dark:text-zinc-100" data-testid="daybook-page">
+    {/* Header */}
     <header className="flex flex-wrap items-center justify-between gap-2">
-      <div><h1 className="flex items-center gap-1.5 text-lg font-bold"><BookOpen className="h-4 w-4 text-amber-500"/>{staffMode?'Staff Daybook':'Daybook'}</h1><p className="text-xs text-zinc-500">{currentOutlet?.name} - {staffMode?'Track money each staff member takes and returns.':'Record money received and money paid out.'}</p></div>
-      <div className="flex flex-wrap gap-1.5"><button className={`${button} bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-500`} disabled={blocked||(staffMode&&!selectedStaff?.active)} onClick={()=>openEntry('IN')}><Plus size={14}/>{staffMode?'Cr - Staff gives':'Money in'}</button><button className={`${button} bg-rose-600 text-white border-rose-600 hover:bg-rose-500`} disabled={blocked||(staffMode&&!selectedStaff?.active)} onClick={()=>openEntry('OUT')}><Minus size={14}/>{staffMode?'Dr - Staff takes':'Money out'}</button>{!staffMode&&<button className={`${button} bg-amber-500 text-black border-amber-500 hover:bg-amber-400`} disabled={blocked} onClick={()=>openImport('SALE')}><Download size={14}/>Import today's sales</button>}</div>
+      <div>
+        <h1 className="flex items-center gap-1.5 text-lg font-bold"><BookOpen className="h-4 w-4 text-amber-500"/>{staffMode?'Staff Daybook':'Daybook'}</h1>
+        <p className="text-xs text-zinc-500">{currentOutlet?.name} - {staffMode?'Track money each staff member takes and returns.':'Record money received and money paid out.'}</p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <button className={`${button} bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-500`} disabled={blocked||(staffMode&&!selectedStaff?.active)} onClick={()=>openEntry('IN')}><Plus size={14}/>{staffMode?'Cr - Staff gives':'Money in'}</button>
+        <button className={`${button} bg-rose-600 text-white border-rose-600 hover:bg-rose-500`} disabled={blocked||(staffMode&&!selectedStaff?.active)} onClick={()=>openEntry('OUT')}><Minus size={14}/>{staffMode?'Dr - Staff takes':'Money out'}</button>
+        {!staffMode&&<button className={`${button} bg-amber-500 text-black border-amber-500 hover:bg-amber-400`} disabled={blocked} onClick={()=>openImport('SALE')}><Download size={14}/>Import today's sales</button>}
+      </div>
     </header>
+
+    {/* Staff picker */}
     {staffMode&&<div className="border border-zinc-200 dark:border-zinc-800 p-2 space-y-1">
       <label className={label}><span>Outlet staff</span><select aria-label="Outlet staff" className={input} value={staffId} onChange={e=>{setStaffId(e.target.value);setPage(1);setNotice('');}}><option value="">All staff - choose someone to record an entry</option>{staff.map(person=><option key={person.id} value={person.id}>{person.name}{person.active?'':' (inactive / previous staff)'}</option>)}</select></label>
       {staffError&&<p role="alert" className="text-xs text-rose-500">{staffError}</p>}
       {staffLoading&&<p role="status" className="text-xs text-zinc-500">Loading outlet staff...</p>}
-      {!staffLoading&&!staff.length&&!staffError&&<p className="text-xs text-zinc-500">No staff available yet. Assign staff to this outlet in Staff & Access.</p>}
+      {!staffLoading&&!staff.length&&!staffError&&<p className="text-xs text-zinc-500">No staff available yet. Assign staff to this outlet in Staff &amp; Access.</p>}
     </div>}
-    {(error||command.error) && <p role="alert" className="border border-rose-400/40 bg-rose-500/10 p-2 text-xs text-rose-500">{command.error||error}</p>}
-    {command.pending&&!command.busy && <div role="alert" className="border border-amber-400/40 bg-amber-500/10 p-2 text-xs">The last request has not been confirmed. Retry it safely before adding another entry.<button className={`${button} ml-2`} onClick={async()=>finish(await command.retry())}>Retry pending entry</button></div>}
-    {notice && <p role="status" className="p-2 text-xs bg-emerald-500/10 text-emerald-600">{notice}</p>}
-    <div className="flex flex-wrap items-end gap-2 border border-zinc-200 dark:border-zinc-800 p-2">
-      <label className={label}><span>Daybook date (Nepal)</span><input type="date" aria-label="Daybook date" className={input} value={date} max={todayNepal()} onChange={e=>changeFilter(setDate,e.target.value||todayNepal())}/></label>
-      <button className={button} onClick={()=>changeFilter(setDate,todayNepal())}>Today</button>
-      <label className={label}><span>Direction</span><select aria-label="Filter direction" className={input} value={direction} onChange={e=>changeFilter(setDirection,e.target.value)}><option value="ALL">All entries</option><option value="IN">{staffMode?'Cr - Staff gives':'Money in'}</option><option value="OUT">{staffMode?'Dr - Staff takes':'Money out'}</option></select></label>
-      <label className={label}><span>Payment method</span><select aria-label="Filter payment method" className={input} value={method} onChange={e=>changeFilter(setMethod,e.target.value)}><option value="ALL">All methods</option>{daybookMethods.map(m=><option key={m}>{m}</option>)}</select></label>
-      <label className={`${label} grow`}><span>Search</span><input className={input} aria-label="Search daybook" placeholder="Person, category, note, or reference" value={search} onChange={e=>setSearch(e.target.value)}/></label>
-      <button aria-label="Refresh daybook" className={button} disabled={loading} onClick={()=>void refresh()}><RefreshCw size={14}/></button>
+
+    {/* Alerts */}
+    {(error||command.error)&&<p role="alert" className="border border-rose-400/40 bg-rose-500/10 p-2 text-xs text-rose-500">{command.error||error}</p>}
+    {command.pending&&!command.busy&&<div role="alert" className="border border-amber-400/40 bg-amber-500/10 p-2 text-xs">The last request has not been confirmed. Retry it safely before adding another entry.<button className={`${button} ml-2`} onClick={async()=>finish(await command.retry())}>Retry pending entry</button></div>}
+    {notice&&<p role="status" className="p-2 text-xs bg-emerald-500/10 text-emerald-600">{notice}</p>}
+    {exportError&&<p role="alert" className="p-2 text-xs bg-rose-500/10 text-rose-500">{exportError}</p>}
+
+    {/* Filters + date range + export */}
+    <div className="border border-zinc-200 dark:border-zinc-800 p-2 space-y-2">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className={label}>
+          <span>From date (Nepal)</span>
+          <input type="date" aria-label="Start date" className={input} value={startDate} max={todayNepal()} onChange={e=>handleStartDate(e.target.value)}/>
+        </label>
+        <label className={label}>
+          <span>To date (Nepal)</span>
+          <input type="date" aria-label="End date" className={input} value={endDate} min={startDate} max={todayNepal()} onChange={e=>handleEndDate(e.target.value)}/>
+        </label>
+        <button className={button} onClick={setToday}>Today</button>
+        {[7,30].map(days=><button key={days} className={button} onClick={()=>{const end=todayNepal();const start=new Date(`${end}T00:00:00Z`);start.setUTCDate(start.getUTCDate()-days+1);setStartDate(start.toISOString().slice(0,10));setEndDate(end);setPage(1);}}>Last {days} days</button>)}
+        <button className={button} onClick={()=>{const end=todayNepal();setStartDate(`${end.slice(0,7)}-01`);setEndDate(end);setPage(1);}}>This month</button>
+        <label className={label}>
+          <span>Direction</span>
+          <select aria-label="Filter direction" className={input} value={direction} onChange={e=>changeFilter(setDirection,e.target.value)}>
+            <option value="ALL">All entries</option>
+            <option value="IN">{staffMode?'Cr - Staff gives':'Money in'}</option>
+            <option value="OUT">{staffMode?'Dr - Staff takes':'Money out'}</option>
+          </select>
+        </label>
+        <label className={label}>
+          <span>Payment method</span>
+          <select aria-label="Filter payment method" className={input} value={method} onChange={e=>changeFilter(setMethod,e.target.value)}>
+            <option value="ALL">All methods</option>
+            {daybookMethods.map(m=><option key={m}>{m}</option>)}
+          </select>
+        </label>
+        <label className={`${label} grow`}>
+          <span>Search</span>
+          <input className={input} aria-label="Search daybook" placeholder="Person, category, note, or reference" value={search} onChange={e=>setSearch(e.target.value)}/>
+        </label>
+        <button aria-label="Refresh daybook" className={button} disabled={loading} onClick={()=>void refresh()}><RefreshCw size={14}/></button>
+      </div>
+
+      {/* Range hint + Export button */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+        <span className="text-[11px] text-zinc-500">
+          {isRange
+            ? <>Showing entries from {startDate} to {endDate}.</>
+            : <>Showing all entries for <span className="font-semibold text-zinc-300">{startDate}</span>.</>
+          }
+        </span>
+        <button
+          className={`${button} bg-emerald-700 text-white border-emerald-700 hover:bg-emerald-600`}
+          disabled={exporting||loading}
+          onClick={handleExport}
+          title={`Export ${startDate} to ${endDate} as Excel with two sheets`}
+        >
+          <FileSpreadsheet size={14}/>
+          {exporting ? 'Exporting…' : isRange ? `Export Excel (${startDate} → ${endDate})` : `Export Excel (${startDate})`}
+        </button>
+      </div>
     </div>
-    {ledger && (
+
+    {/* Summary bar */}
+    {ledger&&(
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 px-3 py-1.5 text-xs">
         {([
-          ['Opening', 'opening', 'text-zinc-300'],
-          ['Money in', 'income', 'text-emerald-500'],
-          ['Money out', 'expense', 'text-rose-500'],
-          ['Closing', 'closing', 'text-amber-300'],
-          ['Cash balance', 'cash_closing', 'text-zinc-200'],
-        ] as const).map(([shortName, key, color]) => {
-          const labelName = staffMode
-            ? ({ opening: 'Opening staff', income: 'Cr (gives)', expense: 'Dr (takes)', closing: 'Staff bal', cash_closing: 'Cash staff' } as Record<string, string>)[key]
-            : shortName;
-          const rawVal = Number(ledger.summary[key]) * (staffMode && ['opening', 'closing', 'cash_closing'].includes(key) ? -1 : 1) || 0;
-          return (
+          ['Opening','opening','text-zinc-300'],
+          ['Money in','income','text-emerald-500'],
+          ['Money out','expense','text-rose-500'],
+          ['Closing','closing','text-amber-300'],
+          ['Cash balance','cash_closing','text-zinc-200'],
+        ] as const).map(([shortName,key,color])=>{
+          const labelName=staffMode
+            ?({opening:'Opening staff',income:'Cr (gives)',expense:'Dr (takes)',closing:'Staff bal',cash_closing:'Cash staff'} as Record<string,string>)[key]
+            :shortName;
+          const rawVal=Number(ledger.summary[key])*(staffMode&&['opening','closing','cash_closing'].includes(key)?-1:1)||0;
+          return(
             <div key={key} className="flex items-center gap-1.5 font-mono text-[11px]" data-testid={`daybook-${key}`}>
               <span className="text-zinc-500 uppercase tracking-wider text-[10px]">{labelName}:</span>
               <span className={`font-semibold ${color}`}>{formatNPR(rawVal)}</span>
             </div>
           );
         })}
+        {isRange&&<span className="text-[10px] text-amber-400 ml-auto">↑ Totals for {startDate} to {endDate}</span>}
       </div>
     )}
+
+    {/* Entries table */}
     <section className="border border-zinc-200 dark:border-zinc-800 overflow-hidden">
       <div className="flex flex-wrap justify-between items-center gap-2 px-2.5 py-1.5 border-b border-zinc-200 dark:border-zinc-800 text-xs">
-        <h2 className="font-semibold text-xs">Entries {ledger ? `(${ledger.count})` : ''}</h2>
+        <h2 className="font-semibold text-xs">
+          Entries {ledger?`(${ledger.count})`:''}
+          {isRange&&<span className="text-zinc-500 font-normal ml-1">— {startDate} to {endDate}</span>}
+        </h2>
         <div className="flex gap-3 items-center">
+          <button className="text-[11px] underline text-amber-500" disabled={loading} onClick={()=>{setShowAll(v=>!v);setPage(1);}}>{showAll?'Show pages':'View all'}</button>
           <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
-            <input type="checkbox" checked={showVoided} onChange={e => { setShowVoided(e.target.checked); setPage(1); }} />
+            <input type="checkbox" checked={showVoided} onChange={e=>{setShowVoided(e.target.checked);setPage(1);}}/>
             Show voided
           </label>
-          {!staffMode && (
-            <button className="text-[11px] underline text-amber-500 hover:text-amber-400" disabled={blocked} onClick={() => openImport('REFUND')}>
+          {!staffMode&&(
+            <button className="text-[11px] underline text-amber-500 hover:text-amber-400" disabled={blocked} onClick={()=>openImport('REFUND')}>
               Import refunds
             </button>
           )}
         </div>
       </div>
-      {!ledger ? (
-        <p role="status" className="py-8 text-center text-xs text-zinc-500">{error ? 'Unable to load entries. Retry with Refresh daybook.' : 'Loading daybook...'}</p>
-      ) : !ledger.results.length ? (
+      {!ledger?(
+        <p role="status" className="py-8 text-center text-xs text-zinc-500">{error?'Unable to load entries. Retry with Refresh daybook.':'Loading daybook...'}</p>
+      ):!ledger.results.length?(
         <div className="py-8 text-center">
-          <BookOpen className="mx-auto mb-2 h-5 w-5 text-zinc-400" />
+          <BookOpen className="mx-auto mb-2 h-5 w-5 text-zinc-400"/>
           <h3 className="font-semibold text-xs">No entries for these filters</h3>
-          <p className="mt-0.5 text-[11px] text-zinc-500">{staffMode ? 'Choose a staff member and record money taken or returned.' : 'Add money in, record money out, or select paid sales to import.'}</p>
+          <p className="mt-0.5 text-[11px] text-zinc-500">{staffMode?'Choose a staff member and record money taken or returned.':'Add money in, record money out, or select paid sales to import.'}</p>
         </div>
-      ) : (
+      ):(
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-zinc-50 dark:bg-zinc-900 text-[11px] text-zinc-500 uppercase tracking-wider">
               <tr>
-                {['Entry / time', 'Details', 'Payment', staffMode ? 'Cr - Staff gives' : 'Money in', staffMode ? 'Dr - Staff takes' : 'Money out', 'Recorded by', ''].map((h, i) => (
+                {['Entry / time','Details','Payment',staffMode?'Cr - Staff gives':'Money in',staffMode?'Dr - Staff takes':'Money out','Recorded by',''].map((h,i)=>(
                   <th key={i} className="py-1 px-2.5 whitespace-nowrap font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {ledger.results.map(entry => (
-                <tr key={entry.id} className={`border-t border-zinc-200 dark:border-zinc-800 hover:bg-zinc-800/30 ${entry.voided_at ? 'opacity-55' : ''}`}>
+              {ledger.results.map(entry=>(
+                <tr key={entry.id} className={`border-t border-zinc-200 dark:border-zinc-800 hover:bg-zinc-800/30 ${entry.voided_at?'opacity-55':''}`}>
                   <td className="py-1 px-2.5 whitespace-nowrap text-[11px]">
                     <span className="font-mono font-medium">DB-{entry.id}</span>
-                    <span className="block text-[10px] text-zinc-500">{localTime(entry.created_at)}</span>
+                    <span className="block text-[10px] text-zinc-500">{entry.date} | {localTime(entry.created_at)}</span>
                   </td>
                   <td className="py-1 px-2.5 min-w-44 text-xs">
-                    <p className="font-semibold leading-tight">{entry.category}{entry.voided_at && <span className="ml-1.5 text-[10px] text-rose-500">Voided</span>}</p>
-                    {entry.party && <p className="text-[11px] text-zinc-400 leading-tight">{entry.party}</p>}
-                    {entry.description && <p className="text-[11px] text-zinc-500 break-words leading-tight">{entry.description}</p>}
-                    {entry.reference && <p className="font-mono text-[10px] text-zinc-500 break-all leading-tight">{entry.reference}</p>}
-                    {entry.voided_at && <p className="mt-0.5 text-[10px] text-rose-500">{entry.void_reason} - {entry.voided_by}</p>}
+                    <p className="font-semibold leading-tight">{entry.category}{entry.voided_at&&<span className="ml-1.5 text-[10px] text-rose-500">Voided</span>}</p>
+                    {entry.party&&<p className="text-[11px] text-zinc-400 leading-tight">{entry.party}</p>}
+                    {entry.description&&<p className="text-[11px] text-zinc-500 break-words leading-tight">{entry.description}</p>}
+                    {entry.reference&&<p className="font-mono text-[10px] text-zinc-500 break-all leading-tight">{entry.reference}</p>}
+                    {entry.voided_at&&<p className="mt-0.5 text-[10px] text-rose-500">{entry.void_reason} - {entry.voided_by}</p>}
                   </td>
                   <td className="py-1 px-2.5 text-[11px] whitespace-nowrap">
-                    {entry.payment_method.replace('_', ' ')}
-                    {!entry.voided_at && (
-                      <PaymentMethodEdit outlet={outlet} kind="daybook" payments={[{ id: String(entry.id), method: entry.payment_method }]} onSaved={() => void refresh()} />
+                    {entry.payment_method.replace('_',' ')}
+                    {!entry.voided_at&&(
+                      <PaymentMethodEdit outlet={outlet} kind="daybook" payments={[{id:String(entry.id),method:entry.payment_method}]} onSaved={()=>void refresh()}/>
                     )}
                   </td>
-                  <td className={`py-1 px-2.5 font-mono whitespace-nowrap text-xs text-emerald-500 ${entry.voided_at ? 'line-through' : ''}`}>
-                    {entry.direction === 'IN' ? formatNPR(Number(entry.amount)) : '-'}
+                  <td className={`py-1 px-2.5 font-mono whitespace-nowrap text-xs text-emerald-500 ${entry.voided_at?'line-through':''}`}>
+                    {entry.direction==='IN'?formatNPR(Number(entry.amount)):'-'}
                   </td>
-                  <td className={`py-1 px-2.5 font-mono whitespace-nowrap text-xs text-rose-500 ${entry.voided_at ? 'line-through' : ''}`}>
-                    {entry.direction === 'OUT' ? formatNPR(Number(entry.amount)) : '-'}
+                  <td className={`py-1 px-2.5 font-mono whitespace-nowrap text-xs text-rose-500 ${entry.voided_at?'line-through':''}`}>
+                    {entry.direction==='OUT'?formatNPR(Number(entry.amount)):'-'}
                   </td>
                   <td className="py-1 px-2.5 text-[11px] text-zinc-400 whitespace-nowrap">{entry.recorded_by}</td>
                   <td className="py-1 px-2 text-right">
-                    {ledger.can_void && !entry.voided_at && (
-                      <button aria-label={`Void entry DB-${entry.id}`} className="p-1 border border-zinc-700 hover:border-rose-500 text-zinc-400 hover:text-rose-500" disabled={blocked} onClick={() => { setVoidEntry(entry); setVoidReason(''); setModal('void'); }}>
-                        <Ban size={12} />
+                    {ledger.can_void&&!entry.voided_at&&(
+                      <button aria-label={`Void entry DB-${entry.id}`} className="p-1 border border-zinc-700 hover:border-rose-500 text-zinc-400 hover:text-rose-500" disabled={blocked} onClick={()=>{setVoidEntry(entry);setVoidReason('');setModal('void');}}>
+                        <Ban size={12}/>
                       </button>
                     )}
                   </td>
@@ -213,26 +470,29 @@ const DaybookContent:React.FC<{staffMode:boolean}>=({staffMode})=>{
           </table>
         </div>
       )}
-      {ledger && ledger.count > ledger.page_size && (
+      {ledger&&ledger.count>ledger.page_size&&(
         <div className="flex items-center justify-end gap-2 px-2.5 py-1 border-t dark:border-zinc-800 text-xs">
-          <button className={button} aria-label="Previous page" disabled={page === 1 || loading} onClick={() => setPage(p => p - 1)}>
-            <ChevronLeft size={14} />
-          </button>
-          <span className="text-[11px] font-mono">Page {page} of {Math.ceil(ledger.count / ledger.page_size)}</span>
-          <button className={button} aria-label="Next page" disabled={page * ledger.page_size >= ledger.count || loading} onClick={() => setPage(p => p + 1)}>
-            <ChevronRight size={14} />
-          </button>
+          <button className={button} aria-label="Previous page" disabled={page===1||loading} onClick={()=>setPage(p=>p-1)}><ChevronLeft size={14}/></button>
+          <span className="text-[11px] font-mono">Page {page} of {Math.ceil(ledger.count/ledger.page_size)}</span>
+          <button className={button} aria-label="Next page" disabled={page*ledger.page_size>=ledger.count||loading} onClick={()=>setPage(p=>p+1)}><ChevronRight size={14}/></button>
         </div>
       )}
     </section>
-    <p className="text-[11px] text-zinc-500">{live?'Live daybook updates connected':'Connecting to live updates...'} {ledger&&'Summary totals cover the whole selected day, regardless of search filters.'}</p>
+    <p className="text-[11px] text-zinc-500">{live?'Live daybook updates connected':'Connecting to live updates...'} {ledger&&'Summary totals cover the whole selected period, regardless of search filters.'}</p>
 
+    {/* Entry modal */}
     <Modal isOpen={modal==='entry'} onClose={()=>{if(!command.busy)setModal(null);}} title={staffMode?`${form.direction==='IN'?'Cr - Staff gives':'Dr - Staff takes'} - ${selectedStaff?.name||''}`:form.direction==='IN'?'Record money in':'Record money out'} maxWidth="lg">
       <form onSubmit={submit} className="p-3.5 space-y-3">
         <p className="text-xs text-zinc-500">{staffMode?'Record the actual amount taken or returned by the selected staff member.':form.direction==='OUT'?'Use this for cash withdrawals, expenses, supplier payments, and other money paid out.':'Use this for actual receipts or starting funds. If a sale is recorded here manually, leave it unticked when importing sales.'}</p>
         <fieldset disabled={blocked} className="space-y-3">
-          <div className="grid grid-cols-2 gap-2"><label className={label}><span>Date</span><input aria-label="Entry date" className={input} type="date" value={form.date} max={todayNepal()} required onChange={e=>update('date',e.target.value)}/></label><label className={label}><span>Amount (Rs)</span><input aria-label="Entry amount" className={input} type="number" min="0.01" max="9999999999.99" step="0.01" value={form.amount} required onChange={e=>update('amount',e.target.value)}/></label></div>
-          <div className="grid grid-cols-2 gap-2"><label className={label}><span>Category</span><select aria-label="Entry category" className={input} value={form.category} onChange={e=>update('category',e.target.value)}>{(staffMode?(form.direction==='IN'?['Staff return','Staff deposit','Other staff receipt']:['Staff wage / advance','Staff expense advance','Other staff payment']):categories[form.direction]).map(c=><option key={c}>{c}</option>)}</select></label><label className={label}><span>Payment method</span><select aria-label="Entry payment method" className={input} value={form.payment_method} onChange={e=>update('payment_method',e.target.value)}>{daybookMethods.map(m=><option key={m}>{m}</option>)}</select></label></div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className={label}><span>Date</span><input aria-label="Entry date" className={input} type="date" value={form.date} max={todayNepal()} required onChange={e=>update('date',e.target.value)}/></label>
+            <label className={label}><span>Amount (Rs)</span><input aria-label="Entry amount" className={input} type="number" min="0.01" max="9999999999.99" step="0.01" value={form.amount} required onChange={e=>update('amount',e.target.value)}/></label>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className={label}><span>Category</span><select aria-label="Entry category" className={input} value={form.category} onChange={e=>update('category',e.target.value)}>{(staffMode?(form.direction==='IN'?['Staff return','Staff deposit','Other staff receipt']:['Staff wage / advance','Staff expense advance','Other staff payment']):categories[form.direction]).map(c=><option key={c}>{c}</option>)}</select></label>
+            <label className={label}><span>Payment method</span><select aria-label="Entry payment method" className={input} value={form.payment_method} onChange={e=>update('payment_method',e.target.value)}>{daybookMethods.map(m=><option key={m}>{m}</option>)}</select></label>
+          </div>
           {!staffMode&&<label className={label}><span>{form.direction==='IN'?'Received from':'Paid to / taken by'} (optional)</span><input aria-label="Entry person" className={input} value={form.party} maxLength={150} onChange={e=>update('party',e.target.value)}/></label>}
           <label className={label}><span>Description / reason</span><textarea aria-label="Entry description" className={input} value={form.description} required maxLength={1000} onChange={e=>update('description',e.target.value)}/></label>
           <label className={label}><span>Receipt / reference (optional)</span><input aria-label="Entry reference" className={input} value={form.reference} maxLength={128} onChange={e=>update('reference',e.target.value)}/></label>
@@ -242,20 +502,63 @@ const DaybookContent:React.FC<{staffMode:boolean}>=({staffMode})=>{
         {command.pending&&!command.busy&&<button type="button" className={button} onClick={async()=>finish(await command.retry())}>Retry pending entry</button>}
       </form>
     </Modal>
+
+    {/* Import modal */}
     <Modal isOpen={modal==='import'} onClose={()=>{if(!command.busy)setModal(null);}} title={kind==='SALE'?'Import sales received':'Import refunds paid'} maxWidth="4xl">
       <div className="p-3.5 space-y-3">
         <p className="text-xs text-zinc-500">{kind==='SALE'?'Choose actual payments received on this date. All unimported payments start selected; untick any already entered manually. Split payments appear separately. Unpaid orders and credit are excluded.':'Refund payments become money-out entries. Previously imported payments cannot be imported again, including voided entries.'}</p>
-        <div className="flex flex-wrap items-end gap-2"><label className={label}><span>Payment date (Nepal)</span><input aria-label="Import date" className={input} type="date" max={todayNepal()} value={importDate} disabled={blocked} onChange={e=>setImportDate(e.target.value||todayNepal())}/></label><label className={label}><span>Type</span><select aria-label="Import type" className={input} value={kind} disabled={blocked} onChange={e=>setKind(e.target.value as 'SALE'|'REFUND')}><option value="SALE">Sales received (IN)</option><option value="REFUND">Refunds paid (OUT)</option></select></label><button className={button} disabled={importLoading||blocked} onClick={()=>void loadPreview()}>Reload list</button></div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className={label}><span>Payment date (Nepal)</span><input aria-label="Import date" className={input} type="date" max={todayNepal()} value={importDate} disabled={blocked} onChange={e=>setImportDate(e.target.value||todayNepal())}/></label>
+          <label className={label}><span>Type</span><select aria-label="Import type" className={input} value={kind} disabled={blocked} onChange={e=>setKind(e.target.value as 'SALE'|'REFUND')}><option value="SALE">Sales received (IN)</option><option value="REFUND">Refunds paid (OUT)</option></select></label>
+          <button className={button} disabled={importLoading||blocked} onClick={()=>void loadPreview()}>Reload list</button>
+        </div>
         {importError&&<p role="alert" className="text-rose-500 text-xs">{importError}</p>}
         {command.error&&<p role="alert" className="text-rose-500 text-xs">{command.error}</p>}
-        {importLoading&&!preview?<p role="status" className="text-xs">Loading payments...</p>:preview&&!preview.results.length?<p className="py-6 text-center text-xs text-zinc-500">No {kind==='SALE'?'received sales payments':'refund payments'} for this date.</p>:preview&&<div className="max-h-80 overflow-auto border border-zinc-200 dark:border-zinc-800"><table className="w-full text-xs text-left"><thead className="bg-zinc-100 dark:bg-zinc-900 sticky top-0 text-[11px] text-zinc-500 uppercase"><tr><th className="py-1 px-2.5"><input aria-label="Select all eligible payments" type="checkbox" checked={allSelected} disabled={blocked||importLoading} onChange={e=>setSelected(e.target.checked?new Set(eligible.map(row=>row.id)):new Set())}/></th>{['Order / payment','Customer / channel','Method','Amount','Status'].map(h=><th key={h} className="py-1 px-2.5 whitespace-nowrap">{h}</th>)}</tr></thead><tbody>{preview.results.map(row=><tr key={row.id} className="border-t border-zinc-200 dark:border-zinc-800"><td className="py-1 px-2.5"><input type="checkbox" aria-label={`Select payment ${row.transaction_id}`} checked={selected.has(row.id)&&!row.imported} disabled={row.imported||blocked||importLoading} onChange={e=>setSelected(old=>{const next=new Set(old);e.target.checked?next.add(row.id):next.delete(row.id);return next;})}/></td><td className="py-1 px-2.5"><p className="font-mono text-xs">{row.order_number}</p><p className="text-[10px] text-zinc-500 break-all">{row.transaction_id}</p><p className="text-[10px] text-zinc-500">{localTime(row.created_at)}</p></td><td className="py-1 px-2.5 text-xs">{row.customer}<span className="block text-[10px] text-zinc-500">{row.source.replace('_',' ')}</span></td><td className="py-1 px-2.5 text-xs">{row.payment_method}</td><td className="py-1 px-2.5 font-mono whitespace-nowrap text-xs">{formatNPR(Number(row.amount))}</td><td className="py-1 px-2.5 text-[11px]">{row.voided?'Imported, then voided':row.imported?'Already imported':kind==='SALE'?'Money in':'Money out'}</td></tr>)}</tbody></table></div>}
+        {importLoading&&!preview
+          ?<p role="status" className="text-xs">Loading payments...</p>
+          :preview&&!preview.results.length
+          ?<p className="py-6 text-center text-xs text-zinc-500">No {kind==='SALE'?'received sales payments':'refund payments'} for this date.</p>
+          :preview&&<div className="max-h-80 overflow-auto border border-zinc-200 dark:border-zinc-800">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-zinc-100 dark:bg-zinc-900 sticky top-0 text-[11px] text-zinc-500 uppercase">
+                <tr>
+                  <th className="py-1 px-2.5"><input aria-label="Select all eligible payments" type="checkbox" checked={allSelected} disabled={blocked||importLoading} onChange={e=>setSelected(e.target.checked?new Set(eligible.map(row=>row.id)):new Set())}/></th>
+                  {['Order / payment','Customer / channel','Method','Amount','Status'].map(h=><th key={h} className="py-1 px-2.5 whitespace-nowrap">{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {preview.results.map(row=>(
+                  <tr key={row.id} className="border-t border-zinc-200 dark:border-zinc-800">
+                    <td className="py-1 px-2.5"><input type="checkbox" aria-label={`Select payment ${row.transaction_id}`} checked={selected.has(row.id)&&!row.imported} disabled={row.imported||blocked||importLoading} onChange={e=>setSelected(old=>{const next=new Set(old);e.target.checked?next.add(row.id):next.delete(row.id);return next;})}/></td>
+                    <td className="py-1 px-2.5"><p className="font-mono text-xs">{row.order_number}</p><p className="text-[10px] text-zinc-500 break-all">{row.transaction_id}</p><p className="text-[10px] text-zinc-500">{localTime(row.created_at)}</p></td>
+                    <td className="py-1 px-2.5 text-xs">{row.customer}<span className="block text-[10px] text-zinc-500">{row.source.replace('_',' ')}</span></td>
+                    <td className="py-1 px-2.5 text-xs">{row.payment_method}</td>
+                    <td className="py-1 px-2.5 font-mono whitespace-nowrap text-xs">{formatNPR(Number(row.amount))}</td>
+                    <td className="py-1 px-2.5 text-[11px]">{row.voided?'Imported, then voided':row.imported?'Already imported':kind==='SALE'?'Money in':'Money out'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        }
         {preview?.truncated&&<p className="text-[11px] text-amber-500">Showing up to 5,000 payments, with unimported payments first. Import this batch and reload for the remaining payments.</p>}
-        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-semibold">{selected.size} selected - {formatNPR(selectedTotal)} {kind==='SALE'?'IN':'OUT'}</p><button className={`${button} bg-amber-500 text-black border-amber-500`} disabled={blocked||importLoading||!!importError||!selected.size} onClick={()=>void importSelected()}>{command.busy?'Importing...':`Import ${selected.size} selected`}</button></div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-semibold">{selected.size} selected - {formatNPR(selectedTotal)} {kind==='SALE'?'IN':'OUT'}</p>
+          <button className={`${button} bg-amber-500 text-black border-amber-500`} disabled={blocked||importLoading||!!importError||!selected.size} onClick={()=>void importSelected()}>{command.busy?'Importing...':`Import ${selected.size} selected`}</button>
+        </div>
         {command.pending&&!command.busy&&<button className={button} onClick={async()=>finish(await command.retry())}>Retry pending entry</button>}
       </div>
     </Modal>
+
+    {/* Void modal */}
     <Modal isOpen={modal==='void'} onClose={()=>{if(!command.busy)setModal(null);}} title={`Void entry DB-${voidEntry?.id}`}>
-      <form className="p-3.5 space-y-3" onSubmit={submitVoid}><p className="text-xs text-zinc-500">This removes the entry from balances and keeps its original details in the audit history. It does not refund or change an order payment. To correct an entry, void it and record its replacement manually.</p><label className={label}><span>Reason for voiding</span><textarea aria-label="Void reason" required maxLength={500} className={input} value={voidReason} disabled={blocked} onChange={e=>setVoidReason(e.target.value)}/></label><button className={`${button} w-full bg-rose-600 text-white border-rose-600`} disabled={blocked||!voidReason.trim()}>{command.busy?'Saving...':'Void entry'}</button>{command.error&&<p role="alert" className="text-rose-500 text-xs">{command.error}</p>}{command.pending&&!command.busy&&<button type="button" className={button} onClick={async()=>finish(await command.retry())}>Retry pending entry</button>}</form>
+      <form className="p-3.5 space-y-3" onSubmit={submitVoid}>
+        <p className="text-xs text-zinc-500">This removes the entry from balances and keeps its original details in the audit history. It does not refund or change an order payment. To correct an entry, void it and record its replacement manually.</p>
+        <label className={label}><span>Reason for voiding</span><textarea aria-label="Void reason" required maxLength={500} className={input} value={voidReason} disabled={blocked} onChange={e=>setVoidReason(e.target.value)}/></label>
+        <button className={`${button} w-full bg-rose-600 text-white border-rose-600`} disabled={blocked||!voidReason.trim()}>{command.busy?'Saving...':'Void entry'}</button>
+        {command.error&&<p role="alert" className="text-rose-500 text-xs">{command.error}</p>}
+        {command.pending&&!command.busy&&<button type="button" className={button} onClick={async()=>finish(await command.retry())}>Retry pending entry</button>}
+      </form>
     </Modal>
   </div>;
 };

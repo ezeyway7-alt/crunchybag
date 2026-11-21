@@ -414,13 +414,7 @@ export const CustomerFooter: React.FC = () => {
               </h5>
               <ul className="space-y-1.5 text-zinc-600 dark:text-zinc-400">
                 <li>
-                  <button
-                    type="button"
-                    onClick={() => setIsPrivacyModalOpen(true)}
-                    className="hover:text-amber-500 transition-colors cursor-pointer text-left font-medium"
-                  >
-                    Privacy Policy
-                  </button>
+                  <a href="/privacy" className="hover:text-amber-500 transition-colors cursor-pointer text-left font-medium">Privacy Policy</a>
                 </li>
                 <li>
                   <button
@@ -530,13 +524,7 @@ export const CustomerFooter: React.FC = () => {
             </div>
 
             <nav aria-label="Footer Legal and Policy Links" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-              <button
-                type="button"
-                onClick={() => setIsAboutModalOpen(true)}
-                className="hover:text-amber-500 transition-colors cursor-pointer"
-              >
-                About Us
-              </button>
+              <a href="/about" className="hover:text-amber-500 transition-colors cursor-pointer">About Us</a>
               <span>•</span>
               <a
                 href="/blogs"
@@ -554,14 +542,11 @@ export const CustomerFooter: React.FC = () => {
                 Blogs
               </a>
               <span>•</span>
-              <button
-                type="button"
-                onClick={() => setIsPrivacyModalOpen(true)}
-                className="hover:text-amber-500 transition-colors cursor-pointer"
-              >
-                Privacy Policy
-              </button>
+              <a href="/privacy" className="hover:text-amber-500 transition-colors cursor-pointer">Privacy Policy</a>
               <span>•</span>
+              <a href="/terms" className="hover:text-amber-500">Terms</a>
+              <a href="/faq" className="hover:text-amber-500">FAQ</a>
+              <a href="/reserve" className="hover:text-amber-500">Plan a dine-in visit</a>
               <a
                 href="/sitemap.xml"
                 target="_blank"

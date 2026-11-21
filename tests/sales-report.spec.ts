@@ -29,9 +29,10 @@ test('sales report filters, live updates, errors and mobile layout', async({page
       const item={product_id:1,name:'Burger',quantity:8,item_sales:'1200.00'};
       data={summary:{...totals,average_daily_sales:'171.43',average_daily_orders:0.57},
         timeline:[{...totals,date:url.searchParams.get('start_date')}],
+        all_items:Array.from({length:8},(_,i)=>({...item,product_id:i+1,name:`Full item ${i+1}`})),
         tables:[{...totals,table_id:1,table__table_number:'A1'},
           {...totals,table_id:2,table__table_number:'A2',orders:9,sales:'900.00'}],top_items:[item],
-        channels:['POS','TABLE_QR','KIOSK','WEBSITE'].map(order_source=>({...totals,order_source,top_items:[item]})),
+        channels:['POS','TABLE_QR','KIOSK','WEBSITE'].map(order_source=>({...totals,order_source,all_items:Array.from({length:6},(_,i)=>({...item,product_id:i+1,name:`Channel item ${i+1}`})),top_items:[item]})),
         hourly:Array.from({length:24},(_,hour)=>({...totals,hour,sales:hour===12?'700.00':'0.00',orders:hour===12?14:0,average_sales:hour===12?'100.00':'0.00',average_orders:hour===12?2:0}))};
     }
     await route.fulfill({json:data});
@@ -39,6 +40,10 @@ test('sales report filters, live updates, errors and mobile layout', async({page
   await page.goto('/admin?tab=sales_reports');
   const report=page.getByRole('region',{name:'Sales Reports'});
   await expect(report.getByRole('heading',{name:'Sales timeline'})).toBeVisible();
+  await report.getByRole('button',{name:'View all',exact:true}).first().click();
+  await expect(report.getByTitle('Full item 8',{exact:true})).toBeVisible();
+  await report.getByRole('button',{name:'View all',exact:true}).first().click();
+  await expect(report.getByTitle('Channel item 6',{exact:true})).toBeVisible();
   const tableOrders=report.getByRole('region',{name:'Orders by table'});
   await expect(tableOrders.getByRole('listitem').first()).toContainText('Table A2');
   await expect(tableOrders.getByRole('listitem').first()).toContainText('9 completed orders');

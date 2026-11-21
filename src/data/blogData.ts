@@ -54,7 +54,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
       "Bhaktapur"
     ],
     "metaTitle": "Fried Chicken in Kathmandu: Portions, Sides and Ordering | Crunchy Bag",
-    "metaDescription": "Compare the fried chicken choices on our current menu and plan a delivery or takeaway order."
+    "metaDescription": "Compare fried chicken portions, sides and current menu options at Crunchy Bag, Imadol. Plan 24/7 delivery or takeaway across Kathmandu Valley."
   },
   {
     "id": "blog-2",
@@ -83,8 +83,8 @@ export const BLOG_ARTICLES: BlogArticle[] = [
       "Lalitpur",
       "Bhaktapur"
     ],
-    "metaTitle": "Food Ingredients and Dietary Requests: A Guide to Ordering | Crunchy Bag",
-    "metaDescription": "What to check in a dish description and what to ask our restaurant before choosing your meal."
+    "metaTitle": "Ingredients & Dietary Requests Guide | Crunchy Bag",
+    "metaDescription": "Check menu descriptions and ask Crunchy Bag about ingredients, vegetarian options and dietary requests before ordering delivery or takeaway from Imadol."
   },
   {
     "id": "blog-3",
@@ -114,7 +114,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
       "Bhaktapur"
     ],
     "metaTitle": "How to Order Food Online from Crunchy Bag | Crunchy Bag",
-    "metaDescription": "A practical checklist for choosing food, checking the total and arranging delivery or takeaway."
+    "metaDescription": "Learn how to choose food, review options, check discounts and confirm your total before arranging Crunchy Bag delivery or takeaway from Imadol."
   },
   {
     "id": "blog-4",
@@ -144,7 +144,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
       "Bhaktapur"
     ],
     "metaTitle": "Which Burger or Sandwich Should You Order in Kathmandu? | Crunchy Bag",
-    "metaDescription": "Compare chicken burgers, aloo tikki burgers and grilled sandwiches on the Crunchy Bag menu."
+    "metaDescription": "Compare chicken burgers, aloo tikki burgers and grilled sandwiches at Crunchy Bag. Check portions, extras and prices for delivery or takeaway."
   },
   {
     "id": "blog-5",
@@ -173,8 +173,8 @@ export const BLOG_ARTICLES: BlogArticle[] = [
       "Lalitpur",
       "Bhaktapur"
     ],
-    "metaTitle": "Chicken 65 Pakoda, Veg Pakoda or Fries: Choosing Your Snack | Crunchy Bag",
-    "metaDescription": "A guide to the pakoda and crispy snack choices available from our Imadol restaurant."
+    "metaTitle": "Chicken 65 Pakoda, Veg Pakoda & Fries | Crunchy Bag",
+    "metaDescription": "Compare chicken 65 pakoda, vegetarian pakoda and fries on the Crunchy Bag menu. Plan a snack order for 24/7 delivery or takeaway from Imadol."
   },
   {
     "id": "blog-6",
@@ -203,8 +203,8 @@ export const BLOG_ARTICLES: BlogArticle[] = [
       "Lalitpur",
       "Bhaktapur"
     ],
-    "metaTitle": "24-Hour Food Delivery in Kathmandu Valley: Before You Order | Crunchy Bag",
-    "metaDescription": "A late-night ordering checklist for Kathmandu, Lalitpur and Bhaktapur, with preparation and pickup information."
+    "metaTitle": "24-Hour Food Delivery in Kathmandu Valley | Crunchy Bag",
+    "metaDescription": "Plan a late-night Crunchy Bag order in Kathmandu, Lalitpur or Bhaktapur. Check preparation time, delivery charges and takeaway details before ordering."
   }
 ];
 
@@ -216,5 +216,6 @@ export function getBlogBySlug(slug: string): BlogArticle | undefined {
 }
 
 export function getRelatedBlogs(currentSlug: string, limit: number = 3): BlogArticle[] {
-  return BLOG_ARTICLES.filter((a) => a.slug !== currentSlug).slice(0, limit);
+  const index = BLOG_ARTICLES.findIndex(article => article.slug === currentSlug);
+  return Array.from({length: BLOG_ARTICLES.length - 1}, (_, offset) => BLOG_ARTICLES[(index + offset + 1 + BLOG_ARTICLES.length) % BLOG_ARTICLES.length]).slice(0, limit);
 }

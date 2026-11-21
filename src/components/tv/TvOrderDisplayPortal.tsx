@@ -27,11 +27,6 @@ import { Order, OrderStatus } from "../../types";
 import { CrunchyLogo } from "../common/CrunchyLogo";
 import { Skeleton } from "../common/Skeleton";
 import { formatNPR } from "../../lib/utils";
-import { TiharTvHeader } from "./TiharTvHeader";
-import { TiharBottomDiyas } from "./TiharBottomDiyas";
-import { TiharRocketFireworks } from "./TiharRocketFireworks";
-import { TiharBananaPlants } from "./TiharBananaPlants";
-import { TiharHeaderToran } from "./TiharHeaderToran";
 
 interface CallingAnnouncement {
   id: string;
@@ -124,7 +119,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [menuCarouselIndex, setMenuCarouselIndex] = useState(0);
   const [menuCarouselTransitionEnabled, setMenuCarouselTransitionEnabled] = useState(true);
-  const [menuItemsPerPage, setMenuItemsPerPage] = useState(4);
+  const [menuItemsPerPage, setMenuItemsPerPage] = useState(8);
   const [displayMode, setDisplayMode] = useState<"menu" | "orders">("menu");
 
   // Auto-pagination / scroll page for preparing orders when there are many (8-16+)
@@ -187,7 +182,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
 
   useEffect(() => {
     const updateItemsPerPage = () => {
-      setMenuItemsPerPage(window.matchMedia("(min-width: 1280px)").matches ? 4 : window.matchMedia("(min-width: 640px)").matches ? 2 : 1);
+      setMenuItemsPerPage(window.matchMedia("(min-width: 1280px)").matches ? 8 : window.matchMedia("(min-width: 640px)").matches ? 4 : 2);
     };
     updateItemsPerPage();
     window.addEventListener("resize", updateItemsPerPage);
@@ -487,26 +482,19 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
   if (displayMode === "menu") {
     return (
       <div className="tv-menu-screen relative flex h-screen w-screen select-none flex-col overflow-hidden bg-[#08090b] text-white">
-        {/* Continuous Festive Rocket Fireworks Soaring and Bursting Overhead Across Middle & Scatter Area (z-[45]) */}
-        <TiharRocketFireworks />
-
-        {/* Traditional Doorway Toran Flower Garland (z-15: LESS than banana plants, menu, and diyas) */}
-        <TiharHeaderToran />
-
-        {/* Auspicious Big Banana Plants (z-25: IN FRONT OF the flower garland toran) */}
-        <TiharBananaPlants />
-
-        {/* Tihar & Chhath Grand Header with Shubhakamana & Controls (z-35) */}
-        <TiharTvHeader
-          onSwitchToOrders={() => setDisplayMode("orders")}
-          onToggleFullscreen={toggleFullscreen}
-          isFullscreen={isFullscreen}
-          onClose={onClose}
-        />
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 px-4 py-2">
+          <CrunchyLogo size="md" className="h-8 w-auto" />
+          <h1 className="text-lg font-bold text-amber-400">Our Menu</h1>
+          <div className="flex items-center gap-3 text-xs">
+            <button onClick={()=>setDisplayMode('orders')}>Order display</button>
+            <button aria-label="Toggle fullscreen" onClick={toggleFullscreen}>{isFullscreen?<Minimize2 size={18}/>:<Maximize2 size={18}/>}</button>
+            {onClose&&<button aria-label="Close TV display" onClick={onClose}><X size={18}/></button>}
+          </div>
+        </header>
 
         {isLoadingSkeleton ? (
-          <main className="grid min-h-0 flex-1 grid-cols-1 items-center gap-6 px-6 py-4 sm:grid-cols-2 sm:px-10 xl:grid-cols-4 xl:gap-6 relative z-20">
-            {[1, 2, 3, 4].map((item) => (
+          <main className="grid min-h-0 flex-1 grid-cols-1 grid-rows-2 items-stretch gap-3 px-4 py-2 sm:grid-cols-2 xl:grid-cols-4 relative z-20">
+            {Array.from({length:menuItemsPerPage},(_,i)=>i).map((item) => (
               <div key={item} className="flex flex-col gap-4">
                 <Skeleton className="aspect-[1.12/1] w-full rounded-2xl bg-zinc-900" />
                 <Skeleton className="h-5 w-1/3 bg-zinc-900" />
@@ -516,7 +504,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
             ))}
           </main>
         ) : showcaseProducts.length > 0 ? (
-          <main className="min-h-0 flex-1 overflow-hidden px-4 sm:px-8 xl:px-10 py-2 sm:py-3 pb-6 sm:pb-8 flex flex-col justify-center relative z-20">
+          <main className="min-h-0 flex-1 overflow-hidden px-2 sm:px-4 py-2 flex flex-col justify-center relative z-20">
             <div
               className={`tv-menu-track flex h-full items-center ${menuCarouselTransitionEnabled ? "" : "tv-menu-track-reset"}`}
               style={{ transform: `translateX(-${menuCarouselIndex * 100}%)` }}
@@ -525,7 +513,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
               {menuCarouselPages.map((page, pageIndex) => (
                 <section
                   key={`menu-page-${pageIndex}`}
-                  className="tv-menu-page grid h-full min-w-0 grid-cols-1 items-center gap-4 px-3 sm:grid-cols-2 sm:gap-6 sm:px-6 xl:grid-cols-4 xl:gap-5 2xl:gap-7"
+                  className="tv-menu-page grid h-full min-w-0 grid-cols-1 grid-rows-2 items-stretch gap-3 px-2 sm:grid-cols-2 xl:grid-cols-4"
                 >
                   {page.map((product) => {
                     const category = categories.find((item) => item.id === product.categoryId);
@@ -537,9 +525,9 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                     return (
                       <article
                         key={product.id}
-                        className="flex min-w-0 max-h-[82vh] flex-col justify-center rounded-2xl transition-transform"
+                        className="flex min-h-0 min-w-0 h-full flex-col rounded-2xl transition-transform"
                       >
-                        <div className="tv-menu-image relative aspect-[1.12/1] sm:aspect-[1.15/1] xl:aspect-[1.08/1] 2xl:aspect-[1.05/1] max-h-[44vh] 2xl:max-h-[48vh] w-full overflow-hidden rounded-2xl bg-zinc-900/80 shadow-2xl border border-white/5">
+                        <div className="tv-menu-image relative min-h-0 flex-1 w-full overflow-hidden rounded-2xl bg-zinc-900/80 shadow-2xl border border-white/5">
                           {image ? (
                             <img
                               src={image}
@@ -555,17 +543,17 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
                           )}
                           <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/55 to-transparent" />
                         </div>
-                        <div className="flex min-h-[5.5rem] sm:min-h-[6.5rem] flex-col justify-start gap-1.5 px-1 pt-3 sm:pt-4">
+                        <div className="flex shrink-0 flex-col gap-0.5 px-1 pt-1">
                           {category && (
                             <p className="truncate text-[11px] sm:text-xs font-bold uppercase tracking-[0.2em] text-amber-400">
                               {category.name}
                             </p>
                           )}
-                          <h2 className="line-clamp-2 text-xl font-bold leading-snug text-white sm:text-2xl 2xl:text-[1.75rem] min-h-[2.8rem] sm:min-h-[3.6rem] flex items-start">
+                          <h2 className="line-clamp-2 text-base font-bold leading-tight text-white sm:text-lg 2xl:text-xl">
                             {product.name}
                           </h2>
                           <div className="flex items-baseline gap-2.5 mt-auto">
-                            <p className="font-mono text-2xl font-black tabular-nums text-amber-400 sm:text-3xl 2xl:text-4xl">
+                            <p className="font-mono text-lg font-black tabular-nums text-amber-400 sm:text-xl 2xl:text-2xl">
                               {formatNPR(price)}
                             </p>
                             {product.discountPercent ? (
@@ -591,8 +579,10 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
           </main>
         )}
 
-        {/* Traditional Lighting Clay Diyos at Bottom-Left & Bottom-Right Corners */}
-        <TiharBottomDiyas />
+        <footer className="flex shrink-0 justify-between border-t border-zinc-800 px-4 py-1 text-xs text-zinc-400">
+          <span>{currentOutlet?.name} | Order at table or counter</span>
+          <span>Menu {Math.min(menuCarouselIndex+1,menuPages.length)||1} / {menuPages.length||1}</span>
+        </footer>
       </div>
     );
   }
@@ -767,7 +757,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
             <div className="p-3 sm:p-4 overflow-hidden flex flex-col justify-start">
               {isLoadingSkeleton ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full content-start">
-                  {[1, 2, 3, 4].map((n) => (
+                  {Array.from({length:menuItemsPerPage},(_,i)=>i).map((n) => (
                     <div key={n} className="bg-[#0C0E14] border border-zinc-800/90 p-3 flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                         <Skeleton className="h-7 w-20 bg-zinc-800" />
@@ -840,7 +830,7 @@ export const TvOrderDisplayPortal: React.FC<TvOrderDisplayPortalProps> = ({ onCl
             <div className="p-3 sm:p-4 overflow-hidden flex flex-col justify-start bg-emerald-950/5">
               {isLoadingSkeleton ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full content-start">
-                  {[1, 2, 3, 4].map((n) => (
+                  {Array.from({length:menuItemsPerPage},(_,i)=>i).map((n) => (
                     <div key={n} className="bg-[#0A1811] border-2 border-emerald-900/50 p-3 flex flex-col gap-2">
                       <div className="flex items-center justify-between">
                         <Skeleton className="h-7 w-20 bg-emerald-950/60" />
